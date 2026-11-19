@@ -1,0 +1,103 @@
+.alpha-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-left: 2px solid #8dcbeb;
+  padding-left: 9px;
+  font:
+    9px ui-monospace,
+    monospace;
+  white-space: nowrap;
+}
+.alpha-progress progress {
+  width: 65px;
+  height: 4px;
+  accent-color: #a8d8e8;
+}
+.alpha-progress strong {
+  color: #e6bd75;
+}
+
+.alpha-queue {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  z-index: 50;
+  padding: 16px;
+  color: var(--app-text);
+  background: var(--app-bg);
+}
+.alpha-queue-card {
+  position: relative;
+  z-index: 2;
+  width: min(100%, 560px);
+  background: #04101be6;
+  border: 1px solid #799daf;
+  padding: 24px;
+  text-align: center;
+  font:
+    12px/1.5 ui-monospace,
+    monospace;
+}
+.alpha-queue-card h1 {
+  font-size: 25px;
+  margin: 7px 0;
+}
+.alpha-queue-card h2 {
+  font-size: 12px;
+  color: #adcce0;
+}
+.alpha-queue-position {
+  display: block;
+  font-size: 64px;
+  line-height: 1.15;
+  color: #a3e6ff;
+}
+.alpha-queue-card .alpha-queue-note {
+  font-size: 10px;
+  color: #b6c4ce;
+}
+.alpha-queue-footer {
+  margin-top: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.alpha-queue-footer .menu-control {
+  justify-content: center;
+}
+.alpha-queue-card .controller-shortcuts {
+  justify-content: center;
+}
+
+.alpha-progress[data-tier="bronze"] strong {
+  color: #d0a17e;
+}
+.alpha-progress[data-tier="silver"] strong {
+  color: #d1dbe5;
+}
+.alpha-progress[data-tier="gold"] strong {
+  color: #edce75;
+}
+.alpha-progress[data-tier="platinum"] strong {
+  color: #9eddd8;
+}
+.alpha-progress[data-tier="diamond"] strong {
+  color: #8fc9f6;
+}
+.alpha-progress[data-tier="master"] strong {
+  color: #c3a0ef;
+}
+.alpha-progress[data-tier="grandmaster"] strong {
+  color: #f19cba;
+}
+
+
+@media (max-height:500px) and (orientation:landscape) {
+ .alpha-queue { padding:8px; }
+ .alpha-queue-card { padding:12px; }
+ .alpha-queue-card h1 { font-size:20px; margin:4px; }
+ .alpha-queue-card p { font-size:10px; margin:5px; }
+ .alpha-queue-position { font-size:42px; }
+}

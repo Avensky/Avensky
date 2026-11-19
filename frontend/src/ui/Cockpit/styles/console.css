@@ -1,0 +1,152 @@
+/* Shared console surfaces and press feedback. HUD sizing lives only in
+   layout.css; radio, climate and wheel artwork have their own style owners. */
+.cockpit-drive-layout {
+  display: block;
+  max-width: 520px;
+}
+.cockpit-console-page {
+  width: min(100%, 400px);
+  margin: auto;
+  display: grid;
+  gap: 5px;
+}
+.drive-dock button {
+  cursor: pointer;
+  border: 1px solid #626e7a88;
+  border-radius: 1px;
+  background: linear-gradient(#262c34b8, #0c1219c4);
+  color: #dce4e9;
+  font: 8px/1.1 ui-monospace, monospace;
+  padding: 4px 5px;
+  touch-action: none;
+}
+:is(.drive-dock, .console-display, .climate-panel) button:disabled {
+  opacity: .35;
+  cursor: default;
+}
+.drive-dock img {
+  width: 15px;
+  height: 15px;
+  filter: brightness(0) invert(1);
+  pointer-events: none;
+}
+/* One physical frame for both units; one declaration keeps borders in sync. */
+:is(.drive-dock, .cockpit-panel) :is(.console-display, .climate-panel) {
+  border: 2px solid #737d87;
+  border-radius: 3px;
+  background: #060e15;
+  box-shadow: inset 0 0 0 1px #05070b;
+}
+.console-display {
+  padding: 3px;
+  color: #b9dce4;
+  font: 9px monospace;
+  min-width: 0;
+}
+.console-display .console-display-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 0;
+  border-bottom: 1px solid #42606c;
+}
+.console-display .console-display-tabs button {
+  flex: 1 1 29%;
+  min-width: 0;
+  min-height: 18px;
+  padding: 2px;
+  background: #10212c;
+  border: 1px solid #3e5967;
+  color: #a8bfc9;
+  font: 6px monospace;
+}
+.console-display .console-display-content {
+  padding-top: 3px;
+  overflow: visible;
+}
+.console-command-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+}
+.console-command-grid button {
+  min-height: 22px;
+  padding: 4px 2px;
+  font: 6px monospace;
+  overflow-wrap: anywhere;
+}
+.component-minimize {
+  background: transparent;
+  border: 1px solid #627e8c50;
+  color: #bed7e0;
+  font: 10px monospace;
+  cursor: pointer;
+}
+.match-clock {
+  font: 9px monospace;
+  color: #9ed9e7;
+}
+.match-clock[data-phase="overtime"] {
+  color: #ffad58;
+}
+.cockpit-ignition-page {
+  width: 220px;
+  margin: 20px auto;
+}
+.driving-hud button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Confirmed function state is separate from contact feedback on console controls. */
+:is([data-momentary-controls] button, button[data-momentary-controls]) {
+  border-color: var(--contact-border, var(--app-line, #626e7a88)) !important;
+  background: var(--contact-surface, var(--app-panel, #111a24)) !important;
+  color: var(--contact-ink, var(--app-text, #dce4e9)) !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  -webkit-tap-highlight-color: transparent;
+}
+[data-momentary-controls] .component-minimize {
+  --contact-border: #627e8c50;
+  --contact-surface: transparent;
+  --contact-ink: #bed7e0;
+}
+[data-momentary-controls] .physical-hazard {
+  --contact-border: #934143;
+  --contact-surface: linear-gradient(#611e20, #351416);
+  --contact-ink: #ff8079;
+}
+[data-momentary-controls] .console-display-tabs button {
+  --contact-border: #3e5967;
+  --contact-surface: #10212c;
+  --contact-ink: #a8bfc9;
+}
+[data-momentary-controls] .climate-knob > button {
+  --contact-border: #5e7079;
+  --contact-surface: #111e29;
+  --contact-ink: #dceaf1;
+}
+:is(
+  [data-momentary-controls] button,
+  button[data-momentary-controls]
+)[data-hud-held="true"] {
+  border-color: var(--app-accent, #a7dbe9) !important;
+  background: var(--app-raised, #1e3b49) !important;
+  color: var(--app-text, #effbff) !important;
+  outline: 1px solid var(--app-accent, #a7dbe9) !important;
+  outline-offset: -2px;
+}
+[data-momentary-controls] .climate-knob[data-hud-held="true"] {
+  border-color: #a7dbe9;
+  box-shadow: 0 0 0 1px #a7dbe9;
+}
+.console-display[data-expanded="true"],
+.climate-panel[data-expanded="true"] {
+  border-color: #8eb5c4;
+}
+/* Keyboard focus is a thin locator, never a depressed switch face. */
+[data-momentary-controls] button:focus-visible {
+  text-decoration: none;
+  outline:1px solid var(--app-accent,#82b7ff);outline-offset:2px;
+
+}

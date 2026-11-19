@@ -1,0 +1,15 @@
+// Public page/navigation API. Pages use concrete siblings to avoid barrel cycles.
+export { LightsPanel } from "./LightsPanel";
+export { WipersPanel } from "./WipersPanel";
+export { CruisePanel } from "./CruisePanel";
+export { HudVisibilityPanel } from "./HudVisibilityPanel";
+export { useCockpitNavigation } from "./useCockpitNavigation";
+export { COCKPIT_TABS } from "./tabs";
+export { ClimatePage } from "./ClimatePage";
+export { BrightnessPage } from "./BrightnessPage";
+export { IgnitionPage, RadioPage } from "./HudControlPages";
+export { HudVisibilityToggle } from "./HudVisibilityToggle";
+export {
+  SteeringSystemPicker,
+  type SteeringSystem,
+} from "./SteeringSystemPicker";

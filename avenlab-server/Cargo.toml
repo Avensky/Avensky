@@ -1,0 +1,30 @@
+[package]
+name = "avenlab-server"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+avenlab-physics = "0.1.0"
+anyhow = "1"
+rand = "0.8"
+nalgebra = "0.32"
+rapier3d = { version = "0.22", features = ["dim3"] }
+tokio = { version = "1.37", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = { version = "1.0", features = ["float_roundtrip", "raw_value"] }
+futures = "0.3"
+tokio-tungstenite = "0.21"
+tungstenite = "0.21"
+uuid = { version = "1", features = ["v4"] }
+bitflags = "2"
+argon2 = "0.5.3"
+sha2 = "0.10"
+
+# A single release codegen unit avoids cross-unit serde linkage failures and
+# empty optimized physics objects observed with the current Rust toolchain.
+[profile.release]
+codegen-units = 1
+
+# Match the existing single-unit release workaround for generic serde linkage.
+[profile.test]
+codegen-units = 1

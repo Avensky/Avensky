@@ -1,0 +1,359 @@
+//! Explicit runtime-space shapes authored by World workshop. Positions are Y-up
+//! metres, yaw is degrees around +Y, and object origins are at their base.
+use std::collections::HashSet;
+use rapier3d::prelude::*;
+use serde::{Deserialize, Serialize};
+use super::road_colliders::RoadPlacement;
+use super::model_colliders::ModelPlacement;
+use super::background_vehicles::VehiclePlacement;
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct AuthoredLayout {
+    pub format: String,
+    pub version: u32,
+    pub map_id: String,
+    pub title: String,
+    pub base: LayoutBase,
+    pub objects: Vec<LayoutObject>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spawns: Option<Vec<LayoutSpawn>>,
+    #[serde(default = "default_solid")]
+    pub ground: bool,
+    #[serde(default = "default_solid")]
+    pub repeat: bool,
+}
+/// Editor marker only; the exported team_spawns table owns runtime spawning.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LayoutSpawn {
+    pub id: String,
+    pub team: String,
+    pub position: [f32; 3],
+    pub yaw: f32,
+}
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum LayoutBase { Replace, Overlay }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DestructionSettings { pub enabled: bool, pub hp:f32, #[serde(rename="smallArms")] pub small_arms:f32, pub cannon:f32, pub bomb:f32, pub rubble:String }
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LayoutObject {
+    #[serde(default, skip_serializing_if="Option::is_none")] pub destruction: Option<DestructionSettings>,
+    pub id: String,
+    pub name: String,
+    pub piece: String,
+    pub position: [f32; 3],
+    pub size: [f32; 3],
+    pub yaw: f32,
+    pub color: String,
+    pub locked: bool,
+    pub solid: bool,
+    pub parts: Vec<LayoutPart>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub road: Option<RoadPlacement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub model: Option<ModelPlacement>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vehicle: Option<VehiclePlacement>,
+}
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct LayoutPart {
+    pub shape: PartShape,
+    #[serde(default, skip_serializing_if="Option::is_none")]
+    pub rise: Option<f32>,
+    pub position: [f32; 3],
+    pub size: [f32; 3],
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub color: Option<String>,
+    #[serde(default = "default_solid")]
+    pub solid: bool,
+}
+fn default_solid() -> bool { true }
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PartShape { Box, Wedge, Deck }
+fn vector_ok(value: &[f32; 3], min: f32, max: f32) -> bool {
+    value.iter().all(|v| v.is_finite() && *v >= min && *v <= max)
+}
+fn identifier(value: &str, max: usize) -> bool {
+    !value.is_empty() && value.len() <= max && value.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+}
+fn color_ok(value: &str) -> bool {
+    value.len() == 7 && value.starts_with('#') && value.as_bytes()[1..].iter().all(u8::is_ascii_hexdigit)
+}
+impl AuthoredLayout {
+    pub fn replaces_base(&self) -> bool { self.base == LayoutBase::Replace }
+    pub fn validate(&self, map_id: &str) -> anyhow::Result<()> {
+        anyhow::ensure!(self.format == "avenlab-world-layout" && self.version == 1, "Unsupported authored layout format");
+        anyhow::ensure!(self.map_id == map_id && identifier(&self.map_id, 96), "Authored layout map ID mismatch");
+        anyhow::ensure!(!self.title.trim().is_empty() && self.title.chars().count() <= 80, "Invalid layout title");
+        // Match the editor budget, including independent destructible rail panels.
+        anyhow::ensure!(self.objects.len() <= 3072, "Authored layout exceeds 3072 pieces");
+        if let Some(spawns) = &self.spawns {
+            let mut ids = HashSet::new();
+            for team in ["red", "blue"] {
+                anyhow::ensure!(spawns.iter().filter(|p| p.team == team).count() <= 256, "Too many team spawns");
+            }
+            for point in spawns {
+                anyhow::ensure!(identifier(&point.id, 86) && point.id.starts_with("spawn-") && ids.insert(&point.id), "Invalid spawn ID");
+                anyhow::ensure!(["red", "blue"].contains(&point.team.as_str()) && vector_ok(&point.position, -100000.0, 100000.0) && point.yaw.is_finite() && point.yaw.abs() <= 36000.0, "Invalid authored spawn");
+            }
+        }
+        let mut ids = HashSet::new();
+        let mut count = 0;
+        for object in &self.objects {
+            let kit = super::map_kit::piece(&object.piece);
+            anyhow::ensure!(!object.piece.starts_with("kit-") || kit.is_some(), "Unknown map kit piece");
+            if let Some(d)=&object.destruction {
+                anyhow::ensure!(d.hp.is_finite() && d.hp>=1.0 && d.hp<=1000000.0 && [d.small_arms,d.cannon,d.bomb].iter().all(|n|n.is_finite()&&*n>=0.0&&*n<=10.0) && ["clear","cover"].contains(&d.rubble.as_str()), "Invalid destruction profile");
+                anyhow::ensure!(!d.enabled || (!kit.is_some_and(|p| p.permanent) && !["coastal-land","coastal-land-bridge"].contains(&object.piece.as_str())), "Permanent land cannot be destructible");
+            }
+            anyhow::ensure!(identifier(&object.id, 96) && ids.insert(object.id.clone()), "Invalid or duplicate authored piece ID");
+            anyhow::ensure!(identifier(&object.piece, 64) && !object.name.trim().is_empty() && object.name.chars().count() <= 80, "Invalid piece name");
+            anyhow::ensure!(vector_ok(&object.position, -100000.0, 100000.0) && vector_ok(&object.size, 0.02, 512.0) && object.yaw.is_finite() && object.yaw.abs() <= 36000.0, "Invalid authored piece transform");
+            anyhow::ensure!(color_ok(&object.color), "Invalid authored piece color");
+            anyhow::ensure!([kit.is_some(),object.model.is_some(),object.road.is_some(),object.vehicle.is_some()].iter().filter(|v| **v).count() <= 1, "A piece has one asset type");
+            if kit.is_some() {
+                anyhow::ensure!(object.parts.is_empty(), "Map kit pieces use their measured triangle surfaces");
+                count += 1;
+                continue;
+            }
+            if let Some(vehicle) = &object.vehicle {
+                anyhow::ensure!(object.piece == format!("vehicle-{}",vehicle.asset.id()) && object.parts.is_empty() && !object.solid, "Background vehicles must be decorative approved assets");
+                continue;
+            }
+            if let Some(model) = &object.model {
+                model.validate()?;
+                anyhow::ensure!((object.piece == format!("prefab-{}",model.asset) || matches!(object.piece.as_str(),"fuel-station"|"repair-shop"|"service-center")) && object.parts.is_empty(), "Prefab requires its measured structural surfaces");
+                count += model.shape_count(); continue;
+            }
+            if let Some(road) = &object.road {
+                road.validate()?;
+                anyhow::ensure!(object.piece == format!("glb-{}",road.asset) && object.parts.is_empty(), "Road must use its measured catalog, without extra guessed shapes");
+                count += road.shape_count();
+                continue;
+            }
+            anyhow::ensure!(!object.parts.is_empty() && object.parts.len() <= 512, "Piece must have 1-512 shapes");
+            count += object.parts.len();
+            for part in &object.parts {
+                anyhow::ensure!(vector_ok(&part.position, -2.0, 2.0) && vector_ok(&part.size, 0.001, 4.0), "Invalid authored shape transform");
+                anyhow::ensure!(part.rise.is_none_or(|rise| matches!(part.shape, PartShape::Box) && rise.is_finite() && rise.abs() <= 4.0), "Invalid box incline");
+                anyhow::ensure!(part.color.as_ref().is_none_or(|c| color_ok(c)), "Invalid authored shape color");
+                anyhow::ensure!(part.collider(object).is_some(), "Degenerate authored collision shape");
+            }
+        }
+        anyhow::ensure!(count <= 16384, "Authored layout exceeds 16384 shapes");
+        Ok(())
+    }
+    pub fn spawn(&self, bodies: &mut RigidBodySet, colliders: &mut ColliderSet, origin: [f32; 3], groups: InteractionGroups) -> Vec<RigidBodyHandle> {
+        let mut handles = Vec::new();
+        for (object_index, object) in self.objects.iter().enumerate() {
+            if let Some(kit) = super::map_kit::piece(&object.piece) {
+                if let Some(handle) = kit.spawn(object,object_index,bodies,colliders,origin,groups) { handles.push(handle); }
+                continue;
+            }
+            if object.vehicle.is_some() { continue; }
+            if let Some(model) = &object.model {
+                if let Some(handle) = model.spawn(object,bodies,colliders,origin,groups) { handles.push(handle); }
+                continue;
+            }
+            if let Some(road) = &object.road {
+                if let Some(handle) = road.spawn(object,bodies,colliders,origin,groups) { handles.push(handle); }
+                continue;
+            }
+            if !object.solid || !object.parts.iter().any(|p| p.solid) { continue; }
+            let builder = if object.piece=="canal-lift" {RigidBodyBuilder::kinematic_position_based()} else {RigidBodyBuilder::fixed()};
+            let root = builder.user_data((object_index+1) as u128)
+                .translation(vector![origin[0] + object.position[0], origin[1] + object.position[1], origin[2] + object.position[2]])
+                .rotation(vector![0.0, object.yaw.to_radians(), 0.0]).build();
+            let handle = bodies.insert(root);
+            for part in object.parts.iter().filter(|p| p.solid) {
+                let shape = part.collider(object).expect("authored layout validated before spawning")
+                    .translation(vector![part.position[0] * object.size[0], part.position[1] * object.size[1], part.position[2] * object.size[2]])
+                    .collision_groups(groups).friction(1.2).restitution(0.0).build();
+                colliders.insert_with_parent(shape, handle, bodies);
+            }
+            handles.push(handle);
+        }
+        handles
+    }
+}
+impl LayoutPart {
+    fn collider(&self, object: &LayoutObject) -> Option<ColliderBuilder> {
+        let h = [self.size[0] * object.size[0] / 2.0, self.size[1] * object.size[1] / 2.0, self.size[2] * object.size[2] / 2.0];
+        match self.shape {
+            PartShape::Box if self.rise.is_some() => {
+                let dy = self.rise.unwrap_or_default() * object.size[1] * 0.5;
+                let corners: Vec<_> = [-1.0, 1.0].into_iter().flat_map(|side|
+                    [-h[1], h[1]].into_iter().flat_map(move |y| [-h[2], h[2]].map(|z|
+                        point![side * h[0], y + side * dy, z]))).collect();
+                ColliderBuilder::convex_hull(&corners)
+            }
+            PartShape::Box => Some(ColliderBuilder::cuboid(h[0], h[1], h[2])),
+            PartShape::Deck => {
+                let points: Vec<_> = [-h[0],h[0]].into_iter().flat_map(|x|
+                    [-1.,1.].into_iter().flat_map(move |z| [0.,0.2*h[1]].map(|t|
+                        point![x, -z*h[1]-t, z*h[2]]))).collect();
+                ColliderBuilder::convex_hull(&points)
+            }
+            PartShape::Wedge => ColliderBuilder::convex_hull(&[
+                point![-h[0], -h[1], h[2]], point![h[0], -h[1], h[2]],
+                point![-h[0], -h[1], -h[2]], point![h[0], -h[1], -h[2]],
+                point![-h[0], h[1], -h[2]], point![h[0], h[1], -h[2]],
+            ]),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn background_vehicle_survives_snapshot_without_a_physics_body() {
+        let mut value=serde_json::to_value(sample()).unwrap();
+        let vehicle=serde_json::json!({"id":"parked-brz","name":"Parked BRZ","piece":"vehicle-brz","position":[4,2,7],"size":[1.9,1.35,4.3],"yaw":90,"color":"#5f9fd8","solid":false,"locked":false,"parts":[],"vehicle":{"asset":"brz","lod":"auto"}});
+        value["objects"].as_array_mut().unwrap().push(vehicle.clone());
+        let doc:AuthoredLayout=serde_json::from_value(value.clone()).unwrap();doc.validate("test").unwrap();
+        let snapshot=serde_json::to_value(&doc).unwrap();assert_eq!(snapshot["objects"][1]["vehicle"],vehicle["vehicle"]);
+        let mut bodies=RigidBodySet::new();let mut colliders=ColliderSet::new();
+        assert_eq!(doc.spawn(&mut bodies,&mut colliders,[0.0;3],InteractionGroups::all()).len(),1);
+        assert_eq!(bodies.len(),1);assert_eq!(colliders.len(),1);
+        value["objects"][1]["solid"]=serde_json::json!(true);
+        assert!(serde_json::from_value::<AuthoredLayout>(value.clone()).unwrap().validate("test").is_err());
+        value["objects"][1]["solid"]=serde_json::json!(false);value["objects"][1]["vehicle"]["asset"]=serde_json::json!("unknown");
+        assert!(serde_json::from_value::<AuthoredLayout>(value).is_err());
+    }
+    fn sample() -> AuthoredLayout {
+        serde_json::from_value(serde_json::json!({"format":"avenlab-world-layout","version":1,"map_id":"test","title":"Test","base":"replace","objects":[
+            {"id":"ramp-1","name":"Ramp","piece":"ramp","position":[10,2,20],"size":[8,4,16],"yaw":90,"color":"#c2a879","solid":true,"locked":false,"parts":[{"shape":"wedge","position":[0,0.5,0],"size":[1,1,1]}]}
+        ]})).unwrap()
+    }
+    #[test]
+    fn road_jump_lab_has_explicit_surfaces_and_no_support_across_the_gap() {
+        let file: serde_json::Value=serde_json::from_str(include_str!("../assets/blocks/road_jump_lab_colliders.json")).unwrap();
+        let doc: AuthoredLayout=serde_json::from_value(file["authored_layout"].clone()).unwrap();
+        doc.validate("road_jump_lab").unwrap();
+        assert!(!doc.ground && !doc.repeat && doc.replaces_base());
+        let mut bodies=RigidBodySet::new();let mut colliders=ColliderSet::new();
+        doc.spawn(&mut bodies,&mut colliders,[0.0;3],InteractionGroups::all());
+        let height=|x:f32,z:f32| {
+            let ray=Ray::new(point![x,100.0,z],vector![0.0,-1.0,0.0]);
+            colliders.iter().filter_map(|(_,c)|c.shape().cast_ray(c.position(),&ray,200.0,true))
+                .min_by(f32::total_cmp).map(|distance|100.0-distance)
+        };
+        for (x,z,y) in [(0.0,1.0,0.0),(0.0,-8.0,2.0),(0.0,-40.0,2.0),
+                         (30.0,-20.0,0.0),(16.0,-112.0,1.0),(50.0,-64.0,24.0)] {
+            assert!((height(x,z).unwrap()-y).abs()<0.001,"surface at {x},{z}");
+        }
+        for (x,z) in [(0.0,-20.0),(18.0,100.0),(0.0,1200.0)] {
+            assert!(height(x,z).is_none(),"gap, masked sidewalk and out-of-map air must stay empty at {x},{z}");
+        }
+    }
+
+    #[test]
+    fn harbor_exchange_has_drivable_bores_and_navigable_water_below_the_bridge() {
+        let file: serde_json::Value = serde_json::from_str(include_str!("../assets/blocks/harbor_exchange_colliders.json")).unwrap();
+        let doc: AuthoredLayout = serde_json::from_value(file["authored_layout"].clone()).unwrap();
+        doc.validate("harbor_exchange").unwrap();
+        assert!(!doc.ground && !doc.repeat && doc.replaces_base());
+        let mut bodies = RigidBodySet::new();
+        let mut colliders = ColliderSet::new();
+        doc.spawn(&mut bodies, &mut colliders, [0.; 3], InteractionGroups::all());
+        assert!(colliders.len() < 400);
+        let hit = |start: Point<f32>, direction: Vector<f32>, length: f32| {
+            let ray = Ray::new(start, direction);
+            colliders.iter().filter_map(|(_, c)| c.shape().cast_ray(c.position(), &ray, length, true))
+                .min_by(f32::total_cmp)
+        };
+        // Probe a vehicle-sized width at several roof clearances, end to end.
+        for x in [-66., 62.] {
+            for lateral in [-5.5, 0., 5.5] {
+                for y in [0.1, 2., 6.8] {
+                    assert!(hit(point![x + lateral, y, -100.], Vector::z(), 198.).is_none(), "blocked vehicle passage {x} {lateral} {y}");
+                }
+            }
+            let floor = hit(point![x, 2., 0.], -Vector::y(), 5.).unwrap();
+            assert!((floor - 2.).abs() < 0.01);
+        }
+        for x in [-10., 0., 10.] {
+            assert!(hit(point![x, -6., -100.], Vector::z(), 213.).is_none(), "underwater hull passage");
+            assert!(hit(point![x, 3., -100.], Vector::z(), 213.).is_none(), "mast/headroom passage");
+            let bed = hit(point![x, -2., 0.], -Vector::y(), 10.).unwrap();
+            assert!((bed - 6.).abs() < 0.01, "water must not become a solid floor");
+        }
+        assert!(hit(point![0., 0., 114.], Vector::z(), 5.).is_some(), "waterfall rock is a deliberate end stop");
+        let underside = hit(point![0., 0., -36.], Vector::y(), 15.).unwrap();
+        assert!((underside - 9.5).abs() < 0.01);
+        for x in [-84., 84.] {
+            for (z, height) in [(-95.5, 1. / 12.), (-66., 5.), (-36.5, 10. - 1. / 12.)] {
+                let down = hit(point![x, 12., z], -Vector::y(), 20.).unwrap();
+                // The bridge overlaps the upper ramp, so it can provide support first.
+                assert!(12. - down >= height - 0.01 && 12. - down <= 10.01);
+            }
+        }
+    }
+
+    #[test]
+    fn boarding_rail_collision_tracks_the_ramp_on_both_banks() {
+        let map: serde_json::Value=serde_json::from_str(include_str!("../assets/blocks/harbor_canal_fleet_colliders.json")).unwrap();
+        let mut layout: AuthoredLayout=serde_json::from_value(map["authored_layout"].clone()).unwrap();
+        layout.objects.retain(|o|o.id=="boarding-rail-east-1-r2" || o.id=="boarding-rail-west-1-r2");
+        assert_eq!(layout.objects.len(),2);
+        let mut bodies=RigidBodySet::new();
+        let mut colliders=ColliderSet::new();
+        layout.spawn(&mut bodies,&mut colliders,[0.;3],InteractionGroups::all());
+        for (_,c) in colliders.iter() {
+            let rail=&layout.objects[(bodies[c.parent().unwrap()].user_data-1) as usize];
+            let beam=&rail.parts[0];
+            for u in [-0.48,0.48] {
+                let x=rail.position[0]+u*rail.size[0]*rail.yaw.to_radians().cos();
+                let y=rail.position[1]+(beam.position[1]+beam.size[1]*0.5+u*beam.rise.unwrap())*rail.size[1];
+                let ray=Ray::new(point![x,20.,rail.position[2]],-Vector::y());
+                let hit=c.shape().cast_ray(c.position(),&ray,40.,true).unwrap();
+                assert!((20.-hit-y).abs()<0.005);
+            }
+        }
+    }
+    #[test]
+    fn wedge_raycast_matches_slope_and_rotates_once() {
+        let doc = sample(); doc.validate("test").unwrap();
+        let mut bodies = RigidBodySet::new(); let mut colliders = ColliderSet::new();
+        let handles = doc.spawn(&mut bodies, &mut colliders, [100.0, 0.0, -100.0], InteractionGroups::all());
+        assert_eq!(handles.len(), 1); assert_eq!(colliders.len(), 1);
+        let collider = colliders.iter().next().unwrap().1;
+        // A 90-degree yaw sends the high -Z end to -X. Sample both ends.
+        for (x, expected_y) in [(104.0, 5.5), (116.0, 2.5)] {
+            let ray = Ray::new(point![x, 20.0, -80.0], vector![0.0, -1.0, 0.0]);
+            let hit = collider.shape().cast_ray(collider.position(), &ray, 30.0, true).unwrap();
+            assert!((20.0 - hit - expected_y).abs() < 0.001);
+        }
+    }
+    #[test]
+    fn rejects_bad_ids_dimensions_and_maps_before_spawning() {
+        let mut doc = sample(); assert!(doc.validate("another").is_err());
+        doc.objects.push(doc.objects[0].clone()); assert!(doc.validate("test").is_err());
+        doc.objects.pop(); doc.objects[0].size[0] = f32::NAN; assert!(doc.validate("test").is_err());
+    }
+    #[test]
+    fn decorative_parts_never_create_physics() {
+        let mut doc = sample(); doc.objects[0].parts[0].solid = false;
+        let mut bodies = RigidBodySet::new(); let mut colliders = ColliderSet::new();
+        assert!(doc.spawn(&mut bodies, &mut colliders, [0.0; 3], InteractionGroups::all()).is_empty());
+        assert!(colliders.is_empty());
+    }
+    #[test]
+    fn frontend_garage_fixture_keeps_its_drive_through_opening() {
+        let mut doc: AuthoredLayout = serde_json::from_str(include_str!("../../../docs/examples/world-builder.layout.json")).unwrap();
+        doc.validate("streaming_endless_city").unwrap();
+        let garage = doc.objects.iter().find(|o| o.piece == "garage").unwrap().clone();
+        doc.objects = vec![garage.clone()];
+        let mut bodies = RigidBodySet::new(); let mut colliders = ColliderSet::new();
+        doc.spawn(&mut bodies, &mut colliders, [0.0; 3], InteractionGroups::all());
+        assert_eq!(colliders.len(), 7);
+        let pose = Isometry::new(vector![garage.position[0], garage.position[1], garage.position[2]], vector![0.0, garage.yaw.to_radians(), 0.0]);
+        for (x, should_hit) in [(0.0, false), (5.76, true)] {
+            let ray = Ray::new(pose * point![x, 2.0, 15.0], pose.rotation * vector![0.0, 0.0, -1.0]);
+            let hit = colliders.iter().any(|(_, c)| c.shape().cast_ray(c.position(), &ray, 20.0, true).is_some());
+            assert_eq!(hit, should_hit, "garage entrance at local x={x}");
+        }
+    }
+}

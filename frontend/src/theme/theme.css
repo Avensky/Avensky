@@ -1,0 +1,265 @@
+/* Surfaces share tokens; gauge art, warning lamps and controller colors retain
+   their semantic colors. Theme changes require no canvas rerender or textures. */
+:root {
+  --app-radius: 16px;
+  --app-radius-sm: 10px;
+  --app-scene-tint: #4484ff;
+  --app-background: #050c18;
+  --app-panel: #0b1729;
+  --app-raised: #142b46;
+  --app-line: #54749a;
+  --app-text: #e6efff;
+  --app-muted: #a6b9d3;
+  --app-accent: #82b7ff;
+  --app-physical: #58e0b0;
+}
+html[data-ui-theme] :is(.menu-surface, .cockpit-overlay, .cockpit-panel) {
+  color: var(--app-text);
+  --menu-idle: var(--app-panel);
+  --menu-active: var(--app-raised);
+  font-size: calc(12px * var(--menu-text-scale, 1));
+}
+html[data-ui-theme]
+  :is(
+    .tabbed-menu,
+    .tabbed-menu-shell,
+    .menu-shell,
+    .cockpit-overlay,
+    .cockpit-panel,
+    .menu-bind-card
+  ) {
+  background: var(--app-background);
+}
+html[data-ui-theme]
+  :is(
+    .menu-control,
+    .menu-row,
+    .menu-tab,
+    .cockpit-panel button,
+    .theme-choice select
+  ):where(:not(.menu-panel-frame, .angled-header-tab)) {
+  background: var(--app-panel);
+  color: var(--app-text);
+  border-color: var(--app-line);
+  border-radius: 0;
+  box-shadow: none;
+}
+html[data-ui-theme]
+  :is(.menu-control, .menu-row, .menu-tab, .cockpit-panel button):is(
+    :hover,
+    :focus-visible,
+    [aria-pressed="true"],
+    [aria-selected="true"],
+    [data-selected="true"]
+  ):not(:disabled, .menu-panel-frame, .angled-header-tab) {
+  background: var(--app-raised);
+  border-color: var(--app-accent);
+  color: var(--app-text);
+  outline-color: var(--app-accent);
+}
+html[data-ui-theme]
+  :is(
+    .menu-heading-title,
+    .menu-row-label,
+    .menu-row-value,
+    .cockpit-header h1,
+    .cockpit-status,
+    .headunit-apps button
+  ) {
+  color: var(--app-text);
+}
+html[data-ui-theme]
+  :is(
+    .menu-heading-eyebrow,
+    .menu-description,
+    .menu-row-description,
+    .menu-control-note,
+    .tabbed-menu-footer,
+    .cockpit-system > small
+  ) {
+  color: var(--app-muted);
+}
+html[data-ui-theme]
+  :is(
+    .tabbed-menu-header,
+    .tabbed-menu-tabs,
+    .tabbed-menu-footer,
+    .cockpit-header,
+    .cockpit-tabs,
+    .cockpit-status,
+    .menu-row
+  ) {
+  border-color: var(--app-line);
+}
+html[data-ui-theme] .cockpit-content {
+  background: var(--app-background);
+  font-size: calc(12px * var(--menu-text-scale, 1));
+}
+html[data-ui-theme] .cockpit-panel button:where(:not(.angled-header-tab)) {
+  font-size: calc(10px * var(--menu-text-scale, 1));
+  min-height: 30px;
+  touch-action: manipulation;
+}
+html[data-ui-theme] .cockpit-radio .radio-display {
+  background: var(--app-panel);
+  color: var(--app-text);
+  border-color: var(--app-line);
+  box-shadow: none;
+}
+html[data-ui-theme] .cockpit-radio .radio-vehicle-status {
+  color: var(--app-muted);
+}
+html[data-ui-theme] .cockpit-radio [data-alert="true"] {
+  color: var(--app-accent);
+}
+html[data-ui-theme] .theme-choice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--app-muted);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+html[data-ui-theme] .theme-choice select {
+  max-width: 150px;
+  padding: 5px;
+  font: inherit;
+}
+html[data-high-contrast="true"]
+  :is(.menu-surface, .cockpit-panel, .cockpit-overlay) {
+  --app-text: #fff;
+  --app-muted: #eee;
+  --app-background: #000;
+  --app-panel: #070707;
+  --app-raised: #272727;
+  --app-line: #ccc;
+  --app-accent: #fff;
+}
+html[data-high-contrast="true"] :is(.menu-control, .cockpit-panel button):not(.menu-panel-frame, .angled-header-tab) {
+  border-width: 2px;
+}
+html[data-reduce-motion="true"] :is(.cockpit-panel, .driving-hud) * {
+  animation: none !important;
+  transition: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .cockpit-panel *,
+  .driving-hud * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 600px) {
+  html[data-ui-theme] .theme-choice {
+    margin-left: auto;
+  }
+  html[data-ui-theme] .theme-choice select {
+    max-width: 112px;
+  }
+  .cockpit-header .cabin-clock {
+    display: none;
+  }
+}
+/* Radio geometry belongs to Cockpit/styles/console.css. Palette rules above
+   supply its colors; they must not stretch round transport/mute controls. */
+html[data-ui-theme] .cockpit-panel .physical-hazard {
+  color: #ff9292;
+  background: #481b23;
+  border-color: #ad5965;
+}
+
+/* Scene treatment stays dark and translucent even when the panel palette is
+   light. Text over scenery uses scene ink; panel text uses the panel palette. */
+html[data-ui-theme] .main-menu {
+  --scene-ink: #f4f6ff;
+  --scene-muted: #c8d1e4;
+  background: #060a14;
+}
+html[data-ui-theme] .menu-video-background { opacity: 1; }
+html[data-ui-theme] .menu-video-background::after {
+  background: linear-gradient(90deg,#060a14b8,#060a144d,#060a14b8),
+    color-mix(in srgb,var(--app-scene-tint) 18%,transparent);
+}
+html[data-ui-theme] .main-menu .menu-video-background::after {
+  background: linear-gradient(90deg, #060a1499, #060a140a 49%, #060a1455);
+}
+html[data-ui-theme] .main-menu .menu-home-content { text-shadow: 0 1px 4px #000; }
+html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-brand-title,.menu-action) { color: var(--scene-ink); }
+html[data-ui-theme] .main-menu :is(.menu-brand-tagline,.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }
+html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action {
+  background: #060a147d;
+  border-color: #d7e5ff30;
+}
+html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action:is(:hover,:focus-visible,[data-selected="true"]) {
+  color: var(--scene-ink);
+  background: color-mix(in srgb,var(--app-scene-tint) 25%,#060a14c9);
+  border-color: color-mix(in srgb,var(--app-scene-tint) 65%,#fff);
+}
+html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu {
+  background: color-mix(in srgb, var(--app-background) 78%, transparent);
+  backdrop-filter: blur(4px);
+}
+html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu-shell {
+  background: transparent;
+}
+html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu .menu-row {
+  background: var(--app-panel);
+}
+html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu .menu-row:is(:hover,:focus-visible,[data-selected="true"]):not(:disabled) {
+  background: var(--app-raised);
+}
+html[data-ui-theme] .hero-selection {
+  background: color-mix(in srgb,var(--app-scene-tint) 6%,transparent);
+  backdrop-filter: none;
+}
+html[data-ui-theme] .hero-selection .alpha-header {
+  background: color-mix(in srgb,var(--app-panel) 97%,transparent);
+  color: var(--app-text);
+  border-color: var(--app-line);
+}
+html[data-ui-theme] .hero-selection :is(.alpha-header h1,.hero-summary h2,.hero-roster h2,.hero-team-strip strong) { color: var(--app-text);text-shadow:none; }
+html[data-ui-theme] .hero-selection :is(.alpha-header small,.hero-roster header span,.hero-team-strip small,.alpha-progress small,.alpha-progress span) { color: var(--app-muted);text-shadow:none; }
+html[data-ui-theme] .hero-selection .hero-role-tabs {
+  background: var(--app-panel);
+  color: var(--app-text);
+}
+html[data-ui-theme] .hero-selection .hero-role-tabs .menu-control {
+  color: var(--app-text);background: var(--app-panel);border-color: var(--app-line);
+}
+html[data-ui-theme] .hero-selection .hero-role-tabs [aria-selected="true"] {
+  background: var(--app-raised);color:var(--app-text);border-color:var(--app-accent);
+  box-shadow:inset 0 -2px var(--app-accent);
+}
+html[data-ui-theme] .hero-selection :is(.hero-roster>header,.alpha-squad-seat) {
+  color:var(--app-text);background:color-mix(in srgb,var(--app-panel) 96%,transparent);
+  text-shadow:none;border-color:var(--app-line);
+}
+html[data-ui-theme] .hero-selection .hero-summary {background:transparent;padding:0;border:0;border-radius:0;}
+html[data-ui-theme] .hero-selection .hero-summary h2 {color:#f3f6ff;text-shadow:0 2px 6px #000,0 0 2px #000;}
+/* Scene captions use readable world text; chrome keeps the player's palette. */
+html[data-ui-theme] .hero-selection .hero-summary > small {color:#e4edf6;text-shadow:0 1px 4px #000,0 0 2px #000;}
+html[data-ui-theme] .hero-selection .hero-role-tabs .menu-control {border-radius:0;}
+html[data-ui-theme] .hero-selection .hero-roster>header {padding:6px;border-radius:var(--app-radius-sm);}
+
+/* Shared full-screen menu surfaces live in components/menus/menuFrame.css.
+   Physical cockpit/editor controls keep their own compact hardware shapes. */
+html[data-ui-theme] :is(.cockpit-panel button,.ve-panel button,.ve-drive-bar button) {border-radius:var(--app-radius-sm);}
+html[data-ui-theme] :is(.ve-panel,.ve-drive-bar,.menu-bind-card) {border-radius:var(--app-radius);}
+html[data-ui-theme] :is(.menu-field,.menu-input,.controller-guide) {color:var(--app-text);}
+html[data-ui-theme] .menu-input {background:var(--app-panel);border-color:var(--app-line);border-radius:var(--app-radius-sm);}
+html[data-high-contrast="true"] .menu-frame .menu-row:focus-visible {outline-width:3px;}
+html[data-ui-theme] .alpha-progress strong {background:#111b2b;padding:3px 6px;border-radius:6px;}
+html[data-ui-theme] .alpha-queue {background:var(--app-background);}
+html[data-ui-theme] .alpha-queue-card {background:var(--app-panel);color:var(--app-text);border-color:var(--app-line);border-radius:var(--app-radius);}
+html[data-ui-theme] .alpha-queue-card :is(h2,.alpha-queue-note) {color:var(--app-muted);}
+html[data-ui-theme] .alpha-queue-position {color:var(--app-accent);}
+/* Editor controls consume the same Settings-owned app palette. */
+.layout-editor :is(.le-header,.le-footer,.le-library,.le-inspector) {background:var(--le-panel);color:var(--le-text);}
+.layout-editor :is(.le-section-title,.le-stage-help,.le-stage-message p) {color:var(--le-muted);}
+.layout-editor :is(.le-search,input,select) {background:var(--le-bg);color:var(--le-text);border-color:var(--le-line);}
+.layout-editor :is(button,input,select,.le-search) {border-radius:var(--app-radius-sm,10px);}
+.layout-editor .le-categories .menu-tab {border:0;background:transparent;box-shadow:none;}
+.layout-editor .le-categories .menu-tab[aria-selected="true"] {background:var(--le-raised);color:var(--le-text);box-shadow:inset 0 -2px var(--le-green);}
+
+html[data-match-cockpit="true"] :is(.cockpit-panel,.driving-hud) {--cockpit-accent:var(--vehicle-accent,var(--app-accent));}
+html[data-match-cockpit="true"] .cockpit-header {border-bottom-color:var(--vehicle-accent);}

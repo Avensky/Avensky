@@ -1,0 +1,751 @@
+import {SnapshotDecoder} from './snapshotDecoder';
+import {isDriverAppearance} from '../game/characters/driverAppearance';
+import {SnapshotDelivery, type SnapshotReceipt} from './snapshotDelivery';
+import {useScoreboardStore} from "../store/hud/scoreboardStore";
+import {receiveMatchResult} from "../store/session/matchResultsStore";
+// One socket owner. Direct imports avoid loading models/UI/CAN via the store barrel.
+import {
+  useNetworkStore,
+  snapshotEntity,
+  type PhysicsSnapshot,
+} from "../store/session/networkStore";
+import { useInputStore } from "../store/input/inputStore";
+import { useWorldStore, type MapSnapshot } from "../store/world/worldStore";
+import { useVehicleConfigStore } from "../store/session/vehicleConfigStore";
+import {
+  beginSocialSession,
+  receiveSocialResult,
+  receiveSocialState,
+  setSocialConnection,
+} from "./socialClient";
+
+import { performanceRecorder as recorder } from "../performance/measurements";
+import { handlingSample } from "../performance/handling";
+import { useChatStore } from "../store/chat/chatStore";
+import {useSocialStore} from '../store/social/socialStore';
+import {useUIStore} from '../store/menus/uiStore';
+import {useSelectionStore} from '../store/selection/selectionStore';
+import {useWorldCatalog} from '../store/selection/worldCatalog';
+import {heroForVehicle, isMatchMode, useAlphaStore} from '../store/alpha/alphaStore';
+const packetEncoder = new TextEncoder();
+
+let socket: WebSocket | null = null;
+const packedInputPeers = new WeakSet<WebSocket>();
+export function supportsPackedInput(peer: WebSocket) {return packedInputPeers.has(peer);}
+let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+let setupTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectEnabled = false;
+let pingSentMs: number | null = null;
+let vehicleChangeSequence = 0;
+let lastSnapshotReceiptMs: number | null = null;
+const snapshotDelivery = new SnapshotDelivery<PhysicsSnapshot>(publishSnapshot, {
+  request: callback => window.requestAnimationFrame(callback),
+  cancel: handle => window.cancelAnimationFrame(handle),
+});
+
+// Preserve only an already-deployed session; authentication and world permissions
+// are rechecked by the server. Explicit leave/menu navigation cancels recovery.
+let resumeIntent: {profile:string;world:number;vehicle:string;map:string;mode:ReturnType<typeof useAlphaStore.getState>['mode'];teamSize:3|5;matchId?:string;step:"waiting"|"retained"|"redeploy"|"requested"}|null=null;
+let recoveryTimer:ReturnType<typeof setTimeout>|null=null;
+let foregroundTimer:ReturnType<typeof setTimeout>|null=null;
+let lastPacketMs=0,foregroundGraceUntil=0,hadLocalBody=false,missingBodySince:number|null=null;
+function forgetRecovery(){resumeIntent=null;if(recoveryTimer!==null)clearTimeout(recoveryTimer);recoveryTimer=null;}
+function failRecovery(message:string){
+ const intent=resumeIntent;forgetRecovery();hadLocalBody=false;missingBodySince=null;
+ if(useUIStore.getState().screen!=='sandbox')return;
+ if(intent){useAlphaStore.getState().restoreMode(intent.mode,intent.teamSize);const mapIndex=useWorldCatalog.getState().maps.findIndex(m=>m.id===intent.map);if(mapIndex>=0)useSelectionStore.setState({mapIndex});}
+ useChatStore.getState().notify(message);useSocialStore.setState({message,recoveryMessage:message});useUIStore.getState().setScreen('mode_select');
+}
+function armRecoveryTimeout(seconds:number){
+ if(recoveryTimer!==null)clearTimeout(recoveryTimer);
+ recoveryTimer=setTimeout(()=>failRecovery('Connection recovery timed out. Your previous game mode is selected; reconnect and deploy when ready.'),seconds*1000);
+}
+function rememberDeployment(){
+ if(resumeIntent)return;
+ const net=useNetworkStore.getState(),view=useSocialStore.getState().view,me=net.getMe();
+ if(useUIStore.getState().screen!=='sandbox'||!me?.vehicle_id||!view||net.room_id===null||!net.worldMap)return;
+ const active=view.alpha?.active;
+ const mode=active?.mode??useAlphaStore.getState().mode;
+ resumeIntent={profile:view.profile.id,world:net.room_id,vehicle:me.vehicle_id,map:net.worldMap,mode,
+  teamSize:active?.team_size===3?3:active?.team_size===5?5:useAlphaStore.getState().teamSize,
+  matchId:active?.match_id??undefined,step:"waiting"};
+ // The server starts its lease after detecting a dead socket. Allow for its
+ // 20-second silent-peer deadline before timing out locally.
+ armRecoveryTimeout(isMatchMode(mode)?(view.alpha?.reconnect_grace_seconds??30)+20:20);
+}
+function resumeDeployment(){
+ const intent=resumeIntent,view=useSocialStore.getState().view,net=useNetworkStore.getState();
+ if(!intent)return;
+ if(useUIStore.getState().screen!=='sandbox'){forgetRecovery();return;}
+ if(!view)return;
+ if(view.profile.id!==intent.profile){failRecovery('Your player profile changed. Choose a world to continue.');return;}
+ if(net.room_id!==intent.world||net.worldMap!==intent.map||!useWorldStore.getState().map)return;
+ const active=view.alpha?.active;
+ if(intent.step==="redeploy"){
+  if(!active||active.world_id!==intent.world||!socket||socket.readyState!==WebSocket.OPEN)return;
+  if(active.match_phase==='ended'){forgetRecovery();return;}
+  if(active.mode!==intent.mode||!isMatchMode(active.mode)||active.hero!==heroForVehicle(intent.vehicle)?.id||
+    (intent.matchId&&active.match_id!==intent.matchId)){
+   failRecovery('Your previous match deployment is no longer available.');return;
+  }
+  intent.step="requested";
+  socket.send(JSON.stringify({type:"spawn_request",map:intent.map,vehicle:intent.vehicle}));
+ }
+ if((intent.step==="retained"||intent.step==="requested")&&net.getMe()?.vehicle_id===intent.vehicle){
+  forgetRecovery();
+  useChatStore.getState().notify(intent.step==="retained"?'Practice session restored: your vehicle and physics world were retained.':'Reconnected to your match on the same team.');
+ }
+}
+function foregroundRecovery(){
+ if(document.visibilityState==='hidden')return;
+ useInputStore.getState().releaseControls();foregroundGraceUntil=performance.now()+3500;
+ if(foregroundTimer!==null)clearTimeout(foregroundTimer);
+ const connection=socket,receipt=lastPacketMs;
+ if(connection?.readyState===WebSocket.OPEN){
+  try{connection.send(JSON.stringify({type:'ping'}));}catch{connection.close();}
+  // Give queued frames a chance to arrive before declaring a resumed tab stale.
+  foregroundTimer=setTimeout(()=>{foregroundTimer=null;if(socket===connection&&document.visibilityState!=='hidden'&&lastPacketMs<=receipt&&performance.now()-lastPacketMs>8000)connection.close();},3000);
+ }else if(!connection&&reconnectEnabled)connectRustServer();
+}
+if(typeof window!=='undefined'){window.addEventListener('focus',foregroundRecovery);document.addEventListener('visibilitychange',foregroundRecovery);}
+
+export function requestVehicleChange(vehicle: string): Promise<void> {
+  const connection = socket;
+  if (!connection || connection.readyState !== WebSocket.OPEN) {
+    return Promise.reject(
+      new Error("Connect to the game server before changing vehicles."),
+    );
+  }
+  const requestId = `vehicle-${++vehicleChangeSequence}`;
+  return new Promise((resolve, reject) => {
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      connection.removeEventListener("message", onMessage);
+      connection.removeEventListener("close", onClose);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onMessage = (event: MessageEvent) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message?.request_id !== requestId) return;
+      if (message.type === "vehicle_changed" && message.vehicle === vehicle)
+        finish();
+      else if (message.type === "vehicle_change_error")
+        finish(new Error(message.message || "Unable to change vehicles."));
+    };
+    const onClose = () =>
+      finish(
+        new Error(
+          "The game-server connection closed before the vehicle change completed.",
+        ),
+      );
+    const timeout = setTimeout(
+      () =>
+        finish(
+          new Error(
+            "The server did not confirm the vehicle change. Try again.",
+          ),
+        ),
+      5000,
+    );
+    connection.addEventListener("message", onMessage);
+    connection.addEventListener("close", onClose);
+    try {
+      connection.send(
+        JSON.stringify({
+          type: "change_vehicle_request",
+          vehicle,
+          request_id: requestId,
+        }),
+      );
+    } catch (error) {
+      finish(
+        error instanceof Error
+          ? error
+          : new Error("Unable to send the vehicle change."),
+      );
+    }
+  });
+}
+
+export function requestSandboxService(): Promise<void> {
+  const connection = socket;
+  if (!connection || connection.readyState !== WebSocket.OPEN)
+    return Promise.reject(
+      new Error("Connect to the game server before servicing."),
+    );
+  const requestId = `service-${++vehicleChangeSequence}`;
+  return new Promise((resolve, reject) => {
+    const finish = (error?: Error) => {
+      clearTimeout(timeout);
+      connection.removeEventListener("message", onMessage);
+      connection.removeEventListener("close", onClose);
+      if (error) reject(error);
+      else resolve();
+    };
+    const onMessage = (event: MessageEvent) => {
+      let message;
+      try {
+        message = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (message?.request_id !== requestId) return;
+      if (message.type === "vehicle_serviced") finish();
+      else if (message.type === "vehicle_service_error")
+        finish(new Error(message.message || "Unable to service vehicle."));
+    };
+    const onClose = () =>
+      finish(new Error("Connection closed before service completed."));
+    const timeout = setTimeout(
+      () =>
+        finish(
+          new Error(
+            "The server did not confirm service. Rebuild/restart the updated Rust backend.",
+          ),
+        ),
+      5000,
+    );
+    connection.addEventListener("message", onMessage);
+    connection.addEventListener("close", onClose);
+    try {
+      connection.send(
+        JSON.stringify({
+          type: "service_vehicle_request",
+          request_id: requestId,
+        }),
+      );
+    } catch (error) {
+      finish(
+        error instanceof Error
+          ? error
+          : new Error("Unable to send service request."),
+      );
+    }
+  });
+}
+
+// The input sender is the only writer; diagnostics are plain counters, not React state.
+// Keeping them here lets the menu inspect transport without importing/starting a sender.
+export const inputSenderDiagnostics = { running: false, sent: 0, skipped: 0 };
+const pendingInputTimes = new Map<number, number>();
+let acknowledgedInputSeq: number | null = null;
+let inputAckMs: number | null = null;
+export const packetDiagnostics = {
+  snapshotChars: 0,
+  debugChars: 0,
+  decodeMs: 0,
+  worstDecodeMs: 0,
+  // Dispatch cost is distinct from JSON decoding and network round-trip time.
+  publishMs: 0,
+  worstPublishMs: 0,
+  coalescedSnapshots: 0,
+};
+
+function resetSnapshotDelivery() {
+  snapshotDelivery.reset();
+  lastSnapshotReceiptMs = null;
+  packetDiagnostics.coalescedSnapshots = 0;
+}
+
+function publishSnapshot({snapshot, receivedMs}: SnapshotReceipt<PhysicsSnapshot>) {
+  const startedMs = performance.now();
+  const state = useNetworkStore.getState();
+  if (snapshot.match_state?.match_id && snapshot.match_state.match_id !== state.snapshot?.match_state?.match_id)
+    useScoreboardStore.getState().resetView();
+  state.setSnapshot(snapshot, receivedMs);
+  if (resumeIntent) resumeDeployment();
+  packetDiagnostics.publishMs = Math.max(0, performance.now() - startedMs);
+  packetDiagnostics.worstPublishMs = Math.max(packetDiagnostics.worstPublishMs, packetDiagnostics.publishMs);
+  recorder.record('publishMs', packetDiagnostics.publishMs, startedMs);
+}
+
+// Control/lifecycle boundaries are not cosmetic frames. Keep the input sender,
+// death/respawn notices and finished-match screens responsive even in a slow tab.
+function needsImmediateSnapshot(snapshot: PhysicsSnapshot) {
+  const state = useNetworkStore.getState();
+  const previous = state.snapshot;
+  if (!previous) return true;
+  const before = snapshotEntity(previous, state.playerId);
+  const after = snapshotEntity(snapshot, state.playerId);
+  return Boolean(before) !== Boolean(after) ||
+    before?.vehicle_id !== after?.vehicle_id ||
+    before?.health?.defeated !== after?.health?.defeated ||
+    previous.match_state?.match_id !== snapshot.match_state?.match_id ||
+    previous.match_state?.phase !== snapshot.match_state?.phase ||
+    previous.match_clock?.phase !== snapshot.match_clock?.phase;
+}
+
+export function recordInputPacketSent(seq: number, sentMs: number) {
+  pendingInputTimes.set(seq, sentMs);
+  // Diagnostics must remain bounded even before spawning or during a stall.
+  if (pendingInputTimes.size > 1024)
+    pendingInputTimes.delete(pendingInputTimes.keys().next().value!);
+}
+
+function acknowledgeInput(seq: unknown, receivedMs: number) {
+  if (
+    typeof seq !== "number" ||
+    !Number.isInteger(seq) ||
+    seq < 0 ||
+    seq > 0xffffffff
+  )
+    return;
+  const sentMs = pendingInputTimes.get(seq);
+  if (sentMs === undefined) return; // Older servers or an untracked connection.
+  acknowledgedInputSeq = seq;
+  inputAckMs = Math.max(0, receivedMs - sentMs);
+  recorder.record("inputAckMs", inputAckMs, receivedMs);
+  // The newest held-state ack supersedes older packets, including dropped
+  // intermediate intent. Delete by insertion order, which also handles u32 wrap.
+  for (const pendingSeq of pendingInputTimes.keys()) {
+    pendingInputTimes.delete(pendingSeq);
+    if (pendingSeq === seq) break;
+  }
+}
+
+export function getInputSenderStats() {
+  const oldest = pendingInputTimes.values().next().value;
+  return {
+    ...inputSenderDiagnostics,
+    queuedBytes: socket?.bufferedAmount ?? 0,
+    acknowledgedInputSeq,
+    inputAckMs,
+    pendingInputs: pendingInputTimes.size,
+    oldestPendingMs:
+      oldest === undefined ? null : Math.max(0, performance.now() - oldest),
+    ...packetDiagnostics,
+  };
+}
+
+function getRustWsUrl() {
+  if (import.meta.env.VITE_RUST_WS_URL) return import.meta.env.VITE_RUST_WS_URL;
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  // A remote browser must use the server hostname, not its own localhost.
+  if (import.meta.env.DEV) {
+    const url = new URL(window.location.href);
+    url.protocol = protocol;
+    url.port = "9001";
+    url.pathname = "/";
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  }
+  return `${protocol}//${window.location.host}/ws/`;
+}
+
+function clearTimers() {
+  if (setupTimer !== null) clearTimeout(setupTimer);
+  setupTimer = null;
+  if(foregroundTimer!==null)clearTimeout(foregroundTimer);foregroundTimer=null;
+  if (heartbeatTimer !== null) clearInterval(heartbeatTimer);
+  if (reconnectTimer !== null) clearTimeout(reconnectTimer);
+  heartbeatTimer = null;
+  reconnectTimer = null;
+  pingSentMs = null;
+}
+
+function clearSession() {
+  resetSnapshotDelivery();
+  hadLocalBody = false;
+  missingBodySince = null;
+  setSocialConnection(null);
+  pendingInputTimes.clear();
+  acknowledgedInputSeq = inputAckMs = null;
+  packetDiagnostics.snapshotChars = packetDiagnostics.debugChars = 0;
+  packetDiagnostics.decodeMs = packetDiagnostics.worstDecodeMs = 0;
+  packetDiagnostics.publishMs = packetDiagnostics.worstPublishMs = 0;
+  useNetworkStore.getState().resetSession();
+  useVehicleConfigStore.getState().reset();
+  useWorldStore.getState().setMap(null);
+  useInputStore.getState().releaseControls();
+}
+
+function scheduleReconnect() {
+  if (!reconnectEnabled || reconnectTimer !== null) return;
+  reconnectTimer = setTimeout(
+    () => {
+      reconnectTimer = null;
+      if (reconnectEnabled) connectRustServer();
+    },
+    1000 + Math.random() * 2000,
+  );
+}
+
+function finiteTuple(value: unknown, length: number): boolean {
+  return (
+    Array.isArray(value) &&
+    value.length === length &&
+    value.every(
+      (component) =>
+        typeof component === "number" && Number.isFinite(component),
+    )
+  );
+}
+
+// Reject malformed transforms before they can reach Three. Optional timing stays compatible.
+function isSnapshot(value: unknown): value is PhysicsSnapshot {
+  if (!value || typeof value !== "object") return false;
+  const snap = value as PhysicsSnapshot;
+  return (
+    Number.isSafeInteger(snap.tick) &&
+    snap.tick >= 0 &&
+    Array.isArray(snap.entities) &&
+    snap.entities.every(
+      (entity) =>
+        entity &&
+        typeof entity.id === "string" &&
+        finiteTuple(entity.position, 3) &&
+        finiteTuple(entity.rotation, 4) &&
+        (entity.driver == null || isDriverAppearance(entity.driver)) &&
+        (entity.wheels === undefined ||
+          (Array.isArray(entity.wheels) &&
+            entity.wheels.every(
+              (wheel) =>
+                wheel &&
+                typeof wheel.id === "string" &&
+                finiteTuple(wheel.position, 3) &&
+                finiteTuple(wheel.rotation, 4),
+            ))),
+    ) &&
+    (snap.simulation_time_s === undefined ||
+      (Number.isFinite(snap.simulation_time_s) &&
+        snap.simulation_time_s >= 0)) &&
+    (snap.tick_dt_s === undefined ||
+      (Number.isFinite(snap.tick_dt_s) && snap.tick_dt_s > 0))
+  );
+}
+
+export function connectRustServer(): WebSocket {
+  reconnectEnabled = true;
+  if (
+    socket &&
+    (socket.readyState === WebSocket.CONNECTING ||
+      socket.readyState === WebSocket.OPEN)
+  )
+    return socket;
+  clearTimers();
+  clearSession();
+  let snapshotVersion=2;
+  const decoder = new SnapshotDecoder();
+  const connection = new WebSocket(getRustWsUrl());
+  socket = connection;
+  let pendingResult: unknown;
+  // Old callbacks cannot clear or close the replacement session.
+  const isCurrent = () => socket === connection && reconnectEnabled;
+
+  const handleLoss = () => {
+    if (!isCurrent()) return;
+    rememberDeployment();
+    if(resumeIntent)resumeIntent.step="waiting";
+    clearTimers();
+    socket = null;
+    clearSession();
+    scheduleReconnect();
+  };
+  const retrySocket = () => {
+    if (!isCurrent()) return;
+    handleLoss();
+    connection.close();
+  };
+  // CONNECTING and an upgraded socket without welcome both need a deadline.
+  // Otherwise the single-socket guard prevents any later reconnect attempt.
+  setupTimer = setTimeout(retrySocket, 15000);
+
+  connection.onopen = () => {
+    if (!isCurrent()) return;
+    lastPacketMs = performance.now();
+    useNetworkStore.getState().setConnected(true);
+    setSocialConnection(connection);
+    heartbeatTimer = setInterval(() => {
+      const now=performance.now();
+      // Menus have no local physics body. Detect a silent established socket
+      // there as well, while giving resumed background tabs their usual grace.
+      if (isCurrent() && document.visibilityState !== 'hidden' &&
+          now > foregroundGraceUntil && now - lastPacketMs > 15000) {
+        retrySocket();
+        return;
+      }
+      // Match completion deliberately stops snapshots. A paused world with a
+      // responsive transport is not a disconnect. Missing-body snapshots have
+      // their own recovery path; silence is handled by the deadline above.
+      if (
+        !isCurrent() ||
+        connection.readyState !== WebSocket.OPEN ||
+        connection.bufferedAmount > 0
+      )
+        return;
+      // Application pong has no timestamp, so allow one outstanding RTT measurement.
+      if (pingSentMs !== null) return;
+      pingSentMs = performance.now();
+      try { connection.send(JSON.stringify({ type: "ping" })); }
+      catch { retrySocket(); }
+    }, 5000);
+  };
+
+  connection.onclose = handleLoss;
+
+  connection.onerror = () => {
+    if (!isCurrent()) return;
+    // Only the close handler owns cleanup and retries.
+    connection.close();
+  };
+
+  connection.onmessage = (event) => {
+    if (!isCurrent()) return;
+    const receivedMs = performance.now();
+    lastPacketMs=receivedMs;
+    let message;
+    try {
+      message = JSON.parse(event.data);
+    } catch {
+      console.warn("Invalid JSON from Rust server");
+      return;
+    }
+    if (!message || typeof message !== "object") return;
+    if(message.type==='snapshot_compact'&&[1,2,3].includes(message.version))snapshotVersion=message.version;
+    const masked = message.type === 'snapshot_compact' || message.type === 'snapshot_delta';
+    if (masked) {
+      // Reliable world changes can overtake a coalesced frame on the server.
+      // Reject stale envelopes before they replace this world's keyframe.
+      if (message.world_id !== useNetworkStore.getState().room_id) return;
+      message = decoder.decode(message,useNetworkStore.getState().playerId);
+      if (!message) {
+        if(decoder.takeResyncRequest()) {
+          try {connection.send(JSON.stringify({type:'snapshot_format',version:snapshotVersion}));}
+          catch {retrySocket();}
+        }
+        return;
+      }
+    }
+    packetDiagnostics.decodeMs = Math.max(0, performance.now() - receivedMs);
+    packetDiagnostics.worstDecodeMs = Math.max(
+      packetDiagnostics.worstDecodeMs,
+      packetDiagnostics.decodeMs,
+    );
+    if (recorder.enabled || recorder.capturing)
+      recorder.packet(
+        message.type,
+        packetEncoder.encode(event.data).byteLength,
+        packetDiagnostics.decodeMs,
+        receivedMs,
+      );
+    const state = useNetworkStore.getState();
+    switch (message.type) {
+      case "driver":
+        if(message.world_id===state.room_id && decoder.receiveDriver(message)) acknowledgeInput(message.data[0],receivedMs);
+        return;
+      case "pong":
+        if (pingSentMs !== null) {
+          state.setPingMs(receivedMs - pingSentMs);
+          recorder.record("rttMs", receivedMs - pingSentMs, receivedMs);
+        }
+        pingSentMs = null;
+        return;
+      case "welcome":
+        if (typeof message.player_id !== "string") return;
+        if (setupTimer !== null) clearTimeout(setupTimer);
+        setupTimer = null;
+        if (message.packed_input_version === 1) packedInputPeers.add(connection);
+        if ([1,2,3].includes(message.compact_snapshot_version)) {
+          snapshotVersion=message.compact_snapshot_version;
+          connection.send(JSON.stringify({type:'snapshot_format',version:message.compact_snapshot_version}));
+        }
+        state.setPlayerId(message.player_id);
+        useNetworkStore.setState({
+          team: message.team === "red" ? "red" : "blue",
+          room_id: Number.isSafeInteger(message.room_id)
+            ? message.room_id
+            : null,
+          spawn: finiteTuple(message.spawn, 3) ? message.spawn : null,
+        });
+        if (message.social_version === 1) beginSocialSession(message.server_id, () => {
+          // A half-open old socket may still own the profile. Retry only while
+          // this tab is recovering a deployment, within its original deadline.
+          if(resumeIntent)retrySocket();
+        });
+        return;
+      case "match_result":
+        if(!receiveMatchResult(message.data)&&!useSocialStore.getState().view)pendingResult=message.data;
+        break;
+      case "social_result":
+        receiveSocialResult(message);
+        return;
+      case "social_state":
+        receiveSocialState(message.data);
+        if(pendingResult&&useSocialStore.getState().view){
+          receiveMatchResult(pendingResult);
+          pendingResult=undefined;
+        }
+        resumeDeployment();
+        return;
+      case "chat_message":
+        useChatStore.getState().receive(message.data);
+        return;
+      case "social_error":
+        console.warn(message.message || "Social connection unavailable");
+        return;
+      case "session_restored":
+        if(resumeIntent&&resumeIntent.step==="waiting"){
+          if(message.preserved===true)resumeIntent.step="retained";
+          else if(message.reason==="REDEPLOY"&&isMatchMode(resumeIntent.mode))resumeIntent.step="redeploy";
+          else {
+            failRecovery(message.reason==='EXPIRED'||message.reason==='NO_RESERVATION'
+              ?'Your reconnect reservation expired. Join the queue to play again.'
+              :'Your previous deployment could not be restored. Choose a mode to continue.');
+            return;
+          }
+          resumeDeployment();
+        }
+        return;
+      case "world_changed":
+        resetSnapshotDelivery();
+        decoder.reset();
+        if(!message.world&&hadLocalBody&&!resumeIntent&&useUIStore.getState().screen==='sandbox'&&!['leave_game','match_results'].includes(useUIStore.getState().overlay??''))failRecovery('The server closed your physics world. Your previous game mode is selected; deploy when ready.');
+        hadLocalBody=false;missingBodySince=null;
+        state.resetWorld();
+        useVehicleConfigStore.getState().reset();
+        useWorldStore.getState().setMap(null);
+        useInputStore.getState().resetWorldControls();
+        pendingInputTimes.clear();
+        acknowledgedInputSeq = inputAckMs = null;
+        useNetworkStore.setState({
+          room_id: message.world?.id ?? null,
+          worldMap: message.world?.map ?? null,
+          worldName: message.world?.name ?? null,
+          team: message.world?.team === "red" ? "red" : "blue",
+        });
+        return;
+      case "snapshot":
+        if (
+          message.world_id !== undefined &&
+          message.world_id !== state.room_id
+        )
+          return;
+        // Preserve simulation_time_s/tick_dt_s instead of rebuilding tick/entities only.
+        if (isSnapshot(message.data)) {
+          if(state.snapshot && message.data.tick<=state.snapshot.tick)return;
+          if (!snapshotDelivery.offer(message.data, receivedMs, needsImmediateSnapshot(message.data))) return;
+          packetDiagnostics.coalescedSnapshots = snapshotDelivery.coalesced;
+          packetDiagnostics.snapshotChars =
+            typeof event.data === "string" ? event.data.length : 0;
+          // Measure arrivals independently of UI publication/coalescing.
+          if (lastSnapshotReceiptMs !== null)
+            recorder.record(
+              "arrivalMs",
+              receivedMs - lastSnapshotReceiptMs,
+              receivedMs,
+            );
+          lastSnapshotReceiptMs = receivedMs;
+          recorder.record(
+            "serverLockMs",
+            message.data.server_timing?.lock_ms,
+            receivedMs,
+          );
+          recorder.record(
+            "serverPhysicsMs",
+            message.data.server_timing?.physics_ms,
+            receivedMs,
+          );
+          recorder.record(
+            "serverWorkMs",
+            message.data.server_timing?.work_ms,
+            receivedMs,
+          );
+          const me = snapshotEntity(message.data, state.playerId);
+          if (recorder.enabled || recorder.capturing) {
+            const handling = handlingSample(me);
+            recorder.record("bodyRollDeg", handling.bodyRollDeg, receivedMs);
+            recorder.record(
+              "airborneWheels",
+              handling.airborneWheels,
+              receivedMs,
+            );
+          }
+          if(me){hadLocalBody=true;missingBodySince=null;}
+          else if(hadLocalBody&&!resumeIntent&&useUIStore.getState().screen==='sandbox'&&useUIStore.getState().overlay!=='match_results'&&!useUIStore.getState().isModeLoading){
+            missingBodySince??=receivedMs;
+            if(receivedMs-missingBodySince>1500)failRecovery('Your physics body is no longer available. Returned to your previous game mode; choose deploy to start again.');
+          }
+          if(!masked) acknowledgeInput(me?.last_input_seq, receivedMs);
+        }
+        return;
+      case "sector_chart":
+        if(message.world_id===state.room_id && message.map===state.worldMap && message.team===state.team &&
+          typeof message.sectors==="string" && /^[0-9a-f]{16}$/.test(message.sectors)){
+          useWorldStore.setState({sectorChart:message.sectors});
+        }
+        return;
+      case "map_snapshot": {
+        if(message.world_id!==undefined&&message.world_id!==state.room_id)return;
+        const map = message.data as MapSnapshot | undefined;
+        if (map && Array.isArray(map.chunks) && Array.isArray(map.visuals)) {
+          useWorldStore.getState().setMap(map);
+          resumeDeployment();
+        }
+        return;
+      }
+      case "physics":
+        // Legacy fallback; networkStore ignores this once snapshot telemetry is available.
+        if (message.data) state.setPhysicsData(message.data);
+        return;
+      case "debug":
+        if (
+          message.world_id !== undefined &&
+          message.world_id !== state.room_id
+        )
+          return;
+        packetDiagnostics.debugChars =
+          typeof event.data === "string" ? event.data.length : 0;
+        if (
+          message.data &&
+          Array.isArray(message.data.wheels) &&
+          Array.isArray(message.data.chassis)
+        ) {
+          state.setDebugOverlay(message.data, message.tick);
+        }
+        return;
+      // Existing addEventListener consumers still receive these setup events.
+      case "vehicle_config":
+        useVehicleConfigStore
+          .getState()
+          .receive(message.data?.player_id, message.data?.config);
+        return;
+      case "spawn_ok":
+      case "spawn_ready":
+      case "vehicle_changed":
+        if(message.player_id===state.playerId)window.dispatchEvent(new CustomEvent('avenlab:vehicle-entered',{detail:{vehicle:message.vehicle}}));
+        return;
+      case "spawn_error":
+        if(resumeIntent)failRecovery(message.message||"Vehicle recovery failed. Select a world to continue.");
+        return;
+      case "vehicle_change_error":
+      case "vehicle_serviced":
+      case "vehicle_service_error":
+        return;
+      default:
+        console.warn("Unknown Rust message type:", message.type);
+    }
+  };
+  return connection;
+}
+
+// App teardown must cancel retry timers as well as closing the live connection.
+export function disconnectRustServer() {
+  forgetRecovery();hadLocalBody=false;missingBodySince=null;
+  reconnectEnabled = false;
+  clearTimers();
+  const previous = socket;
+  socket = null; // Invalidate callbacks before close can dispatch an event.
+  previous?.close();
+  clearSession();
+}
+
+if (import.meta.hot) import.meta.hot.dispose(()=>{window.removeEventListener('focus',foregroundRecovery);document.removeEventListener('visibilitychange',foregroundRecovery);disconnectRustServer();});
+export { socket };

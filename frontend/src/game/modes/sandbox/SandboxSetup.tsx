@@ -1,0 +1,166 @@
+import { useConnectionView } from "../../../store/session/networkViews";
+import { useGameStore, useSelectionStore, useUIStore } from "../../../store";
+import { useRenderSettingsStore } from "../../../store/presentation/renderSettingsStore";
+import { ControllerAction } from "../../../components/controller";
+import { socket } from "../../../net/rustSocket";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { MapSelector } from "../MapSelector";
+import { VehicleSelector } from "../VehicleSelector";
+
+type Sandbox = {
+  collapsed: boolean;
+  setCollapsed: (collapsed: boolean) => void;
+};
+
+export function SandboxSetup({ collapsed, setCollapsed }: Sandbox) {
+  const connected = useConnectionView(s => s.connected);
+  const joinedWorld = useConnectionView(s => s.worldName);
+  const [spawnError, setSpawnError] = useState("");
+  const setScreen = useUIStore((s) => s.setScreen);
+
+  const vehicle = useSelectionStore((s) => s.getSelectedVehicle());
+  const map = useSelectionStore((s) => s.getSelectedMap());
+  const setActiveMenuIndex = useUIStore((s) => s.setActiveMenuIndex);
+  const selectedIndex = useUIStore(
+    (s) => s.selectedMenuIndexById.sandbox_setup,
+  );
+  const choices = useRef<HTMLDivElement>(null);
+
+  const startSandbox = useCallback(() => {
+    if(!map.id){setSpawnError("No installed worlds available. Refresh your world list.");return;}
+    if (!connected || !socket || socket.readyState !== WebSocket.OPEN) {
+      setSpawnError("Connecting to the game server. Try again when connected.");
+      return;
+    }
+    setSpawnError("");
+    useRenderSettingsStore.getState().startSandbox();
+
+    socket?.send?.(
+      JSON.stringify({
+        type: "spawn_request",
+        vehicle: vehicle.id,
+        map: map.id,
+        mode: "sandbox",
+      }),
+    );
+
+    setScreen("sandbox");
+    useGameStore.setState({
+      camera: "DEFAULT",
+    });
+  }, [connected, map.id, setScreen, vehicle.id]);
+
+  const exitSandboxSetup = useCallback(() => {
+    setScreen("main");
+  }, [setScreen]);
+
+  useEffect(() => {
+    setActiveMenuIndex(0);
+  }, [setActiveMenuIndex]);
+
+  useEffect(() => {
+    const element = choices.current?.querySelector<HTMLElement>(
+      `[data-sandbox-choice="${selectedIndex}"]`,
+    );
+    element?.focus({ preventScroll: true });
+    element?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
+  useEffect(() => {
+    const handleStart = () => startSandbox();
+    const handleExit = () => exitSandboxSetup();
+
+    window.addEventListener("avenlab:sandbox-start", handleStart);
+    window.addEventListener("avenlab:sandbox-exit", handleExit);
+
+    return () => {
+      window.removeEventListener("avenlab:sandbox-start", handleStart);
+      window.removeEventListener("avenlab:sandbox-exit", handleExit);
+    };
+  }, [exitSandboxSetup, startSandbox]);
+
+  return (
+    <div className="absolute inset-0 z-10 flex flex-col w-screen text-cyan-100">
+      <header className="garage-selection-header px-4 py-2">
+        <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>
+          REDLINE VECTOR // SANDBOX
+        </button>
+        {!collapsed && <p>Vehicle &amp; map selection</p>}
+      </header>
+      {/* Selection Components */}
+      <div
+        ref={choices}
+        className="garage-selection-controls absolute bottom-0 left-1/2 z-20 max-h-[65svh] w-full -translate-x-1/2 overflow-y-auto"
+      >
+        {(!connected || spawnError) && (
+          <p
+            role="status"
+            className="garage-selection-status px-4 py-2 text-center text-sm text-amber-200"
+          >
+            {spawnError || "Connecting to the game server…"}
+          </p>
+        )}
+        <div
+          data-sandbox-choice={0}
+          tabIndex={0}
+          role="group"
+          aria-label="Vehicle selection"
+          className="outline-none"
+          onFocus={() => setActiveMenuIndex(0)}
+        >
+          <VehicleSelector
+            menuId="sandbox_setup"
+            menuIndex={0}
+            translucent
+          />
+        </div>
+        <div
+          data-sandbox-choice={1}
+          tabIndex={0}
+          role="group"
+          aria-label="Environment selection"
+          className="outline-none"
+          onFocus={() => setActiveMenuIndex(1)}
+        >
+          {joinedWorld ? (
+            <div className="garage-selection-status px-4 py-2 text-center">
+              WORLD: {joinedWorld} · MAP: {map.name}
+            </div>
+          ) : (
+            <MapSelector menuId="sandbox_setup" menuIndex={1} translucent />
+          )}
+        </div>
+
+        <div className="relative grid grid-cols-2 border border-cyan-400/30">
+          <ControllerAction button="A"
+            data-sandbox-choice={2}
+
+            data-selected={selectedIndex === 2}
+            aria-disabled={!connected}
+            onFocus={() => setActiveMenuIndex(2)}
+            onClick={startSandbox}
+            className={`flex justify-center border-0 ${connected ? "" : "opacity-50"}`}
+          >
+            START
+          </ControllerAction>
+
+          <ControllerAction button="B"
+            data-sandbox-choice={3}
+
+            data-selected={selectedIndex === 3}
+            onFocus={() => setActiveMenuIndex(3)}
+            onClick={exitSandboxSetup}
+            className="flex justify-center border-0"
+          >
+            EXIT
+          </ControllerAction>
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 left-1/2 z-10 border-l border-cyan-300/60"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,256 @@
+import { useEffect, useRef } from "react";
+import { useInputStore } from "../../store/input/inputStore";
+import {
+  cockpitCommandPending,
+  cockpitStatus,
+  unpackCockpit,
+} from "../../store/input/protocol/cockpitMasks";
+import { VehicleFlags, hasFlag } from "../../store/input/protocol/inputMasks";
+import { useVehicleTelemetryStore } from "../../store/telemetry/vehicleTelemetryStore";
+import { useMomentaryFeedback } from "./useMomentaryFeedback";
+import { usePreferencesStore } from "../../store/preferences/index";
+
+function requestAssist(assist: number, traction: boolean) {
+  useInputStore.getState().setAssist(assist, traction);
+}
+
+// The same switches live in the optional drive dock and full cockpit. Indicators
+// always follow confirmed telemetry; requests never paint a successful state.
+export function DriveAssists({ compact = false, instrument = false }: { compact?: boolean; instrument?: boolean }) {
+  const layout = usePreferencesStore((s) => s.assistHudLayout);
+  const extended = !instrument && (!compact || layout === "extended");
+  const contact = useMomentaryFeedback();
+  const live = useVehicleTelemetryStore((s) => s.data.signal === "live");
+  const supported = useVehicleTelemetryStore(
+    (s) => s.data.config.cockpitVersion >= 2,
+  );
+  const confirmedMask = useVehicleTelemetryStore((s) => s.data.cockpitMask);
+  const tcs = useVehicleTelemetryStore((s) => s.data.tcsEnabled),
+    abs = useVehicleTelemetryStore((s) => s.data.absEnabled);
+  const moving = useVehicleTelemetryStore(
+    (s) => (s.data.speedKph ?? Infinity) > 1.8,
+  );
+  const requestedMask = useInputStore((s) => s.input.cockpit_mask);
+  const requestedVehicle = useInputStore((s) => s.input.vehicleMask);
+  const confirmed = unpackCockpit(confirmedMask ?? undefined);
+  const latched = cockpitStatus(confirmedMask).tractionLatchedOff || confirmed.assist === 3;
+  const pending = cockpitCommandPending(requestedMask, confirmedMask, 1);
+  const timer = useRef<number | null>(null),
+    held = useRef<number | null>(null),
+    consumed = useRef(false);
+  const stop = () => {
+    if (timer.current !== null) window.clearTimeout(timer.current);
+    timer.current = null;
+    held.current = null;
+  };
+  useEffect(() => {
+    const clear = () => {
+      if (timer.current !== null) window.clearTimeout(timer.current);
+      timer.current = null;
+      held.current = null;
+      consumed.current = false;
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") clear();
+    };
+    window.addEventListener("blur", clear);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      clear();
+      window.removeEventListener("blur", clear);
+      document.removeEventListener("visibilitychange", hidden);
+    };
+  }, []);
+  const fullOff = () => requestAssist(3, false);
+  const toggleTrac = () =>
+    !latched && requestAssist(confirmed.assist === 1 ? 1 : tcs ? 2 : 0, !tcs);
+  const beginTrac = (id: number) => {
+    if (held.current !== null) return;
+    consumed.current = false;
+    held.current = id;
+    if (!moving)
+      timer.current = window.setTimeout(() => {
+        timer.current = null;
+        const data = useVehicleTelemetryStore.getState().data;
+        if (
+          held.current !== null &&
+          document.visibilityState !== "hidden" &&
+          data.signal === "live" &&
+          (data.speedKph ?? Infinity) <= 1.8
+        ) {
+          consumed.current = true;
+          fullOff();
+        }
+      }, 3100);
+  };
+  const activateTrac = () => {
+    if (consumed.current) {
+      consumed.current = false;
+      return;
+    }
+    toggleTrac();
+  };
+  return (
+    <div
+      {...contact}
+      className={`drive-assists${compact ? " drive-assists-compact" : " factory-assists"}`}
+      role="group"
+      aria-label="Driving assists"
+      data-layout={extended ? "extended" : "three"}
+      onKeyDown={(event) => {
+        if (event.key === " " || event.key === "Enter") event.stopPropagation();
+      }}
+      onKeyUp={(event) => {
+        if (event.key === " " || event.key === "Enter") event.stopPropagation();
+      }}
+    >
+      <button
+        type="button"
+        className="assist-abs"
+        aria-label="Toggle ABS"
+        disabled={!live}
+        aria-pressed={abs}
+        aria-busy={live && hasFlag(requestedVehicle, VehicleFlags.ABS) !== abs}
+        onClick={() =>
+          useInputStore.getState().toggleVehicleFlag(VehicleFlags.ABS)
+        }
+      >
+        {instrument && <i className="assist-bulb" aria-hidden="true" />}
+        ABS<span>{abs ? "ON" : "OFF"}</span>
+      </button>
+      <button
+        type="button"
+        className="assist-trac"
+        aria-label="Toggle TCS"
+        title="Tap: one-launch traction off. Hold 3 seconds while stopped: latched TRAC off until engine shutdown."
+        disabled={!live || !supported}
+        aria-pressed={tcs}
+        aria-busy={pending}
+        data-off={!tcs}
+        onPointerDown={(event) => {
+          if (event.button !== 0 || held.current !== null) return;
+          beginTrac(event.pointerId);
+        }}
+        onPointerUp={(event) => {
+          if (held.current === event.pointerId) stop();
+        }}
+        onPointerCancel={() => {
+          stop();
+          consumed.current = false;
+        }}
+        onPointerLeave={() => {
+          stop();
+          consumed.current = false;
+        }}
+        onBlur={stop}
+        onKeyDown={(event) => {
+          if (![" ", "Enter"].includes(event.key)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (!event.repeat) beginTrac(-1);
+        }}
+        onKeyUp={(event) => {
+          if (![" ", "Enter"].includes(event.key)) return;
+          event.preventDefault();
+          event.stopPropagation();
+          if (held.current === -1) {
+            stop();
+            activateTrac();
+          }
+        }}
+        onClick={activateTrac}
+      >
+        {instrument && <i className="assist-bulb" aria-hidden="true" />}
+        <span className="assist-trac-content">
+          <img src="/images/traction-control.svg" alt="" />
+          <span>
+            TRAC
+            {!instrument && <><br />{tcs ? "ON" : "OFF"}</>}
+          </span>
+        </span>
+      </button>
+      <button
+        type="button"
+        className="assist-sport"
+        aria-label="VSC Sport"
+        disabled={!live || !supported}
+        aria-pressed={confirmed.assist === 1}
+        aria-busy={pending}
+        onClick={() =>
+          requestAssist(confirmed.assist === 1 ? (tcs ? 0 : 2) : 1, tcs)
+        }
+      >
+        {instrument && <i className="assist-bulb" aria-hidden="true" />}
+        VSC<span>SPORT</span>
+      </button>
+      {extended && (
+        <>
+          <button
+            type="button"
+            aria-label="TRAC and VSC off"
+            disabled={!live || !supported || moving}
+            aria-pressed={confirmed.assist === 3}
+            onClick={fullOff}
+          >
+            {compact ? "ALL" : "TRAC + VSC"}
+            <span>{compact ? "OFF" : "OFF · STOPPED"}</span>
+          </button>
+          <button
+            type="button"
+            className="assist-normal"
+            aria-label="Restore normal driving assists"
+            title={latched ? "Switch the engine off to reset latched TRAC OFF" : "Restore normal driving assists"}
+            disabled={!live || !supported || latched}
+            onClick={() => requestAssist(0, true)}
+          >
+            NORMAL
+          </button>
+          <small>
+            {confirmed.assist === 3
+              ? "TRAC + VSC OFF"
+              : confirmed.assist === 1
+                ? `VSC SPORT · TRAC ${tcs ? "ON" : "OFF"}`
+                : `NORMAL · TRAC ${tcs ? "ON" : "OFF"}`}
+          </small>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** HUD appearance and visibility share the same saved state as Research and
+ * Settings. This changes the interface, never ABS/TRAC/VSC function state. */
+export function AssistPreferences() {
+  const visible = usePreferencesStore((s) => s.hudGroups.assists);
+  const layout = usePreferencesStore((s) => s.assistHudLayout);
+  return (
+    <fieldset className="assist-preferences">
+      <legend>DRIVING ASSISTS HUD</legend>
+      <div>
+        <button
+          type="button"
+          role="switch"
+          aria-label="Traction controls on driving HUD"
+          aria-checked={visible}
+          onClick={() =>
+            usePreferencesStore.getState().setHudGroup("assists", !visible)
+          }
+        >
+          HUD: {visible ? "SHOW" : "HIDE"}
+        </button>
+        {(["three", "extended"] as const).map((value) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={layout === value}
+            onClick={() =>
+              usePreferencesStore.getState().update({ assistHudLayout: value })
+            }
+          >
+            {value === "three" ? "3 SWITCHES" : "EXPANDED BANK"}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}

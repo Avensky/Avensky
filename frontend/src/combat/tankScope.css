@@ -1,0 +1,14 @@
+.tank-scope-overlay{position:fixed;inset:0;z-index:8;pointer-events:none;color:#9af7e5;font:10px/1.4 ui-monospace,monospace}
+.tank-scope-vignette{position:absolute;width:min(80vw,90vh);height:min(80vw,90vh);left:50%;top:46%;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 0 0 100vmax #01090cc4,inset 0 0 40px #000b;border:1px solid #9af7e530}
+.tank-scope-reticle{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(72vw,82vh);height:min(72vw,82vh);fill:none;stroke:#9af7e5;stroke-width:1;filter:drop-shadow(0 1px 2px #000)}
+.tank-scope-reticle circle:first-child{opacity:.2;stroke-dasharray:2 18}
+.scope-top-controls{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:5px;pointer-events:auto;white-space:nowrap}
+.scope-top-controls button{background:#071d24e8;color:#c4fff1;border:1px solid #71c8b957;border-radius:5px;padding:5px 9px;font:700 10px system-ui;min-height:30px}
+.scope-range-readout{position:absolute;top:54%;left:50%;transform:translateX(-50%);text-align:center;text-shadow:0 1px 4px #000;white-space:nowrap;font-size:9px}
+@media(max-width:600px){.scope-top-controls{top:8px}.scope-range-readout{font-size:8px}}
+
+/* Scope prioritizes the reticle; input controls remain available. */
+.driving-hud[data-scoped=true] :is(.instrument-hud,.world-edit-tools,.ignition-hud){visibility:hidden;pointer-events:none}
+.tank-scope-reticle[data-cue=attack]{stroke:#ff7978}
+.tank-scope-reticle[data-cue=ally]{stroke:#7bcdff}
+.tank-scope-reticle[data-cue=heal]{stroke:#89eda5}

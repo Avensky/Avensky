@@ -1,0 +1,245 @@
+import { useConnectionView, useMotionView } from "../store/session/networkViews";
+import {cameraGround,cameraSeabed} from '../utils/cameraGround';
+import {useWorldStore} from '../store/world/worldStore';
+import {TankScopeRig} from '../combat/TankScope';
+import {useCombatStore} from '../combat/combatStore';
+import { useBuilderStore } from "../worldBuilder/state/builderStore";
+import { useVehicleEditorStore } from "../worldBuilder/vehicleEditor/vehicleEditorStore";
+import { VehicleCameraRig } from "../worldBuilder/vehicleEditor/VehicleCameraRig";
+import { useSocialStore } from "../store/social/socialStore";
+import { PerspectiveCamera, OrbitControls } from "@react-three/drei";
+import { InspectionCameraControls } from "../components/InspectionCameraControls";
+import { specialCameraPreset } from "../utils/drivingViews";
+import { RotatingCamera } from "./RotatingCamera";
+import { useEffect, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { OrbitControls as ThreeOrbitControls } from "three-stdlib";
+import { usePreferencesStore } from "../store/preferences/preferencesStore";
+import { useGameStore } from "../store/presentation/gameStore";
+import { useUIStore } from "../store/menus/uiStore";
+import {snapshotEntity} from "../store/session/networkStore";
+import { PlayerCameraControls } from "../components/PlayerCameraControls";
+import {
+  beginVehicleRenderFrame,
+  releaseVehicleRenderFrameClock,
+} from "../hooks/usePhysicsInterpolator";
+
+type VehicleCameraPreset = {
+  offset: [number, number, number];
+  targetOffset: [number, number, number];
+  positionSpeed: number;
+  targetSpeed: number;
+};
+
+const DEFAULT_CAMERA_PRESET: VehicleCameraPreset = {
+  offset: [0, 2.3, -5.8],
+  targetOffset: [0, 1.1, 6.0],
+  positionSpeed: 7,
+  targetSpeed: 10,
+};
+
+const VEHICLE_CAMERA_PRESETS: Record<string, VehicleCameraPreset> = {
+  'hawaii-rescue': {offset:[0,50,-200],targetOffset:[0,13,65],positionSpeed:2.5,targetSpeed:3.5},
+  'louisiana': {offset:[0,68,-245],targetOffset:[0,20,82],positionSpeed:2.1,targetSpeed:3.0},
+  ae86: {
+    offset: [0, 2.2, -5.4],
+    targetOffset: [0, 1.0, 5.5],
+    positionSpeed: 7,
+    targetSpeed: 10,
+  },
+  brz: {
+    offset: [0, 2.25, -5.6],
+    targetOffset: [0, 1.05, 5.8],
+    positionSpeed: 7,
+    targetSpeed: 10,
+  },
+  frs: {
+    offset: [0, 2.25, -5.6],
+    targetOffset: [0, 1.05, 5.8],
+    positionSpeed: 7,
+    targetSpeed: 10,
+  },
+  sierra: {offset:[0,3.15,-7.6],targetOffset:[0,1.25,7.2],positionSpeed:7,targetSpeed:10},
+  fortuner: {offset:[0,2.9,-6.8],targetOffset:[0,1.1,6.5],positionSpeed:7,targetSpeed:10},
+  landcruiser: {offset:[0,3.0,-6.9],targetOffset:[0,1.12,6.55],positionSpeed:7,targetSpeed:10},
+  mini: {offset:[0,2.15,-5.0], targetOffset:[0,.95,5.5], positionSpeed:7, targetSpeed:10},
+  cx30: {
+    offset:[0,2.55,-6.0],targetOffset:[0,1.05,6.0],positionSpeed:7,targetSpeed:10,
+  },
+  camaro: {
+    offset: [0, 2.6, -6.4],
+    targetOffset: [0, 1.2, 6.5],
+    positionSpeed: 7,
+    targetSpeed: 10,
+  },
+  supra: {
+    offset: [0, 2.25, -5.7],
+    targetOffset: [0, 1.05, 6.0],
+    positionSpeed: 7,
+    targetSpeed: 10,
+  },
+  tank: {
+    offset: [0, 5.0, -11.0],
+    targetOffset: [0, 2.0, 8.0],
+    positionSpeed: 5,
+    targetSpeed: 7,
+  },
+};
+
+function normalizeVehicleId(vehicleId?: string | null) {
+  return vehicleId?.trim().toLowerCase().replaceAll("_", "-") ?? "";
+}
+
+function cameraPresetForVehicle(
+  vehicleId?: string | null,
+): VehicleCameraPreset {
+  const id = normalizeVehicleId(vehicleId);
+
+  if (id === "toyota-ae86") return VEHICLE_CAMERA_PRESETS.ae86;
+  if (
+    [
+      "subaru-brz",
+      "fr-s",
+      "scion-frs",
+      "scion-fr-s",
+      "gt86",
+      "toyota-gt86",
+    ].includes(id)
+  ) {
+    return VEHICLE_CAMERA_PRESETS.brz;
+  }
+  if (id === "camaro-2017") return VEHICLE_CAMERA_PRESETS.camaro;
+  if (
+    ["supra-2020", "gr-supra", "toyota-supra", "a90", "toyota-a90"].includes(id)
+  ) {
+    return VEHICLE_CAMERA_PRESETS.supra;
+  }
+
+  return VEHICLE_CAMERA_PRESETS[id] ?? DEFAULT_CAMERA_PRESET;
+}
+
+const driverEyeSockets: Record<string, [number, number, number]> = {
+  cx30: [.385,.375,.19], mini: [.34,.26,.21],
+  sierra: [.38,.59,.64], fortuner: [-.38,.47,.15], landcruiser: [.4,.51,.10],
+};
+
+export default function Cameras() {
+  const scope=useCombatStore(s=>s.scope&&s.enabled);
+  const fov = usePreferencesStore((s) => s.fov);
+  const reducedMotion = usePreferencesStore((s) => s.reducedMotion);
+  const overlay = useUIStore((s) => s.overlay);
+  const screen = useUIStore((state) => state.screen);
+  const camMode = useGameStore((state) => state.camera);
+  const editor = useGameStore((state) => state.editor);
+  const playerId = useConnectionView(state => state.playerId);
+  const playerVehicleId = useMotionView(
+    (state) =>
+      snapshotEntity(state.snapshot, state.playerId)
+        ?.vehicle_id ?? null,
+  );
+  const sinkingWreck = useMotionView(state=>{
+    const health=snapshotEntity(state.snapshot,state.playerId)?.health;
+    return health?.defeated===true && health.last_damage_kind==='water';
+  });
+  const playerCameraPreset =
+    camMode === "FIRST_PERSON" || camMode === "BIRDS_EYE"
+      ? specialCameraPreset(camMode, playerVehicleId)
+      : { ...cameraPresetForVehicle(playerVehicleId), worldAligned: false };
+  const workspace = useBuilderStore(s => s.workspace);
+  const cameraView = useVehicleEditorStore(s => s.view);
+  const profile = useVehicleEditorStore(s => s.cameras[playerVehicleId ?? ""]);
+  const editorSession = useSocialStore(s => s.view?.alpha?.active?.mode === "editor");
+  const cameraEditing = editorSession && workspace === "vehicle" && overlay === "world_builder";
+  const expectedMode = cameraView === "bird" ? "BIRDS_EYE" : "FIRST_PERSON";
+  const rigActive = editorSession && (overlay === null || cameraEditing) && cameraView !== "chase" && camMode === expectedMode;
+  const socket = driverEyeSockets[playerVehicleId ?? ""];
+  if (!profile && socket && camMode === "FIRST_PERSON") {
+    playerCameraPreset.offset = [...socket];
+    playerCameraPreset.targetOffset = [socket[0], socket[1], socket[2] + 20];
+  }
+  if (profile && camMode === "FIRST_PERSON") {
+    const yaw = profile.yaw * Math.PI / 180, pitch = profile.pitch * Math.PI / 180;
+    playerCameraPreset.offset = [profile.x, profile.y, profile.z];
+    playerCameraPreset.targetOffset = [profile.x + Math.sin(yaw)*Math.cos(pitch)*20,
+      profile.y + Math.sin(pitch)*20, profile.z + Math.cos(yaw)*Math.cos(pitch)*20];
+  }
+  const controlsRef = useRef<ThreeOrbitControls | null>(null);
+  // Run before camera (-1) and model (0). Keep the frame clock alive in
+  // editor mode too. Negative priority retains automatic R3F rendering.
+  useFrame(() => beginVehicleRenderFrame(), -100);
+  useEffect(() => releaseVehicleRenderFrameClock, []);
+  // Run after chase, scope, orbit and the vehicle camera rig place their eye.
+  useFrame(({camera}) => {
+    if (screen !== 'sandbox') return;
+    const p=camera.position;
+    const map=useWorldStore.getState().map;
+    p.y=Math.max(p.y,sinkingWreck?cameraSeabed(map):cameraGround(map,p.x,p.z));
+  }, -.01);
+
+  if(scope&&screen==='sandbox'&&overlay===null&&playerVehicleId)return <TankScopeRig playerId={playerId}/>;
+
+  if (editor && screen === "sandbox" && !cameraEditing && overlay !== "vehicle_select") {
+    return (
+      <>
+        <PerspectiveCamera makeDefault fov={profile && (camMode === "FIRST_PERSON" || rigActive) ? profile.fov : fov} near={0.05} />
+        <InspectionCameraControls
+          playerId={playerId}
+          enabled={overlay === null}
+        />
+      </>
+    );
+  }
+
+  const isGallery =
+    camMode === "GALLERY" &&
+    (screen === "sandbox_setup");
+
+  const isChanging = screen === "sandbox" && overlay === "vehicle_select";
+  const isDriving =
+    screen === "sandbox" &&
+    !editor &&
+    (camMode === "DEFAULT" ||
+      camMode === "FIRST_PERSON" ||
+      camMode === "BIRDS_EYE");
+  return (
+    <>
+      <PerspectiveCamera
+        makeDefault
+        fov={profile && (camMode === "FIRST_PERSON" || rigActive) ? profile.fov : fov}
+        near={0.05}
+        position={[0, 7, 12]}
+      />
+      <PlayerCameraControls
+        worldAligned={playerCameraPreset.worldAligned}
+        maxYaw={camMode === "BIRDS_EYE" ? 0 : Math.PI * 0.65}
+        maxPitch={camMode === "BIRDS_EYE" ? 0 : 0.45}
+        playerId={playerId}
+        enabled={(isChanging || (isDriving && (overlay === null || cameraEditing))) && !rigActive}
+        offset={isChanging ? [7, 3.5, -8] : playerCameraPreset.offset}
+        targetOffset={isChanging ? [0, .5, 0] : playerCameraPreset.targetOffset}
+        positionSpeed={playerCameraPreset.positionSpeed}
+        targetSpeed={playerCameraPreset.targetSpeed}
+      />
+      <VehicleCameraRig playerId={playerId} vehicleId={playerVehicleId ?? ""} enabled={rigActive} reducedMotion={reducedMotion} showMarker={cameraEditing && (cameraView === "chase" || cameraView === "bird")} />
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        enabled={isGallery}
+        maxPolarAngle={Math.PI / 2 - 0.05}
+        minPolarAngle={0}
+        enableZoom
+        minDistance={3}
+        maxDistance={13}
+      />
+      {isGallery && !reducedMotion && (
+        <RotatingCamera
+          orbitRef={controlsRef}
+          radius={4.5}
+          speed={0.2}
+          height={2.2}
+          resumeDuration={5}
+        />
+      )}
+    </>
+  );
+}

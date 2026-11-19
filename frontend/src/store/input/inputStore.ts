@@ -1,0 +1,523 @@
+//  inputStore.ts     ← controls/input packets
+import { create } from "zustand";
+import { useNetworkStore } from "../session/networkStore";
+import {
+  reviseCabin,
+  unpackCabin,
+  HEADLIGHT_FLASH,
+  CABIN_MAX_MASK,
+  type CabinState,
+} from "./protocol/cabinMasks";
+import {
+  reviseCockpit,
+  unpackCockpit,
+  type CockpitCommand,
+  type CockpitRequest,
+} from "./protocol/cockpitMasks";
+import { deriveInputSignals } from "./protocol/deriveInputSignals";
+import {
+  hasFlag,
+  PlayerFlags,
+  setFlag,
+  VehicleFlags,
+} from "./protocol/inputMasks";
+
+import {
+  clampControl, clearAnalogSources, releaseDeviceAnalog, updateDeviceAnalog,
+  type InputSource, type VehicleControlInput,
+} from "./deviceAnalog";
+export type { InputSource, VehicleControlInput } from "./deviceAnalog";
+
+export interface VehicleControls {
+  braking: boolean;
+  accelerating: boolean;
+  reversing: boolean;
+  coasting: boolean;
+  absActive?: boolean;
+  tractionControl?: boolean;
+}
+// A menu owns its brake independently of every physical device. Releasing a
+// keyboard, controller or touch hold cannot clear this brake while paused.
+let menuBrake = false;
+const heldVehicleFlags = new Map<number, Set<InputSource>>();
+const heldPlayerFlags = new Map<number, Set<InputSource>>();
+const flashOwners = new Set<InputSource>();
+function updateHold(
+  flags: Map<number, Set<InputSource>>,
+  source: InputSource,
+  flag: number,
+  enabled: boolean,
+) {
+  let owners = flags.get(flag);
+  if (!owners && !enabled) return false;
+  if (!owners) flags.set(flag, (owners = new Set()));
+  if (enabled) owners.add(source);
+  else owners.delete(source);
+  if (!owners.size) flags.delete(flag);
+  return owners.size > 0;
+}
+
+export interface VehicleStateInput {
+  engineOn: boolean;
+  headlights: boolean;
+  blinkerLeft: boolean;
+  blinkerRight: boolean;
+  hazards: boolean;
+  abs: boolean;
+  tcs: boolean;
+  boost: boolean;
+}
+
+export interface PlayerStateInput {
+  dyno: boolean;
+  radio: boolean;
+  honk: boolean;
+  reset: boolean;
+}
+
+export interface InputPacket {
+  type: "input";
+  seq: number;
+  dt: number;
+
+  // analog controls (always present)
+  throttle: number; // [-1..1]
+  steer: number; // [-1..1]
+  brake: number; // [0..1]
+  handbrake: number; // [0..1]
+
+  // bitmasks
+  vehicleMask: number; // uint16
+  playerMask: number; // uint16
+  debug_mask?: number; // uint32, optional
+  cockpit_mask?: number; // optional packed cockpit request; absent keeps legacy controls
+  parking_brake?: number; // v7 continuous latched cable fraction; command 3 owns it
+  cabin_mask?: number; // climate/key v3, airflow/fan4 v5, held headlight flash v6
+}
+const defaultVehicleMask =
+  VehicleFlags.ENGINE_ON | VehicleFlags.ABS | VehicleFlags.TCS;
+const defaultPlayerMask = 0;
+const defaultDebugMask = 0;
+
+export const inputRef: { current: InputPacket } = {
+  current: {
+    type: "input",
+    seq: 0,
+    dt: 0,
+    throttle: 0,
+    steer: 0,
+    brake: 0,
+    handbrake: 0,
+    vehicleMask: defaultVehicleMask,
+    playerMask: defaultPlayerMask,
+    debug_mask: defaultDebugMask,
+  },
+};
+
+interface InputState {
+  setMenuBrake: (enabled: boolean) => void;
+  controls: VehicleControls;
+
+  input: InputPacket;
+  setInput: (partial: Partial<InputPacket>) => void;
+  setCockpit: (patch: Partial<CockpitRequest>, command: CockpitCommand) => void;
+  setParkingBrake: (fraction: number) => void;
+  setAssist: (assist: number, traction: boolean) => void;
+  setCabin: (patch: Partial<CabinState>, confirmed?: number) => void;
+  setHeadlightFlash: (
+    source: InputSource,
+    held: boolean,
+    confirmed?: number,
+  ) => void;
+  setIgnition: (
+    position: number,
+    inserted: boolean,
+    confirmed?: number,
+  ) => void;
+
+  setAnalog: (partial: Partial<VehicleControlInput>) => void;
+  releaseAnalog: () => void;
+  setAnalogFromSource: (
+    source: InputSource,
+    partial: Partial<VehicleControlInput>,
+  ) => void;
+  releaseInputSource: (source: InputSource) => void;
+  releaseControls: () => void;
+  resetWorldControls: () => void;
+  setHeldVehicleFlag: (
+    source: InputSource,
+    flag: number,
+    enabled: boolean,
+  ) => void;
+  setHeldPlayerFlag: (
+    source: InputSource,
+    flag: number,
+    enabled: boolean,
+  ) => void;
+
+  setVehicleFlag: (flag: number, enabled: boolean) => void;
+  toggleVehicleFlag: (flag: number) => void;
+
+  setPlayerFlag: (flag: number, enabled: boolean) => void;
+  togglePlayerFlag: (flag: number) => void;
+}
+
+// Once acknowledged, confirmed selector state replaces stale request bits. A
+// brake/lighting request must not revive a rejected gear or leave Neutral/Park.
+function cockpitRequestBase(current: InputPacket) {
+  const network = useNetworkStore.getState(),
+    confirmed = network.connected ? network.getMe()?.cockpit_mask : undefined;
+  if (
+    confirmed === undefined ||
+    !Number.isSafeInteger(confirmed) ||
+    confirmed < 0 ||
+    confirmed > 0xffffffff
+  )
+    return current.cockpit_mask;
+  return current.cockpit_mask === undefined ||
+    unpackCockpit(current.cockpit_mask).revision ===
+      unpackCockpit(confirmed).revision
+    // Snapshot v8 bits 14/15 are traction status, not a cruise request.
+    ? (confirmed & ~(3 << 14)) >>> 0
+    : current.cockpit_mask;
+}
+export const useInputStore = create<InputState>((set, get) => ({
+  setMenuBrake(enabled) {
+    if (menuBrake === enabled) return;
+    menuBrake = enabled;
+    // Discard stale acceleration before returning to driving. Producers
+    // must re-engage after a menu; their existing arming rules still apply.
+    get().releaseControls();
+  },
+  // Initial HUD state must include the default ABS/TCS bits too.
+  controls: deriveInputSignals(inputRef.current),
+
+  input: inputRef.current,
+  setInput(partial) {
+    const previous = inputRef.current;
+    const nextInput: InputPacket = {
+      ...inputRef.current,
+      ...partial,
+    };
+
+    // Validate controls at their single writer, before JSON can turn NaN
+    // into null. Input producers must call these actions, not mutate inputRef.
+    nextInput.throttle = clampControl(nextInput.throttle, -1, 1);
+    nextInput.steer = clampControl(nextInput.steer, -1, 1);
+    nextInput.brake = clampControl(nextInput.brake, 0, 1);
+    nextInput.handbrake = clampControl(nextInput.handbrake, 0, 1);
+    if (nextInput.parking_brake !== undefined)
+      nextInput.parking_brake = Number.isFinite(nextInput.parking_brake)
+        ? Math.max(0, Math.min(1, nextInput.parking_brake))
+        : previous.parking_brake;
+    if (menuBrake) {
+      nextInput.throttle = 0;
+      nextInput.steer = 0;
+      nextInput.brake = 1;
+    }
+    if (
+      nextInput.cockpit_mask !== undefined &&
+      (!Number.isSafeInteger(nextInput.cockpit_mask) ||
+        nextInput.cockpit_mask < 0 ||
+        nextInput.cockpit_mask > 0xffffffff)
+    )
+      nextInput.cockpit_mask = previous.cockpit_mask;
+    if (
+      nextInput.cabin_mask !== undefined &&
+      (!Number.isSafeInteger(nextInput.cabin_mask) ||
+        nextInput.cabin_mask < 0 ||
+        nextInput.cabin_mask > CABIN_MAX_MASK ||
+        (nextInput.cabin_mask & 0xc000) !== 0)
+    )
+      nextInput.cabin_mask = previous.cabin_mask;
+    // Polling the same held button must not broadcast another React update.
+    if (
+      (Object.keys(nextInput) as (keyof InputPacket)[]).every((key) =>
+        Object.is(nextInput[key], previous[key]),
+      )
+    )
+      return;
+
+    inputRef.current = nextInput;
+
+    // Zustand update only for UI/HUD/debug, not networking.
+    set({
+      input: nextInput,
+      controls: deriveInputSignals(nextInput),
+    });
+  },
+
+  setCockpit(patch, command) {
+    const current = inputRef.current;
+    const initial =
+      cockpitRequestBase(current) ??
+      reviseCockpit(
+        undefined,
+        {
+          lights: hasFlag(current.vehicleMask, VehicleFlags.HEADLIGHTS) ? 2 : 1,
+          assist: hasFlag(current.vehicleMask, VehicleFlags.TCS) ? 0 : 2,
+        },
+        0,
+      );
+    const revised = reviseCockpit(initial, patch, command);
+    get().setInput({
+      cockpit_mask: revised,
+      // A legacy detent command must replace an earlier precise fraction too.
+      ...(command === 3
+        ? { parking_brake: unpackCockpit(revised).parkingStrength / 3 }
+        : {}),
+    });
+  },
+  setParkingBrake(fraction) {
+    if (!Number.isFinite(fraction)) return;
+    const value = Math.round(Math.max(0, Math.min(1, fraction)) * 1000) / 1000;
+    const current = inputRef.current;
+    if (current.parking_brake === value) return;
+    const initial =
+      cockpitRequestBase(current) ??
+      reviseCockpit(
+        undefined,
+        {
+          lights: hasFlag(current.vehicleMask, VehicleFlags.HEADLIGHTS) ? 2 : 1,
+          assist: hasFlag(current.vehicleMask, VehicleFlags.TCS) ? 0 : 2,
+        },
+        0,
+      );
+    get().setInput({
+      cockpit_mask: reviseCockpit(
+        initial,
+        // Preserve the 1/3 and 2/3 presets after rounding to 0.1% precision.
+        {
+          parking: value > 0,
+          parkingStrength:
+            value > 0 ? Math.max(1, Math.ceil(value * 3 - 0.0015)) : 0,
+        },
+        3,
+      ),
+      parking_brake: value,
+    });
+  },
+  setAssist(assist, traction) {
+    const current = inputRef.current;
+    const initial =
+      cockpitRequestBase(current) ??
+      reviseCockpit(
+        undefined,
+        {
+          lights: hasFlag(current.vehicleMask, VehicleFlags.HEADLIGHTS) ? 2 : 1,
+        },
+        0,
+      );
+    get().setInput({
+      vehicleMask: setFlag(current.vehicleMask, VehicleFlags.TCS, traction),
+      cockpit_mask: reviseCockpit(initial, { assist }, 1),
+    });
+  },
+  setCabin(patch, confirmed) {
+    get().setInput({
+      cabin_mask: reviseCabin(inputRef.current.cabin_mask ?? confirmed, patch),
+    });
+  },
+  setHeadlightFlash(source, held, confirmed) {
+    if (held) flashOwners.add(source);
+    else flashOwners.delete(source);
+    const current = inputRef.current.cabin_mask;
+    if (current === undefined && !flashOwners.size) return;
+    const cabin = reviseCabin(current ?? confirmed, {});
+    get().setInput({
+      cabin_mask: setFlag(cabin, HEADLIGHT_FLASH, flashOwners.size > 0),
+    });
+  },
+  setIgnition(position, inserted, confirmed) {
+    const current = inputRef.current;
+    get().setInput({
+      cabin_mask: reviseCabin(
+        current.cabin_mask ?? confirmed,
+        { ignition: position, keyInserted: inserted },
+        true,
+      ),
+      vehicleMask: setFlag(
+        current.vehicleMask,
+        VehicleFlags.ENGINE_ON,
+        inserted &&
+          position >= 2 &&
+          (position === 3 ||
+            hasFlag(current.vehicleMask, VehicleFlags.ENGINE_ON)),
+      ),
+    });
+  },
+  setAnalog(partial) {
+    // Compatibility for single-writer callers. Mounted keyboard and
+    // controller producers use setAnalogFromSource instead.
+    get().setInput(partial);
+  },
+  setAnalogFromSource(source, partial) {
+    const merged = updateDeviceAnalog(source, partial);
+    // A legacy direct write can change the packet despite unchanged device
+    // intent. Reassert the merged request in that case, respecting menu brake.
+    const packet = inputRef.current;
+    if (packet.throttle === (menuBrake ? 0 : merged.throttle) &&
+        packet.steer === (menuBrake ? 0 : merged.steer) &&
+        packet.brake === (menuBrake ? 1 : merged.brake) &&
+        packet.handbrake === merged.handbrake) return;
+    get().setInput(merged);
+  },
+  // Legacy callers can release axes alone; producers own their individual holds.
+  releaseAnalog() {
+    get().setInput(clearAnalogSources());
+  },
+  setHeldVehicleFlag(source, flag, enabled) {
+    get().setVehicleFlag(
+      flag,
+      updateHold(heldVehicleFlags, source, flag, enabled),
+    );
+  },
+  setHeldPlayerFlag(source, flag, enabled) {
+    get().setPlayerFlag(
+      flag,
+      updateHold(heldPlayerFlags, source, flag, enabled),
+    );
+  },
+  releaseInputSource(source) {
+    const merged = releaseDeviceAnalog(source);
+    flashOwners.delete(source);
+    let vehicleMask = inputRef.current.vehicleMask;
+    let playerMask = inputRef.current.playerMask;
+    for (const [flag, owners] of heldVehicleFlags) {
+      owners.delete(source);
+      vehicleMask = setFlag(vehicleMask, flag, owners.size > 0);
+      if (!owners.size) heldVehicleFlags.delete(flag);
+    }
+    for (const [flag, owners] of heldPlayerFlags) {
+      owners.delete(source);
+      playerMask = setFlag(playerMask, flag, owners.size > 0);
+      if (!owners.size) heldPlayerFlags.delete(flag);
+    }
+    const cabin = inputRef.current.cabin_mask;
+    get().setInput({
+      ...merged,
+      vehicleMask,
+      playerMask,
+      ...(cabin === undefined
+        ? {}
+        : {
+            cabin_mask: setFlag(cabin, HEADLIGHT_FLASH, flashOwners.size > 0),
+          }),
+    });
+  },
+  // Blur, disconnect and sender teardown release transient intent. Engine,
+  // ABS/TCS, lights and display toggles remain deliberate settings.
+  resetWorldControls() {
+    get().releaseControls();
+    // A new world creates a new vehicle. Do not replay the previous key,
+    // selector revision or parking cable command against that fresh entity.
+    get().setInput({
+      cockpit_mask: undefined,
+      cabin_mask: undefined,
+      parking_brake: undefined,
+      vehicleMask: defaultVehicleMask,
+    });
+  },
+  releaseControls() {
+    const neutral = clearAnalogSources();
+    heldVehicleFlags.clear();
+    heldPlayerFlags.clear();
+    flashOwners.clear();
+    const cockpit = inputRef.current.cockpit_mask;
+    const cabin = inputRef.current.cabin_mask;
+    const releaseKey = cabin !== undefined && unpackCabin(cabin).ignition === 3;
+    const stopCockpit =
+      cockpit !== undefined &&
+      ((cockpit & (1 << 12)) !== 0 || ((cockpit >>> 14) & 3) !== 3);
+    get().setInput({
+      ...neutral,
+      ...(cabin !== undefined
+        ? {
+            cabin_mask: releaseKey
+              ? reviseCabin(cabin & ~HEADLIGHT_FLASH, { ignition: 2 }, true)
+              : cabin & ~HEADLIGHT_FLASH,
+          }
+        : {}),
+      ...(stopCockpit
+        ? {
+            cockpit_mask: reviseCockpit(
+              cockpit,
+              { washer: false, cruiseAction: 3 },
+              4,
+            ),
+          }
+        : {}),
+      vehicleMask: inputRef.current.vehicleMask & ~VehicleFlags.BOOST,
+      playerMask:
+        inputRef.current.playerMask & ~(PlayerFlags.HONK | PlayerFlags.RESET),
+    });
+  },
+
+  setVehicleFlag(flag, enabled) {
+    const current = inputRef.current.vehicleMask;
+    const vehicleMask = setFlag(current, flag, enabled);
+
+    const cockpit = cockpitRequestBase(inputRef.current);
+    const cabin = inputRef.current.cabin_mask;
+    const revisesCockpit = cockpit !== undefined && (flag === VehicleFlags.TCS || flag === VehicleFlags.HEADLIGHTS);
+    const revisesIgnition = cabin !== undefined && flag === VehicleFlags.ENGINE_ON;
+    if (current === vehicleMask && !revisesCockpit && !revisesIgnition) return;
+    get().setInput({
+      vehicleMask,
+      ...(flag === VehicleFlags.ENGINE_ON && cabin !== undefined
+        ? {
+            cabin_mask: reviseCabin(
+              cabin,
+              { ignition: enabled ? 3 : 0, keyInserted: true },
+              true,
+            ),
+          }
+        : {}),
+      ...(cockpit === undefined
+        ? {}
+        : flag === VehicleFlags.TCS
+          ? {
+              cockpit_mask: reviseCockpit(
+                cockpit,
+                {
+                  assist:
+                    unpackCockpit(cockpit).assist === 1 ? 1 : enabled ? 0 : 2,
+                },
+                1,
+              ),
+            }
+          : flag === VehicleFlags.HEADLIGHTS
+            ? {
+                cockpit_mask: reviseCockpit(
+                  cockpit,
+                  { lights: enabled ? 2 : 0 },
+                  6,
+                ),
+              }
+            : {}),
+    });
+  },
+
+  toggleVehicleFlag(flag) {
+    const current = inputRef.current.vehicleMask;
+    const mode = flag === VehicleFlags.HEADLIGHTS ? cockpitRequestBase(inputRef.current) : undefined;
+    const lights = mode === undefined ? undefined : unpackCockpit(mode).lights;
+    const on = lights === undefined ? hasFlag(current, flag)
+      : lights >= 2 || (lights === 1 && hasFlag(current, VehicleFlags.ENGINE_ON));
+    get().setVehicleFlag(flag, !on);
+  },
+
+  setPlayerFlag(flag, enabled) {
+    const current = inputRef.current.playerMask;
+    const playerMask = setFlag(current, flag, enabled);
+
+    if (playerMask !== current) get().setInput({ playerMask });
+  },
+
+  togglePlayerFlag(flag) {
+    const current = inputRef.current.playerMask;
+    const enabled = !hasFlag(current, flag);
+
+    get().setPlayerFlag(flag, enabled);
+  },
+}));

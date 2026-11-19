@@ -1,0 +1,164 @@
+.controller-key,
+.layout-editor .controller-key {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-width: 22px;
+  height: 21px;
+  padding: 1px 4px;
+  background: #090b0e !important;
+  color: #eceff3 !important;
+  border: 1px solid #8b929d !important;
+  border-radius: 4px !important;
+  font:
+    800 10px/1 ui-monospace,
+    monospace;
+  box-shadow: inset 0 -2px 0 #0008;
+  vertical-align: middle;
+}
+.controller-key:is(
+  [data-controller-key="A"],
+  [data-controller-key="B"],
+  [data-controller-key="X"],
+  [data-controller-key="Y"]
+) {
+  width: 21px;
+  min-width: 21px;
+  border-radius: 50% !important;
+}
+.controller-key[data-controller-key="A"] {
+  color: #62df82 !important;
+  border-color: #62df82 !important;
+}
+.controller-key[data-controller-key="B"] {
+  color: #ff626b !important;
+  border-color: #ff626b !important;
+}
+.controller-key[data-controller-key="X"] {
+  color: #75adff !important;
+  border-color: #75adff !important;
+}
+.controller-key[data-controller-key="Y"] {
+  color: #f4d45d !important;
+  border-color: #f4d45d !important;
+}
+.controller-menu-icon {
+  width: 0.95em;
+  height: 1px;
+  background: currentColor;
+  box-shadow: 0 -0.3em currentColor, 0 0.3em currentColor;
+}
+.controller-shortcuts {
+  display: flex;
+  gap: 6px 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  color: var(--app-muted, #a6b9d3);
+  font:
+    10px/1.3 system-ui,
+    sans-serif;
+}
+.controller-shortcuts > :is(span, .controller-shortcut-back) {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.keyboard-key {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  min-height: 20px;
+  padding: 1px 5px;
+  background: var(--app-background);
+  color: var(--app-text);
+  border: 1px solid var(--app-line);
+  border-radius: 4px;
+  box-shadow: inset 0 -2px var(--app-line);
+  font: 700 10px/1 ui-monospace, monospace;
+  white-space: nowrap;
+}
+.controller-shortcut-back {
+  flex: none;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.controller-shortcut-back:disabled { opacity: .45; cursor: default; }
+.controller-shortcut-back:focus-visible { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .controller-shortcut-back { min-width: 44px; min-height: 32px; }
+}
+@media (max-width: 600px) {
+  .controller-shortcuts {
+    gap: 4px 9px;
+    font-size: 9px;
+  }
+  .controller-key,
+  .layout-editor .controller-key {
+    min-width: 18px;
+    height: 18px;
+    font-size: 8px;
+  }
+  .controller-key:is(
+    [data-controller-key="A"],
+    [data-controller-key="B"],
+    [data-controller-key="X"],
+    [data-controller-key="Y"]
+  ) {
+    min-width: 18px;
+    width: 18px;
+  }
+}
+.controller-guide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 7px 14px;
+  color: var(--app-muted, #a6b9d3);
+  font:
+    11px/1.4 system-ui,
+    sans-serif;
+}
+.controller-guide > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* One clickable action surface for every A/Continue and B/Back menu action. */
+.controller-action,
+.menu-surface .controller-action,
+.cockpit-panel .controller-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 3px 6px;
+  border: var(--controller-action-border, 0) !important;
+  outline: none !important;
+  background: var(--controller-action-background, transparent) !important;
+  box-shadow: none !important;
+  color: var(--app-text, #d7e8f1);
+  text-decoration: none !important;
+  cursor: pointer;
+  transition: filter 120ms ease, text-shadow 120ms ease;
+}
+.controller-action:not(:disabled):is(:hover, :focus-visible) {
+  text-decoration: none !important;
+  text-shadow: 0 0 8px color-mix(in srgb, var(--app-accent, #82b7ff) 65%, transparent);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--app-accent, #82b7ff) 55%, transparent));
+}
+.controller-action:focus-visible :is(.controller-key, .keyboard-key) {
+  outline: 2px solid var(--app-accent, #82b7ff);
+  outline-offset: 3px;
+}
+.controller-action:focus-visible:not(.menu-panel-frame, :has(.controller-key, .keyboard-key)) {
+  outline: 2px solid var(--app-accent, #82b7ff) !important;
+}
+.controller-action:disabled { opacity: .45; cursor: default; }
+@media (prefers-reduced-motion: reduce) { .controller-action { transition: none; } }
+html[data-reduce-motion="true"] .controller-action { transition: none; }

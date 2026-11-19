@@ -1,0 +1,57 @@
+@import "tailwindcss";
+/* Installed 3D assets contain no CSS classes. */
+@source not "../public/models/**/*.glb";
+@source not "../public/models/**/*.blend";
+
+html,
+body,
+#root,
+.canvas-container,
+.game-wrapper {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+
+  overscroll-behavior: none;
+  touch-action: none;
+  background: #020617;
+
+  -webkit-user-select: none;
+  user-select: none;
+
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  position: fixed;
+  inset: 0;
+}
+
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+* {
+  box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+button,
+[role="button"] {
+  touch-action: manipulation;
+  user-select: none;
+}
+
+/* Hide scrollbar chrome throughout the game. Scrollable menus still accept
+   touch, wheel and keyboard input; the driving HUD fits without scrolling. */
+* { scrollbar-width: none !important; }
+*::-webkit-scrollbar { display: none; width: 0; height: 0; }
+
+/* App controls use game-style focus/hover feedback, never link underlines. */
+:is(button,[role="button"],.menu-control,.controller-action):is(:hover,:focus-visible),:is(button,[role="button"],.menu-control,.controller-action):is(:hover,:focus-visible) *{text-decoration:none!important;}

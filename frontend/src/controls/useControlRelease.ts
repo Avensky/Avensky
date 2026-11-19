@@ -1,0 +1,38 @@
+import { useConnectionView } from "../store/session/networkViews";
+import { useGameStore } from "../store/presentation/gameStore";
+import { useEffect } from "react";
+import { useUIStore } from "../store/menus/uiStore";
+
+import { usePerformanceOverlayStore } from "../performance/performanceOverlayStore";
+import { canDrive } from "./inputRouting";
+import { useTextKeyboardStore } from "../store/text/keyboardStore";
+
+export function useControlRelease(release: () => void) {
+  useEffect(() => {
+    const blocked = () => {
+      if (!canDrive()) release();
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") release();
+    };
+    const game = useGameStore.subscribe(blocked);
+    const keyboard = useTextKeyboardStore.subscribe(blocked);
+    const ui = useUIStore.subscribe(blocked),
+      inspector = usePerformanceOverlayStore.subscribe(blocked);
+    const network = useConnectionView.subscribe((state, previous) => {
+      if (previous.connected && !state.connected) release();
+    });
+    window.addEventListener("blur", release);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      game();
+      keyboard();
+      ui();
+      inspector();
+      network();
+      window.removeEventListener("blur", release);
+      document.removeEventListener("visibilitychange", hidden);
+      release();
+    };
+  }, [release]);
+}

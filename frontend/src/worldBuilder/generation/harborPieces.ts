@@ -1,0 +1,132 @@
+import data from "./carrierDeck.json" with {type:"json"};
+import type {Piece, LayoutPart, V3} from "../document/layoutDocument.ts";
+import {burkeSize,burkeCollisionParts,burkeKeelY} from "./burkeDeck.ts";
+import {LOUISIANA_SIZE,louisianaCollisionParts} from './navalHullSpecs.ts';
+
+export const CARRIER = "big-e-docked";
+export const DESTROYER="arleigh-burke-docked";
+export const HAWAII_DOCKED='hawaii-rescue-docked';
+export const LOUISIANA_DOCKED='louisiana-docked';
+export const LIFT = "canal-lift";
+// Small enough that a car breaks one panel, rather than removing a whole road edge.
+export const GUARDRAIL_MODULE_METERS = 3.6;
+export const railDamage={enabled:true,hp:5,smallArms:1,cannon:1,bomb:1,rubble:"clear" as const};
+export const carrierSize = data.size as V3;
+export const harborPieces: Piece[] = [{
+  id:CARRIER, label:"Big E · docked flight deck", category:"props", collection:"Harbor Fleet",
+  description:"Level CVN-65 deck. Place the origin at flight-deck height.",
+  size:carrierSize, color:"#677882", parts:data.parts as LayoutPart[],
+}, {
+  id:"highway-support-pier", label:"Elevated highway support pier", category:"roads", collection:"Harbor Highway Infrastructure",
+  description:"Resizable reinforced concrete pier · structural collider · separate from road deck and breakable guardrails.",
+  size:[14,12,3], color:"#848b8e",
+  parts:[
+    {shape:"box",position:[0,.92,0],size:[.94,.14,.38]},
+    ...[-.27,.27].flatMap(x=>[
+      {shape:"box" as const,position:[x,.46,0] as V3,size:[.13,.78,.28] as V3},
+      {shape:"box" as const,position:[x,.055,0] as V3,size:[.24,.11,.42] as V3},
+    ]),
+  ],
+}, {
+  id:"urban-tunnel-shell", label:"Urban underpass shell", category:"tunnels", collection:"Urban Tunnel Kit",
+  description:"Open-ended tunnel envelope · solid roof and sidewalls · no floor, so the road collider stays independent.",
+  size:[16,8,32], color:"#777d80",
+  parts:[
+    {shape:"box",position:[-.47,.5,0],size:[.06,1,1]},
+    {shape:"box",position:[.47,.5,0],size:[.06,1,1]},
+    {shape:"box",position:[0,.94,0],size:[1,.12,1]},
+    ...[-.47,.47].flatMap(z=>[
+      {shape:"box" as const,position:[-.41,.45,z] as V3,size:[.08,.9,.05] as V3},
+      {shape:"box" as const,position:[.41,.45,z] as V3,size:[.08,.9,.05] as V3},
+      {shape:"box" as const,position:[0,.91,z] as V3,size:[.9,.08,.05] as V3},
+    ]),
+  ],
+}, {
+  id:"highway-guardrail", label:"Highway guardrail", category:"road-rails", collection:"Road Rails Kit",
+  description:"Independent 3.6 m impact panel. Road deck and edge protection resize separately.",
+  size:[GUARDRAIL_MODULE_METERS,1.05,.4], color:"#9da9aa",
+  parts:[{shape:"box",position:[0,.68,0],size:[1,.37,.56]},
+    ...[-.46,0,.46].map(x=>({shape:"box" as const,position:[x,.4,.19] as V3,size:[.035,.8,.55] as V3,solid:false}))],
+}, {
+  id:'bridge-lever',label:'Bridge lever',category:'props',collection:'Harbor Modular Bridge Kit',description:'Operate the canal drawbridge from the switch stand.',
+  size:[.72,1.5,.7],color:'#c59346',parts:[
+    {shape:'box',position:[0,.36,0],size:[.64,.72,.70],color:'#545e64'},
+    {shape:'box',position:[0,.82,0],size:[.12,.36,.12],color:'#c59346'},
+    {shape:'box',position:[0,.96,0],size:[.58,.12,.21],color:'#d34c3f'},
+  ],
+}, {
+  id:DESTROYER,label:"Arleigh Burke · escort destroyer",category:"props",collection:"Harbor Fleet",
+  description:"154 m destroyer · static harbor prototype with walkable deck, bridge and hull collision. Buoyancy and weapons come later.",
+  size:burkeSize,color:"#52626b",parts:burkeCollisionParts,
+}, {
+  id:HAWAII_DOCKED,label:'USS Hawaii · rescue vessel (docked)',category:'boats',collection:'Harbor Fleet',
+  description:'Static hull and landing-deck proxy; pilot the dynamic version from the Sandbox BOAT tab.',
+  size:[24,26,154],color:'#445867',parts:[
+    {shape:'box',position:[0,.32,0],size:[.92,.52,.94]},
+    {shape:'box',position:[0,.72,0],size:[.87,.045,.88]},
+  ],
+}, {
+  id:LOUISIANA_DOCKED,label:'USS Louisiana · battleship (docked)',category:'boats',collection:'Harbor Fleet',
+  description:'188 m historical-style battleship · hull, three deck zones and bridge collision; its source GLB contains one merged mesh, so original gun turrets do not animate.',
+  size:LOUISIANA_SIZE,color:'#4e626d',parts:louisianaCollisionParts,
+}, {
+  id:'naval-route-waypoint',label:'Rescue ship · route waypoint',category:'boats',collection:'Harbor Navigation Markers',
+  description:'Place successive markers at SEA LEVEL to record a future cruiser patrol/rescue route. Non-colliding authoring guide.',
+  size:[4,1,4],color:'#40b9d9',solid:false,parts:[
+    {shape:'box',position:[0,.12,0],size:[1,.10,1],color:'#40b9d9',solid:false},
+    {shape:'box',position:[0,.6,0],size:[.12,.8,.12],color:'#f4d48b',solid:false},
+  ],
+}];
+
+export function guardrail(id:string,x1:number,z1:number,x2:number,z2:number,surface:number, rise=0):import("../document/layoutDocument.ts").LayoutObject{
+  const dx=x2-x1,dz=z2-z1,template=harborPieces.find(piece=>piece.id==="highway-guardrail")!;
+  if(Math.hypot(dx,dz)>GUARDRAIL_MODULE_METERS+.001)
+    throw Error(`Guardrail ${id} exceeds one vehicle-length module; use guardrailRun()`);
+  const parts=structuredClone(template.parts);
+  // Local +X points from endpoint 1 toward endpoint 2 on either bank.
+  // Keep posts plumb and move their feet to the deck directly beneath them.
+  if (rise) {
+    for (const part of parts) {
+      part.position[1] += part.position[0] * rise / template.size[1];
+      if (part.solid !== false) part.rise = rise / template.size[1];
+    }
+  }
+  return {id,name:template.label,piece:template.id,position:[(x1+x2)/2,surface,(z1+z2)/2],
+    size:[Math.hypot(dx,dz),template.size[1],template.size[2]],yaw:(-Math.atan2(dz,dx)*180/Math.PI)||0,
+    color:template.color,locked:false,solid:true,parts,destruction:{...railDamage}};
+}
+
+/** Independent impact pieces along a level or graded rail. The requested
+ * surface is the midpoint height; rise is the total end-to-end grade.
+ */
+export function guardrailRun(id:string,x1:number,z1:number,x2:number,z2:number,surface:number,rise=0){
+  const count=Math.max(1,Math.ceil(Math.hypot(x2-x1,z2-z1)/GUARDRAIL_MODULE_METERS));
+  return Array.from({length:count},(_,i)=>{
+    const a=i/count,b=(i+1)/count;
+    return guardrail(`${id}-${i+1}`,x1+(x2-x1)*a,z1+(z2-z1)*a,
+      x1+(x2-x1)*b,z1+(z2-z1)*b,surface+rise*((a+b)/2-.5),rise/count);
+  });
+}
+
+// Recompute the eye from the placed hull, so rotated and resized prefabs keep a
+// viewpoint above the deck. Look toward the nearest bank (city center fallback).
+export function deckPanorama(item:import("../document/layoutDocument.ts").LayoutObject,
+    objects:import("../document/layoutDocument.ts").LayoutObject[]){
+  const [x,y,z]=item.position, yaw=item.yaw*Math.PI/180;
+  const destroyer=[DESTROYER,HAWAII_DOCKED,LOUISIANA_DOCKED].includes(item.piece);
+  const fore=item.size[2]*(destroyer ? .38 : -.28);
+  const deckEye=item.piece===DESTROYER?(-2.85-burkeKeelY)*item.size[1]/burkeSize[1]+3.5:
+    destroyer?item.size[1]*.34:Math.max(5,item.size[1]*.13);
+  const eye:V3=[x+fore*Math.sin(yaw),y+deckEye,z+fore*Math.cos(yaw)];
+  let shore:V3=[0,y,0],nearest=Infinity;
+  for(const o of objects){
+    if(o.piece!=="coastal-land")continue;
+    const distance=(o.position[0]-eye[0])**2+(o.position[2]-eye[2])**2;
+    if(distance<nearest){shore=o.position;nearest=distance;}
+  }
+  let dx=shore[0]-eye[0],dz=shore[2]-eye[2];
+  if(Math.hypot(dx,dz)<1){dx=Math.cos(yaw);dz=-Math.sin(yaw);}
+  const distance=Math.hypot(dx,dz);
+  const target:V3=[eye[0]+dx/distance*120,y+2,eye[2]+dz/distance*120];
+  return {eye,target};
+}

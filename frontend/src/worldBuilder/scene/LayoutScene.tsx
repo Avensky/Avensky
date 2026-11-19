@@ -1,0 +1,422 @@
+import { useThree } from "@react-three/fiber";
+import {
+  OrbitControls,
+  Line,
+  PerspectiveCamera,
+  TransformControls,
+} from "@react-three/drei";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Group, MOUSE, TOUCH } from "three";
+import type { OrbitControls as OrbitControlsImpl, TransformControls as TransformControlsImpl } from "three-stdlib";
+import {
+  footprint,
+  pieceById,
+  snap,
+  type LayoutObject,
+  type V3,
+} from "../document/layoutDocument";
+import type { LayoutSpawn } from "../document/spawnDocument";
+import {
+  localBounds,
+  snapLayoutPosition,
+  type LayoutSnapLock,
+} from "../roads/layoutSnapping";
+import { useBuilderStore } from "../state/builderStore";
+import { useEditorScenePalette } from "./useEditorScenePalette";
+import { layoutAction, useLayoutStore } from "../state/layoutStore";
+import { CARRIER,DESTROYER,HAWAII_DOCKED,LOUISIANA_DOCKED,deckPanorama } from "../generation/harborPieces";
+import {recordedNavalRoute} from '../generation/navalRoutes';
+import { ChunkGuide } from "./ChunkGuide";
+import { LayoutInstances, PieceModel } from "./LayoutMeshes";
+import { SpawnMarkers } from "./SpawnMarkers";
+import { WorldReference } from "./WorldReference";
+import { useExcavationPreview } from '../state/excavationPreview';
+
+function layoutFrame(
+  objects: LayoutObject[],
+  tight = false,
+  cell?: [number, number],
+  spawns: LayoutSpawn[] = [],
+) {
+  const points = [
+      ...objects.flatMap(footprint),
+      ...spawns.map((p) => [p.position[0], p.position[2]]),
+    ],
+    xs = points.map((p) => p[0]),
+    zs = points.map((p) => p[1]);
+  const minX =
+      tight && points.length
+        ? Math.min(...xs)
+        : Math.min(cell ? -cell[0] / 2 : -20, ...xs),
+    maxX =
+      tight && points.length
+        ? Math.max(...xs)
+        : Math.max(cell ? cell[0] / 2 : 20, ...xs);
+  const minZ =
+      tight && points.length
+        ? Math.min(...zs)
+        : Math.min(cell ? -cell[1] / 2 : -20, ...zs),
+    maxZ =
+      tight && points.length
+        ? Math.max(...zs)
+        : Math.max(cell ? cell[1] / 2 : 20, ...zs);
+  const lows = [
+      ...objects.map((o) => o.position[1] + localBounds(o).min[1]),
+      ...spawns.map((p) => p.position[1]),
+    ],
+    highs = [
+      ...objects.map((o) => o.position[1] + localBounds(o).max[1]),
+      ...spawns.map((p) => p.position[1]),
+    ];
+  const minY =
+      tight && (objects.length || spawns.length)
+        ? Math.min(...lows)
+        : Math.min(0, ...lows),
+    maxY =
+      tight && (objects.length || spawns.length)
+        ? Math.max(...highs)
+        : Math.max(0, ...highs);
+  return {
+    center: [
+      (minX + maxX) / 2,
+      (minY + maxY) * (tight ? 0.5 : 0.25),
+      (minZ + maxZ) / 2,
+    ] as V3,
+    span:
+      Math.max(tight ? 10 : 65, maxX - minX, maxZ - minZ, (maxY - minY) * 1.5) *
+      (tight ? 2.4 : 1.65),
+  };
+}
+function SelectedObject({ item }: { item: LayoutObject }) {
+  const mode = useLayoutStore((s) => s.tool),
+    grid = useLayoutStore((s) => s.snap),
+    angle = useLayoutStore((s) => s.angleSnap),
+    wireframe = useLayoutStore((s) => s.wireframe);
+  const navigation = useLayoutStore(s=>s.navigation);
+  const target = useRef<Group>(null),
+    controls = useRef<TransformControlsImpl>(null);
+  const magnetLock = useRef<LayoutSnapLock | null>(null);
+  const held = useRef<{ doc: unknown; id: string } | null>(null),
+    enabled = !item.locked && mode !== "select" && navigation !== "pan";
+  const cancel = useCallback(() => {
+    if (!held.current) return false;
+    held.current = null;
+    magnetLock.current = null;
+    controls.current?.reset();
+    const s = useLayoutStore.getState(),
+      object = s.doc?.objects.find((o) => o.id === s.selected);
+    if (object && target.current) {
+      target.current.position.fromArray(object.position);
+      target.current.scale.fromArray(object.size);
+      target.current.rotation.set(0, (object.yaw * Math.PI) / 180, 0);
+    }
+    return true;
+  }, []);
+  useEffect(() => {
+    const escape = (e: Event) => {
+      if (cancel()) e.preventDefault();
+    };
+    const hidden = () => {
+      if (document.visibilityState === "hidden") cancel();
+    };
+    window.addEventListener("avenlab:cancel-authoring", escape);
+    window.addEventListener("blur", cancel);
+    window.addEventListener("pointercancel", cancel);
+    window.addEventListener("lostpointercapture", cancel);
+    document.addEventListener("visibilitychange", hidden);
+    return () => {
+      window.removeEventListener("avenlab:cancel-authoring", escape);
+      window.removeEventListener("blur", cancel);
+      window.removeEventListener("pointercancel", cancel);
+      window.removeEventListener("lostpointercapture", cancel);
+      document.removeEventListener("visibilitychange", hidden);
+      cancel();
+    };
+  }, [cancel]);
+  return (
+    <TransformControls
+      ref={controls}
+      mode={mode === "select" ? "translate" : mode}
+      enabled={enabled}
+      showX={enabled && mode !== "rotate"}
+      showY={enabled}
+      showZ={enabled && mode !== "rotate"}
+      translationSnap={grid}
+      rotationSnap={(angle * Math.PI) / 180}
+      scaleSnap={0.05}
+      size={0.8}
+      onMouseDown={() => {
+        magnetLock.current = null;
+        held.current = { doc: useLayoutStore.getState().doc, id: item.id };
+      }}
+      onObjectChange={() => {
+        const state = useLayoutStore.getState(),
+          object = target.current;
+        if (!held.current || !object || mode !== "translate" || !state.magnet)
+          return;
+        const result = snapLayoutPosition(
+          item,
+          object.position.toArray() as V3,
+          state.doc?.objects ?? [],
+          state.snapBasis,
+          state.magnetRadius,
+          magnetLock.current,
+        );
+        object.position.fromArray(result.position);
+        object.rotation.y=result.yaw*Math.PI/180;
+        magnetLock.current = result.lock;
+      }}
+      onMouseUp={() => {
+        const drag = held.current,
+          s = useLayoutStore.getState(),
+          object = target.current;
+        held.current = null;
+        magnetLock.current = null;
+        if (!drag || !object || drag.doc !== s.doc || drag.id !== s.selected)
+          return;
+        layoutAction(() =>
+          s.update({
+            position: object.position.toArray() as V3,
+            size: object.scale.toArray() as V3,
+            yaw: (object.rotation.y * 180) / Math.PI,
+          }),
+        );
+        // Invalid transforms restore the committed geometry immediately.
+        const current = useLayoutStore
+          .getState()
+          .doc?.objects.find((o) => o.id === drag.id);
+        if (current) {
+          object.position.fromArray(current.position);
+          object.scale.fromArray(current.size);
+          object.rotation.set(0, (current.yaw * Math.PI) / 180, 0);
+        }
+      }}
+    >
+      <group
+        ref={target}
+        name={`road-${item.id}`}
+        position={item.position}
+        rotation={[0, (item.yaw * Math.PI) / 180, 0]}
+        scale={item.size}
+        onClick={(e) => {
+          if (e.delta < 5) e.stopPropagation();
+        }}
+      >
+        <PieceModel
+          item={item}
+          selected
+          wireframe={wireframe}
+          collisionOnly={wireframe}
+        />
+      </group>
+    </TransformControls>
+  );
+}
+export default function LayoutScene() {
+  const invalidate = useThree((s) => s.invalidate);
+  const activeCamera = useThree((s) => s.camera);
+  const palette = useEditorScenePalette();
+  const navigation = useLayoutStore(s=>s.navigation);
+  const doc = useLayoutStore((s) => s.doc),
+    selected = useLayoutStore((s) => s.selected),
+    placing = useLayoutStore((s) => s.placing),
+    cursor = useLayoutStore((s) => s.cursor),
+    yaw = useLayoutStore((s) => s.placementYaw),
+    grid = useLayoutStore((s) => s.snap),
+    camera = useLayoutStore((s) => s.camera),
+    reference = useLayoutStore((s) => s.reference),
+    wireframe = useLayoutStore((s) => s.wireframe);
+  const focus = useLayoutStore((s) => s.focus),
+    selectedSpawn = useLayoutStore((s) => s.selectedSpawn);
+  const source = useBuilderStore((s) => s.doc),
+    ghost = useRef<Group>(null);
+  const navalRoute=useMemo(()=>recordedNavalRoute(doc?.objects??[]),[doc]);
+  const orbit=useRef<OrbitControlsImpl>(null);
+  const previousFloor=useRef(cursor[1]);
+  useEffect(()=>{
+    // Like a Sims story switch: shift the orbit rig with its working plane.
+    // Otherwise a high-floor grid can be hundreds of metres above the view.
+    const delta=cursor[1]-previousFloor.current;
+    previousFloor.current=cursor[1];
+    if(!delta)return;
+    activeCamera.position.y+=delta;
+    if(orbit.current){orbit.current.target.y+=delta;orbit.current.update();}
+    invalidate();
+  },[cursor[1],activeCamera,invalidate]);
+  const [frame] = useState(() =>
+    layoutFrame(
+      focus === "selected" && selected
+        ? (doc?.objects.filter((o) => o.id === selected) ?? [])
+        : (doc?.objects ?? []),
+      focus === "selected",
+      (reference || doc?.base === "overlay") && source && focus !== "selected"
+        ? source.cell
+        : undefined,
+      focus === "selected" && selectedSpawn
+        ? doc?.spawns?.filter((p) => p.id === selectedSpawn)
+        : doc?.spawns,
+    ),
+  );
+  const excavation = useExcavationPreview(s => s.preview);
+  const preview = excavation?.base === doc ? excavation : null;
+  const selectedObject = preview ? undefined : doc?.objects.find((o) => o.id === selected),
+    piece = placing ? pieceById(placing) : undefined;
+  const [panorama]=useState(()=>focus==="deck" && doc && selectedObject && [CARRIER,DESTROYER,HAWAII_DOCKED,LOUISIANA_DOCKED].includes(selectedObject.piece) ?
+    deckPanorama(selectedObject,doc.objects):null);
+  const phantom = useMemo<LayoutObject | null>(
+    () =>
+      piece
+        ? {
+            id: "preview",
+            name: piece.label,
+            piece: piece.id,
+            position: cursor,
+            size: piece.size,
+            yaw,
+            color: piece.color,
+            locked: false,
+            solid: piece.solid !== false,
+            parts: piece.parts,
+            ...(piece.road ? { road: piece.road } : {}),
+            ...(piece.model ? { model: piece.model } : {}),
+            ...(piece.vehicle ? { vehicle: piece.vehicle } : {}),
+          }
+        : null,
+    [piece, cursor, yaw],
+  );
+  const hoverLock = useRef<LayoutSnapLock | null>(null);
+  const previewPosition = (position: V3) => {
+    const state = useLayoutStore.getState();
+    if (!phantom || !state.magnet) return {position,yaw};
+    const result = snapLayoutPosition(
+      phantom,
+      position,
+      state.doc?.objects ?? [],
+      state.snapBasis,
+      state.magnetRadius,
+      hoverLock.current,
+    );
+    hoverLock.current = result.lock;
+    return result;
+  };
+  const select = useCallback(
+    (id: string | null) => useLayoutStore.getState().select(id),
+    [],
+  );
+  const floor = source?.surface.road_y ?? 0;
+  const activePlane = cursor[1];
+  // Slightly above the water/road skin, so the active floor remains visible
+  // and clickable even at sea level or across an existing bridge deck.
+  const activeGuide = activePlane + .11;
+  return (
+    <group name="layout-authoring-scene">
+      <hemisphereLight args={["#dde7ee", palette.floor, 0.9]} />
+      <directionalLight
+        position={[-60, 100, 40]}
+        intensity={1.5}
+        color="#fff3e4"
+      />
+      <PerspectiveCamera
+        makeDefault
+        position={
+          panorama ? panorama.eye : camera === "top"
+            ? [
+                frame.center[0],
+                frame.center[1] + frame.span * 1.25,
+                frame.center[2] + 0.001,
+              ]
+            : [
+                frame.center[0] + frame.span * 0.65,
+                frame.center[1] + frame.span * 0.65,
+                frame.center[2] + frame.span * 0.7,
+              ]
+        }
+        fov={42}
+        near={1}
+        far={Math.max(3000, frame.span * 10)}
+      />
+      <OrbitControls
+        ref={orbit}
+        makeDefault
+        target={panorama?.target??frame.center}
+        enableRotate={camera !== "top" && navigation !== "pan"}
+        enablePan
+        screenSpacePanning
+        mouseButtons={{LEFT:camera === "top" || navigation === "pan" ? MOUSE.PAN : MOUSE.ROTATE,MIDDLE:MOUSE.DOLLY,RIGHT:MOUSE.PAN}}
+        touches={{ONE:camera === "top" || navigation === "pan" ? TOUCH.PAN : TOUCH.ROTATE,TWO:TOUCH.DOLLY_PAN}}
+        maxPolarAngle={Math.PI / 2 - 0.015}
+        minDistance={3}
+        maxDistance={Math.max(1800, frame.span * 4)}
+      />
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, activeGuide, 0]}
+        onPointerMove={(e) => {
+          if (ghost.current && placing) {
+            ghost.current.visible = true;
+            const pose = previewPosition([snap(e.point.x, grid), cursor[1], snap(e.point.z, grid)]);
+            ghost.current.position.fromArray(pose.position);
+            ghost.current.rotation.y=pose.yaw*Math.PI/180;
+            invalidate();
+          }
+        }}
+        onClick={(e) => {
+          if (e.delta >= 5 || e.button !== 0 || navigation === "pan" || preview) return;
+          e.stopPropagation();
+          if (placing)
+            layoutAction(() =>
+              useLayoutStore
+                .getState()
+                .place(
+                  [snap(e.point.x, grid), cursor[1], snap(e.point.z, grid)],
+                ),
+            );
+          else select(null);
+        }}
+      >
+        <planeGeometry args={[10000, 10000]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+      {doc?.ground !== false && (
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floor - 0.15, 0]}>
+          <planeGeometry args={source ? source.cell : [200, 200]} />
+          <meshStandardMaterial color={palette.floor} roughness={1} />
+        </mesh>
+      )}
+      <gridHelper
+        args={[1000, 200, palette.axis, palette.grid]}
+        position={[0, activeGuide + .015, 0]}
+      />
+      <ChunkGuide floor={floor} />
+      {source && (reference || doc?.base === "overlay") && (
+        <WorldReference source={source} full={reference} />
+      )}
+      <SpawnMarkers />
+      {navalRoute.length>1&&<Line points={navalRoute.map(mark=>[mark.position[0],mark.position[1]+1.3,mark.position[2]] as [number,number,number])}
+        color="#45d9f3" lineWidth={2.5} dashed={false} />}
+      {doc && (
+        <LayoutInstances
+          objects={preview?.doc.objects ?? doc.objects}
+          exclude={placing || preview ? null : selected}
+          onSelect={placing || preview ? undefined : select}
+          wireframe={wireframe}
+          collisionOnly={wireframe || Boolean(preview)}
+        />
+      )}
+      {preview && <LayoutInstances objects={preview.clearance} wireframe />}
+      {selectedObject && !placing && (
+        <SelectedObject key={selectedObject.id} item={selectedObject} />
+      )}
+      {phantom && (
+        <group
+          ref={ghost}
+          position={cursor}
+          rotation={[0, (yaw * Math.PI) / 180, 0]}
+          scale={phantom.size}
+        >
+          <PieceModel item={phantom} ghost />
+        </group>
+      )}
+    </group>
+  );
+}

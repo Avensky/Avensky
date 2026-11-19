@@ -1,0 +1,182 @@
+/* Shared clock, hazard strip and rotary knobs. Landscape density lives in layout.css. */
+.climate-panel {
+  /* Physical LCD lighting is shared by every size; the outer unit still uses
+     the app palette. Keep amber ink paired with its dark inset in light themes. */
+  --cabin-lcd-ink: #ffad55;
+  --cabin-lcd-background: #14100c;
+  --cabin-lcd-border: #6d4725;
+  --cabin-lcd-glow: 0 0 4px #ff7f2440;
+  margin: 0;
+  padding: 2px;
+}
+.console-clock-strip {
+  margin: 0;
+  min-height: 24px;
+  background: var(--cabin-lcd-background, #14100c);
+  color: var(--cabin-lcd-ink, #ffad55);
+  border-radius: 2px;
+  box-shadow: inset 0 1px 3px #0009;
+}
+.console-clock-strip .cabin-clock {
+  box-sizing: border-box;
+  flex: none;
+  min-width: 64px;
+  padding: 4px 16px 4px 6px;
+  border: 1px solid var(--cabin-lcd-border, #6d4725);
+  border-radius: 3px;
+  background: var(--cabin-lcd-background, #14100c);
+  color: var(--cabin-lcd-ink, #ffad55);
+  text-shadow: var(--cabin-lcd-glow);
+  font: 700 12px/1.1 ui-monospace, monospace;
+  letter-spacing: .02em;
+  font-variant-numeric: tabular-nums;
+}
+.console-clock-strip output {
+  font: 11px/1.2 ui-monospace, monospace;
+  white-space: nowrap;
+  color: var(--cabin-lcd-ink, #ffad55);
+  text-shadow: var(--cabin-lcd-glow);
+}
+.console-clock-strip .match-clock {
+  font-size: 6px;
+}
+.climate-three-knobs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  padding: 9px 3px 5px;
+}
+.climate-knob {
+  aspect-ratio: 1;
+  position: relative;
+  border: 2px solid #8395a0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 25%, #3a4650, #111a23 70%);
+  box-shadow: 0 2px 3px #0006;
+  touch-action: none;
+  cursor: grab;
+}
+.climate-knob[aria-disabled="true"] {
+  opacity: 0.4;
+}
+.knob-title {
+  position: absolute;
+  top: -9px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 5px/1 monospace;
+  white-space: nowrap;
+  color: #b1c3ce;
+}
+.knob-ring {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid transparent;
+  border-top-color: #a6c7d6;
+  border-right-color: #758e9d;
+  border-radius: 50%;
+}
+.climate-knob:last-child .knob-ring {
+  border-left-color: #6fbcff;
+  border-right-color: #ef776b;
+}
+.knob-pointer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.knob-pointer:before {
+  content: "";
+  position: absolute;
+  left: calc(50% - 1px);
+  top: 0;
+  width: 2px;
+  height: 7px;
+  background: #eef8fc;
+}
+.climate-three-knobs .climate-knob button {
+  position: absolute;
+  inset: 27% 16% 25%;
+  padding: 0;
+  min-height: 0;
+  border: 1px solid #5e7079;
+  border-radius: 50%;
+  background: #111e29;
+  font: 4px monospace;
+  color: #dceaf1;
+}
+.climate-knob button[aria-pressed="true"] {
+  color: #ffbc53;
+  border-color: #bd9051;
+}
+.climate-knob output {
+  position: absolute;
+  bottom: -5px;
+  left: -5px;
+  right: -5px;
+  text-align: center;
+  font: 5px/1 monospace;
+  pointer-events: none;
+  color: #dbeaf2;
+  background: #07111b9c;
+}
+.climate-panel .climate-three-knobs {
+  justify-items: center;
+}
+.climate-panel .climate-knob {
+  width: 100%;
+  max-width: 72px;
+}
+/* Keep the clock and cabin readings together. Hazards may also be shown as an
+   independent HUD widget when the climate unit is hidden. */
+.climate-panel .console-clock-strip {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 6px;
+}
+.climate-panel .console-clock-strip > :last-child {
+  flex: none;
+}
+.climate-panel .console-clock-strip > .physical-hazard {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  margin: 0;
+}
+.climate-panel[data-controls-visible="false"] {
+  padding-block: 3px;
+}
+
+.climate-panel .console-clock-strip > .physical-hazard[data-shape="round"] {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  margin: 0;
+  padding: 2px !important;
+  border: 1px solid #934143 !important;
+  border-radius: 50%;
+  clip-path: none;
+  background: linear-gradient(#611e20, #351416) !important;
+}
+.climate-panel .physical-hazard[data-shape="round"]::before {
+  content: "";
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+}
+.climate-panel .physical-hazard[data-shape="round"] svg {
+  width: 100%;
+  height: 100%;
+}
+
+.climate-panel .console-clock-strip {
+  justify-content: space-between; gap: 12px; margin-inline-end: 22px;
+  padding: 3px 6px; border: 1px solid var(--cabin-lcd-border); border-radius: 3px;
+}
+.climate-panel .console-clock-strip .cabin-clock {
+  padding: 0; min-width: 0; border: 0; background: transparent;
+}
+.climate-status-row { display: flex; align-items: center; justify-content: center; gap: 8px; }
