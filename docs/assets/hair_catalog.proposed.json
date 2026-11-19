@@ -1,0 +1,14 @@
+{
+  "schema": "draft-only-not-runtime",
+  "hero": "Vesper Vega",
+  "preexistingPack": {"styles": 12, "approval": "provisional", "finalGate": "in-game color check", "testFirst": ["Style 12", "Style 07"]},
+  "newCandidates": [
+    {"id":"curly_mane","name":"Curly Mane","sourceFile":"CURLY 01.FBX","sourceTriangles":55836,"textureFamily":"Curls","status":"candidate"},
+    {"id":"curly_ponytail","name":"Curly Ponytail","sourceFile":"CURLY 02.FBX","sourceTriangles":36788,"textureFamily":"verify-in-authoring","status":"candidate"},
+    {"id":"curly_punk","name":"Curly Punk","sourceFile":"CURLY 03.FBX","sourceTriangles":25496,"textureFamily":"verify-in-authoring","status":"candidate"}
+  ],
+  "proposedColorGroups":["base","roots","highlights","tips"],
+  "headwearModes":["show","compress","hide"],
+  "lodPlan":["hero-close","gameplay-mobile","npc-silhouette"],
+  "licenseNote":"Third-party source assets are not included in this proposed public manifest."
+}
