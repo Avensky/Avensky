@@ -1,0 +1,200 @@
+{
+  "version": 1,
+  "type": "authoring-only-private-batch",
+  "description": "Style-specific UV families and material preset controls. Not a runtime catalog.",
+  "styles": [
+    {
+      "id": "Hair_01",
+      "label": "Side-swept short",
+      "family": "Straight",
+      "rect": [
+        735,
+        98,
+        930,
+        1023
+      ],
+      "triangles": 4029,
+      "priority": 2
+    },
+    {
+      "id": "Hair_02",
+      "label": "Curved bob",
+      "family": "Straight",
+      "rect": [
+        1220,
+        92,
+        1450,
+        1023
+      ],
+      "triangles": 4423,
+      "priority": 2
+    },
+    {
+      "id": "Hair_03",
+      "label": "Two braids",
+      "family": "Straight",
+      "rect": [
+        522,
+        100,
+        718,
+        1023
+      ],
+      "triangles": 6980,
+      "priority": 2
+    },
+    {
+      "id": "Hair_04",
+      "label": "Short with bangs",
+      "family": "Straight",
+      "rect": [
+        1496,
+        92,
+        1664,
+        1023
+      ],
+      "triangles": 4397,
+      "priority": 3
+    },
+    {
+      "id": "Hair_05",
+      "label": "Rounded bob",
+      "family": "Straight",
+      "rect": [
+        318,
+        94,
+        524,
+        1023
+      ],
+      "triangles": 5284,
+      "priority": 2
+    },
+    {
+      "id": "Hair_06",
+      "label": "Straight with bangs",
+      "family": "Straight",
+      "rect": [
+        320,
+        96,
+        525,
+        1023
+      ],
+      "triangles": 5561,
+      "priority": 2
+    },
+    {
+      "id": "Hair_07",
+      "label": "Long waves",
+      "family": "Straight",
+      "rect": [
+        953,
+        1082,
+        1180,
+        2035
+      ],
+      "triangles": 7978,
+      "priority": 1
+    },
+    {
+      "id": "Hair_08",
+      "label": "Bob with long back",
+      "family": "Straight",
+      "rect": [
+        325,
+        1028,
+        540,
+        2045
+      ],
+      "triangles": 6731,
+      "priority": 2
+    },
+    {
+      "id": "Hair_09",
+      "label": "Swept short",
+      "family": "Straight",
+      "rect": [
+        520,
+        103,
+        722,
+        1023
+      ],
+      "triangles": 7862,
+      "priority": 3
+    },
+    {
+      "id": "Hair_10",
+      "label": "Asymmetric bob",
+      "family": "Straight",
+      "rect": [
+        973,
+        100,
+        1180,
+        1023
+      ],
+      "triangles": 4252,
+      "priority": 3
+    },
+    {
+      "id": "Hair_11",
+      "label": "Flipped curls",
+      "family": "Curls",
+      "rect": [
+        458,
+        1040,
+        647,
+        2045
+      ],
+      "triangles": 15573,
+      "priority": 1
+    },
+    {
+      "id": "Hair_12",
+      "label": "Long with bangs",
+      "family": "Straight",
+      "rect": [
+        735,
+        98,
+        930,
+        1023
+      ],
+      "triangles": 8399,
+      "priority": 1
+    }
+  ],
+  "presets": {
+    "espresso": {
+      "label": "Espresso",
+      "base": "#4c382b",
+      "roots": "#211814",
+      "highlights": "#745444",
+      "tips": "#594336"
+    },
+    "dark_auburn": {
+      "label": "Dark Auburn",
+      "base": "#5a342c",
+      "roots": "#2b1a17",
+      "highlights": "#98604a",
+      "tips": "#7b4835"
+    },
+    "ash_brown": {
+      "label": "Ash Brown",
+      "base": "#6c625c",
+      "roots": "#3a3431",
+      "highlights": "#958882",
+      "tips": "#80756e"
+    },
+    "caramel_balayage": {
+      "label": "Caramel Balayage",
+      "base": "#69513e",
+      "roots": "#2b211b",
+      "highlights": "#ad8357",
+      "tips": "#c49a68"
+    }
+  },
+  "texture_resolution": [
+    256,
+    1024
+  ],
+  "material_output_format": "RGBA sRGB baseColor with alpha, RGB tangent normal, RGB occlusion/roughness/metallic",
+  "geometry_rule": "No changes to source fitted positions, skin weights, morphs or rig",
+  "copyright": "No source textures or commercial asset meshes may be committed to public repo without verified redistribution rights."
+}
