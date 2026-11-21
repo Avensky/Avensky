@@ -43,6 +43,10 @@ fn resolve_social_path(
         anyhow::ensure!(!path.as_os_str().is_empty(), "AVENLAB_SOCIAL_PATH cannot be empty");
         if deployment != Deployment::Development {
             anyhow::ensure!(path.is_absolute(), "AVENLAB_SOCIAL_PATH must be absolute outside development");
+            anyhow::ensure!(
+                !path.components().any(|part| part == std::path::Component::ParentDir),
+                "AVENLAB_SOCIAL_PATH cannot contain .. outside development"
+            );
         }
         match deployment {
             Deployment::Staging => anyhow::ensure!(
@@ -123,6 +127,11 @@ mod tests {
         assert!(resolve_social_path(Deployment::Staging, Some(prod), base).is_err());
         assert!(resolve_social_path(Deployment::Test, Some(prod), base).is_err());
         assert!(resolve_social_path(Deployment::Production, Some(staging), base).is_err());
+        assert!(resolve_social_path(
+            Deployment::Staging,
+            Some(Path::new("/data/staging/../social.json")),
+            base
+        ).is_err());
     }
 
     #[test]
