@@ -39,6 +39,7 @@ mod world;
 
 mod alpha;
 mod capacity_bench;
+mod deployment_env;
 mod server;
 mod social;
 mod world_sessions;
