@@ -26,6 +26,8 @@ test("production uses secure live API only on the intended play domain", () => {
     /Production multiplayer only connects/);
   assert.throws(() => resolveRustWebSocketUrl({ ...production, pageUrl: "https://staging.avensky.com/" }),
     /Production multiplayer only connects/);
+  assert.throws(() => resolveRustWebSocketUrl({ ...production, configuredUrl: "wss://api-staging.avensky.com/ws/" }),
+    /must connect to api.avensky.com/);
 });
 
 test("staging and test must configure their own socket", () => {
