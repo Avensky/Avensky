@@ -1,4 +1,4 @@
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame } from "@react-three/fiber";
 import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Mesh, MeshStandardMaterial, Vector3, type Group, type Object3D } from "three";
@@ -21,7 +21,7 @@ function BagFallback({ colors }: { colors?: PieceColors }) {
 }
 
 function BagModel({ url, colors }: { url: string; colors?: PieceColors }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useAssetGLTF(url);
   const model = useMemo(() => {
     const copy = scene.clone();
     const grip = copy.getObjectByName("Grip_Handle");

@@ -1,3 +1,4 @@
+import { assetUrl } from "../../assets/runtimeAssets";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Suspense, useMemo, useRef, useState } from "react";
 import {
@@ -164,7 +165,7 @@ function collisionDraws(a: ModelAsset) {
 }
 function GarageVisual({ item, ghost }: { item: LayoutObject; ghost: boolean }) {
   const a = modelAsset(item.model!.asset)!,
-    gltf = useLoader(GarageGLTFLoader, a.lods[0].url),
+    gltf = useLoader(GarageGLTFLoader, assetUrl(a.lods[0].url)),
     draws = useMemo(() => modelDraws(gltf.scene, a), [gltf.scene, a]);
   return (
     <group dispose={null}>

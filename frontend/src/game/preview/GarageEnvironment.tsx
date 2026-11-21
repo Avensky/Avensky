@@ -1,5 +1,6 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { Environment, Html, Lightformer, useGLTF } from "@react-three/drei";
+import { Environment, Html, Lightformer } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { createPortal, useThree } from "@react-three/fiber";
 import { Box3, BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
@@ -74,7 +75,7 @@ function GarageModel({ turntable, onPlatformReady, onSettled, accentOverride = n
   const environmentReflections = usePreferencesStore(
     (s) => s.garageEffects.environmentReflections,
   );
-  const { scene } = useGLTF(GARAGE_MODEL_PATH, "/draco/");
+  const { scene } = useAssetGLTF(GARAGE_MODEL_PATH, "/draco/");
   const prepared = useMemo(() => {
     const display = prepareGarageDisplay(scene);
     display.root.scale.multiplyScalar(GARAGE_DISPLAY_SCALE);

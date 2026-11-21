@@ -1,10 +1,11 @@
-import {Detailed,useGLTF} from '@react-three/drei';
+import { Detailed } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import {useMemo} from 'react';
 import {useRenderSettingsStore} from '../../store/presentation/renderSettingsStore';
 import {cloneStaticHull,fleetDetailDistance} from './fleetHullPolicy';
 
 function Hull({path}:{path:string}){
-  const {scene}=useGLTF(path);
+  const {scene}=useAssetGLTF(path);
   const instance=useMemo(()=>cloneStaticHull(scene),[scene]);
   return <primitive object={instance} dispose={null}/>;
 }

@@ -1,5 +1,5 @@
 import {vehicleModelUrl} from './assetCatalog.ts';
-import {useGLTF} from '@react-three/drei';
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import {useFrame} from '@react-three/fiber';
 import {useMemo,useRef} from 'react';
 import type {Group,Object3D} from 'three';
@@ -15,7 +15,7 @@ const SCALE:[number,number,number]=[12,12,31];
 export function NavalVessel({entityId,model='hawaii-rescue'}:{entityId:string;model?:'hawaii-rescue'|'louisiana'}){
   const body=useRef<Group>(null);
   const {getInterpolated}=useVehiclePhysicsInterpolator(entityId);
-  const {scene}=useGLTF(model==='louisiana'?LOUISIANA:HAWAII);
+  const {scene}=useAssetGLTF(model==='louisiana'?LOUISIANA:HAWAII);
   useLiveAppearance(body, model, entityId);
   const {root,radars,launchers}=useMemo(()=>{
     const root=scene.clone(true),radars:Object3D[]=[],launchers:Object3D[]=[];

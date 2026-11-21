@@ -9,7 +9,7 @@ import {
   useRef,
 } from "react";
 import type { PropsWithChildren } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { useFrame } from "@react-three/fiber";
 import { Group, MathUtils } from "three";
 
@@ -36,7 +36,7 @@ export const Supra = forwardRef<Group, SupraProps>(function Supra(
   { children, entityId },
   ref,
 ) {
-  const { scene } = useGLTF(MODEL_PATH);
+  const { scene } = useAssetGLTF(MODEL_PATH);
   const vehicleGroupRef = useRef<Group>(null!);
   const vehicleVisualGroupRef = useRef<Group>(null!);
   useLiveAppearance(vehicleVisualGroupRef, "supra", entityId);

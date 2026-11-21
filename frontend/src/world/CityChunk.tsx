@@ -1,7 +1,8 @@
 import {cityWallScene} from './facades/cityWallScene';
 import { memo, useMemo } from "react";
 import { useRenderSettingsStore } from "../store/presentation/renderSettingsStore";
-import { Clone, useGLTF } from "@react-three/drei";
+import { Clone } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { cityMaterialScene } from "./cityMaterials";
 
 type Props = {
@@ -20,7 +21,7 @@ export const CityChunk = memo(function CityChunk({
   quaternion = [0, 0, 0, 1],
   scale = [1, 1, 1],
 }: Props) {
-  const gltf = useGLTF(path, "/draco/");
+  const gltf = useAssetGLTF(path, "/draco/");
   const shadows = useRenderSettingsStore((s) => s.shadows);
   const opaqueMaterials = useRenderSettingsStore((s) => s.opaqueCityMaterials);
   const scene = useMemo(
