@@ -37,11 +37,7 @@ pub struct Server {
 }
 impl Server {
     pub fn load() -> anyhow::Result<Self> {
-        let path = std::env::var_os("AVENLAB_SOCIAL_PATH")
-            .map(PathBuf::from)
-            .unwrap_or_else(|| {
-                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("runtime/social.json")
-            });
+        let path = crate::deployment_env::social_data_path()?;
         let mut data = SocialData::load(&path)?;
         matches::recover_archives(&path, &mut data)?;
         let managed_worlds = data

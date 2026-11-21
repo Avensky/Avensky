@@ -29,6 +29,10 @@ If you received the transfer bundle, follow its **START-HERE.md** before install
 
 The Rust server consumes the versioned `avenlab-physics` crate. The client receives game state over WebSocket. A future experiment can use the same model or simulation package at that boundary. Soft-body solvers and automotive signal research belong in private projects. Review redistribution rights for each model before a public source release or portfolio deployment.
 
+## Deployment environments
+
+Development, staging, and production use different game WebSocket endpoints and server-side social-data files/volumes. The production browser client uses `wss://api.avensky.com/ws/`; staging must explicitly configure its own endpoint and may not use live player data. See [Deployment environments](docs/DEPLOYMENT_ENVIRONMENTS.md) for Vite modes, local build commands, and the separate `compose.staging.yaml` example. The Rust server currently persists to `social.json`, not a SQL database.
+
 ## Verification
 
 ```sh

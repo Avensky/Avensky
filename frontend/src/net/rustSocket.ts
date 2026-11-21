@@ -1,3 +1,4 @@
+import { resolveRustWebSocketUrl } from "./deploymentEnvironment";
 import {SnapshotDecoder} from './snapshotDecoder';
 import {isDriverAppearance} from '../game/characters/driverAppearance';
 import {SnapshotDelivery, type SnapshotReceipt} from './snapshotDelivery';
@@ -325,19 +326,12 @@ export function getInputSenderStats() {
 }
 
 function getRustWsUrl() {
-  if (import.meta.env.VITE_RUST_WS_URL) return import.meta.env.VITE_RUST_WS_URL;
-  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-  // A remote browser must use the server hostname, not its own localhost.
-  if (import.meta.env.DEV) {
-    const url = new URL(window.location.href);
-    url.protocol = protocol;
-    url.port = "9001";
-    url.pathname = "/";
-    url.search = "";
-    url.hash = "";
-    return url.toString();
-  }
-  return `${protocol}//${window.location.host}/ws/`;
+  return resolveRustWebSocketUrl({
+    mode: import.meta.env.MODE,
+    deployment: import.meta.env.VITE_DEPLOY_ENV,
+    configuredUrl: import.meta.env.VITE_RUST_WS_URL,
+    pageUrl: window.location.href,
+  });
 }
 
 function clearTimers() {
