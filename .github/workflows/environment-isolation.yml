@@ -26,6 +26,10 @@ jobs:
           node-version: "24"
       - name: Verify environment-specific WebSocket routing
         run: node --test frontend/tests/deployment-environment.test.mjs
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+      - name: Type-check frontend integration
+        run: npm --prefix frontend run typecheck
 
   server-environment:
     runs-on: ubuntu-latest
@@ -34,3 +38,5 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify persistent data paths are isolated
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml deployment_env::tests
+      - name: Validate isolated staging Docker Compose file
+        run: docker compose -f compose.staging.yaml config --quiet
