@@ -4,8 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node ../scripts/sync-vehicle-asset-catalog.mjs && node ../scripts/sync-world-builder-map.mjs && node ../scripts/sync-road-kit-catalog.mjs && node ../scripts/build-road-colliders.mjs --check && node ../scripts/build-placement-colliders.mjs --check && node ../scripts/build-map-kit-colliders.mjs --check && node scripts/build-heroes-vehicle-previews.mjs && node scripts/build-harbor-facades.mjs && node scripts/build-character-lods.mjs && node scripts/build-wardrobe-pieces.mjs",
-    "prebuild": "node ../scripts/sync-vehicle-asset-catalog.mjs && node ../scripts/sync-world-builder-map.mjs && node ../scripts/sync-road-kit-catalog.mjs && node ../scripts/build-road-colliders.mjs --check && node ../scripts/build-placement-colliders.mjs --check && node ../scripts/build-map-kit-colliders.mjs --check && node scripts/build-heroes-vehicle-previews.mjs && node scripts/build-harbor-facades.mjs && node scripts/build-character-lods.mjs && node scripts/build-wardrobe-pieces.mjs",
+    "predev": "node scripts/prepare-build.mjs",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
@@ -14,7 +13,10 @@
     "test:performance": "node --test tests/*.test.mjs",
     "audit:wardrobe": "node scripts/audit-wardrobe.mjs",
     "build:roads": "node ../scripts/build-road-colliders.mjs && node ../scripts/build-road-test-map.mjs",
-    "build:prefabs": "node ../scripts/build-placement-colliders.mjs && node ../scripts/build-workshop-yard.mjs"
+    "build:prefabs": "node ../scripts/build-placement-colliders.mjs && node ../scripts/build-workshop-yard.mjs",
+    "assets:lock-colliders": "node scripts/prepare-build.mjs colliders",
+    "assets:prepare": "node scripts/prepare-staging-assets.mjs",
+    "test:assets": "node --test tests/cloud-assets.test.mjs"
   },
   "dependencies": {
     "@react-three/drei": "10.7.7",

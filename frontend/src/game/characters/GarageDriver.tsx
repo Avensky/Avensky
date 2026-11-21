@@ -3,7 +3,8 @@ import { CharacterTurntable } from "./CharacterTurntable";
 import { usesFittedAnimation } from "./animationFit";
 import { clothingColors } from "./clothingPieces";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { Html, useGLTF } from "@react-three/drei";
+import { Html } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Object3D } from "three";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
@@ -29,7 +30,7 @@ type VillagerPlayback = {
 };
 
 function WardrobeAsset({ url, onReady }: { url: string; onReady: WardrobeAssetListener }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useAssetGLTF(url);
   useLayoutEffect(() => onReady(url, scene), [url, scene, onReady]);
   return null;
 }

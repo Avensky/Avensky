@@ -1,3 +1,4 @@
+import { assetUrl } from "../../assets/runtimeAssets";
 import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import { Suspense, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Color, Group, InstancedMesh, Matrix4, Object3D, Vector3 } from "three";
@@ -59,7 +60,7 @@ function LocalProxy({
 }
 function VehicleVisual({ item }: { item: LayoutObject }) {
   const a = vehicleAsset(item.vehicle!.asset)!,
-    gltf = useLoader(GarageGLTFLoader, a.url),
+    gltf = useLoader(GarageGLTFLoader, assetUrl(a.url)),
     root = useMemo(
       () => cloneSkeleton(vehicleTemplate(gltf.scene, a.id)),
       [gltf.scene, a.id],

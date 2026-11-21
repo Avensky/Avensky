@@ -19,7 +19,7 @@ import {
   Vector3,
 } from "three";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 
 import { useNetworkStore, useInputStore, useUIStore } from "../store";
 import { useVehiclePhysicsInterpolator } from "../hooks/usePhysicsInterpolator";
@@ -66,7 +66,7 @@ export const Ae86 = forwardRef<Group, Ae86Props>(function Ae86(
   { children, entityId },
   ref: React.Ref<Group>,
 ) {
-  const { scene } = useGLTF(MODEL_PATH); //load the model and get the scene
+  const { scene } = useAssetGLTF(MODEL_PATH); //load the model and get the scene
   const isVehiclePreview = useUIStore(
     (state) =>
       state.screen === "sandbox_setup",

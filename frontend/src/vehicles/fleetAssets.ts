@@ -1,3 +1,4 @@
+import { assetUrl } from "../assets/runtimeAssets";
 import {vehicleLodUrl} from './assetCatalog.ts';
 import {BufferGeometry, BufferAttribute, Color, Group, Mesh, MeshStandardMaterial} from 'three';
 import {GLTFLoader} from 'three/examples/jsm/loaders/GLTFLoader.js';
@@ -21,6 +22,7 @@ function loadNext(){
     const decoder=new DRACOLoader().setDecoderPath('/draco/').setWorkerLimit(2);
     loader=new GLTFLoader().setDRACOLoader(decoder);
   }
+  const currentLoader=loader;
   const now=Date.now();
   const waiting=[...entries.values()].filter(e=>e.users>0&&!e.art&&!e.loading);
   waiting.sort((a,b)=>rank[b.tier]-rank[a.tier]);
@@ -30,7 +32,7 @@ function loadNext(){
     if(e.retryAt>now){nextRetry=Math.min(nextRetry,e.retryAt);continue;}
     if(active>=2)break;
     active++;e.loading=true;
-    loader.loadAsync(vehicleLodUrl(e.model,e.tier)).then(gltf=>{
+    Promise.resolve().then(() => currentLoader.loadAsync(assetUrl(vehicleLodUrl(e.model,e.tier)))).then(gltf=>{
       e.art={scene:gltf.scene,tier:e.tier};revision++;listeners.forEach(fn=>fn());
     }).catch(()=>{e.retryAt=Date.now()+15000;}).finally(()=>{e.loading=false;active--;loadNext();});
   }

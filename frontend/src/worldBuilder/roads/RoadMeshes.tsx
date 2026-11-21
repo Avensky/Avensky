@@ -1,4 +1,4 @@
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Suspense, useMemo, useRef, useState } from "react";
 import {
@@ -131,7 +131,7 @@ function RoadVisual({
   ghost: boolean;
 }) {
   const asset = roadAsset(item.road!.asset)!,
-    gltf = useGLTF(asset.lods[lod].url),
+    gltf = useAssetGLTF(asset.lods[lod].url),
     draws = useMemo(() => visualDraws(gltf.scene, asset), [gltf.scene, asset]);
   return (
     <group dispose={null}>

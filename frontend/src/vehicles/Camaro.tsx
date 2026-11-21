@@ -12,7 +12,7 @@ import {
   useRef,
 } from "react";
 import type { PropsWithChildren } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { Group, MathUtils, Matrix4, Mesh } from "three";
 import {
   CAMARO_GLASS_PARTS as GLASS_PARTS,
@@ -61,7 +61,7 @@ export const Camaro = forwardRef<Group, CamaroProps>(function Camaro(
   ref,
 ) {
   // Load the car model
-  const { scene } = useGLTF(MODEL_PATH);
+  const { scene } = useAssetGLTF(MODEL_PATH);
 
   // Refs for car group
   const vehicleGroupRef = useRef<Group>(null!);

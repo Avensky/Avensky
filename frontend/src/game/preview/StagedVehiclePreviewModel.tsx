@@ -1,5 +1,5 @@
 import { Suspense, useLayoutEffect, useState, type ComponentProps, type ReactNode } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { VEHICLE_MODEL_PATHS } from "../../vehicles/tools/vehicleModelPaths";
 import { VehiclePreviewModel } from "./VehiclePreviewModel";
@@ -7,7 +7,7 @@ import { VehiclePreviewModel } from "./VehiclePreviewModel";
 // Suspend only the detailed request. The displayed car keeps its scene, paint,
 // and driver placement until the replacement can mount synchronously from cache.
 function WaitForDetailedVehicle({ path, onReady }: { path: string; onReady: (ready: true) => void }) {
-  useGLTF(path, "/draco/");
+  useAssetGLTF(path, "/draco/");
   useLayoutEffect(() => onReady(true), [onReady]);
   return null;
 }

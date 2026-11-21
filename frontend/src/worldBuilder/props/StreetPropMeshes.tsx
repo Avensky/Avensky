@@ -1,5 +1,5 @@
 import { Suspense, useLayoutEffect, useMemo, useRef, type ReactNode } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { InstancedMesh, MathUtils, Mesh, Object3D } from "three";
 import type { LayoutObject } from "../document/layoutDocument";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
@@ -7,7 +7,7 @@ import { streetProp } from "./streetPropCatalog";
 
 const kit = "/models/roads/Downtown_Roadworks.glb";
 function usePropMesh(piece:string) {
-  const {nodes} = useGLTF(streetProp(piece)?.source??kit, '/draco/');
+  const {nodes} = useAssetGLTF(streetProp(piece)?.source??kit, '/draco/');
   const mesh = nodes[streetProp(piece)!.node];
   if (!(mesh instanceof Mesh)) throw Error("Missing street prop: " + piece);
   return mesh;

@@ -1,5 +1,5 @@
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import {
   Suspense,
   useLayoutEffect,
@@ -141,7 +141,7 @@ function CityBuildings({
   items: LayoutObject[];
   onSelect?: (id: string) => void;
 }) {
-  const { scene } = useGLTF(
+  const { scene } = useAssetGLTF(
     "/models/harbor-generated/dock-facades.glb",
     "/draco/",
   );

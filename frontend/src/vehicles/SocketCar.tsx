@@ -1,5 +1,5 @@
 import { useMemo, useRef } from 'react';
-import { useGLTF } from '@react-three/drei';
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { useFrame } from '@react-three/fiber';
 import { Group, MathUtils } from 'three';
 import { useVehiclePhysicsInterpolator } from '../hooks/usePhysicsInterpolator';
@@ -13,7 +13,7 @@ const corners = ['fl', 'fr', 'rl', 'rr'] as const;
 /** The exported hub is the steering/suspension pivot. Only SPIN carries axle
  * rotation; its sibling CALIPER follows the wheel around corners. */
 export function SocketCar({ entityId, model }: { entityId: string; model: "enforcer" | "interceptor" | "charger70" | "skyline34" | "timecar" | "cx30" | "mini" | "fortuner" | "landcruiser" | "sierra" }) {
-  const { scene } = useGLTF(VEHICLE_MODEL_PATHS[model], "/draco/");
+  const { scene } = useAssetGLTF(VEHICLE_MODEL_PATHS[model], "/draco/");
   const body = useRef<Group>(null), visual = useRef<Group>(null);
   const { getInterpolated } = useVehiclePhysicsInterpolator(entityId);
   const rig = useMemo(() => {

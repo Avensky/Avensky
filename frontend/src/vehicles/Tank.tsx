@@ -13,7 +13,7 @@ import { Group, Vector3, Quaternion, type Object3D } from "three";
 import {worldAim} from '../combat/turretPresentation';
 import {weaponVisuals} from "../combat/weaponVisuals";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { getTankParts } from "./tools/getTankParts";
 
 import { useUIStore } from "../store/menus/uiStore";
@@ -30,7 +30,7 @@ export const Tank = forwardRef<Group, TankProps>(function Tank(
   { children, entityId, turretRotation = 0, cannonElevation = 0 },
   ref,
 ) {
-  const { scene } = useGLTF(MODEL_PATH);
+  const { scene } = useAssetGLTF(MODEL_PATH);
   const root = useRef<Group>(null!);
   const visual = useRef<Group>(null!);
   const turret = useRef<Group | null>(null);

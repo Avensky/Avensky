@@ -1,7 +1,7 @@
 import {vehicleLodUrl,vehicleModelUrl} from '../../vehicles/assetCatalog.ts';
 import {Component, Suspense, useEffect, useMemo, useRef, type ReactNode} from 'react';
 import {Canvas, useFrame} from '@react-three/fiber';
-import {useGLTF} from '@react-three/drei';
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import {Box3, Group, Mesh, Vector3} from 'three';
 import {RESCUE_DURATION, rescueFlight} from './rescueFlight';
 
@@ -11,8 +11,8 @@ class SceneBoundary extends Component<{children:ReactNode},{failed:boolean}> {
   render(){return this.state.failed?<p role="status">Extraction preview unavailable.</p>:this.props.children;}
 }
 function Pickup({model,still,finish}:{model:string;still:boolean;finish:()=>void}) {
-  const car=useGLTF(vehicleLodUrl(model,'near'),'/draco/').scene;
-  const source=useGLTF(vehicleModelUrl('rescue-helicopter'),'/draco/').scene;
+  const car=useAssetGLTF(vehicleLodUrl(model,'near'),'/draco/').scene;
+  const source=useAssetGLTF(vehicleModelUrl('rescue-helicopter'),'/draco/').scene;
   const vehicle=useMemo(()=>car.clone(true),[car]);
   const roof=useMemo(()=>new Box3().setFromObject(vehicle).max.y,[vehicle]);
   const aircraft=useMemo(()=>{
