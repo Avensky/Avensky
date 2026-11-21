@@ -1,0 +1,24 @@
+# Separate project, port, data volume and social.json path from the live app.
+# Production continues to use /opt/avensky/app/compose.yaml and app_avensky_data.
+name: avensky-staging
+services:
+  game:
+    build:
+      context: .
+      dockerfile: avenlab-server/Dockerfile
+    restart: unless-stopped
+    environment:
+      AVENLAB_ENV: "staging"
+      AVENLAB_BIND: "0.0.0.0:9001"
+      AVENLAB_SOCIAL_PATH: "/data/staging/social.json"
+      AVENLAB_MAX_PLAYERS: "6"
+      AVENLAB_MAX_ACTIVE_WORLDS: "2"
+      AVENLAB_ALPHA_LIMITS: "1"
+    ports:
+      - "127.0.0.1:9002:9001"
+    volumes:
+      - avensky_staging_data:/data
+    security_opt:
+      - no-new-privileges:true
+volumes:
+  avensky_staging_data:
