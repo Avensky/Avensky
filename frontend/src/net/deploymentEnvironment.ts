@@ -58,6 +58,8 @@ export function resolveRustWebSocketUrl(options: WebSocketEnvironment): string {
     throw new Error("VITE_RUST_WS_URL must be a WebSocket URL without credentials, query or fragment");
   if (environment !== "production" && url.hostname === LIVE_API_HOST)
     throw new Error("Non-production Avensky builds cannot connect to the live multiplayer endpoint");
+  if (environment === "production" && url.hostname !== LIVE_API_HOST)
+    throw new Error("Production multiplayer must connect to api.avensky.com");
   if (environment === "production" && url.protocol !== "wss:")
     throw new Error("Production multiplayer requires wss://");
   if (page.protocol === "https:" && url.protocol !== "wss:")
