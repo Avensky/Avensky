@@ -340,8 +340,10 @@ Vite after adding them. Compatible revisions keep their authored shape.
 Missing or mismatched revisions use the original skirt and its automatic
 waistband fit.
 
-Equipping a complete outfit uses the existing autosave. Keyboard and controller
-navigation work in the catalog and outfit details.
+Selecting a complete outfit previews it. Equip outfit sends the approved look
+to the connected player profile immediately. Discard preview restores the
+equipped look. Trial-only combinations can still be saved as private fitting
+room outfits.
 
 ## Garment authoring and validation
 

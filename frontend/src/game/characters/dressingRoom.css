@@ -45,6 +45,12 @@
   gap: 2px;
 }
 .dressing-camera-shortcuts .dressing-wearable-shortcuts { --fitting-tool-size: var(--dressing-camera-rail); }
+.dressing-preview-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  pointer-events: auto;
+}
 .character-page--editor.character-page--dressing:where(:has(> .dressing-wardrobe > .dressing-catalog:not([hidden]))) {
   --dressing-left: var(--dressing-catalog-rail);
 }

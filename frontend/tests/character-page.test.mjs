@@ -439,6 +439,11 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await browseWardrobe('outfits');
     assert.equal(find('.dressing-color-panel').hidden, true, 'browsing dismisses the color palette');
     await click('[data-wardrobe-item=race-crew]');
+    assert(find('[data-equip-outfit]'));
+    assert.equal(requests.length, 1, 'browsing an approved outfit does not write to the profile');
+    await click('[data-discard-outfit-preview]');
+    assert.equal(find('[data-outfit-preview]').dataset.outfitPreview, 'night-run');
+    await click('[data-wardrobe-item=race-crew]');
     assert.equal(cameraView('Coat').getAttribute('aria-pressed'), 'true');
     await click('[aria-label="Open clothing colors"]');
     const themes = find('[aria-label="Color combinations"]');
@@ -483,8 +488,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await select('Animation clothing fit', 'fitted');
     await click('#character-editor-tab-appearance');
     assert.equal(requests.length, 1);
+    assert.ok(find('[data-equip-outfit]'), `Equip action for ${JSON.stringify(drafts.at(-1))}`);
+    await click('[data-equip-outfit]');
+    assert.equal(requests.length, 2, 'equip submits the approved result immediately');
+    assert.equal(requests[1].character.outfit, 'race-crew');
     await act(async () => t.mock.timers.tick(350));
-    assert.equal(requests.length, 2, 'rapid changes coalesce');
+    assert.equal(requests.length, 2, 'equip also sends pending changes in a single write');
     assert.equal(requests[1].character.appearance.eye_color, 'obsidian');
     assert.equal(requests[1].character.appearance.brow_color, 'copper');
     assert.equal(requests[1].character.appearance.skin, 'deep');
@@ -632,6 +641,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await browseWardrobe('tops');
     await click('[data-wardrobe-item=top-01]');
     assert.deepEqual(drafts.at(-1).garments, { skirt: 'gothic-skirt-04', top: 'top-01' });
+    assert.equal(find('[data-equip-outfit]'), null, 'individual trial pieces stay in the fitting room');
     await click('[aria-label="Open clothing colors"]');
     await click('button[aria-label="Gothic Pink"]');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95');
@@ -650,6 +660,11 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(drafts.at(-1).garments, undefined);
     assert.deepEqual(drafts.at(-1).appearance?.item_colors, { 'underwear:briefs': { color: '#101015', accent: '#ff2d95' } },
       'underwear dye persists across outfits while the trial top dye stays in its preview');
+    await click('[data-equip-outfit]');
+    assert.equal(requests[4].character.outfit, 'shop-crew');
+    assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
+    assert.equal(requests[4].character.appearance.hair, 'cropped');
+    await acknowledge(requests[4], requests[4].character);
     await click('#character-editor-tab-identity');
     await click('[aria-label="Character model"] [data-character-option="jules-okafor"]');
     assert.equal(drafts.at(-1).outfit, 'race-crew');
@@ -657,15 +672,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await act(async () => social.getState().reset());
     await select('Hair color', 'copper');
     await act(async () => t.mock.timers.tick(350));
-    assert.equal(requests.length, 4);
+    assert.equal(requests.length, 5);
     assert.equal(readLocalCharacter(), undefined, 'a known profile continues queuing edits while disconnected');
     assert.equal(drafts.at(-1).id, 'jules-okafor', 'a disconnect keeps the latest draft');
     await act(async () => social.getState().receive({ ...view, profile: { ...view.profile, progression: serverProgression } }));
-    assert.equal(requests[4].character.outfit, 'shop-crew', 'pending female edits resume on reconnect');
-    assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
-    assert.equal(requests[4].character.appearance.hair, 'cropped');
-    await acknowledge(requests[4], requests[4].character);
-    assert.equal(drafts.at(-1).id, 'jules-okafor', 'an acknowledgement for another model does not change the preview');
     assert.equal(requests[5].character.outfit, 'race-crew');
     assert.equal(requests[5].character.appearance.hair_color, 'copper');
     await acknowledge(requests[5], requests[5].character);
