@@ -33,6 +33,8 @@ The Rust server consumes the versioned `avenlab-physics` crate. The client recei
 
 Development, staging, and production use different game WebSocket endpoints and server-side social-data files/volumes. The production browser client uses `wss://api.avensky.com/ws/`; staging must explicitly configure its own endpoint and may not use live player data. See [Deployment environments](docs/DEPLOYMENT_ENVIRONMENTS.md) for Vite modes, local build commands, and the separate `compose.staging.yaml` example. The Rust server currently persists to `social.json`, not a SQL database.
 
+See [Scaling architecture](docs/SCALING_ARCHITECTURE.md) for the server map, asset pipelines and a first performance experiment.
+
 ## Verification
 
 ```sh

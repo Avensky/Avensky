@@ -4,6 +4,8 @@ The staging client loads GLBs and their model textures on demand from a same-ori
 
 The city and vehicle selectors still choose the authored geometry and texture tiers. Each tier has its own versioned URL and private browser cache entry. Existing city, fleet, garage, and portrait fallbacks handle unavailable models where those fallbacks exist. An unhandled staging load error shows a reload screen. Unknown release paths return 404. Upstream errors and changed objects fail without entering the cache.
 
+The [scaling architecture](SCALING_ARCHITECTURE.md) shows where the gateway, Rust servers, build pipelines and browser performance features fit together.
+
 ## Build on Vultr or in CI
 
 Use Node 24 and Git LFS. A new staging checkout can skip LFS downloads entirely.
@@ -11,6 +13,8 @@ Use Node 24 and Git LFS. A new staging checkout can skip LFS downloads entirely.
 ```sh
 GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/Avensky/Avensky.git
 cd Avensky
+# While testing the open pull request, also run:
+# GIT_LFS_SKIP_SMUDGE=1 git switch feat/cloud-asset-streaming
 npm --prefix frontend ci
 cp frontend/.env.staging.example frontend/.env.staging
 npm --prefix frontend run build -- --mode staging
@@ -43,10 +47,10 @@ The build rejects metadata when its tracked asset inventory or generator inputs 
 
 Keep Lightsail set to **All objects are private** and public overrides disabled. The gateway needs download access only to the staging paths it serves. Use a dedicated IAM identity with scoped `s3:GetObject` access where supported. Lightsail bucket access keys grant read and write for the entire bucket. Set credentials through the AWS CLI credential chain for the gateway service account, and keep the publisher credential separate. [Lightsail bucket permissions](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-understanding-bucket-permissions.html) · [Lightsail IAM policies](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bucket-management-policies.html)
 
-Verification tries `staging/objects/<sha256>` first, then `staging/<logical-path>` if the digest key cannot be read. For example, it can reuse the existing object at `staging/models/world/garage_special.glb` if its bytes match. If the existing prefix has a different layout, reconcile missing paths using the manifest. Run the bucket settings inspection with an AWS operator profile that can read Lightsail settings:
+The existing source is `s3://caring-vegan/staging/`. The baseline release at the initial feature commit expects 530 GLBs and one PNG. The reported bucket inventory contains 546 GLBs. Use the manifest to reconcile each release path, byte count and digest before rollout. Verification tries `staging/objects/<sha256>` first, then `staging/<logical-path>` if the digest key cannot be read. For example, it can reuse the existing object at `staging/models/world/garage_special.glb` if its bytes match. Review extra or differently named bucket objects before selecting any for an updated release. Run the bucket settings inspection with an AWS operator profile that can read Lightsail settings.
 
 ```sh
-export AVENSKY_ASSET_BUCKET='<private Lightsail bucket name>'
+export AVENSKY_ASSET_BUCKET=caring-vegan
 aws lightsail get-buckets --region us-west-2 --bucket-name "$AVENSKY_ASSET_BUCKET" --query 'buckets[0].accessRules'
 ```
 

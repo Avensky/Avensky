@@ -38,6 +38,14 @@ function requestedAsset(url, releases) {
   }
 }
 
+function byteRange(header, size) {
+  const match = /^bytes=(\d*)-(\d*)$/i.exec(header);
+  if (!match || (!match[1] && !match[2])) return null;
+  const start = match[1] ? Number(match[1]) : Math.max(0, size - Number(match[2]));
+  const end = match[1] && match[2] ? Math.min(size - 1, Number(match[2])) : size - 1;
+  return start <= end ? { start, end } : null;
+}
+
 export function assetGateway(releases, readObject = signedObjectReader()) {
   const available = new Map(releases.map(release => [release.id, release]));
   return createServer(async (request, response) => {
@@ -48,15 +56,21 @@ export function assetGateway(releases, readObject = signedObjectReader()) {
     const asset = requestedAsset(request.url ?? "", available);
     if (!asset) return errorResponse(response, 404, "Staging asset is missing from this release");
 
-    const range = request.method === "GET" ? request.headers.range : undefined;
-    if (range && !/^bytes=(?:\d+-\d*|-\d+)$/.test(range)) {
+    // The route has no response validator for If-Range. Serve the whole object in that case.
+    const rangeHeader = request.method === "GET" && !request.headers["if-range"] ? request.headers.range : undefined;
+    const range = rangeHeader && byteRange(rangeHeader, asset.size);
+    if (rangeHeader !== undefined && !range) {
       response.setHeader("Content-Range", "bytes */" + asset.size);
-      return errorResponse(response, 416, "Expected a single byte range");
+      return errorResponse(response, 416, "Expected a satisfiable single byte range");
     }
     const abort = new AbortController();
     response.on("close", () => abort.abort());
     try {
-      const upstream = await readObject(asset.key, { signal: abort.signal, range, etag: asset.etag });
+      const upstream = await readObject(asset.key, {
+        signal: abort.signal,
+        range: range ? `bytes=${range.start}-${range.end}` : undefined,
+        etag: asset.etag,
+      });
       if (upstream.status === 404) {
         await upstream.body?.cancel();
         return errorResponse(response, 404, "Staging object is missing from private storage");
@@ -68,11 +82,12 @@ export function assetGateway(releases, readObject = signedObjectReader()) {
       }
       const length = Number(upstream.headers.get("content-length"));
       const contentRange = upstream.headers.get("content-range");
-      const partial = /^bytes (\d+)-(\d+)\/(\d+)$/.exec(contentRange ?? "");
-      const validRange = partial && Number(partial[3]) === asset.size && Number(partial[2]) < asset.size
-        && Number(partial[2]) - Number(partial[1]) + 1 === length && length > 0;
+      const validRange = range
+        && contentRange === `bytes ${range.start}-${range.end}/${asset.size}`
+        && length === range.end - range.start + 1;
       if (upstream.headers.has("content-encoding") || !upstream.body || upstream.headers.get("etag") !== asset.etag
-        || (range ? upstream.status !== 206 || !validRange : upstream.status !== 200 || length !== asset.size)) {
+        || (range ? upstream.status !== 206 || !validRange
+          : upstream.status !== 200 || length !== asset.size || contentRange !== null)) {
         await upstream.body?.cancel();
         return errorResponse(response, 502, "Staging object is unavailable or its size disagrees with the release");
       }

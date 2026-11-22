@@ -33,8 +33,10 @@ jobs:
       - run: npm --prefix frontend run build -- --mode staging
       - name: Verify the build used pointers and excludes cloud payloads
         run: |
+          git lfs pointer --check --file=frontend/public/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb
           git lfs pointer --check --file=frontend/public/models/world/garage_special.glb
           test -s frontend/.asset-release/staging.json
+          test ! -e frontend/dist-staging/.asset-release
           test -s frontend/dist-staging/world-builder/catalog.json
           test -s frontend/dist-staging/images/traction-control.svg
           test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"

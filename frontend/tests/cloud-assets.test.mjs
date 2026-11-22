@@ -88,9 +88,14 @@ test("gateway serves only verified assets and keeps failures and redirects out o
     assert.equal(request.etag, etag);
     if (outcome === "missing") return new Response(null, { status: 404 });
     if (outcome === "redirect") return Response.redirect("https://private.invalid/object?secret=1");
-    const payload = request.range ? bytes.subarray(0, 4) : bytes;
+    const selected = request.range?.match(/^bytes=(\d+)-(\d+)$/);
+    const start = selected ? Number(selected[1]) : 0;
+    const end = selected ? Number(selected[2]) : bytes.length - 1;
+    const payload = bytes.subarray(start, end + 1);
     const headers = { "Content-Length": String(payload.length), etag: outcome === "changed" ? '"different"' : etag };
-    if (request.range) headers["Content-Range"] = "bytes 0-3/" + bytes.length;
+    if (selected) headers["Content-Range"] = outcome === "wrong-range"
+      ? `bytes ${start + 1}-${end + 1}/${bytes.length}`
+      : `bytes ${start}-${end}/${bytes.length}`;
     return new Response(payload, { status: request.range ? 206 : 200, headers });
   });
   server.listen(0, "127.0.0.1");
@@ -101,6 +106,10 @@ test("gateway serves only verified assets and keeps failures and redirects out o
   assert.equal((await fetch(base + url.replace(release.id, "0".repeat(64)))).status, 404);
   assert.equal((await fetch(base + url, { method: "POST" })).status, 405);
   assert.equal((await fetch(base + url, { headers: { Range: "bytes=0-1,3-4" } })).status, 416);
+  assert.equal((await fetch(base + url, { headers: { Range: "bytes=-0" } })).status, 416);
+  const outside = await fetch(base + url, { headers: { Range: `bytes=${bytes.length}-` } });
+  assert.equal(outside.status, 416);
+  assert.equal(outside.headers.get("content-range"), `bytes */${bytes.length}`);
   assert.equal(calls, 0);
   const model = await fetch(base + url);
   assert.equal(model.status, 200);
@@ -113,6 +122,18 @@ test("gateway serves only verified assets and keeps failures and redirects out o
   const range = await fetch(base + url, { headers: { Range: "bytes=0-3" } });
   assert.equal(range.status, 206);
   assert.equal(await range.text(), "glTF");
+  for (const header of ["bytes=-4", `bytes=${bytes.length - 4}-`, `bytes=${bytes.length - 4}-99999`]) {
+    const tail = await fetch(base + url, { headers: { Range: header } });
+    assert.equal(tail.status, 206);
+    assert.deepEqual(Buffer.from(await tail.arrayBuffer()), bytes.subarray(-4));
+  }
+  const conditional = await fetch(base + url, { headers: { Range: "bytes=0-3", "If-Range": etag } });
+  assert.equal(conditional.status, 200);
+  assert.deepEqual(Buffer.from(await conditional.arrayBuffer()), bytes);
+  outcome = "wrong-range";
+  const wrongRange = await fetch(base + url, { headers: { Range: "bytes=0-3" } });
+  assert.equal(wrongRange.status, 502);
+  assert.equal(wrongRange.headers.get("cache-control"), "no-store");
   for (const [result, status] of [["missing", 404], ["redirect", 502], ["changed", 502]]) {
     outcome = result;
     const response = await fetch(base + url);
