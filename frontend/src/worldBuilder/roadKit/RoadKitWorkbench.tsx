@@ -355,7 +355,7 @@ export default function RoadKitWorkbench() {
         <div className="rk-brand">
           <span className="rk-brand-icon"><MenuLogo compact/></span>
           <div>
-            <small>AVENLAB / ASSET WORKBENCH</small>
+            <small>AVENSKY / ASSET WORKBENCH</small>
             <strong>
               Road kit <em>01</em>
             </strong>

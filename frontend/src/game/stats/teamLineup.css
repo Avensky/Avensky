@@ -70,7 +70,7 @@
   overflow: auto;
   background: var(--app-background);
 }
-.team-lineup > .menu-video-background { z-index: -1; }
+.team-lineup > .menu-flare-background { z-index: -1; }
 .team-lineup-heading {
   text-align: center;
   color: #f4f6ff;

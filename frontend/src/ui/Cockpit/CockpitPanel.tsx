@@ -156,7 +156,7 @@ export function CockpitPanel() {
               ? "UPDATED RUST SERVER REQUIRED"
               : pending
                 ? "REQUESTING…"
-                : rejection || "REDLINE VECTOR"}
+                : rejection || "AVENSKY"}
           </span>
         </MenuFooter>
       </section>

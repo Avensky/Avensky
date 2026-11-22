@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { PAUSE_RESUME_INDEX } from "../../game/menus/menuItems";
 import { useInputStore } from "../input/inputStore";
 import { canOpenVehicleSelection } from "../alpha/matchHeroChange";
+import { PLAYER_ONBOARDING } from "../../game/welcome/config";
 
 import { createMenuActions } from "./menuActions";
 import { isDrivingScreen, type SignalMission, type UIState } from "./types";
@@ -24,7 +25,7 @@ export const useUIStore = create<UIState>()((set, get, api) => ({
     if (isDrivingScreen(get().screen) && !get().isModeLoading)
       set({ overlay: "cockpit", cockpitTab });
   },
-  screen: "main",
+  screen: PLAYER_ONBOARDING ? "welcome" : "main",
   setScreen: (screen) => {
     set({
       screen,

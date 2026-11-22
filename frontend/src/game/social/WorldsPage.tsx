@@ -100,8 +100,8 @@ export function WorldsPage({
         await navigator.share({
           title: world.name,
           text: world.locked
-            ? "Join my AvenLab world. Ask me for the password."
-            : "Join my AvenLab world.",
+            ? "Join my Avensky world. Ask me for the password."
+            : "Join my Avensky world.",
           url,
         });
       else if (navigator.clipboard) await navigator.clipboard.writeText(url);

@@ -38,7 +38,7 @@ mod tests {
     use crate::{alpha::{Member,Mode},state::SharedGameState};
     const WORLD:usize=78;
     fn server()->Server {
-        Server { operations:Mutex::new(()),chat:Mutex::new(Default::default()),matches:Mutex::new(Default::default()),revivals:Mutex::new(Default::default()),
+        Server { operations:Mutex::new(()),accounts:None,chat:Mutex::new(Default::default()),matches:Mutex::new(Default::default()),revivals:Mutex::new(Default::default()),
             alpha:Mutex::new(crate::alpha::AlphaState::disabled()),data:Mutex::new(SocialData::default()),connections:Mutex::new(HashMap::new()),runtimes:Mutex::new(HashMap::new()),
             path:std::env::temp_dir().join(format!("avenlab-health-pack-{}",id())).join("social.json"),max_active_worlds:3,max_players:16 }
     }

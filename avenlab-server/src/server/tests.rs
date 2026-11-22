@@ -3,6 +3,7 @@ use super::*;
 fn server(active: usize, players: usize) -> Server {
     Server {
         operations: Mutex::new(()),
+        accounts: None,
         chat: Mutex::new(Default::default()),
         matches: Mutex::new(Default::default()),
         revivals: Mutex::new(Default::default()),
@@ -50,6 +51,61 @@ async fn world(server: &Server, player: &str, name: &str, password: &str, listed
 }
 async fn cleanup(server: Server) {
     let _ = tokio::fs::remove_dir_all(server.path.parent().unwrap()).await;
+}
+
+#[tokio::test]
+async fn account_survives_a_restart_and_restores_the_same_character_and_outfit() {
+    let mut server = server(3, 8);
+    let (desktop, legacy, mut view) = client(&server, "River").await;
+    let old_token = legacy["token"].as_str().unwrap();
+    let profile_id = legacy["profile_id"].as_str().unwrap();
+    let rook = json!({"id":"jules-okafor","outfit":"night-run","driver_id":"ae86-male"});
+    server.handle(&desktop, json!({"action":"character_equip","character":rook})).await.unwrap();
+    let database = server.path.with_extension("sqlite3");
+    let migrated = database::load_or_import(&database,&server.path).unwrap();
+    assert_eq!(migrated.profiles[profile_id].progression.character.as_ref().unwrap().id,"jules-okafor");
+    server.accounts = Some(Default::default());
+
+    let password = "a staging passphrase for test";
+    let registered = server.handle(&desktop, json!({"action":"account_register","login":"River_7","password":password,"name":"River"})).await.unwrap();
+    assert_eq!(registered["profile_id"], profile_id);
+    let desktop_token = registered["token"].as_str().unwrap();
+    server.handle(&desktop, json!({"action":"character_outfit_save","name":"Weekend","character":rook})).await.unwrap();
+    let published = view.borrow_and_update().clone().unwrap();
+    assert!(!published.contains("password_hash") && !published.contains(desktop_token) && !published.contains("river_7"));
+    server.disconnect(&desktop).await;
+
+    let legacy_bytes = std::fs::read(&server.path).unwrap();
+    let restored = database::load_or_import(&database,&server.path).unwrap();
+    assert_eq!(restored.server_id,migrated.server_id);
+    assert_eq!(std::fs::read(&server.path).unwrap(), legacy_bytes, "the legacy source remains an import backup");
+    *server.data.lock().await = restored;
+
+    let (phone, guest, _) = client(&server, "Guest driver").await;
+    assert_ne!(guest["profile_id"], profile_id);
+    assert!(server.handle(&phone,json!({"action":"identify","token":old_token})).await.is_err());
+    let denied = server.handle(&phone,json!({"action":"account_login","login":"RIVER_7","password":"a different wrong password"})).await.unwrap_err();
+    assert_eq!(denied,crate::social::accounts::LOGIN_FAILED);
+    let signed_in = server.handle(&phone,json!({"action":"account_login","login":"RIVER_7","password":password})).await.unwrap();
+    assert_eq!(signed_in["profile_id"],profile_id);
+    let phone_token = signed_in["token"].as_str().unwrap();
+    assert_ne!(phone_token,desktop_token);
+    {
+        let data = server.data.lock().await;
+        let profile = data.profile(profile_id).unwrap();
+        assert!(profile.token_hash.is_empty());
+        let account=profile.account.as_ref().unwrap();
+        assert!(account.password_hash.starts_with("$argon2id$"));
+        assert!(!account.password_hash.contains(password));
+        assert_eq!(profile.progression.character.as_ref().unwrap().id,"jules-okafor");
+        assert_eq!(profile.progression.character.as_ref().unwrap().driver_id.as_deref(),Some("ae86-male"));
+        assert_eq!(profile.progression.character_outfits["Weekend"].outfit,"night-run");
+    }
+    server.handle(&phone,json!({"action":"account_logout","token":phone_token})).await.unwrap();
+    assert!(server.handle(&phone,json!({"action":"identify","token":phone_token})).await.is_err());
+    assert_eq!(server.handle(&phone,json!({"action":"identify","token":desktop_token})).await.unwrap()["profile_id"],profile_id);
+    assert!(server.handle(&phone,json!({"action":"account_register","login":"River_7","password":password,"name":"Unrelated"})).await.is_err());
+    cleanup(server).await;
 }
 
 #[tokio::test]
@@ -990,7 +1046,7 @@ async fn real_ctf_capture_completion_archives_careers_once_and_history_survives_
     assert!(s.handle(&outsider,json!({"action":"career_match","match_id":match_id})).await.is_err());
     assert!(s.handle(&outsider,json!({"action":"match_result","winner":"blue","stats":{"kills":999}})).await.is_err());
     let mut reloaded = SocialData::load(&s.path).unwrap();
-    super::matches::recover_archives(&s.path,&mut reloaded).unwrap();
+    super::matches::recover_archives(&s.path,&mut reloaded,None).unwrap();
     let committed = reloaded.completed_results.clone();
     let page = crate::alpha::career::read_history(&s.path,&red_profile,None,20,&committed).unwrap();
     assert_eq!(page.matches.len(),1);
@@ -1050,8 +1106,8 @@ async fn interrupted_archive_commit_rolls_back_then_recovers_exactly_once() {
     assert_eq!(s.data.lock().await.profiles[&profile].progression.matches,0);
     assert!(s.handle(&player,json!({"action":"career_match","match_id":record.match_id})).await.is_err());
     let mut restarted=baseline;
-    super::matches::recover_archives(&s.path,&mut restarted).unwrap();
-    super::matches::recover_archives(&s.path,&mut restarted).unwrap();
+    super::matches::recover_archives(&s.path,&mut restarted,None).unwrap();
+    super::matches::recover_archives(&s.path,&mut restarted,None).unwrap();
     assert_eq!(restarted.completed_results.len(),1);
     assert_eq!(restarted.profiles[&profile].progression.matches,1);
     assert_eq!(restarted.profiles[&profile].progression.career.summary.best.kills,4);
@@ -1143,7 +1199,7 @@ async fn result_capacity_is_preflighted_and_existing_pending_archives_do_not_blo
     assert!(crate::alpha::career::pending_archives(&s.path,&s.data.lock().await.completed_results).unwrap().is_empty(),"logical capacity failure must precede archive creation");
     crate::alpha::career::write_match_archive(&s.path,&record).unwrap();
     let mut data=s.data.lock().await.clone();
-    super::matches::recover_archives(&s.path,&mut data).unwrap();
+    super::matches::recover_archives(&s.path,&mut data,None).unwrap();
     assert_eq!(data.completed_results.len(),16384);
     assert!(!data.completed_results.contains(&record.match_id));
     cleanup(s).await;

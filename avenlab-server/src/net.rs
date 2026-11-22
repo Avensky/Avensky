@@ -161,7 +161,7 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                 return;
             }
             let server_id = server.data.lock().await.server_id.clone();
-            let _=tx.send(json!({"type":"welcome","player_id":player,"room_id":0,"team":"blue","spawned":false,"social_version":1,"packed_input_version":1,"compact_snapshot_version":crate::snapshot_wire::VERSION,"snapshot_hz":30,"server_id":server_id}).to_string());
+            let _=tx.send(json!({"type":"welcome","player_id":player,"room_id":0,"team":"blue","spawned":false,"social_version":1,"packed_input_version":1,"compact_snapshot_version":crate::snapshot_wire::VERSION,"snapshot_hz":30,"server_id":server_id,"player_accounts":server.player_accounts_enabled()}).to_string());
             let mut commands = RateLimit::new(12, 10);
             let mut passwords = RateLimit::new(4, 30);
             let mut pings = RateLimit::new(2, 1);
@@ -248,7 +248,7 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                         }
                     }
                     "social_request" => {
-                        let identifying = value.get("action").and_then(Value::as_str) == Some("identify");
+                        let identifying = matches!(value.get("action").and_then(Value::as_str), Some("identify" | "account_login" | "account_register"));
                         let password_action = matches!(
                             value.get("action").and_then(Value::as_str),
                             Some("world_join" | "world_create")

@@ -208,7 +208,7 @@ test('dressing room keeps fitted presets and lets imported garments be tried on 
     assert(find('[data-wearable-quick-select="corset"]'));
     assert(!find('[data-wearable-quick-select="bra"]'));
     assert.equal(find('[data-category=colors]'), null, 'presets live in the color toolbar');
-    assert.deepEqual([...find('.dressing-room-title').children].map(label => label.textContent), ['Fitting room', 'Vesper Vega']);
+    assert.deepEqual([...find('.dressing-room-title').children].map(label => label.textContent), ['Fitting room', 'Mara Vega']);
     assert.equal(find('.dressing-catalog').hidden, true);
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'entering the fitting room mounts only visible wardrobe controls');
     assert.equal(find('.dressing-details').hidden, true);

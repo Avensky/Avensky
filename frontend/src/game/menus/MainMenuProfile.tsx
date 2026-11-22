@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { MenuAction } from "../../controls/inputRouting";
-import { createGuestProfile, signInDeviceProfile } from "../../net/socialClient";
+import { createGuestProfile, signInDeviceProfile, signOutPlayerProfile } from "../../net/socialClient";
+import { connectRustServer, disconnectRustServer } from "../../net/rustSocket";
 import { useSocialStore } from "../../store/social/socialStore";
+import { useUIStore } from "../../store/menus/uiStore";
 import { CharacterPortrait } from "../characters/CharacterPortrait";
 import { usePlayerCharacter } from "../characters/localOutfits";
+import { PLAYER_ONBOARDING } from "../welcome/config";
 import "./mainMenuProfile.css";
 
 export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
@@ -12,15 +15,18 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
   const scope = useSocialStore(state => state.profileScope);
   const available = useSocialStore(state => state.available);
   const status = useSocialStore(state => state.profileStatus);
+  const registered = useSocialStore(state => state.registeredProfile);
   const message = useSocialStore(state => state.message);
   const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+  const [error, setError] = useState("");
   const root = useRef<HTMLElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const panelId = useId();
   const guest = Boolean(name) && scope === "tab";
   const signedIn = Boolean(name) && !guest;
-  const busy = status === "restoring";
+  const busy = status === "restoring" || signingOut;
   const caption = guest ? "Guest" : name ?? "Sign in";
 
   const close = useCallback(() => {
@@ -72,6 +78,22 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
     } catch { /* The social client publishes the request error for this panel. */ }
   }
 
+  async function signOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+    setError("");
+    try {
+      await signOutPlayerProfile();
+      useUIStore.getState().setScreen("welcome");
+      disconnectRustServer();
+      connectRustServer();
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not sign out.");
+    } finally {
+      setSigningOut(false);
+    }
+  }
+
   return <header ref={root} className="main-menu-profile" onKeyDown={event => {
     if (open && event.key === "Escape") { event.preventDefault(); close(); }
   }}>
@@ -83,13 +105,20 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
     </button>
     <section ref={panel} id={panelId} className="main-menu-profile-panel menu-panel-frame" aria-label="Player profile options" hidden={!open}>
       <h2>{signedIn ? name : guest ? "Guest session" : "Player profile"}</h2>
-      <p>{signedIn ? "Your progress and outfits are saved on this device." : guest ? "Your progress and outfits stay in this tab." : "Sign in to keep your progress and outfits for later visits."}</p>
+      <p>{registered ? "Your progress and outfits follow your Avensky account." : signedIn ? "Your progress and outfits are saved on this device." : guest ? "Your progress and outfits stay in this tab." : "Sign in to keep your progress and outfits for later visits."}</p>
       {(status === "restoring" || status === "error") && <p role="status">{message}</p>}
       {!available && <p role="status">Connect to the game server to sign in.</p>}
+      {error && <p role="alert">{error}</p>}
       <div className="main-menu-profile-options">
-        {!signedIn && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
+        {PLAYER_ONBOARDING && !registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
+          onClick={() => useUIStore.getState().setScreen("welcome")}>Player options</button>}
+        {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
+          onClick={() => useUIStore.getState().setScreen("welcome")}>Change driver</button>}
+        {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
+          onClick={() => void signOut()}>{signingOut ? "Signing out…" : "Sign out"}</button>}
+        {!PLAYER_ONBOARDING && !signedIn && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
           onClick={() => void connect(signInDeviceProfile)}>Sign in on this device</button>}
-        {!guest && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
+        {!PLAYER_ONBOARDING && !guest && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => available ? void connect(createGuestProfile) : close()}>Continue as guest</button>}
       </div>
     </section>

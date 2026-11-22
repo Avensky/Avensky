@@ -11,6 +11,8 @@ pub struct CharacterChoice {
     pub id: String,
     pub outfit: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub driver_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity: Option<CharacterIdentity>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub appearance: Option<CharacterAppearance>,
@@ -224,6 +226,11 @@ static CAST: LazyLock<Vec<Character>> = LazyLock::new(|| {
         .expect("the built-in character catalog is valid")
 });
 
+static DRIVER_VEHICLES: LazyLock<BTreeMap<String, serde::de::IgnoredAny>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/vehicle-drivers.json"))
+        .expect("the built-in vehicle driver catalog is valid")
+});
+
 fn hex_color(value: &str) -> bool {
     value
         .strip_prefix('#')
@@ -276,7 +283,11 @@ impl CharacterChoice {
     }
 
     pub fn is_available(&self) -> bool {
-        CAST.iter().any(|character| {
+        self.driver_id.as_ref().is_none_or(|driver| {
+            let Some((vehicle, gender)) = driver.rsplit_once('-') else { return false; };
+            DRIVER_VEHICLES.contains_key(vehicle)
+                && matches!((gender, self.id.as_str()), ("female", "mara-vega") | ("male", "jules-okafor"))
+        }) && CAST.iter().any(|character| {
             character.id == self.id
                 && character
                     .outfits
@@ -340,6 +351,26 @@ impl CharacterChoice {
 mod wardrobe_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn roster_choices_match_valid_rigs_and_outfits() {
+        let roster: serde_json::Value = serde_json::from_str(
+            include_str!("../../../packages/wardrobe-catalog/vehicle-drivers.json")
+        ).unwrap();
+        for (key, drivers) in roster.as_object().unwrap() {
+            for (gender, rig) in [("female","mara-vega"),("male","jules-okafor")] {
+                let preset = &drivers[gender];
+                let mut choice: CharacterChoice = serde_json::from_value(json!({
+                    "id":rig, "outfit":preset["outfit"], "identity":gender, "driver_id":format!("{key}-{gender}"),
+                    "appearance":{"hair":"natural","hair_color":"original","skin":"original","headwear":"none",
+                        "color":preset["color"],"accent":preset["accent"]}
+                })).unwrap();
+                assert!(choice.is_equippable(), "{key}-{gender}");
+                choice.driver_id = Some(format!("{key}-unknown"));
+                assert!(!choice.is_equippable());
+            }
+        }
+    }
 
     fn choice(wardrobe: serde_json::Value) -> CharacterChoice {
         let outfit = CAST.iter().find(|c| c.id == "mara-vega").unwrap().outfits[0].id.clone();

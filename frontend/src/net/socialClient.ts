@@ -119,30 +119,35 @@ export function receiveSocialResult(value: Response) {
       new Error(value.message || "The server rejected the request."),
     );
 }
-async function identifyProfile(name: string | undefined, source: IdentitySource) {
+type AccountCredentials = { login: string; password: string };
+
+async function identifyProfile(name: string | undefined, source: IdentitySource, account?: AccountCredentials) {
   if (identifying) throw new Error("Wait for player profile restoration to finish.");
   const generation=connectionGeneration;
   const saved = readIdentity();
-  const identity = source === "saved" ? pageIdentity ?? saved?.identity
+  const identity = account ? null : source === "saved" ? pageIdentity ?? saved?.identity
     : source === "device" ? readStoredIdentity(() => localStorage, identityKey) : null;
   const scope: IdentityScope = source === "new-tab" ? "tab"
     : source === "saved" ? (pageIdentity ? pageIdentityScope : saved?.scope ?? "device") : "device";
   identifying=true;
   useSocialStore.setState({profileStatus:"restoring",message:source === "new-tab" ? "Creating a player for this tab…" : "Connecting your player profile…"});
   try {
-    const result=await requestSocial("identify",{
+    const action = account ? name === undefined ? "account_login" : "account_register" : "identify";
+    const result=await requestSocial(action,{
       ...(identity ? {token:identity.token} : {}),
+      ...(account ?? {}),
       name:name??identity?.name??"DRIVER",
     });
     if(generation!==connectionGeneration) throw new Error("The game connection changed. Try again after reconnecting.");
     const token=typeof result.token==="string"?result.token:identity?.token;
     if(typeof result.profile_id!=="string"||!token||token.length!==64)
       throw new Error("The server did not confirm the player profile. Retry your saved profile.");
-    pageIdentity={id:result.profile_id,token,name:name??identity?.name??"DRIVER"};
+    pageIdentity={id:result.profile_id,token,name:typeof result.name === "string" ? result.name : name??identity?.name??"DRIVER"};
     pageIdentityScope=scope;
     saveIdentity(pageIdentity,scope);
-    useSocialStore.setState({profileScope:scope});
+    useSocialStore.setState({profileScope:scope, registeredProfile:result.account === true});
     // The confirmed social_state owns readiness; a reply alone is not a view.
+    return result.profile_id;
   } catch(error) {
     if(generation===connectionGeneration)useSocialStore.setState({profileStatus:"error",message:error instanceof Error?error.message:"Player profile restoration failed."});
     throw error;
@@ -150,28 +155,56 @@ async function identifyProfile(name: string | undefined, source: IdentitySource)
     if(generation===connectionGeneration)identifying=false;
   }
 }
-export function identifySocial(name?:string,newProfile=false) {
-  return identifyProfile(name,newProfile ? "new-device" : "saved");
+export async function identifySocial(name?:string,newProfile=false) {
+  await identifyProfile(name,newProfile ? "new-device" : "saved");
 }
-export function signInDeviceProfile() {
-  return identifyProfile(undefined, "device");
+export async function signInDeviceProfile() {
+  await identifyProfile(undefined, "device");
 }
-export function createGuestProfile() {
-  return identifyProfile("GUEST", "new-tab");
+export async function createGuestProfile() {
+  await selectGuestProfile("GUEST");
+}
+export function selectGuestProfile(name: string) {
+  return identifyProfile(name, "new-tab");
+}
+export function selectAccount(credentials: AccountCredentials, name?: string) {
+  const socket = connection && new URL(connection.url);
+  if (!socket || (socket.protocol !== "wss:" && !["localhost", "127.0.0.1", "[::1]"].includes(socket.hostname)))
+    return Promise.reject(new Error("Use a secure game connection to sign in."));
+  return identifyProfile(name, "new-device", credentials);
+}
+export async function signOutPlayerProfile() {
+  const generation = connectionGeneration;
+  const key = identityKey;
+  const saved = readIdentity();
+  const identity = pageIdentity ?? saved?.identity;
+  const scope = pageIdentity ? pageIdentityScope : saved?.scope;
+  await requestSocial("account_logout", identity ? { token:identity.token } : {});
+  if (generation !== connectionGeneration) throw new Error("The game connection changed. Try signing out again.");
+  try {
+    if (scope === "tab") sessionStorage.removeItem(`${key}:tab`);
+    else {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(`${key}:tab`);
+    }
+  } catch { /* Private browsing may disallow storage access. */ }
+  pageIdentity = null;
+  useSocialStore.setState({profileOwner:null,cachedCosmetics:null,view:null,profileScope:null,registeredProfile:false});
 }
 /** Explicitly create another authenticated player without changing the saved
  * main profile. Duplicated tabs may inherit sessionStorage and can use this
  * action again if their copied profile is still connected elsewhere. */
-export function createTabProfile() {
-  return identifyProfile("DRIVER 2", "new-tab");
+export async function createTabProfile() {
+  await identifyProfile("DRIVER 2", "new-tab");
 }
-export function beginSocialSession(serverId: unknown, onFailure?: () => void) {
+export function beginSocialSession(serverId: unknown, onFailure?: () => void, accounts = false) {
   if (initialized || typeof serverId !== "string") return;
   initialized = true;
   identityKey = `avenlab-social-profile-v1:${serverId}`;
   const saved = readIdentity();
   useSocialStore.setState({
     available: true,
+    accountsAvailable: accounts,
     profileScope: saved?.scope ?? null,
     profileStatus: saved ? "restoring" : "idle",
     message: saved ? "Restoring your player profile…" : "Sign in on this device or continue as a guest.",

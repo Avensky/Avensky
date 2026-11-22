@@ -1,0 +1,70 @@
+{
+  "ae86": {
+    "female": {"name":"Mara Vega", "outfit":"shop-crew", "color":"#3b5670", "accent":"#a9dfd2"},
+    "male": {"name":"Rook Okafor", "outfit":"night-run", "color":"#3a4654", "accent":"#c3d2e5"}
+  },
+  "brz": {
+    "female": {"name":"Reina Sato", "outfit":"shop-crew", "color":"#556a90", "accent":"#f0b48d"},
+    "male": {"name":"Miles Chen", "outfit":"race-crew", "color":"#3d6f8c", "accent":"#b5e6e9"}
+  },
+  "camaro": {
+    "female": {"name":"Jules Mercer", "outfit":"shop-crew", "color":"#7c393d", "accent":"#e7a77a"},
+    "male": {"name":"Dante Brooks", "outfit":"race-crew", "color":"#743635", "accent":"#f6cb8b"}
+  },
+  "supra": {
+    "female": {"name":"Naomi Hart", "outfit":"shop-crew", "color":"#516f72", "accent":"#d4e8ad"},
+    "male": {"name":"Ren Akiyama", "outfit":"night-run", "color":"#2e5b59", "accent":"#9fdfc8"}
+  },
+  "tank": {
+    "female": {"name":"Inez Castillo", "outfit":"dockwear", "color":"#494d43", "accent":"#bf985e"},
+    "male": {"name":"Omar Najjar", "outfit":"night-run", "color":"#4d4939", "accent":"#d0b37b"}
+  },
+  "sierra": {
+    "female": {"name":"Tessa Ward", "outfit":"shop-crew", "color":"#474f59", "accent":"#d7bc99"},
+    "male": {"name":"Wes Moreno", "outfit":"race-crew", "color":"#354857", "accent":"#eed3a2"}
+  },
+  "fortuner": {
+    "female": {"name":"Amara Mensah", "outfit":"shop-crew", "color":"#3c6750", "accent":"#c2dcb1"},
+    "male": {"name":"Sami Haddad", "outfit":"race-crew", "color":"#396045", "accent":"#e1e4ad"}
+  },
+  "landcruiser": {
+    "female": {"name":"Leila Rahman", "outfit":"dockwear", "color":"#665a46", "accent":"#e6c992"},
+    "male": {"name":"Noah Reyes", "outfit":"night-run", "color":"#5d4e3a", "accent":"#dccc9e"}
+  },
+  "mini": {
+    "female": {"name":"Pippa Lane", "outfit":"shop-crew", "color":"#89556b", "accent":"#f2c1ba"},
+    "male": {"name":"Theo Scott", "outfit":"race-crew", "color":"#7a4c64", "accent":"#f0c0a5"}
+  },
+  "cx30": {
+    "female": {"name":"Elena Park", "outfit":"shop-crew", "color":"#495e6a", "accent":"#c6dbed"},
+    "male": {"name":"Arjun Rao", "outfit":"race-crew", "color":"#4b566b", "accent":"#bbc9ec"}
+  },
+  "enforcer": {
+    "female": {"name":"Nadia Volkov", "outfit":"shop-crew", "color":"#4c415f", "accent":"#c8bddd"},
+    "male": {"name":"Luc Moreau", "outfit":"race-crew", "color":"#594565", "accent":"#e6c7d2"}
+  },
+  "interceptor": {
+    "female": {"name":"Avery Cole", "outfit":"shop-crew", "color":"#354b65", "accent":"#d1dddf"},
+    "male": {"name":"Elias Reed", "outfit":"night-run", "color":"#303e56", "accent":"#e3e8ed"}
+  },
+  "charger70": {
+    "female": {"name":"Ruby James", "outfit":"shop-crew", "color":"#795239", "accent":"#f0bc82"},
+    "male": {"name":"Mack Foster", "outfit":"race-crew", "color":"#70452e", "accent":"#efb97d"}
+  },
+  "skyline34": {
+    "female": {"name":"Hana Mori", "outfit":"shop-crew", "color":"#475a61", "accent":"#98d8d2"},
+    "male": {"name":"Kai Suzuki", "outfit":"race-crew", "color":"#3c4e57", "accent":"#a9dce3"}
+  },
+  "timecar": {
+    "female": {"name":"June Calder", "outfit":"shop-crew", "color":"#6d6e79", "accent":"#ede7c4"},
+    "male": {"name":"Felix Quinn", "outfit":"race-crew", "color":"#545662", "accent":"#ede6d7"}
+  },
+  "hawaii-rescue": {
+    "female": {"name":"Malia Kealoha", "outfit":"dockwear", "color":"#42707b", "accent":"#f4d48d"},
+    "male": {"name":"Koa Nakoa", "outfit":"race-crew", "color":"#386877", "accent":"#f5c88a"}
+  },
+  "louisiana": {
+    "female": {"name":"Celeste Landry", "outfit":"dockwear", "color":"#4c5361", "accent":"#ddd6b9"},
+    "male": {"name":"Andre Bell", "outfit":"night-run", "color":"#414b55", "accent":"#d3d1ab"}
+  }
+}

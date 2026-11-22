@@ -15,7 +15,7 @@ export function LoadingScreen() {
 
   return (
     <div className="menu-screen">
-      <h1>AvenLab</h1>
+      <h1>Avensky</h1>
       <p>Loading world... {Math.round(progress)}%</p>
       <div className="loading-bar">
         <div style={{ width: `${progress}%` }} />

@@ -201,6 +201,7 @@ mod tests {
 
     fn server() -> Server {
         Server {
+            accounts: None,
             operations: Mutex::new(()), chat: Mutex::new(Default::default()),
             matches: Mutex::new(Default::default()), revivals: Mutex::new(Default::default()),
             alpha: Mutex::new(crate::alpha::AlphaState::disabled()), data: Mutex::new(SocialData::default()),

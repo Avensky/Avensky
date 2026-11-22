@@ -282,7 +282,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click(identityTab);
     assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
     assert.deepEqual([...document.querySelectorAll('[aria-label="Character model"] button')].map(node => node.textContent),
-      ['Vesper Vega', 'Rook Okafor']);
+      ['Mara Vega', 'Rook Okafor']);
     await click('#character-editor-tab-emotes');
     assert.equal(find(identityTab), identityControl);
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));

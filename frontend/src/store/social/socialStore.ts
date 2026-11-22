@@ -95,6 +95,8 @@ function hasCosmeticsRevision(cosmetics: unknown): cosmetics is Cosmetics & { co
 /** Human-rate, server-owned data. Physics snapshots never write this store. */
 export const useSocialStore = create<{
   available: boolean;
+  accountsAvailable: boolean;
+  registeredProfile: boolean;
   profileStatus: "idle" | "restoring" | "ready" | "error";
   profileScope: "device" | "tab" | null;
   /** Editor key retained through a transport reconnect. Actions still require the current view. */
@@ -109,6 +111,8 @@ export const useSocialStore = create<{
   acknowledgeProgression: (owner: string, fallback: (progression: Progression) => Progression, cosmetics?: unknown) => void;
 }>((set) => ({
   available: false,
+  accountsAvailable: false,
+  registeredProfile: false,
   profileStatus: "idle",
   profileScope: null,
   profileOwner: null,
@@ -120,6 +124,8 @@ export const useSocialStore = create<{
   reset: () =>
     set({
       available: false,
+      accountsAvailable: false,
+      registeredProfile: false,
       profileStatus: "idle",
       profileScope: null,
       view: null,

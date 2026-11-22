@@ -113,4 +113,3 @@ Other React external subscriptions use local events.
 
 - [Fleet artwork revision](../vehicles/fleetAssets.README.md)
 - [Styled portrait cache](../game/alpha/heroPortraitCache.README.md)
-- [Menu motion preference](../components/menus/MenuVideoBackground.README.md)

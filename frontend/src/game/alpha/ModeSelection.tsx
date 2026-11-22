@@ -5,6 +5,7 @@ import {MatchModePortraits} from "./ModePortraitCard";
 import {useSelectionStore as useWorldSelection} from '../../store/selection/selectionStore';
 import {WorldPortraitCard} from '../preview/WorldPortraitCard';
 import {createGuestProfile,createTabProfile,identifySocial,signInDeviceProfile} from "../../net/socialClient";
+import { PLAYER_ONBOARDING } from "../welcome/config";
 import "./profileRecovery.css";
 import {useSocialStore} from '../../store/social/socialStore';
 import { useHeroLoadouts } from "../../vehicles/cosmetics/heroLoadouts";
@@ -158,7 +159,7 @@ export function ModeSelection() {
       <SceneTabHeader
         title={play ? "PLAY" : "EXPLORE"}
         compact
-        character={{ showProgress: true }}
+        character={{ showProgress: true, readOnly: PLAYER_ONBOARDING }}
         busy={busy}
         backAction={{ onClick: back, disabled: busy }}
         tablistLabel="Game mode"
@@ -181,10 +182,15 @@ export function ModeSelection() {
             <p role="status">{connected?profileMessage:"Connect to the game server to choose a player profile."}</p>
             {connected&&profileStatus!=="restoring"&&<>
               <div className="profile-recovery-actions" data-controller-row>
-                <ControllerAction button="A" className="menu-control" data-profile-action disabled={busy} onClick={()=>void recoverProfile(needsProfileChoice ? createGuestProfile : createTabProfile)}>{needsProfileChoice ? "CONTINUE AS GUEST" : "NEW TAB PROFILE"}</ControllerAction>
-                <button type="button" className="menu-control" data-profile-action disabled={busy} onClick={()=>void recoverProfile(needsProfileChoice ? signInDeviceProfile : identifySocial)}>{needsProfileChoice ? "SIGN IN ON THIS DEVICE" : "RETRY SAVED PROFILE"}</button>
+                {PLAYER_ONBOARDING
+                  ? <ControllerAction button="A" className="menu-control" data-profile-action
+                      onClick={() => useUIStore.getState().setScreen("welcome")}>RETURN TO WELCOME</ControllerAction>
+                  : <>
+                    <ControllerAction button="A" className="menu-control" data-profile-action disabled={busy} onClick={()=>void recoverProfile(needsProfileChoice ? createGuestProfile : createTabProfile)}>{needsProfileChoice ? "CONTINUE AS GUEST" : "NEW TAB PROFILE"}</ControllerAction>
+                    <button type="button" className="menu-control" data-profile-action disabled={busy} onClick={()=>void recoverProfile(needsProfileChoice ? signInDeviceProfile : identifySocial)}>{needsProfileChoice ? "SIGN IN ON THIS DEVICE" : "RETRY SAVED PROFILE"}</button>
+                  </>}
               </div>
-              <small>A guest profile keeps your styles and progress in this tab. A device profile keeps them for later visits on this device.</small>
+              {!PLAYER_ONBOARDING && <small>A guest profile keeps your styles and progress in this tab. A device profile keeps them for later visits on this device.</small>}
             </>}
           </div>}
           {(status||recoveryNotice) && (

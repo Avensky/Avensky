@@ -6,6 +6,7 @@ import appearanceOptions from "../../../../packages/wardrobe-catalog/character-a
 import { hasSeparateWardrobeTop, resolveWardrobe, wardrobeOverEase, type WardrobeChoice } from "./wardrobe";
 import type { OverSkirtEase } from "./overSkirtEase";
 import { getWardrobeGarment, removedWardrobeLayers, visibleWardrobeGarments, wardrobeGarmentModelUrl, type WardrobeGarmentChoice, type WardrobeRemoval } from "./wardrobeGarments";
+import { findVehicleDriver, type VehicleDriver } from "./driverRoster";
 
 export const CHARACTERS = catalog.filter(item => item.id !== "niko-park");
 export const CHARACTER_APPEARANCE_OPTIONS = appearanceOptions;
@@ -42,6 +43,7 @@ export const CHARACTER_IDENTITIES = [
 export type CharacterIdentity = typeof CHARACTER_IDENTITIES[number]["id"];
 export type CharacterChoice = {
   id: string; outfit: string; identity?: CharacterIdentity; appearance?: CharacterAppearance; prop?: "shop-bag"; wardrobe?: WardrobeChoice;
+  driver_id?: string;
   /** Session-only fitting room selections. */
   garments?: WardrobeGarmentChoice;
   wardrobeTrial?: WardrobeChoice;
@@ -72,6 +74,16 @@ const DEFAULT_APPEARANCE: CharacterAppearance = {
   hair: "natural", hair_color: "original", skin: "original", headwear: "none", color: "original",
 };
 
+export function starterDriverChoice(driver: VehicleDriver): CharacterChoice {
+  return {
+    id: driver.gender === "female" ? VILLAGER_ID : ROOK_ID,
+    outfit: driver.outfit,
+    identity: driver.gender,
+    driver_id: driver.id,
+    appearance: { ...DEFAULT_APPEARANCE, color: driver.color, accent: driver.accent },
+  };
+}
+
 export function characterAppearance(choice: CharacterChoice | null | undefined): CharacterAppearance {
   const appearance = choice?.appearance ?? DEFAULT_APPEARANCE;
   return choice?.id === VILLAGER_ID && appearance.headwear !== "hat"
@@ -88,6 +100,7 @@ export function characterLook(choice: CharacterChoice | null | undefined) {
     return option && "color" in option ? option.color : undefined;
   };
   const female = character.id !== ROOK_ID;
+  const driver = findVehicleDriver(choice?.driver_id);
   const wardrobe = character.id === VILLAGER_ID ? resolveWardrobe(choice?.wardrobe) : undefined;
   const trials = character.id === VILLAGER_ID ? visibleWardrobeGarments(choice) : undefined;
   const outfitGarment = character.id === VILLAGER_ID ? getWardrobeGarment(outfit.id) : undefined;
@@ -107,7 +120,8 @@ export function characterLook(choice: CharacterChoice | null | undefined) {
   // The explicit selection takes that slot, while the bundled skirt stays in use.
   const showCorset = character.id === VILLAGER_ID && !hasSeparateWardrobeTop(choice) && !removedClothing.includes("corset") && !removedClothing.includes("top");
   return {
-    character, outfit, appearance, female, removedClothing,
+    character: driver && driver.gender === character.gender ? { ...character, name: driver.name } : character,
+    outfit, appearance, female, removedClothing,
     bra: character.id === VILLAGER_ID ? choice?.bra : undefined,
     wardrobe, outfitRemovals,
     corset: showCorset ? resolveWardrobe(choice?.wardrobeTrial, { includeRetired: true }) : undefined,

@@ -27,6 +27,7 @@ import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
 import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
+import { PLAYER_ONBOARDING } from "../welcome/config";
 
 export const CHARACTER_TABS = [
   { id: "identity", label: "Identity" }, { id: "appearance", label: "Appearance" },
@@ -214,6 +215,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
 
   function update(next: CharacterChoice, preview?: CharacterChoice) {
     if (!canEditCharacter()) return;
+    if (PLAYER_ONBOARDING && next.id === choice.id && choice.driver_id) {
+      next = { ...next, driver_id: choice.driver_id };
+    }
     if (preview) setTrial(preview);
     else clearFittingPreview();
     setChoice(next);
@@ -521,7 +525,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       {tab !== "appearance" && <section className={`character-controls menu-panel-frame ${tab === "identity" ? "character-identity-details" : "character-controls--left"}`} aria-label={tab === "identity" ? "Character details" : "Emote filters"}>
         {tab === "identity" && <>
           <header className="character-description"><h2>Character details</h2></header>
-          {modelPicker}
+          {!PLAYER_ONBOARDING && modelPicker}
           <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
             {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
               aria-pressed={(choice.identity ?? character.gender) === item.id}

@@ -74,14 +74,14 @@ test('portraits stay available outside Heroes without character editing controls
     await show('mode_select', h(CharacterHeaderProfile, { onOpen }));
     assertReadOnlyPortrait();
     await act(async () => writeLocalCharacter({ id: 'jules-okafor', outfit: 'race-crew' }));
-    assert.match(find('.character-header-info').textContent, /Vesper Vega/, 'the profile character takes priority over a device save');
+    assert.match(find('.character-header-info').textContent, /Mara Vega/, 'the profile character takes priority over a device save');
     const receiveCharacter = (character, cosmetics_revision) => act(async () => social.getState().receive({
       ...view, profile: { ...view.profile, progression: { ...view.profile.progression, character, cosmetics_revision } },
     }));
     await receiveCharacter(null, 2);
     assert.match(find('.character-header-info').textContent, /Rook Okafor/, 'a device save appears without a profile character');
     await act(async () => writeLocalCharacter(DEFAULT_CHARACTER));
-    assert.match(find('.character-header-info').textContent, /Vesper Vega/);
+    assert.match(find('.character-header-info').textContent, /Mara Vega/);
     await receiveCharacter({ id: 'jules-okafor', outfit: 'night-run' }, 3);
     assert.match(find('.character-header-info').textContent, /Rook Okafor/, 'saved profile hydration still updates the read-only display');
     assertReadOnlyPortrait();

@@ -54,6 +54,7 @@ export function canNavigateMenu() {
         "hero_select",
       "heroes",
         "mode_select",
+        "welcome",
         "queue",
       ].includes(panel))
   );
@@ -112,6 +113,7 @@ export function routeMenuAction(action: MenuAction) {
       "hero_select",
       "heroes",
       "mode_select",
+      "welcome",
       "queue",
     ].includes(panel)
   ) {

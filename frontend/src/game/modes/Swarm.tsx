@@ -25,7 +25,7 @@ export function Swarm() {
         <header className="mb-5 flex items-center justify-between border-b border-cyan-400/20 pb-4">
           <div>
             <p className="text-xs tracking-[0.45em] text-yellow-300">
-              AVENLAB // MULTI-ASSET CONTROL
+              AVENSKY // MULTI-ASSET CONTROL
             </p>
             <h1 className="text-4xl font-black text-cyan-100">
               SWARM DEMO

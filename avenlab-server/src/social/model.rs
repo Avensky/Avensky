@@ -52,6 +52,8 @@ pub struct Profile {
     pub name: String,
     // Device guest credential, never included in any social-state response.
     pub token_hash: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub account: Option<super::accounts::Account>,
     pub friends: BTreeSet<String>,
     #[serde(default)]
     pub progression: crate::alpha::progression::Progression,
@@ -137,7 +139,11 @@ impl SocialData {
             bytes.len() <= 32 * 1024 * 1024,
             "Social data file is too large"
         );
-        let mut data: Self = serde_json::from_slice(&bytes)?;
+        Self::decode(&bytes)
+    }
+
+    pub(super) fn decode(bytes: &[u8]) -> anyhow::Result<Self> {
+        let mut data: Self = serde_json::from_slice(bytes)?;
         anyhow::ensure!(
             data.version == 1
                 && data.profiles.len() <= MAX_PROFILES
@@ -181,7 +187,8 @@ impl SocialData {
             return self
                 .profiles
                 .values()
-                .find(|profile| profile.token_hash == hash)
+                .find(|profile| profile.token_hash == hash || profile.account.as_ref()
+                    .is_some_and(|account| account.accepts(&hash)))
                 .map(|profile| (profile.id.clone(), None))
                 .ok_or_else(|| {
                     "This profile is unavailable on this server. Create a new device profile."
@@ -200,6 +207,7 @@ impl SocialData {
                 id: profile_id.clone(),
                 name,
                 token_hash: super::security::token_hash(&token),
+                account: None,
                 friends: BTreeSet::new(),
                 progression: Default::default(),
             },
