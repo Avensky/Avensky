@@ -22,8 +22,26 @@ import { startVehicleTelemetry } from "../store/telemetry/vehicleTelemetryStore"
 import { HudGroup } from "./HudGroup";
 
 import { useRenderSettingsStore } from "../store/presentation/renderSettingsStore";
+import { useMenuInputDevice } from "../components/controller/useMenuInputDevice";
+import { isMobileBrowser } from "../controls/inputDevice";
+import { useUIStore } from "../store/menus/uiStore";
 
-export function DrivingHUD() {
+export function DrivingOverlay({ hud }: { hud: boolean }) {
+  const device = useMenuInputDevice();
+  const touch = device === "touch" || isMobileBrowser();
+  return (
+    <>
+      {(hud || touch) && <DrivingHUD controlsOnly={!hud} />}
+      {touch && (
+        <button className="touch-pause-button" type="button" aria-label="Pause menu" onClick={useUIStore.getState().openPause}>
+          Pause
+        </button>
+      )}
+    </>
+  );
+}
+
+export function DrivingHUD({ controlsOnly = false }: { controlsOnly?: boolean }) {
   const ctf = useMotionView((s) => Boolean(s.snapshot?.match_state));
   const scoped=useCombatStore(s=>s.scope&&s.enabled);
   const drivingLayout = usePreferencesStore((s) => s.drivingLayout);
@@ -33,13 +51,9 @@ export function DrivingHUD() {
   const groups = usePreferencesStore((s) => s.hudGroups);
   const lowDetail = useRenderSettingsStore(s => s.lowDetail);
   const needsTelemetry =
-    groups.wheel || groups.stalks ||
-      (groups.ignition ||
-        groups.display || groups.missions ||
-        groups.climate ||
-        groups.shifter ||
-        groups.parking ||
-        groups.assists);
+    groups.ignition || groups.shifter || groups.parking ||
+    (!controlsOnly && (groups.wheel || groups.stalks || groups.display ||
+      groups.missions || groups.climate || groups.assists));
   useEffect(
     () => (needsTelemetry ? startVehicleTelemetry() : undefined),
     [needsTelemetry],
@@ -86,12 +100,14 @@ export function DrivingHUD() {
       }}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="hud-top-left">
-      <HudGroup id="gauges" title="INSTRUMENTS" className="instrument-hud">
-        <Dashboard />
-      </HudGroup>
-      {groups.teammates && <TeammateHUD />}
-      </div>
+      {!controlsOnly && (
+        <div className="hud-top-left">
+          <HudGroup id="gauges" title="INSTRUMENTS" className="instrument-hud">
+            <Dashboard />
+          </HudGroup>
+          {groups.teammates && <TeammateHUD />}
+        </div>
+      )}
       {(groups.wheel || groups.stalks) && (
         <section className="hud-group wheel-hud" data-hud-group={groups.wheel ? "wheel" : "stalks"} aria-label={groups.wheel ? "STEERING group" : "WHEEL LEVERS group"}>
           <div
@@ -104,18 +120,22 @@ export function DrivingHUD() {
       )}
 
       {groups.futuristic && groups.ignition && <div className="wheel-ignition-station"><DrivingIgnition/></div>}
-      <EditorDriveBar />
-      <CenterCombatDock>
-        <ActiveEffectsBar />
-        <WeaponSelector />
-        {groups.futuristic && <FuturisticHUD />}
-      </CenterCombatDock>
-      <BridgeControls />
-      <CombatNotices />
-      <VehicleHealthHUD />
-      <ControlsPanel />
-      <InspectionPanel />
-      {groups.chat && <ChatDock />}
+      {!controlsOnly && (
+        <>
+          <EditorDriveBar />
+          <CenterCombatDock>
+            <ActiveEffectsBar />
+            <WeaponSelector />
+            {groups.futuristic && <FuturisticHUD />}
+          </CenterCombatDock>
+          <BridgeControls />
+          <CombatNotices />
+          <VehicleHealthHUD />
+          <InspectionPanel />
+          {groups.chat && <ChatDock />}
+        </>
+      )}
+      <ControlsPanel controlsOnly={controlsOnly} />
     </div>
   );
 }

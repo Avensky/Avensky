@@ -23,7 +23,7 @@ import { PauseMenu } from "./menus/PauseMenu";
 import { ModeLoadingScreen } from "./ModeLoadingScreen";
 import { Sandbox, SandboxSetup } from "./modes/sandbox/index";
 import { DebugMenu } from "../components/debugger/DebugMenu";
-import { DrivingHUD } from "../ui/DrivingHUD";
+import { DrivingOverlay } from "../ui/DrivingHUD";
 import { CockpitPanel } from "../ui/Cockpit/CockpitPanel";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useSocialStore } from "../store/social/socialStore";
@@ -140,7 +140,7 @@ export function GameUI() {
       )}
 
       {/* UI Overlay */}
-      {screen === "sandbox" && !overlay && hud && <DrivingHUD />}
+      {screen === "sandbox" && !overlay && <DrivingOverlay hud={hud} />}
       {screen === "sandbox" && <CombatHUD />}
       {screen === "sandbox" && !overlay && hud && <CtfMatchHUD />}
 
