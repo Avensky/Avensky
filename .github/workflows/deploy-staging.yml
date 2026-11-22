@@ -1,0 +1,11 @@
+name: Deploy to staging
+on: workflow_dispatch
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/frontend-release.yml
+    with:
+      staging_only: true

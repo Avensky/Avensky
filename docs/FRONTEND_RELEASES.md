@@ -4,6 +4,12 @@ After this workflow lands on `main`, merges build an isolated staging frontend i
 
 Staging can deploy the Rust game before activating the website. Production promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for environment and data migration settings. Keep `STAGING_PLAYER_ONBOARDING` unset until the staging Rust backend supports registered accounts.
 
+## Send a build to testers
+
+With the staging receiver configured, open **Actions → Deploy to staging → Run workflow** and select **main**. This builds current main and publishes to **https://staging.avensky.com**. Open the run and check that **publish-staging** succeeded before refreshing the game on your phone. Use **Frontend releases → Run workflow** for the separate production promotion.
+
+For account and game-master testing, set the repository variable `STAGING_PLAYER_ONBOARDING=1` and enable the matching staging backend. Set `AVENSKY_GAME_MASTER_ID` in the staging game environment to your registered staging player code. [Game master setup](PLAYER_ONBOARDING.md#game-master-and-shared-content)
+
 ## One-time setup on Vultr
 
 1. Pick separate writable release roots, such as `/srv/avensky-staging/frontend` and `/srv/avensky-live/frontend`, with a dedicated Unix user for each. Keep their parent directories and the installed `publish.py` under administrator control. Give Caddy read access to each site's static release tree. Give the live release user read access to staging receipts and to a separate administrator-owned directory of approved production bundles.
