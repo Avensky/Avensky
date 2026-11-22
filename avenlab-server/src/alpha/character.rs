@@ -239,7 +239,24 @@ fn hex_color(value: &str) -> bool {
         .is_some_and(|hex| hex.len() == 6 && hex.bytes().all(|byte| byte.is_ascii_hexdigit()))
 }
 
+pub fn builtin_driver(id: &str, gender: &str) -> bool {
+    id.rsplit_once('-').is_some_and(|(vehicle, rig)| rig == gender && DRIVER_VEHICLES.contains_key(vehicle))
+}
+
+pub fn validate_driver(driver: &crate::social::authoring::Driver) -> Result<(), String> {
+    let rig = match driver.gender.as_str() { "female" => "mara-vega", "male" => "jules-okafor", _ => return Err("Choose an available rig.".into()) };
+    if !DRIVER_VEHICLES.contains_key(&driver.vehicle) || !hex_color(&driver.color) || !hex_color(&driver.accent)
+        || !CAST.iter().any(|c| c.id == rig && c.outfits.iter().any(|o| o.id == driver.outfit)) {
+        return Err("Choose an available vehicle, rig outfit and valid colors.".into());
+    }
+    Ok(())
+}
+
 impl CharacterChoice {
+    pub fn known_driver(&self, drivers: &BTreeMap<String, crate::social::authoring::Driver>) -> bool {
+        self.driver_id.as_ref().is_none_or(|id| !id.starts_with("custom-") || drivers.contains_key(id))
+    }
+
     pub fn is_equippable(&self) -> bool {
         self.garments.is_none() && self.wardrobe_trial.is_none() && self.wardrobe_ease.is_none()
             && self.removed_clothing.is_none() && self.bra.is_none() && self.is_available()
@@ -287,7 +304,7 @@ impl CharacterChoice {
     pub fn is_available(&self) -> bool {
         self.driver_id.as_ref().is_none_or(|driver| {
             let Some((vehicle, gender)) = driver.rsplit_once('-') else { return false; };
-            DRIVER_VEHICLES.contains_key(vehicle)
+            (DRIVER_VEHICLES.contains_key(vehicle) || vehicle.strip_prefix("custom-").is_some_and(|s| s.len() == 32 && s.bytes().all(|c| c.is_ascii_hexdigit())))
                 && matches!((gender, self.id.as_str()), ("female", "mara-vega") | ("male", "jules-okafor"))
         }) && CAST.iter().any(|character| {
             character.id == self.id

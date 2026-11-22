@@ -296,6 +296,7 @@ impl SocialData {
                 return Ok(json!({"invited":sent}));
             }
             SocialAction::WorldRotateCode { world_id } => {
+                if self.authored.main_world == Some(world_id) { return Err("The shared main world uses public admission.".into()); }
                 let world = self
                     .worlds
                     .get_mut(&world_id)
@@ -308,6 +309,7 @@ impl SocialData {
                     .retain(|invite| invite.world_id != world_id);
             }
             SocialAction::WorldDelete { world_id } => {
+                if self.authored.main_world == Some(world_id) { return Err("Deselect the main world before deleting it.".into()); }
                 let world = self
                     .worlds
                     .get(&world_id)
@@ -319,6 +321,9 @@ impl SocialData {
                     return Err("Everyone must leave before deleting this world.".into());
                 }
                 self.worlds.remove(&world_id);
+                self.authored.documents.remove(&world_id);
+                self.authored.approved.remove(&world_id);
+                self.authored.match_sources.retain(|_, (source, _)| *source != world_id);
                 self.world_invites
                     .retain(|invite| invite.world_id != world_id);
             }

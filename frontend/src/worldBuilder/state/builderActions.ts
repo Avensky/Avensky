@@ -100,6 +100,22 @@ async function readWorld(mapId: string) {
     );
   return parseMapText(await response.text(), mapId);
 }
+export async function loadSavedWorldDraft(worldId: number, map: string) {
+  const result = await requestSocial("editor_document_get", {world_id:worldId, map});
+  let source = result.document;
+  if (!source) {
+    const response = await fetch(`/world-builder/${map}_colliders.json`);
+    if (!response.ok) throw Error("The installed source is unavailable.");
+    source = await response.json();
+  }
+  const doc = parseMapText(JSON.stringify(source), map);
+  const layout = parseLayout(initialMapLayout(map, doc.authored_layout), map);
+  layout.spawns ??= sourceSpawns(doc);
+  useBuilderStore.getState().load(doc, "Loaded saved world");
+  useLayoutStore.setState({doc:layout, saved:layout, past:[], future:[], selected:null, selectedSpawn:null, placing:null, reference:false,
+    cameraRevision:useLayoutStore.getState().cameraRevision+1});
+}
+
 export async function switchBuilderWorld(mapId: string) {
   if (!editing()) return;
   const mapCatalog=useWorldCatalog.getState().maps;

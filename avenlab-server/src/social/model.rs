@@ -92,6 +92,8 @@ pub struct WorldInvite {
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SocialData {
+    #[serde(default)]
+    pub authored: super::authoring::Authored,
     #[serde(default = "id")]
     pub server_id: String,
     pub version: u8,
@@ -115,6 +117,7 @@ pub struct SocialData {
 impl Default for SocialData {
     fn default() -> Self {
         Self {
+            authored: Default::default(),
             server_id: id(),
             version: 1,
             next_world: 1,
@@ -187,8 +190,7 @@ impl SocialData {
             return self
                 .profiles
                 .values()
-                .find(|profile| profile.token_hash == hash || profile.account.as_ref()
-                    .is_some_and(|account| account.accepts(&hash)))
+                .find(|profile| profile.account.as_ref().map_or_else(|| profile.token_hash == hash, |account| account.accepts(&hash)))
                 .map(|profile| (profile.id.clone(), None))
                 .ok_or_else(|| {
                     "This profile is unavailable on this server. Create a new device profile."

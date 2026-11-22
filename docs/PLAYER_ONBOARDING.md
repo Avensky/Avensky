@@ -26,3 +26,15 @@ The triangular Avensky emblem is available as `/images/logo.svg`, `/images/logo.
 ## Wardrobe follow-up
 
 Verify the female rig first. Reproduce skirt and corset intersections, then check tie alignment, shoe contact and clipping, and hairstyle fit, color, and opacity. Keep saved outfit IDs and existing animation behavior. Check a representative phone at the same time as desktop. Use the verified workflow for the male outfit and hairstyle edits.
+
+## Game master and shared content
+
+Register your own account first. Its **Worlds & social → Profile → Your player code** is the stable profile ID. Set `AVENSKY_GAME_MASTER_ID` to that ID in the game server environment and recreate the staging game service with the updated environment. Use the staging profile ID for staging. The server starts with no staff privileges when the setting is empty. Guest profiles and display names cannot grant staff access.
+
+- **Shared characters.** Open **Worlds & social → Profile → Shared character roster** to create or edit a named driver, choose its vehicle and rig, set its starting outfit, and pick its base and accent colors. Existing choices keep their IDs. Players see the shared drivers in character selection and can still customize their own equipped outfit.
+- **Personal worlds.** Players create worlds under **Worlds & social → Worlds**. In the live editor, choose a matching world under **Save destination**. **Load saved world** opens its stored revision. **Save world & test drive** validates and saves to that world. Leave the destination world empty while saving. **Test session only** previews the draft in the editor room.
+- **Shared main world.** Select **Set as main world** on a listed, unlocked world. Its original owner can still play there. The game master and explicitly assigned world editors can change its layout and handling. The selection drives the Open World entry. When upgrading a server with a legacy `VITE_OPEN_WORLD_ID`, select that world here.
+- **Official game modes.** Select **Approve for game modes** on a listed, unlocked CTF-compatible world. Quickplay, Competitive and Skirmish use the selected world revisions. New servers and upgraded servers begin with an empty rotation until the game master makes a selection. Saving new geometry or changing a world's handling clears approval. Players can still use personal worlds, sandbox and the editor while the rotation is empty.
+- **Future staff.** Set comma-separated registered profile IDs in `AVENSKY_CHARACTER_EDITOR_IDS` or `AVENSKY_WORLD_EDITOR_IDS` when you want to delegate roster or main-world editing. Both lists default to empty. Selection of the main world and official game-mode worlds stays with the game master.
+
+With the automatic staging deploy helper, update the operator-owned staging Compose configuration and its environment file on Vultr. Recreate the staging game when changing staff environment values. The helper compares game image inputs for code releases. Published web bundles contain no privileged credential.

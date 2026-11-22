@@ -23,6 +23,7 @@ pub struct Connection {
     pub team: Team,
 }
 pub struct Server {
+    staff: crate::social::authoring::Staff,
     operations: Mutex<()>,
     chat: Mutex<chat::ChatState>,
     matches: Mutex<matches::MatchBridge>,
@@ -62,6 +63,7 @@ impl Server {
                 .clamp(1, max)
         };
         Ok(Self {
+            staff: crate::social::authoring::Staff::load(),
             operations: Mutex::new(()),
             chat: Mutex::new(Default::default()),
             matches: Mutex::new(Default::default()),
@@ -259,6 +261,9 @@ impl Server {
             .get(&world_id)
             .cloned()
             .ok_or("That world is unavailable.")?;
+        if world.mode.is_some_and(|mode| mode.bucket() == 0) && self.data.lock().await.match_source(world_id).is_none() {
+            return Err("The game master has not approved this match world.".into());
+        }
         if client.world_id == Some(world_id) {
             return Ok(json!({"world_id":world_id,"map":world.map}));
         }
@@ -342,7 +347,10 @@ impl Server {
                 return Err("The active-world limit has been reached. Join an active world or wait for one to empty.".into());
             }
             let map = world.map.clone();
-            let saved_map=self.data.lock().await.saved_maps.get(&map).cloned();
+            let data = self.data.lock().await;
+            let source_id = data.match_source(world_id).unwrap_or(world_id);
+            let saved_map = data.authored.documents.get(&source_id).or_else(|| data.saved_maps.get(&map)).cloned();
+            drop(data);
             let mut loaded = tokio::task::spawn_blocking(move || {
                 if let Some(saved) = saved_map {
                     let file: crate::world::block_colliders::BlockColliderFile = serde_json::from_value(saved)
@@ -432,7 +440,7 @@ impl Server {
             let world_id = if let Some(world) = data
                 .worlds
                 .values()
-                .find(|world| world.owner_id.is_none() && world.map == map)
+                .find(|world| world.mode.is_none() && world.owner_id.is_none() && world.map == map)
             {
                 world.id
             } else {
@@ -533,12 +541,13 @@ impl Server {
                 .to_string()
         };
         let result = match action {
+            "roster_save" | "world_approve" | "world_set_main" => self.author(player, action, &value).await?,
             "mode_join" | "mode_cancel" | "mode_leave" | "hero_select" | "skin_redeem" | "skin_equip"
             | "hero_loadout_save" | "character_equip" | "character_outfit_save" | "character_outfit_delete"
             | "editor_apply" => self.handle_alpha(player, &value).await?,
 
             // These handlers reply directly or publish their own config/gameplay packet.
-            "editor_vehicle_get" | "editor_vehicle_apply" => return self.handle_alpha(player, &value).await,
+            "editor_vehicle_get" | "editor_vehicle_apply" | "editor_document_get" => return self.handle_alpha(player, &value).await,
             "career_history" | "career_match" => return self.handle_career(player, &value).await,
             "vehicle_revive" => return self.handle_vehicle_revive(player, &value).await,
             // Gameplay snapshots already carry these effects; recasting the social lobby for each shot stalls unrelated peers.
@@ -627,9 +636,10 @@ impl Server {
                 let enabled=value.get("enabled").and_then(Value::as_bool).ok_or("Choose on or off.")?;
                 let mut data=self.data.lock().await;
                 let world=data.worlds.get(&world_id).ok_or("Unknown world.")?;
-                if world.owner_id.as_deref()!=Some(&actor) || world.mode.is_some() {return Err("Only the owner may change saved-world handling.".into());}
+                if !data.can_edit_world(world,&actor,self.staff.permissions(data.profile(&actor)?)) {return Err("Only the owner may change saved-world handling.".into());}
                 if world.tire_thermals==enabled {return Ok(json!({"enabled":enabled}));}
                 let previous=data.clone();
+                data.authored.approved.remove(&world_id);
                 data.worlds.get_mut(&world_id).unwrap().tire_thermals=enabled;
                 drop(data);
                 self.commit(previous).await?;
@@ -701,6 +711,7 @@ impl Server {
     }
 }
 
+mod authoring;
 mod alpha_sessions;
 mod identity;
 mod matches;

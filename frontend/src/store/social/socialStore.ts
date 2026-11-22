@@ -1,4 +1,5 @@
 import type { AlphaView, Progression, GameMode } from "../alpha/alphaStore";
+import type { VehicleDriver } from "../../game/characters/driverRoster";
 import { create } from "zustand";
 
 export type SocialPerson = {
@@ -16,6 +17,8 @@ export type SocialGroup = {
   invited: SocialPerson[];
 };
 export type SocialWorld = {
+  can_edit?: boolean;
+  mode_approved?: boolean;
   tire_thermals?: boolean;
   mode?: GameMode | null;
   team_size?: 1 | 3 | 5 | null;
@@ -47,6 +50,9 @@ export type WorldInvitation = {
   expires: number;
 };
 export type SocialView = {
+  main_world_id?: number | null;
+  roster?: VehicleDriver[];
+  permissions?: { game_master: boolean; edit_characters: boolean; edit_main_world: boolean };
   profile: { id: string; name: string; progression?: Progression };
   alpha?: AlphaView;
   players: SocialPerson[];

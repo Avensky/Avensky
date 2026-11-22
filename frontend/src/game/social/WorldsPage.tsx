@@ -49,7 +49,8 @@ export function WorldsPage({
   const current = view.worlds.find(
     (world) => world.id === view.current_world_id,
   );
-  const hub = findOpenWorld(view.worlds);
+  const hubId = view.main_world_id === undefined ? OPEN_WORLD_ID : view.main_world_id;
+  const hub = hubId == null ? undefined : findOpenWorld(view.worlds, hubId);
   const join = async (world?: SocialWorld) => {
     const target = world ?? selected;
     if (
@@ -114,7 +115,7 @@ export function WorldsPage({
   };
   return (
     <div className="social-grid">
-      {OPEN_WORLD_ID !== undefined && (
+      {hubId != null && (
         <section className="social-card" aria-label="Open World">
           <h2>OPEN WORLD</h2>
           {hub && availableMaps.includes(hub.map) ? (
@@ -325,12 +326,24 @@ export function WorldsPage({
                     INVITE LINK
                   </button>
                 )}
-                {world.owner_id === view.profile.id && (
+                {view.permissions?.game_master && !world.mode && world.listed && !world.locked && <>
+                  <button type="button" className="menu-control" aria-pressed={!!world.mode_approved}
+                    onClick={() => void command("world_approve", {world_id: world.id, enabled: !world.mode_approved},
+                      world.mode_approved ? "Removed from game modes" : "Approved for game modes")}>
+                    {world.mode_approved ? "Remove from game modes" : "Approve for game modes"}
+                  </button>
+                  <button type="button" className="menu-control" aria-pressed={view.main_world_id === world.id}
+                    onClick={() => void command("world_set_main", {world_id:world.id, enabled:view.main_world_id !== world.id}, "Main world updated")}>
+                    {view.main_world_id === world.id ? "Deselect main world" : "Set as main world"}
+                  </button>
+                </>}
+                {(world.can_edit ?? (world.owner_id === view.profile.id)) && (
                   <>
                     <button type="button" className="menu-control" aria-pressed={!!world.tire_thermals}
                       onClick={()=>void command("world_tire_thermals",{world_id:world.id,enabled:!world.tire_thermals},"World handling updated")}>
                       TIRE HEAT &amp; PRESSURE: {world.tire_thermals ? "ON" : "OFF"}
                     </button>
+                    {world.id !== view.main_world_id && <>
                     <button
                       type="button"
                       className="menu-control"
@@ -376,7 +389,7 @@ export function WorldsPage({
                       >
                         DELETE
                       </button>
-                    )}
+                    )}</>}
                   </>
                 )}
               </div>

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useSocialStore } from "../../store/social/socialStore";
 import { useBuilderStore } from "../../worldBuilder/state/builderStore";
 import { applyEditorDraft } from "./applyEditorDraft";
-import { closeWorldBuilder } from "../../worldBuilder/state/builderActions";
+import { closeWorldBuilder, loadSavedWorldDraft } from "../../worldBuilder/state/builderActions";
 import { useUIStore } from "../../store/menus/uiStore";
 import { useAlphaStore } from "../../store/alpha/alphaStore";
 import {
@@ -18,6 +18,10 @@ export function EditorTestAction() {
     installed = useWorldCatalog((s)=>s.maps);
   const [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false);
+  const worlds = useSocialStore(s => s.view?.worlds);
+  const targets = worlds?.filter(w => w.can_edit && w.map === source?.map_id) ?? [];
+  const [target, setTarget] = useState<number>();
+  const chosen = targets.find(w => w.id === target);
   const pending = useRef(false);
   const test = async () => {
     if (pending.current) return;
@@ -33,7 +37,7 @@ export function EditorTestAction() {
     setBusy(true);
     setStatus("");
     try {
-      await applyEditorDraft();
+      await applyEditorDraft(chosen?.id);
       closeWorldBuilder();
       useUIStore.getState().closeOverlay();
     } catch (e) {
@@ -45,6 +49,21 @@ export function EditorTestAction() {
   };
   return (
     <div className="le-live-test">
+      {active?.mode === "editor" && targets.length > 0 && <>
+        <label>Save destination<select value={chosen?.id ?? ""} disabled={busy} onChange={e =>
+          setTarget(e.target.value ? Number(e.target.value) : undefined)}>
+          <option value="">Test session only</option>
+          {targets.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}
+        </select></label>
+        {chosen && <button type="button" className="le-button" disabled={busy}
+          onClick={async () => {
+            if (pending.current) return;
+            setBusy(true); pending.current = true;
+            try { await loadSavedWorldDraft(chosen.id, chosen.map); setStatus("Saved world loaded"); }
+            catch (e) { setStatus((e as Error).message); }
+            finally { setBusy(false); pending.current = false; }
+          }}>Load saved world</button>}
+      </>}
       <button
         type="button"
         className="le-button"
@@ -55,7 +74,7 @@ export function EditorTestAction() {
         {busy
           ? "BUILDING PHYSICS…"
           : active?.mode === "editor"
-            ? "APPLY & TEST DRIVE"
+            ? (chosen ? "SAVE WORLD & TEST DRIVE" : "APPLY & TEST DRIVE")
             : "RESERVE LIVE EDITOR"}
       </button>
       {status && <span role="status">{status}</span>}

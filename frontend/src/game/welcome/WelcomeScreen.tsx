@@ -21,6 +21,7 @@ export function WelcomeScreen() {
   const restoring = useSocialStore(state => state.profileStatus === "restoring");
   const restoreError = useSocialStore(state => state.profileStatus === "error" ? state.message : "");
   const profile = useSocialStore(state => state.view?.profile);
+  const roster = useSocialStore(state => state.view?.roster);
   const registered = useSocialStore(state => state.registeredProfile);
   const [entry, setEntry] = useState<Entry>();
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
@@ -148,7 +149,7 @@ export function WelcomeScreen() {
             </select>
           </div>}
           {player && <div className="welcome-characters" data-controller-row aria-label="Starter characters">
-            {driversForVehicle(selectedVehicle).map(driver => {
+            {driversForVehicle(selectedVehicle, roster).map(driver => {
               const base = starterDriverChoice(driver);
               const selection = saved?.driver_id === driver.id && characterLook(saved) ? saved
                 : selectedVehicle === "ae86" && !saved?.driver_id && saved?.id === base.id
