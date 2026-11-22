@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+"""Forced SSH command for versioned frontend releases on Vultr."""
+import argparse
+import fcntl
+import json
+import os
+from pathlib import Path, PurePosixPath
+import re
+import shutil
+import sys
+import tarfile
+import tempfile
+from urllib.error import URLError
+from urllib.request import Request, urlopen
+
+
+MAX_STAGING_SIZE = 512 * 1024 * 1024
+MAX_PRODUCTION_SIZE = 4 * 1024 * 1024 * 1024
+MAX_ENTRIES = 20_000
+SHA = re.compile(r"[a-f0-9]{40}")
+RELEASE = re.compile(r"[a-f0-9]{64}")
+STAGING_MODEL = "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb"
+
+
+def unpack(stream, destination, staging):
+    size, count = 0, 0
+    limit = MAX_STAGING_SIZE if staging else MAX_PRODUCTION_SIZE
+    with tarfile.open(fileobj=stream, mode="r|gz") as archive:
+        for member in archive:
+            count += 1
+            size += member.size
+            name = PurePosixPath(member.name)
+            if (count > MAX_ENTRIES or size > limit or name.is_absolute()
+                    or ".." in name.parts or "\\" in member.name or not name.parts
+                    or (name.parts[0] != "web" and name.as_posix() != "bundle.json")):
+                raise ValueError("Archive path or size is outside the release limits")
+            if staging and (name.suffix.lower() == ".glb" or ".asset-release" in name.parts):
+                raise ValueError("Unexpected model payload in the staging archive")
+            output = destination.joinpath(*name.parts)
+            if member.isdir():
+                output.mkdir(parents=True, exist_ok=True)
+            elif member.isfile():
+                output.parent.mkdir(parents=True, exist_ok=True)
+                with archive.extractfile(member) as source, output.open("xb") as target:
+                    shutil.copyfileobj(source, target)
+            else:
+                raise ValueError("Release archives must contain regular files and directories")
+    if not (destination / "web/index.html").is_file():
+        raise ValueError("The release has no frontend entry point")
+
+
+def check_staging_assets(verified, release):
+    if not isinstance(release, str) or not RELEASE.fullmatch(release):
+        raise ValueError("The staging bundle has an invalid asset release ID")
+    manifest = json.loads(verified.read_text(encoding="utf-8"))
+    if manifest["release"]["id"] != release:
+        raise ValueError("The bundle needs a different verified asset release")
+    request = Request(
+        "http://127.0.0.1:9060/__staging-assets/" + release + STAGING_MODEL,
+        headers={"Range": "bytes=0-3"},
+    )
+    with urlopen(request, timeout=15) as response:
+        if response.status != 206 or response.read(5) != b"glTF":
+            raise ValueError("The private gateway is not serving the verified release")
+
+
+def publish(args, commit):
+    staging = args.environment == "staging"
+    root = args.root.resolve(strict=True)
+    releases = root / "releases"
+    releases.mkdir(exist_ok=True)
+    current = root / "current"
+    final = releases / commit
+
+    with (root / ".release.lock").open("a", encoding="utf-8") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        if current.exists() and not current.is_symlink():
+            raise ValueError("The active frontend path must be a symlink")
+        if not staging:
+            proof = args.staging_root / "releases" / commit / "staged"
+            if not proof.is_file() or proof.read_text(encoding="ascii").strip() != commit:
+                raise ValueError("This commit has no recorded staging release")
+        with tempfile.TemporaryDirectory(prefix=".candidate-", dir=root) as temp:
+            candidate = Path(temp) / "release"
+            candidate.mkdir()
+            if staging:
+                unpack(sys.stdin.buffer, candidate, staging=True)
+            else:
+                with (args.approved_root / (commit + ".tar.gz")).open("rb") as stream:
+                    unpack(stream, candidate, staging=False)
+            metadata = json.loads((candidate / "bundle.json").read_text(encoding="utf-8"))
+            if metadata["commit"] != commit or metadata["environment"] != args.environment:
+                raise ValueError("The bundle does not match the requested commit and environment")
+            if staging:
+                check_staging_assets(args.verified_manifest, metadata.get("assetRelease"))
+            elif not isinstance(metadata.get("licenseReview"), str) or not metadata["licenseReview"].strip():
+                raise ValueError("Production requires a recorded asset license review")
+            if final.exists():
+                previous = json.loads((final / "bundle.json").read_text(encoding="utf-8"))
+                if previous != metadata:
+                    raise ValueError("This commit already has a different installed bundle")
+            else:
+                candidate.rename(final)
+            # Caddy continues serving the previous release until the atomic swap.
+            replacement = Path(temp) / "current"
+            replacement.symlink_to(Path("releases") / commit / "web")
+            os.replace(replacement, current)
+            if staging:
+                receipt = Path(temp) / "staged"
+                receipt.write_text(commit + "\n", encoding="ascii")
+                os.replace(receipt, final / "staged")
+    print("Published", args.environment, commit)
+
+
+def main():
+    os.umask(0o022)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("environment", choices=["staging", "production"])
+    parser.add_argument("root", type=Path)
+    parser.add_argument("--verified-manifest", type=Path)
+    parser.add_argument("--staging-root", type=Path)
+    parser.add_argument("--approved-root", type=Path)
+    args = parser.parse_args()
+    command = os.environ.get("SSH_ORIGINAL_COMMAND", "").split()
+    if (len(command) != 2 or command[0] != "publish-frontend" or not SHA.fullmatch(command[1])):
+        parser.error("Expected a publish-frontend command and a full commit SHA")
+    if args.environment == "staging" and not args.verified_manifest:
+        parser.error("Staging requires a verified asset manifest")
+    if args.environment == "production" and not (args.staging_root and args.approved_root):
+        parser.error("Production requires a staging receipt and independently approved bundle storage")
+    try:
+        publish(args, command[1])
+    except (ValueError, TypeError, OSError, KeyError, tarfile.TarError, URLError) as error:
+        parser.exit(1, f"Frontend release failed: {error}\n")
+
+
+if __name__ == "__main__":
+    main()
