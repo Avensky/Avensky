@@ -71,11 +71,17 @@ class ReleaseTest(unittest.TestCase):
             for root in (stage, production, approved):
                 root.mkdir()
             data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage"})
-            with patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))), +                    patch.object(publish, "check_staging_assets", side_effect=ValueError("Gateway offline")):
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "check_staging_assets", side_effect=ValueError("Gateway offline")),
+            ):
                 with self.assertRaises(ValueError):
                     publish.publish(SimpleNamespace(environment="staging", root=stage, verified_manifest=path / "verified"), COMMIT)
             self.assertFalse((stage / "current").exists())
-            with patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))), +                    patch.object(publish, "check_staging_assets"):
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "check_staging_assets"),
+            ):
                 publish.publish(SimpleNamespace(environment="staging", root=stage, verified_manifest=path / "verified"), COMMIT)
             self.assertEqual((stage / "current/index.html").read_bytes(), b"stage")
 
