@@ -35,6 +35,10 @@ jobs:
           persist-credentials: false
       - run: bash -n deploy/frontend/ssh-publish.sh
       - run: python3 deploy/frontend/test_publish.py
+      - name: Test staging restart, session preservation and recovery with Docker
+        env:
+          TEST_DOCKER: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+        run: sudo env AVENSKY_TEST_DOCKER="$TEST_DOCKER" python3 deploy/frontend/test_staging_game.py
 
   build-staging:
     if: github.event_name == 'push'
@@ -101,6 +105,7 @@ jobs:
           RELEASE_USER: ${{ vars.RELEASE_USER }}
           RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
           RELEASE_KNOWN_HOSTS: ${{ vars.RELEASE_KNOWN_HOSTS }}
+          STAGING_GAME_DEPLOY_ENABLED: ${{ vars.STAGING_GAME_DEPLOY_ENABLED }}
           GH_TOKEN: ${{ github.token }}
         run: |
           tip=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)

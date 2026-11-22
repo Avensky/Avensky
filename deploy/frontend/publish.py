@@ -7,6 +7,7 @@ import os
 from pathlib import Path, PurePosixPath
 import re
 import shutil
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -64,8 +65,10 @@ def check_staging_assets(verified, release):
             raise ValueError("The private gateway is not serving the verified release")
 
 
-def publish(args, commit):
+def publish(args, commit, *, deploy_game=False):
     staging = args.environment == "staging"
+    if deploy_game and not staging:
+        raise ValueError("The automatic game deploy is staging-only")
     root = args.root.resolve(strict=True)
     releases = root / "releases"
     releases.mkdir(exist_ok=True)
@@ -101,6 +104,9 @@ def publish(args, commit):
                     raise ValueError("This commit already has a different installed bundle")
             else:
                 candidate.rename(final)
+            if deploy_game:
+                subprocess.run(["sudo", "-n", "--", "/usr/local/lib/avensky/staging_game.py", commit],
+                               stdin=subprocess.DEVNULL, check=True)
             # Caddy continues serving the previous release until the atomic swap.
             replacement = Path(temp) / "current"
             replacement.symlink_to(Path("releases") / commit / "web")
@@ -122,15 +128,15 @@ def main():
     parser.add_argument("--approved-root", type=Path)
     args = parser.parse_args()
     command = os.environ.get("SSH_ORIGINAL_COMMAND", "").split()
-    if (len(command) != 2 or command[0] != "publish-frontend" or not SHA.fullmatch(command[1])):
+    if (len(command) != 2 or command[0] not in {"publish-frontend", "publish-staging-with-game"} or not SHA.fullmatch(command[1])):
         parser.error("Expected a publish-frontend command and a full commit SHA")
     if args.environment == "staging" and not args.verified_manifest:
         parser.error("Staging requires a verified asset manifest")
     if args.environment == "production" and not (args.staging_root and args.approved_root):
         parser.error("Production requires a staging receipt and independently approved bundle storage")
     try:
-        publish(args, command[1])
-    except (ValueError, TypeError, OSError, KeyError, tarfile.TarError, URLError) as error:
+        publish(args, command[1], deploy_game=command[0] == "publish-staging-with-game")
+    except (ValueError, TypeError, OSError, KeyError, tarfile.TarError, URLError, subprocess.CalledProcessError) as error:
         parser.exit(1, f"Frontend release failed: {error}\n")
 
 

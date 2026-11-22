@@ -2,6 +2,7 @@ import io
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tarfile
 import tempfile
 from types import SimpleNamespace
@@ -62,6 +63,28 @@ class ReleaseTest(unittest.TestCase):
                 self.assertEqual(open_url.call_args.args[0].get_header("Range"), "bytes=0-3")
                 with self.assertRaises(ValueError):
                     publish.check_staging_assets(verified, "c" * 64)
+
+    def test_game_failure_keeps_previous_frontend_and_no_receipt(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old = root / "old"
+            old.mkdir()
+            (root / "current").symlink_to(old)
+            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage"})
+            args = SimpleNamespace(environment="staging", root=root, verified_manifest=root / "verified")
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "check_staging_assets"),
+                patch.object(publish.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "game")) as game,
+            ):
+                with self.assertRaises(subprocess.CalledProcessError):
+                    publish.publish(args, COMMIT, deploy_game=True)
+                self.assertEqual(game.call_args.args[0][-1], COMMIT)
+            self.assertEqual((root / "current").resolve(), old)
+            self.assertFalse((root / "releases" / COMMIT / "staged").exists())
+            args.environment = "production"
+            with self.assertRaisesRegex(ValueError, "staging-only"):
+                publish.publish(args, COMMIT, deploy_game=True)
 
     @unittest.skipIf(sys.platform == "win32", "Activation is installed on Ubuntu")
     def test_staging_switch_and_live_promotion_require_matching_artifacts(self):
