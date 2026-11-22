@@ -91,8 +91,8 @@ function alphaStatus(pieces: Item["pieces"]): AlphaStatus | undefined {
 }
 
 const OUTFIT_DESCRIPTIONS: Record<string, string> = {
-  dockwear: "Vesper’s village outfit pairs a fitted bodice with a full skirt, petticoat and bonnet.",
-  "shop-crew": "Vesper’s workshop colors pair blue fabric with pale trim and a matching bow.",
+  dockwear: "A fitted bodice with a full skirt, petticoat and bonnet.",
+  "shop-crew": "Workshop clothes with pale trim and a matching bow.",
   "night-run": "Rook’s hill-run outfit pairs a dark coat and trousers with gloves and belt pouches.",
   "race-crew": "Rook’s race-crew outfit uses warm brown fabric and gold trim on his coat and accessories.",
 };
@@ -591,7 +591,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
         {inspected.alphaStatus && <p className="dressing-alpha-summary"><span className="dressing-alpha-badge" data-alpha-status={inspected.alphaStatus}>{ALPHA_STATUSES[inspected.alphaStatus].label}</span><span>{ALPHA_STATUSES[inspected.alphaStatus].description}</span></p>}
         {inspected.description && <p className="dressing-item-description">{inspected.description}</p>}
         {underbustOver && !hasUnderbustCut(corset.cut) &&
-          <p className="dressing-note" role="status">This vest cut is missing. Pull the wardrobe models with Git LFS and restart AvenLab.</p>}
+          <p className="dressing-note" role="status">This vest cut is missing. Pull the wardrobe models with Git LFS and restart Avensky.</p>}
         <dl><dt>Price</dt><dd>{inspected.unavailable ? "Not listed" : inspected.trial ? "Free try-on" : inspected.included ? "Included" : "0 credits"}</dd>
           <dt>Item ID</dt><dd className="dressing-item-id">{inspected.id}</dd>
           {inspected.layer && <><dt>Layer</dt><dd>{inspected.layer}</dd></>}</dl>

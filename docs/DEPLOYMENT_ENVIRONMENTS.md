@@ -1,6 +1,6 @@
 # Avensky environments: development, staging, production
 
-Avensky has **one network-backed application service today: the Rust WebSocket server**. Player profiles, worlds, and social state are currently persisted to `social.json` (and related files beside it), **not a SQL database**. A future `DATABASE_URL` would be **server-only** and must be isolated the same way; no database credentials belong in `VITE_*`.
+The Rust WebSocket server owns player profiles, worlds, and social state. The staging account rollout uses SQLite on the staging volume. Deployments with the legacy workflow still read `social.json`. See [Player accounts and onboarding](PLAYER_ONBOARDING.md) for migration and backup details.
 
 This is a separate deployment change; it does not migrate the running Vultr server, its persisted profiles, or the private Lightsail model bucket.
 
@@ -69,7 +69,7 @@ It uses:
 - Compose project `avensky-staging` (not `app`).
 - Private local port `127.0.0.1:9002` (not live port 9001).
 - A distinct Docker volume (`avensky-staging_avensky_staging_data`) rather than the live `app_avensky_data`.
-- Data file `/data/staging/social.json` and a smaller 6-player/2-world admission limit.
+- Legacy import file `/data/staging/social.json`, account database `/data/staging/social.sqlite3`, and a smaller 6-player/2-world admission limit.
 
 No staging service is launched until these commands run. Serving staging to remote users also requires its **own** DNS, Caddy HTTPS site and access controls, for example a `api-staging.avensky.com` WebSocket proxy to `127.0.0.1:9002`; do not route staging through `api.avensky.com`. Ensure this temporary test environment remains controlled and monitor the 4 GB VM before running both instances during a load test.
 

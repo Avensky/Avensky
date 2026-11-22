@@ -87,39 +87,13 @@
   position: relative;
   z-index: 1;
 }
-.menu-video-background {
+.menu-flare-background {
   position: fixed;
   inset: 0;
   z-index: 0;
-  overflow: hidden;
   pointer-events: none;
-  background: radial-gradient(ellipse at 60% 40%, #123044, #020617 75%);
-}
-.menu-video-background video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: 0.7;
-}
-.main-menu .menu-video-background video {
-  opacity: 1;
-}
-.menu-video-background::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    rgb(2 6 23 / 0.65),
-    rgb(2 6 23 / 0.35),
-    rgb(2 6 23 / 0.65)
-  );
-}
-.menu-video-background-loading video {
-  opacity: 0.45;
-}
-.menu-video-background-loading::after {
-  background: rgb(2 6 23 / 0.75);
+  background: linear-gradient(90deg, #060311c9, #0b031a45 48%, #060311c9),
+    url("/images/purple-sunflare.webp") center / cover no-repeat, #060311;
 }
 .menu-surface {
   --menu-control-height: 1.75rem;

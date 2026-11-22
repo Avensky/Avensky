@@ -12,7 +12,6 @@ import { HeroLoadoutSync } from "./heroes/HeroLoadoutSync";
 import type { CharacterChoice } from "./characters/characterCatalog";
 import type { CharacterTab } from "./characters/CharacterPage";
 import { useAlphaFlow } from "./alpha/useAlphaFlow";
-import { useAppTheme } from "../theme";
 import "../theme/theme.css";
 import { FullCanvas } from "../FullCanvas";
 import { useUIStore } from "../store";
@@ -59,7 +58,6 @@ const WorldBuilderScene = lazy(
 
 
 export function GameUI() {
-  useAppTheme();
   useAlphaFlow();
   const workspace = useBuilderStore((s) => s.workspace);
   const hud = useRenderSettingsStore((s) => s.hud);

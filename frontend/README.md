@@ -2,7 +2,7 @@
 
 Start with [source features](src/README.md) and [state ownership](src/store/README.md). Each feature exposes index.ts and explains editing recipes in README.md.
 
-# Redline Vector frontend
+# Avensky frontend
 
 React / TypeScript / React Three Fiber UI for the Rust vehicle sandbox. Rust owns simulation and resources. Stores
 separate received world state, outgoing intent, sampled HUD data and preferences.

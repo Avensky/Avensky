@@ -88,7 +88,7 @@ test("real App removes the startup cover and opens the latest main menu without 
     assert.ok(
       document
         .querySelector(".main-menu")
-        .textContent.includes("REDLINE VECTOR"),
+        .textContent.includes("AVENSKY"),
     );
     assert.equal(
       document.querySelector("canvas"),

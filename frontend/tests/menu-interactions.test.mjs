@@ -33,7 +33,6 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
     });
   }
   dom.window.HTMLElement.prototype.scrollIntoView = () => {};
-  // JSDOM has no decoder; browser QA checks the actual background video.
   dom.window.HTMLMediaElement.prototype.play = async () => {};
   dom.window.HTMLMediaElement.prototype.pause = () => {};
   dom.window.document.hasFocus = () => true;
@@ -189,14 +188,10 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       },
     );
     await t.test(
-      "missing video and reduced motion keep the main menu usable",
+      "the static sunflare and reduced motion leave the main menu usable",
       async () => {
         await reset();
-        const video = document.querySelector(".main-menu video");
-        assert.ok(video);
-        await act(async () =>
-          video.dispatchEvent(new dom.window.Event("error")),
-        );
+        assert.ok(document.querySelector(".main-menu .menu-flare-background"));
         assert.equal(document.querySelector(".main-menu video"), null);
         await key("Enter", "Enter");
         assert.equal(ui.getState().screen, "mode_select");
@@ -210,7 +205,8 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         await act(async () =>
           preferences.getState().update({ reducedMotion: false }),
         );
-        assert.ok(document.querySelector(".main-menu video"));
+        assert.ok(document.querySelector(".main-menu .menu-flare-background"));
+        assert.equal(document.querySelector(".main-menu video"), null);
       },
     );
     await t.test(

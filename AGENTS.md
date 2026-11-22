@@ -1,6 +1,6 @@
 Codex instructions for Avensky
 Project scope
-Avensky / Redline Vector is the public-facing browser vehicle game. Treat Avensky/Avensky as the canonical game repository, separate from AvenLab research. Do not copy private soft-body solvers, vehicle hacking or CAN-bus research, datasets, secrets, or experimental code into this project.
+Avensky is the public-facing browser vehicle game engine. Treat Avensky/Avensky as the canonical game repository, separate from AvenLab research. Do not copy private soft-body solvers, vehicle hacking or CAN-bus research, datasets, secrets, or experimental code into this project.
 Structure
 - frontend/: React, TypeScript, React Three Fiber / Three.js, drivers, garage, wardrobe, poses, vehicles, mobile UI and world editing.
 - avenlab-server/: Rust multiplayer server, player sessions, gameplay and match rules.
@@ -16,7 +16,7 @@ Build and validation
 - Record executed commands and outcomes. Separate passing code tests from visual verification and device performance.
 - For performance changes, supply a reproducible baseline, measurements, parity checks and environmental limits.
 Characters and appearance
-- Vesper Vega is the default hero; Rook Okafor is the second starter. Preserve save IDs, rigs, existing working animation and network compatibility.
+- Mara Vega and Rook Okafor are the original starter rigs. Preserve save IDs, rigs, existing working animation and network compatibility.
 - Repaired 12-style hairstyles have provisional approval only; final approval requires checking actual in-game hair color and opacity.
 - Curly hair pack is a candidate pending material fitting, LODs and device tests. Preserve per-style color controls (base, roots, highlights, tips where supported).
 - Five Pack 7 tops and five corset components have alpha approval individually, not for all layered outfit pairings.

@@ -1,7 +1,7 @@
 //! Control plane and room registry. Infrequent mutations are serialized here;
 //! input mailboxes and the physics scheduler never acquire `operations`.
 use crate::{
-    social::{actions::SocialAction, model::*, security},
+    social::{accounts::AccountAccess, actions::SocialAction, database, model::*, security},
     spawn::Team,
     state::{InputPacket},
     world_sessions::WorldRuntime,
@@ -32,14 +32,23 @@ pub struct Server {
     pub connections: Mutex<HashMap<String, Connection>>,
     pub runtimes: Mutex<HashMap<usize, Runtime>>,
     path: PathBuf,
+    accounts: Option<AccountAccess>,
     pub max_active_worlds: usize,
     pub max_players: usize,
 }
 impl Server {
     pub fn load() -> anyhow::Result<Self> {
         let path = crate::deployment_env::social_data_path()?;
-        let mut data = SocialData::load(&path)?;
-        matches::recover_archives(&path, &mut data)?;
+        let accounts = (std::env::var("AVENLAB_PLAYER_ACCOUNTS").as_deref() == Ok("1"))
+            .then(AccountAccess::default);
+        let database_path = path.with_extension("sqlite3");
+        let use_database = accounts.is_some() || database_path.exists();
+        let mut data = if use_database {
+            database::load_or_import(&database_path, &path)?
+        } else {
+            SocialData::load(&path)?
+        };
+        matches::recover_archives(&path, &mut data, use_database.then_some(database_path.as_path()))?;
         let managed_worlds = data
             .worlds
             .iter()
@@ -72,11 +81,22 @@ impl Server {
             connections: Mutex::new(HashMap::new()),
             runtimes: Mutex::new(HashMap::new()),
             path,
+            accounts,
             max_active_worlds: limit("AVENLAB_MAX_ACTIVE_WORLDS", 3, 16),
             max_players: limit("AVENLAB_MAX_PLAYERS", 24, 160),
         })
     }
     async fn save(&self) -> Result<(), String> {
+        let database_path = self.path.with_extension("sqlite3");
+        if self.accounts.is_some() || database_path.exists() {
+            let data = self.data.lock().await.clone();
+            return tokio::task::spawn_blocking(move || database::save(&database_path, &data))
+                .await.map_err(|_| "The social database worker stopped.")?
+                .map_err(|error| {
+                    eprintln!("[social] Database commit failed: {error}");
+                    "Could not commit the player database.".to_string()
+                });
+        }
         let bytes = serde_json::to_vec(&*self.data.lock().await)
             .map_err(|_| "Could not serialize social data.")?;
         if bytes.len() > 8 * 1024 * 1024 {
@@ -493,11 +513,14 @@ impl Server {
         Ok(())
     }
     pub async fn handle(&self, player: &str, value: Value) -> Result<Value, String> {
-        let _operation = self.operations.lock().await;
         let action = value
             .get("action")
             .and_then(Value::as_str)
             .ok_or("Choose a social action.")?;
+        if matches!(action, "identify" | "account_register" | "account_login" | "account_logout") {
+            return self.handle_identity(player, action, &value).await;
+        }
+        let _operation = self.operations.lock().await;
         // Chat does not serialize profiles, republish social views or touch physics.
         if matches!(action, "chat_send" | "chat_history") {
             return self.handle_chat(player, &value).await;
@@ -540,48 +563,6 @@ impl Server {
                 return Ok(json!({"activated":true}));
             }
 
-            "identify" => {
-                let previous = self.data.lock().await.clone();
-                let token = value.get("token").and_then(Value::as_str);
-                let (profile_id, new_token) = self
-                    .data
-                    .lock()
-                    .await
-                    .authenticate(token, &string("name"))?;
-                if self.connections.lock().await.iter().any(|(id, client)| {
-                    id != player && client.profile_id.as_deref() == Some(&profile_id)
-                }) {
-                    *self.data.lock().await = previous;
-                    return Err("This player profile is already connected in another tab.".into());
-                }
-                let connection = self.connections.lock().await.get(player).cloned();
-                let queued = self
-                    .alpha
-                    .lock()
-                    .await
-                    .queue
-                    .iter()
-                    .any(|ticket| ticket.player == player);
-                if connection.as_ref().is_some_and(|client| {
-                    client
-                        .profile_id
-                        .as_ref()
-                        .is_some_and(|id| id != &profile_id)
-                        && (client.world_id.is_some() || queued)
-                }) {
-                    *self.data.lock().await = previous;
-                    return Err("Leave your current session before switching profiles.".into());
-                }
-                self.commit(previous).await?;
-                self.connections
-                    .lock()
-                    .await
-                    .get_mut(player)
-                    .ok_or("The connection closed.")?
-                    .profile_id = Some(profile_id.clone());
-                self.restore_reservation(player, &profile_id).await;
-                json!({"profile_id":profile_id,"token":new_token})
-            }
             "refresh" => {
                 self.publish_for(Some(player)).await;
                 return Ok(json!({}));
@@ -721,6 +702,7 @@ impl Server {
 }
 
 mod alpha_sessions;
+mod identity;
 mod matches;
 mod revival;
 mod guard;

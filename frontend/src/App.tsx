@@ -9,19 +9,25 @@ import { useInputStore } from "./store/input/inputStore";
 import "./App.css";
 import { GameUI } from "./game/GameUI";
 import { OnScreenKeyboard } from "./components/text/OnScreenKeyboard";
+import { useUIStore } from "./store/menus/uiStore";
+import { WelcomeScreen } from "./game/welcome/WelcomeScreen";
+import { useAppTheme } from "./theme";
 
 export default function App() {
   const mobilePortrait = useMobilePortrait();
+  const welcome = useUIStore((state) => state.screen === "welcome");
+  const rotate = mobilePortrait && !welcome;
+  useAppTheme();
 
   useEffect(() => {
-    if (mobilePortrait) {
+    if (rotate) {
       useInputStore.getState().releaseControls();
       releaseWeaponSource("pointer");
     }
-  }, [mobilePortrait]);
+  }, [rotate]);
 
   // The HTML logo is visible before JavaScript loads. Clear it after React
-  // commits the UI; video, WebGL and server readiness must not hold it open.
+  // commits the UI without waiting on artwork, WebGL or the game server.
   useEffect(() => {
     const frame = requestAnimationFrame(() =>
       document.getElementById("startup-screen")?.remove(),
@@ -44,11 +50,11 @@ export default function App() {
 
   return (
     <div className="canvas-container">
-      <div className="game-viewport" inert={mobilePortrait}>
-        <GameUI />
-        {!mobilePortrait && <OnScreenKeyboard />}
+      <div className="game-viewport" inert={rotate}>
+        {welcome ? <WelcomeScreen /> : <GameUI />}
+        {!rotate && <OnScreenKeyboard />}
       </div>
-      {mobilePortrait ? (
+      {rotate ? (
         <div className="mobile-rotate-screen" role="status">
           <svg width="64" height="64" viewBox="0 0 48 48" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <rect x="7" y="19" width="34" height="21" rx="3" />

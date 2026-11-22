@@ -175,14 +175,6 @@ html[data-ui-theme] .main-menu {
   --scene-muted: #c8d1e4;
   background: #060a14;
 }
-html[data-ui-theme] .menu-video-background { opacity: 1; }
-html[data-ui-theme] .menu-video-background::after {
-  background: linear-gradient(90deg,#060a14b8,#060a144d,#060a14b8),
-    color-mix(in srgb,var(--app-scene-tint) 18%,transparent);
-}
-html[data-ui-theme] .main-menu .menu-video-background::after {
-  background: linear-gradient(90deg, #060a1499, #060a140a 49%, #060a1455);
-}
 html[data-ui-theme] .main-menu .menu-home-content { text-shadow: 0 1px 4px #000; }
 html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-brand-title,.menu-action) { color: var(--scene-ink); }
 html[data-ui-theme] .main-menu :is(.menu-brand-tagline,.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }

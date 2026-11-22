@@ -563,7 +563,7 @@ export function connectRustServer(): WebSocket {
           // A half-open old socket may still own the profile. Retry only while
           // this tab is recovering a deployment, within its original deadline.
           if(resumeIntent)retrySocket();
-        });
+        }, message.player_accounts === true);
         return;
       case "match_result":
         if(!receiveMatchResult(message.data)&&!useSocialStore.getState().view)pendingResult=message.data;

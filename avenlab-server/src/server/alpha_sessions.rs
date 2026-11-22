@@ -371,6 +371,10 @@ impl Server {
                 if !choice.is_equippable() { return Err("Choose an available character outfit.".into()); }
                 let mut data = self.data.lock().await;
                 let progression = &data.profiles.get(&actor).ok_or("Profile unavailable.")?.progression;
+                if choice.driver_id.is_none() {
+                    choice.driver_id = progression.character.as_ref()
+                        .filter(|current| current.id == choice.id).and_then(|current| current.driver_id.clone());
+                }
                 if choice.identity.is_none() {
                     choice.identity = progression.character.as_ref().and_then(|current| current.identity);
                 }

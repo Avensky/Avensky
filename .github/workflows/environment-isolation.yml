@@ -9,6 +9,10 @@ on:
       - "avenlab-server/src/deployment_env.rs"
       - "avenlab-server/src/main.rs"
       - "avenlab-server/src/server.rs"
+      - "avenlab-server/src/server/**"
+      - "avenlab-server/src/social/**"
+      - "avenlab-server/Cargo.*"
+      - "packages/wardrobe-catalog/vehicle-drivers.json"
       - "compose.staging.yaml"
       - ".github/workflows/environment-isolation.yml"
   workflow_dispatch:
@@ -38,5 +42,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify persistent data paths are isolated
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml deployment_env::tests
+      - name: Verify account migration and outfit recovery
+        run: cargo test --locked --manifest-path avenlab-server/Cargo.toml account_survives_a_restart
       - name: Validate isolated staging Docker Compose file
         run: docker compose -f compose.staging.yaml config --quiet

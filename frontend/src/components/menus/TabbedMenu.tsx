@@ -31,7 +31,7 @@ export type MenuTab = {
 
 export function TabbedMenu({
   title,
-  eyebrow = "REDLINE VECTOR",
+  eyebrow = "AVENSKY",
   subtitle,
   tabs,
   onBack,

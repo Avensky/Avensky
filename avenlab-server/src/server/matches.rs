@@ -121,7 +121,7 @@ fn apply_record(data: &mut SocialData, record: &CareerMatch) -> Result<bool, Str
     data.completed_results.insert(record.match_id.clone());
     Ok(true)
 }
-pub(super) fn recover_archives(path: &Path, data: &mut SocialData) -> anyhow::Result<()> {
+pub(super) fn recover_archives(path: &Path, data: &mut SocialData, database: Option<&Path>) -> anyhow::Result<()> {
     let pending = career::pending_archives(path, &data.completed_results).map_err(anyhow::Error::msg)?;
     if pending.is_empty() { return Ok(()); }
     let mut changed = false;
@@ -150,6 +150,9 @@ pub(super) fn recover_archives(path: &Path, data: &mut SocialData) -> anyhow::Re
         changed = true;
     }
     if !changed { return Ok(()); }
+    if let Some(database) = database {
+        return crate::social::database::save(database, data);
+    }
     let bytes = serde_json::to_vec(data)?;
     anyhow::ensure!(bytes.len() <= 8 * 1024 * 1024, "Recovered social data exceeds its save budget");
     if let Some(parent) = path.parent() { std::fs::create_dir_all(parent)?; }

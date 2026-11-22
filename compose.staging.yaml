@@ -1,4 +1,4 @@
-# Separate project, port, data volume and social.json path from the live app.
+# Separate project, port, data volume and profile database from the live app.
 # Production continues to use /opt/avensky/app/compose.yaml and app_avensky_data.
 name: avensky-staging
 services:
@@ -11,6 +11,7 @@ services:
       AVENLAB_ENV: "staging"
       AVENLAB_BIND: "0.0.0.0:9001"
       AVENLAB_SOCIAL_PATH: "/data/staging/social.json"
+      AVENLAB_PLAYER_ACCOUNTS: "1"
       AVENLAB_MAX_PLAYERS: "6"
       AVENLAB_MAX_ACTIVE_WORLDS: "2"
       AVENLAB_ALPHA_LIMITS: "1"

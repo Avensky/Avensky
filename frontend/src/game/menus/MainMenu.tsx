@@ -4,7 +4,7 @@ import { GameButton } from "../../components/GameButton";
 import { useCallback, useEffect, useRef } from "react";
 import { MenuLogo } from "../../components/menus/MenuLogo";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { MenuVideoBackground } from "../../components/menus/MenuVideoBackground";
+import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { MainMenuProfile } from "./MainMenuProfile";
 
 import { MAIN_MENU_ITEMS } from "./menuItems";
@@ -31,20 +31,15 @@ export function MainMenu() {
 
   return (
     <div className="game-ui menu-surface menu-home main-menu relative z-30">
-      <MenuVideoBackground />
+      <MenuFlareBackground />
       <MainMenuProfile focusMenu={focusSelection} />
       <div className="menu-home-content">
-        <section className="main-menu-identity" aria-label="Redline Vector">
+        <section className="main-menu-identity" aria-label="Avensky">
           <header className="menu-brand menu-brand-main">
             <MenuLogo />
             <div className="menu-brand-copy">
-              <p className="menu-brand-eyebrow">
-                AVENSKY
-              </p>
-
-              <h1 className="menu-brand-title">REDLINE VECTOR</h1>
-
-              <p className="menu-brand-tagline">Land. Air. Sea.</p>
+              <h1 className="menu-brand-title">AVENSKY</h1>
+              <p className="menu-brand-tagline">Vehicle simulation, world building, and real-time multiplayer.</p>
             </div>
           </header>
 

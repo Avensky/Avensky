@@ -77,7 +77,7 @@ test('compact prematch views share a frame and keep opposing picks mysterious un
    await render(h(PreMatchTeamPreview,{view,selectedHero:null}));
    assert.equal(document.querySelectorAll('.team-portrait-ellipsis').length,5);
   });
-  await t.test('the confirmed lineup opens over video once per round and enables swaps only at spawn',async()=>{
+  await t.test('the confirmed lineup opens over the sunflare once per round and enables swaps only at spawn',async()=>{
    const {TeamLineup}=await load('game/stats/TeamLineup.tsx');
    const {PauseMenu}=await load('game/menus/PauseMenu.tsx');
    const {routeMenuAction}=await load('controls/inputRouting.ts');
@@ -102,11 +102,12 @@ test('compact prematch views share a frame and keep opposing picks mysterious un
    await act(async()=>{social.setState({view:ready});network.setState({snapshot:snapshot(true,'old-round')});});
    assert.equal(document.querySelector('.team-lineup'),null,'a snapshot from another round cannot open the lineup');
    await act(async()=>network.setState({snapshot:snapshot(true)}));
-   assert(document.querySelector('.team-lineup video'));
+   assert(document.querySelector('.team-lineup .menu-flare-background'));
+   assert.equal(document.querySelector('.team-lineup video'),null);
    assert.equal(document.querySelectorAll('.team-lineup-card').length,3);
    assert.match(document.querySelector('.team-lineup-card[data-self=true]').textContent,/dpsLevel 12BRZLocal Driver/);
    assert.match(document.querySelector('.team-lineup-cards').textContent,/Level 8VANGUARDAtlas/);
-   assert.deepEqual([...document.querySelectorAll('.team-lineup-identity [role=img]')].map(node=>node.getAttribute('aria-label')),['Vesper Vega','Niko Park']);
+   assert.deepEqual([...document.querySelectorAll('.team-lineup-identity [role=img]')].map(node=>node.getAttribute('aria-label')),['Mara Vega','Niko Park']);
    assert.doesNotMatch(document.querySelector('.team-lineup-cards').textContent,/Opponent/);
    const changeHero = '.team-lineup-actions button:first-child';
    assert.equal(document.querySelector(changeHero).disabled,false);
@@ -124,7 +125,7 @@ test('compact prematch views share a frame and keep opposing picks mysterious un
    await click('.team-lineup-heading [data-header-back]');
    assert.equal(ui.getState().overlay,null);
    await act(async()=>network.setState({snapshot:snapshot(true)}));
-   assert.equal(ui.getState().overlay,null,'returning to spawn does not replay the video');
+   assert.equal(ui.getState().overlay,null,'returning to spawn does not reopen the lineup');
    await act(async()=>ui.getState().openVehicleSelection());
    assert.equal(ui.getState().overlay,'vehicle_select');
    await act(async()=>{network.setState({snapshot:snapshot(false)});ui.getState().openPause();});

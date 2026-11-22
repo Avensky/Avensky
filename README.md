@@ -1,6 +1,6 @@
-# Avensky · Redline Vector
+# Avensky
 
-Avensky is a browser-based 3D vehicle game. Pick a driver, fit an outfit in the garage, then choose a vehicle and a map for a practice session. Quickplay and Competitive use the server’s capture-the-flag rules. The world editor places roads and props in the game environment.
+Avensky is a browser-based game engine for vehicle simulation, world building, and real-time multiplayer.
 
 ## Play locally
 
@@ -31,7 +31,7 @@ The Rust server consumes the versioned `avenlab-physics` crate. The client recei
 
 ## Deployment environments
 
-Development, staging, and production use different game WebSocket endpoints and server-side social-data files/volumes. The production browser client uses `wss://api.avensky.com/ws/`; staging must explicitly configure its own endpoint and may not use live player data. See [Deployment environments](docs/DEPLOYMENT_ENVIRONMENTS.md) for Vite modes, local build commands, and the separate `compose.staging.yaml` example. The Rust server currently persists to `social.json`, not a SQL database.
+Development, staging, and production use different game WebSocket endpoints and player-data volumes. The production browser client uses `wss://api.avensky.com/ws/`. Staging uses its own endpoint and volume. See [Deployment environments](docs/DEPLOYMENT_ENVIRONMENTS.md) for build modes and the staging Compose file. See [Player accounts and onboarding](docs/PLAYER_ONBOARDING.md) for the staged SQLite migration and rollout.
 
 See [Scaling architecture](docs/SCALING_ARCHITECTURE.md) for the server map, asset pipelines and a first performance experiment.
 

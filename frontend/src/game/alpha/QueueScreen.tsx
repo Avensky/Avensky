@@ -1,7 +1,7 @@
 import { CharacterHeaderProfile } from "../characters/CharacterHeaderProfile";
 import { useConnectionView } from "../../store/session/networkViews";
 import { useCallback, useRef, useState } from "react";
-import { MenuVideoBackground } from "../../components/menus/MenuVideoBackground";
+import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { MenuShortcuts, ControllerAction } from "../../components/controller";
 import { MenuFooter, MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { useSocialStore } from "../../store/social/socialStore";
@@ -56,9 +56,9 @@ export function QueueScreen() {
       className="game-ui menu-surface alpha-queue"
       data-controller-form
     >
-      <MenuVideoBackground loading cycle />
+      <MenuFlareBackground />
       <section className="alpha-queue-card" aria-label="Alpha waiting line">
-        <small>REDLINE VECTOR · LIMITED ALPHA</small>
+        <small>AVENSKY · LIMITED ALPHA</small>
         <header className="menu-title-with-logo">
           <MenuHeaderBack onClick={cancel} disabled={busy} label="Leave queue" />
           <h1>{queue ? "YOU’RE IN LINE" : "FINDING A SERVER"}</h1>

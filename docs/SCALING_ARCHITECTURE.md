@@ -14,12 +14,14 @@ flowchart LR
     G["Vultr · Node asset gateway · 127.0.0.1:9060"]
     S["AWS Lightsail · private caring-vegan/staging · us-west-2"]
     R["Vultr · staging Rust container · 127.0.0.1:9002"]
+    D["Staging Docker volume · SQLite and career archives"]
     B -->|"Authenticated page and asset requests"| P
     P -->|"Page and application files"| F
     P -->|"Versioned model and texture requests"| G
     G -->|"Signed object reads"| S
     B -->|"api-staging.avensky.com WebSocket"| P
     P -->|"Staging multiplayer"| R
+    R -->|"Profile and outfit transactions"| D
 ```
 
 | Component | Where it runs | Role |
@@ -28,6 +30,7 @@ flowchart LR
 | Staging asset gateway | Separate Node process on Vultr, loopback port 9060 | Matches each same-origin URL to a verified release, reads from Lightsail and streams bytes through to the browser. AWS credentials and signed URLs stay on the server. |
 | Private model storage | AWS Lightsail Object Storage, `s3://caring-vegan/staging/`, `us-west-2` | Stores the heavy assets outside the Vultr filesystem. The release manifest determines which objects the gateway can serve. Staging access is limited to testers covered by the asset terms. |
 | Staging multiplayer | Vultr, `api-staging.avensky.com`, host port 9002 | Runs the staging Rust container with a dedicated player-data volume and admission limits of six players and two active worlds. |
+| Staging player database | Dedicated Docker volume on Vultr | Keeps one writer close to the Rust app and commits account, driver, and outfit changes without a separate database server. |
 | Production multiplayer | Vultr, `api.avensky.com`, host port 9001 | Runs the live Rust container with its own persistent player data. Production keeps its existing frontend asset workflow. |
 | Local development | Developer machine | Vite serves the app and local asset files. The development client uses a local Rust WebSocket by default. |
 
@@ -49,8 +52,12 @@ See the [environment configuration](DEPLOYMENT_ENVIRONMENTS.md), [staging Compos
 | Fleet LOD queue | Duplicate and simultaneous model requests. The fleet loader coalesces requests, permits two active loads and uses already available models or compact seed geometry while a tier loads. | Requests in flight and time to visible vehicles |
 | Prebuilt previews and browser workers | Preview geometry to decode, and main-thread work when the portrait runs in an offscreen worker | Time to first visible preview and main-thread stalls |
 | Versioned browser cache | Model bytes fetched again on repeat visits to the same release | Cold versus warm model bytes and time to the first usable scene |
+| Static menu art | Removes two bundled videos (75.2 MB combined) and replaces their playback with one 10.5 kB WebP background | Cold menu bytes and time until the first button responds |
+| Embedded player database | Avoids a database network hop while the staging game runs as one writer | Account response time, SQLite commit time, and volume growth independently of simulation frame time |
 
 Implementation references include [city tier selection](../frontend/src/world/cityLod.ts), [fleet loading](../frontend/src/vehicles/fleetAssets.ts) and the [portrait worker](../frontend/src/game/characters/characterPortrait.worker.ts).
+
+Account hashing and database writes run off the simulation path. Track write latency and lock contention as player traffic grows. Revisit a separate database when several game processes need shared writes or availability across hosts. The current staging database uses the existing Vultr volume. [Onboarding and database rollout](PLAYER_ONBOARDING.md) · [SQLite deployment tradeoffs](https://www.sqlite.org/whentouse.html)
 
 ## A first scaling experiment
 

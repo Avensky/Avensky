@@ -783,7 +783,7 @@ test("alpha selection, queue and HUD route to their own state owners", async (t)
       },
     );
     await t.test(
-      "queue shows the server position, cycles supplied videos and B cancels the actual ticket",
+      "queue shows the server position over the sunflare and B cancels the actual ticket",
       async () => {
         const { QueueScreen } = await load("game/alpha/QueueScreen.tsx");
         await act(async () => {
@@ -809,12 +809,8 @@ test("alpha selection, queue and HUD route to their own state owners", async (t)
           document.querySelector(".alpha-queue-position").textContent,
           /#3/,
         );
-        const video = document.querySelector("video");
-        assert.ok(video);
-        assert.equal(video.muted, true);
-        assert.equal(video.loop, false);
-        await act(async () => video.dispatchEvent(new Event("ended")));
-        assert.match(document.querySelector("video").src, /SEA-STRIKE-2043/);
+        assert.ok(document.querySelector(".menu-flare-background"));
+        assert.equal(document.querySelector("video"), null);
         await act(async () => route("back"));
         const command = sent.at(-1);
         assert.equal(command.action, "mode_cancel");

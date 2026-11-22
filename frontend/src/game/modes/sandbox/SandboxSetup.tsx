@@ -84,7 +84,7 @@ export function SandboxSetup({ collapsed, setCollapsed }: Sandbox) {
     <div className="absolute inset-0 z-10 flex flex-col w-screen text-cyan-100">
       <header className="garage-selection-header px-4 py-2">
         <button type="button" aria-expanded={!collapsed} onClick={() => setCollapsed(!collapsed)}>
-          REDLINE VECTOR // SANDBOX
+          AVENSKY // SANDBOX
         </button>
         {!collapsed && <p>Vehicle &amp; map selection</p>}
       </header>
