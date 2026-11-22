@@ -1,0 +1,34 @@
+name: Check release receiver
+on:
+  pull_request:
+    paths:
+      - "deploy/frontend/**"
+      - ".github/workflows/frontend-release.yml"
+      - ".github/workflows/deploy-staging.yml"
+      - ".github/workflows/check-receiver.yml"
+  workflow_call:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-publisher:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require main for deployments
+        if: github.event_name != 'pull_request'
+        run: |
+          if [[ "$GITHUB_REF" != refs/heads/main ]]; then
+            echo "::error::Select the main branch for deployment."
+            exit 1
+          fi
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          persist-credentials: false
+      - run: bash -n deploy/frontend/ssh-publish.sh
+      - run: python3 deploy/frontend/test_publish.py
+      - name: Test staging restart, session preservation and recovery with Docker
+        env:
+          TEST_DOCKER: ${{ github.event_name == 'pull_request' && '1' || '0' }}
+        run: sudo env AVENSKY_TEST_DOCKER="$TEST_DOCKER" python3 deploy/frontend/test_staging_game.py

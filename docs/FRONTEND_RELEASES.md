@@ -1,12 +1,10 @@
 # Frontend releases
 
-After this workflow lands on `main`, merges build an isolated staging frontend in GitHub Actions. Once the staging connection is enabled, a successful build can replace the staging static site. Use **Actions → Frontend releases → Run workflow** on `main` to push a staged commit to the live frontend. The manual job uses a separate GitHub environment and a separately reviewed production bundle.
+Each push to `main` builds and publishes the staging frontend at **https://staging.avensky.com**. A merge starts the same workflow. Open **Actions → Deploy to staging** to follow the build and the **publish-staging** job. **Run workflow** on `main` retries staging after a connection or asset issue is fixed.
 
-Staging can deploy the Rust game before activating the website. Production promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for environment and data migration settings. Keep `STAGING_PLAYER_ONBOARDING` unset until the staging Rust backend supports registered accounts.
+**Actions → Deploy to live → Run workflow** publishes to **https://play.avensky.com** using the production environment. Select `main` and leave the commit field empty for its current tip, or enter the full SHA of an earlier staged commit on `main`. The production receiver requires a staging receipt and the approved production bundle for that exact SHA.
 
-## Send a build to testers
-
-With the staging receiver configured, open **Actions → Deploy to staging → Run workflow** and select **main**. This builds current main and publishes to **https://staging.avensky.com**. Open the run and check that **publish-staging** succeeded before refreshing the game on your phone. Use **Frontend releases → Run workflow** for the separate production promotion.
+Staging can deploy the Rust game before activating the website. Live promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for server configuration and data migrations.
 
 For account and game-master testing, set the repository variable `STAGING_PLAYER_ONBOARDING=1` and enable the matching staging backend. Set `AVENSKY_GAME_MASTER_ID` in the staging game environment to your registered staging player code. [Game master setup](PLAYER_ONBOARDING.md#game-master-and-shared-content)
 
@@ -21,8 +19,8 @@ For account and game-master testing, set the repository variable `STAGING_PLAYER
    ```
 
 3. Create GitHub environments `staging` and `production`. Restrict them to `main` and configure production reviewer protection if available for the repository. In each environment set `RELEASE_HOST`, `RELEASE_USER`, and `RELEASE_KNOWN_HOSTS` as variables and `RELEASE_SSH_KEY` as a secret. Use separate credentials. [GitHub environment settings](https://docs.github.com/en/actions/how-tos/deploy/configure-and-manage-deployments/manage-environments)
-4. Enable staging with the repository variable `STAGING_FRONTEND_DEPLOY_ENABLED=true`. Optionally set `STAGING_PLAYER_ONBOARDING=1` and `STAGING_OPEN_WORLD_ID` to match the staging backend. The next merge creates the first staging candidate.
-5. Set the Caddy root for each site to its separate `current` path after confirming its first candidate. Preserve the staging authentication and `/__staging-assets/` routing. Run Caddy's config validation before reloading it. Record the previous roots for rollback. Enable the live job separately with `LIVE_FRONTEND_DEPLOY_ENABLED=true` after the approved bundle directory and production protection are in place.
+4. Optionally set the repository variables `STAGING_PLAYER_ONBOARDING=1` and `STAGING_OPEN_WORLD_ID` to match the staging backend. Once the receiver and credentials are configured, run **Deploy to staging** on `main` to publish immediately. Future pushes publish automatically. Missing connection settings fail the publish job and its log lists the missing names.
+5. Set the Caddy root for each site to its separate `current` path after confirming its first candidate. Preserve the staging authentication and `/__staging-assets/` routing. Run Caddy's config validation before reloading it. Record the previous roots for rollback. Configure the approved bundle directory and production environment before the first live promotion.
 
 ## Include the staging game server
 
@@ -45,7 +43,7 @@ In `visudo`, grant the existing staging release user the single installed helper
 avensky_stage ALL=(root) NOPASSWD: /usr/local/lib/avensky/staging_game.py *
 ```
 
-Set the GitHub repository variable `STAGING_GAME_DEPLOY_ENABLED=true` alongside `STAGING_FRONTEND_DEPLOY_ENABLED=true`. The first enabled deploy builds a baseline and briefly disconnects staging players. After the **publish-staging** job succeeds, refresh the page on your phone. An open game continues using the JavaScript it loaded until refreshed.
+Set the GitHub repository variable `STAGING_GAME_DEPLOY_ENABLED=true` to include the staging game in the release. The first enabled deploy builds a baseline and briefly disconnects staging players. After the **publish-staging** job succeeds, refresh the page on your phone. An open game continues using the JavaScript it loaded until refreshed.
 
 On each release the host fetches the exact main commit. It compares the Docker context inputs (`avenlab-server/`, `packages/wardrobe-catalog/`, and `.dockerignore`) with the running image label. A frontend-only change after the baseline skips the rebuild and restart. When the inputs change, Docker builds while the old game serves players. The helper then stops the staging writer, copies the complete staging data volume, recreates the staging service and checks a WebSocket handshake. The frontend switches after that check succeeds. Allow disk space for the build and a cold copy of the volume.
 

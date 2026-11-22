@@ -1,11 +1,88 @@
 name: Deploy to staging
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: avensky-staging-frontend-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    uses: ./.github/workflows/frontend-release.yml
-    with:
-      staging_only: true
+  verify-publisher:
+    uses: ./.github/workflows/check-receiver.yml
+
+  build-staging:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    env:
+      GIT_LFS_SKIP_SMUDGE: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm --prefix frontend ci
+      - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
+      - run: npm --prefix frontend run build -- --mode staging
+        env:
+          VITE_DEPLOY_ENV: staging
+          VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
+          VITE_PLAYER_ONBOARDING: ${{ vars.STAGING_PLAYER_ONBOARDING }}
+          VITE_OPEN_WORLD_ID: ${{ vars.STAGING_OPEN_WORLD_ID }}
+      - name: Package the staging frontend
+        run: |
+          test -s frontend/dist-staging/index.html
+          test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"
+          test ! -e frontend/dist-staging/.asset-release
+          mkdir snapshot
+          mv frontend/dist-staging snapshot/web
+          node --input-type=module -e '
+            import { writeFileSync, readFileSync } from "node:fs";
+            const release = JSON.parse(readFileSync("frontend/.asset-release/staging.json", "utf8"));
+            writeFileSync("snapshot/bundle.json", JSON.stringify({
+              environment: "staging", commit: process.env.GITHUB_SHA, assetRelease: release.id
+            }));'
+          tar --create --gzip --file staging.tar.gz -C snapshot bundle.json web
+      - uses: actions/upload-artifact@v4
+        with:
+          name: staging-frontend
+          path: staging.tar.gz
+          if-no-files-found: error
+          retention-days: 7
+
+  publish-staging:
+    needs: [build-staging, verify-publisher]
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: https://staging.avensky.com
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: staging-frontend
+      - name: Check branch head and publish staging
+        env:
+          RELEASE_HOST: ${{ vars.RELEASE_HOST }}
+          RELEASE_USER: ${{ vars.RELEASE_USER }}
+          RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
+          RELEASE_KNOWN_HOSTS: ${{ vars.RELEASE_KNOWN_HOSTS }}
+          STAGING_GAME_DEPLOY_ENABLED: ${{ vars.STAGING_GAME_DEPLOY_ENABLED }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tip=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
+          if [[ $tip != "$GITHUB_SHA" ]]; then
+            echo "Superseded by $tip. This run did not publish a build." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          bash deploy/frontend/ssh-publish.sh "$GITHUB_SHA" staging.tar.gz

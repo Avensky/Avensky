@@ -3,8 +3,18 @@ set -euo pipefail
 
 commit=${1:?Supply a commit SHA}
 [[ $commit =~ ^[0-9a-f]{40}$ ]]
-[[ ${RELEASE_HOST:?} =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]
-[[ ${RELEASE_USER:?} =~ ^[a-z_][a-z0-9_-]*$ ]]
+missing=()
+for setting in RELEASE_HOST RELEASE_USER RELEASE_KNOWN_HOSTS RELEASE_SSH_KEY; do
+  if [[ -z ${!setting:-} ]]; then
+    missing+=("$setting")
+  fi
+done
+if (( ${#missing[@]} )); then
+  echo "::error::Missing GitHub environment settings: ${missing[*]}. Configure the Vultr release connection and retry." >&2
+  exit 1
+fi
+[[ $RELEASE_HOST =~ ^[A-Za-z0-9][A-Za-z0-9.-]+$ ]]
+[[ $RELEASE_USER =~ ^[a-z_][a-z0-9_-]*$ ]]
 
 ssh_files=$(mktemp -d)
 trap 'rm -f "$ssh_files/key" "$ssh_files/known_hosts"; rmdir "$ssh_files"' EXIT
