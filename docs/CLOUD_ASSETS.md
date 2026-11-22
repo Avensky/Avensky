@@ -45,7 +45,7 @@ The build rejects metadata when its tracked asset inventory or generator inputs 
 
 ## Verify the private bucket
 
-Keep Lightsail set to **All objects are private** and public overrides disabled. The gateway needs download access only to the staging paths it serves. Use a dedicated IAM identity with scoped `s3:GetObject` access where supported. Lightsail bucket access keys grant read and write for the entire bucket. Set credentials through the AWS CLI credential chain for the gateway service account, and keep the publisher credential separate. [Lightsail bucket permissions](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-understanding-bucket-permissions.html) · [Lightsail IAM policies](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bucket-management-policies.html)
+Keep the bucket default private. The shared bucket uses **Individual objects can be made public (read-only)** for selected media from other projects. Every Avensky release object needs an owner-only access control list (ACL) and must reject unauthenticated requests. The gateway needs download access only to the staging paths it serves. Use a dedicated IAM identity with scoped `s3:GetObject` access where supported. Lightsail bucket access keys grant read and write for the entire bucket. Set credentials through the AWS CLI credential chain for the gateway service account, and keep the publisher credential separate. [Lightsail object permissions](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-configuring-individual-object-access.html) · [Lightsail IAM policies](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bucket-management-policies.html)
 
 The existing source is `s3://caring-vegan/staging/`. Its keys mirror the contents of `frontend/public/models/`. For example, the logical asset `/models/world/garage_special.glb` maps to `staging/world/garage_special.glb`. All 531 baseline release paths matched existing keys and sizes in the 566-object inventory. The byte and dependency checks below verify that the objects are the ones the build expects.
 
@@ -56,7 +56,7 @@ export AVENSKY_ASSET_BUCKET=caring-vegan
 aws lightsail get-buckets --region us-west-2 --bucket-name "$AVENSKY_ASSET_BUCKET" --query 'buckets[0].accessRules'
 ```
 
-For rollout, confirm that the output shows `"getObject": "private"` and `"allowPublicOverrides": false`.
+For rollout, confirm that the output shows `"getObject": "private"`. With public overrides enabled, use the per-object audit below to check the Avensky release.
 
 Publish missing or generated models under their digest keys from an authorized workstation. Use the actual asset bytes and the manifest SHA-256 encoded as Base64:
 
@@ -79,6 +79,13 @@ node deploy/staging-assets/verify.mjs \
 ```
 
 Keep the verified file outside the web root with the matching frontend release. The gateway pins each object to its verified ETag, so an object that changes after verification fails closed.
+
+Before rollout or after changing access settings, run the access audit using an operator profile with `lightsail:GetBuckets` and `s3:GetObjectAcl` permissions. It checks the bucket default and reads the ACL and anonymous response headers for each object in the verified release. It leaves the permissions of all objects as configured. Review any bucket-wide cross-account grants against the staging asset terms.
+
+```sh
+AWS_PROFILE=avensky-asset-operator node deploy/staging-assets/audit-access.mjs \
+  frontend/.asset-release/verified-staging.json
+```
 
 ## Serve only to authorized testers
 
