@@ -56,6 +56,7 @@ impl Server {
             let Some(profile) = data.profiles.get(actor) else {
                 continue;
             };
+            let permissions = self.staff.permissions(profile);
             let person = |id: &String| {
                 let online = by_profile.get(id.as_str()).copied();
                 json!({"id":id,"name":data.profiles.get(id).map(|p|p.name.as_str()).unwrap_or("Unavailable player"),"online":online.is_some(),"team":online.filter(|peer|peer.world_id==client.world_id && client.world_id.is_some()).map(|peer|peer.team.as_str())})
@@ -73,9 +74,9 @@ impl Server {
             let worlds:Vec<Value>=data.worlds.values().filter(|world|world.listed || world.owner_id.as_ref()==Some(actor) || client.world_id==Some(world.id) || data.world_invites.iter().any(|invite|invite.to==*actor && invite.world_id==world.id && invite.expires>now)).map(|world|{
                 let members = world_members.get(&world.id).map(Vec::as_slice).unwrap_or_default();
                 let can_share=world.owner_id.as_ref()==Some(actor)||client.world_id==Some(world.id);
-                json!({"id":world.id,"name":world.name,"map":world.map,"owner_id":world.owner_id,"listed":world.listed,"mode":world.mode,"team_size":world.mode.map(|mode|crate::alpha::MatchFormat::for_world(mode,world.max_players).team_size),"max_players":if alpha.enabled&&world.mode.is_none(){1}else{world.max_players},"players":members.len(),"active":runtimes.contains_key(&world.id),"tire_thermals":world.tire_thermals,"locked":world.password_hash.is_some(),"invite_code":if can_share{Some(&world.invite_code)}else{None},"members":if can_share { members } else { &[] }})
+                json!({"can_edit":data.can_edit_world(world,actor,permissions),"mode_approved":data.authored.approved.contains_key(&world.id),"id":world.id,"name":world.name,"map":world.map,"owner_id":world.owner_id,"listed":world.listed,"mode":world.mode,"team_size":world.mode.map(|mode|crate::alpha::MatchFormat::for_world(mode,world.max_players).team_size),"max_players":if alpha.enabled&&world.mode.is_none(){1}else{world.max_players},"players":members.len(),"active":runtimes.contains_key(&world.id),"tire_thermals":world.tire_thermals,"locked":world.password_hash.is_some(),"invite_code":if can_share{Some(&world.invite_code)}else{None},"members":if can_share { members } else { &[] }})
             }).collect();
-            let view=json!({"type":"social_state","data":{"profile":{"id":profile.id,"name":profile.name,"progression":profile.progression.view()},"alpha":Self::alpha_view_for_phases(&alpha,actor,player,&clients,&data,self.max_active_worlds,&phases),"players":players,"teammates":teammates,"requests":requests,"groups":groups,"worlds":worlds,"world_invites":invitations,"current_world_id":client.world_id,"limits":{"active_worlds":runtimes.len(),"max_active_worlds":self.max_active_worlds,"active_players":active_players,"max_players":self.max_players},"maps":maps}}).to_string();
+            let view=json!({"type":"social_state","data":{"permissions":permissions,"main_world_id":data.authored.main_world,"roster":data.authored.drivers.values().collect::<Vec<_>>(),"profile":{"id":profile.id,"name":profile.name,"progression":profile.progression.view()},"alpha":Self::alpha_view_for_phases(&alpha,actor,player,&clients,&data,self.max_active_worlds,&phases),"players":players,"teammates":teammates,"requests":requests,"groups":groups,"worlds":worlds,"world_invites":invitations,"current_world_id":client.world_id,"limits":{"active_worlds":runtimes.len(),"max_active_worlds":self.max_active_worlds,"active_players":active_players,"max_players":self.max_players},"maps":maps}}).to_string();
             client.social.send_if_modified(|current| {
                 if current.as_ref() == Some(&view) {
                     false

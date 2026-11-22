@@ -13,6 +13,7 @@ import {useAngledMenuHeader} from "../../components/menus/useAngledMenuHeader";
 import {ControllerAction} from "../../components/controller";
 import {isTypingTarget} from "../../controls/inputRouting";
 import { trapMenuFocus } from "../../components/menus/menuFocus";
+import { CharacterRosterEditor } from "./CharacterRosterEditor";
 import { WorldsPage } from "./WorldsPage";
 import { TeammatesPage, GroupsPage } from "./PeoplePages";
 import { InvitationsPage } from "./InvitationsPage";
@@ -266,6 +267,9 @@ export function SocialPanel() {
             )}
             {view && tab === "INVITES" && (
               <InvitationsPage view={view} command={command} />
+            )}
+            {view?.permissions?.edit_characters && tab === "PROFILE" && (
+              <CharacterRosterEditor key={view.profile.id} overrides={view.roster ?? []} command={command} />
             )}
             {(!view || tab === "PROFILE") && (
               <ProfilePage

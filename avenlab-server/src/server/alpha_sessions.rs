@@ -198,7 +198,7 @@ impl Server {
     async fn admit_mode(&self, ticket: &Ticket) -> Result<Value, String> {
         if !ticket.hero.is_empty() { policy::hero(&ticket.hero)?; }
         if !map_available(&ticket.map) { return Err("Choose an installed environment.".into()); }
-        let quickplay_maps=if ticket.mode.bucket()==0 {crate::harbor::quickplay_maps()} else {Vec::new()};
+        let quickplay_maps = if ticket.mode.bucket() == 0 { crate::harbor::quickplay_maps() } else { Vec::new() };
         if ticket.mode.bucket()==0 && quickplay_maps.is_empty() {return Err("No installed CTF Quickplay maps are enabled.".into());}
         let format=ticket.format();
         // Admission only needs populations here. Do not clone every connection,
@@ -225,7 +225,7 @@ impl Server {
         let worlds: Vec<_> = {
             let data = self.data.lock().await;
             formats.into_iter().filter(|world| data.worlds.get(world)
-                .is_some_and(|w| (format.bucket()==0 && quickplay_maps.contains(&w.map)) || (format.bucket()!=0 && w.map==ticket.map))).collect()
+                .is_some_and(|w| (format.bucket()==0 && data.match_source(*world).is_some() && quickplay_maps.contains(&w.map)) || (format.bucket()!=0 && w.map==ticket.map))).collect()
         };
         let mut candidates = Vec::new();
         for world in worlds {
@@ -247,9 +247,20 @@ impl Server {
         let previous=self.data.lock().await.clone();
         let mut data=self.data.lock().await;
         if data.worlds.len()>=256 {return Err("The saved-world budget is full.".into());}
-        let world=data.next_world;data.next_world+=1;
-        let chosen_map=if format.bucket()==0 {crate::harbor::queue_map(world).ok_or("No installed CTF Quickplay maps are enabled.")?}else{ticket.map.clone()};
-        data.worlds.insert(world,World{tire_thermals:crate::tire_thermals::server_default(),mode:Some(ticket.mode),id:world,
+        let world = data.next_world;
+        let mut thermals = crate::tire_thermals::server_default();
+        let chosen_map = if format.bucket() == 0 {
+            let sources = data.approved_sources(&quickplay_maps);
+            if sources.is_empty() { return Err("The game master has not selected a world for matchmaking.".into()); }
+            let source = sources[world % sources.len()];
+            let map = data.worlds[&source].map.clone();
+            thermals = data.worlds[&source].tire_thermals;
+            let revision = data.authored.approved[&source].clone();
+            data.authored.match_sources.insert(world, (source, revision));
+            map
+        } else { ticket.map.clone() };
+        data.next_world += 1;
+        data.worlds.insert(world,World{tire_thermals:thermals,mode:Some(ticket.mode),id:world,
             name:if format.bucket()==0 {format!("ALPHA {} {}V{}",ticket.mode.label(),format.team_size,format.team_size)}else{format!("ALPHA {}",ticket.mode.label())},
             map:chosen_map,owner_id:None,listed:true,max_players:format.capacity(),password_hash:None,invite_code:crate::social::model::id()});
         drop(data);self.commit(previous).await?;
@@ -272,8 +283,11 @@ impl Server {
         let hero = value["hero"].as_str().unwrap_or("").to_string();
         if !hero.is_empty() { policy::hero(&hero)?; }
         let map = if mode.bucket() == 0 {
-            crate::harbor::quickplay_maps().into_iter().next()
-                .ok_or("No installed CTF Quickplay maps are enabled.")?
+            let compatible = crate::harbor::quickplay_maps();
+            let data = self.data.lock().await;
+            let source = data.approved_sources(&compatible).into_iter().next()
+                .ok_or("The game master has not selected a world for matchmaking.")?;
+            data.worlds[&source].map.clone()
         } else {
             value["map"]
                 .as_str()
@@ -339,7 +353,16 @@ impl Server {
                 if member.mode!=Mode::Editor{return Err("Saved editor maps require the editor slot.".into());}
                 let map=value["map"].as_str().ok_or("Select an installed map.")?;
                 if !map_available(map){return Err("Map is not installed.".into());}
-                Ok(json!({"map":map,"document":self.data.lock().await.saved_maps.get(map)}))
+                let actor = self.actor(player).await?;
+                let data = self.data.lock().await;
+                let document = if let Some(id) = value["world_id"].as_u64() {
+                    let world = data.worlds.get(&(id as usize)).ok_or("Unknown saved world.")?;
+                    if world.map != map || !data.can_edit_world(world, &actor, self.staff.permissions(data.profile(&actor)?)) {
+                        return Err("You cannot edit this saved world.".into());
+                    }
+                    data.authored.documents.get(&world.id).or_else(|| data.saved_maps.get(map))
+                } else { data.saved_maps.get(map) };
+                Ok(json!({"map":map,"document":document}))
             },
             "editor_vehicle_get" | "editor_vehicle_apply" | "editor_vehicle_publish" => self.edit_vehicle(player, value).await,
             "hero_loadout_save" => {
@@ -375,6 +398,7 @@ impl Server {
                     choice.driver_id = progression.character.as_ref()
                         .filter(|current| current.id == choice.id).and_then(|current| current.driver_id.clone());
                 }
+                if !choice.known_driver(&data.authored.drivers) { return Err("Unknown roster character.".into()); }
                 if choice.identity.is_none() {
                     choice.identity = progression.character.as_ref().and_then(|current| current.identity);
                 }
@@ -410,7 +434,7 @@ impl Server {
                 let choice = if value["action"] == "character_outfit_save" {
                     let choice: crate::alpha::character::CharacterChoice =
                         serde_json::from_value(value["character"].clone()).map_err(|_| "Choose a valid outfit.")?;
-                    if !choice.is_available() {
+                    if !choice.is_available() || !choice.known_driver(&self.data.lock().await.authored.drivers) {
                         return Err("Choose available pieces and a valid fit for this outfit.".into());
                     }
                     Some(choice)
@@ -600,6 +624,19 @@ impl Server {
         if member.mode != Mode::Editor {
             return Err("Live physics edits require the dedicated editor world.".into());
         }
+        let actor = self.actor(player).await?;
+        let target = if let Some(id) = value.get("world_id") {
+            let id = id.as_u64().ok_or("Choose a saved world.")? as usize;
+            let data = self.data.lock().await;
+            let world = data.worlds.get(&id).ok_or("Unknown saved world.")?;
+            if !data.can_edit_world(world, &actor, self.staff.permissions(data.profile(&actor)?)) || value["document"]["map_id"] != world.map {
+                return Err("You cannot save this draft to that world.".into());
+            }
+            if self.connections.lock().await.values().any(|c| c.world_id == Some(id)) {
+                return Err("Save when the target world is empty.".into());
+            }
+            Some(id)
+        } else { None };
         let document = value
             .get("document")
             .ok_or("Export a valid editor document.")?;
@@ -738,16 +775,16 @@ impl Server {
         let packet = room.physics.map_snapshot_packet(world.id);
         let runtime = Arc::new(Mutex::new(room));
         // Environment switches update this editor slot only, after successful validation.
-        // One successful Apply now publishes a durable server-wide map revision.
+        // A preview changes only the editor slot. An explicit save targets one authorized world.
         // Commit before swapping the runtime; a failed disk write keeps both
         // the previous live world and the previous saved map intact.
         {
             let mut data=self.data.lock().await;
-            if !data.saved_maps.contains_key(&world.map)&&data.saved_maps.len()>=8 {
-                return Err("Server map archive is full (eight editor environments).".into());
-            }
             let previous=data.clone();
-            data.saved_maps.insert(world.map.clone(),saved_document);
+            if let Some(id) = target {
+                data.authored.documents.insert(id, saved_document);
+                data.authored.approved.remove(&id);
+            }
             if let Some(record)=data.worlds.get_mut(&member.world){record.map=world.map.clone();}
             drop(data);
             self.commit(previous).await?;

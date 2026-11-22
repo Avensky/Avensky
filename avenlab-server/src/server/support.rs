@@ -38,7 +38,7 @@ mod tests {
     use crate::{alpha::{Member,Mode},state::SharedGameState};
     const WORLD:usize=78;
     fn server()->Server {
-        Server { operations:Mutex::new(()),accounts:None,chat:Mutex::new(Default::default()),matches:Mutex::new(Default::default()),revivals:Mutex::new(Default::default()),
+        Server { staff:Default::default(),operations:Mutex::new(()),accounts:None,chat:Mutex::new(Default::default()),matches:Mutex::new(Default::default()),revivals:Mutex::new(Default::default()),
             alpha:Mutex::new(crate::alpha::AlphaState::disabled()),data:Mutex::new(SocialData::default()),connections:Mutex::new(HashMap::new()),runtimes:Mutex::new(HashMap::new()),
             path:std::env::temp_dir().join(format!("avenlab-health-pack-{}",id())).join("social.json"),max_active_worlds:3,max_players:16 }
     }
@@ -50,6 +50,7 @@ mod tests {
     async fn fixture()->(Server,String,String,Value){
         let server=server();let(actor,identity)=client(&server,"Pack Mechanic").await;let(target,_)=client(&server,"Pack Ally").await;
         server.data.lock().await.worlds.insert(WORLD,World{tire_thermals:false,mode:Some(Mode::Quickplay),id:WORLD,name:"Health-pack range".into(),map:"road_precision".into(),owner_id:None,listed:true,max_players:10,password_hash:None,invite_code:id()});
+        crate::server::tests::approve_fixture_match(&server, WORLD).await;
         {let mut alpha=server.alpha.lock().await;alpha.enabled=true;alpha.enforce_roles=false;alpha.worlds.insert(WORLD,Mode::Quickplay.into());
          for(player,hero)in[(&actor,"mechanic"),(&target,"brz")]{alpha.members.insert(player.clone(),Member{mode:Mode::Quickplay, team_size:5,world:WORLD,hero:hero.into(),team:Team::Red});}}
         let mut game=SharedGameState::new();game.room_id=WORLD;

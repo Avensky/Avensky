@@ -9,7 +9,7 @@ const openWorld = {
 } as const;
 
 // Labels, routing and controller item counts share the same source of truth.
-export const MAIN_MENU_ITEMS = [
+export const mainMenuItems = (mainWorld: number | null | undefined) => [
   {
     id: "play",
     label: "Play",
@@ -17,7 +17,7 @@ export const MAIN_MENU_ITEMS = [
     screen: "mode_select",
     available: true,
   },
-  ...(OPEN_WORLD_ID === undefined ? [] : [openWorld]),
+  ...((mainWorld === undefined ? OPEN_WORLD_ID : mainWorld) == null ? [] : [openWorld]),
   {id:"explore",label:"Explore",description:"Drive in the sandbox or build a world.",screen:"mode_select",available:true},
   {id:"heroes",label:"Heroes",description:"Choose and customize heroes, vehicles and drivers.",screen:"heroes",available:true},
   {
@@ -42,6 +42,7 @@ export const MAIN_MENU_ITEMS = [
     available: true,
   },
 ] as const;
+export const MAIN_MENU_ITEMS = mainMenuItems(undefined);
 
 export const PAUSE_MENU_ITEMS = [
   {

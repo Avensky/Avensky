@@ -4,3 +4,4 @@ pub mod accounts;
 pub mod database;
 pub mod model;
 pub mod security;
+pub mod authoring;

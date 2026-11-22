@@ -346,6 +346,33 @@ test("social requests, world transitions and assisted text have independent owne
         assert.equal(social.getState().view, previous);
       },
     );
+    await t.test("game master can curate a world and edit the shared roster", async () => {
+      const { WorldsPage } = await load("game/social/WorldsPage.tsx");
+      const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
+      const { CharacterRosterEditor } = await load("game/social/CharacterRosterEditor.tsx");
+      const { driversForVehicle } = await load("game/characters/driverRoster.ts");
+      const calls = [];
+      const command = async (action, fields) => { calls.push([action, fields]); return {driver_id:fields.driver?.id}; };
+      const world = {id:77, name:"Approved harbor", map:"road_precision", listed:true, locked:false,
+        owner_id:"other", players:0, max_players:6, members:[]};
+      const props = {view:{...view, worlds:[world]}, command, onStatus(){}};
+      const named = label => [...document.querySelectorAll("button")].find(b => b.textContent.trim() === label);
+      await render(h(WorldsPage, props));
+      await act(async()=>useWorldCatalog.setState({maps:mapCatalog}));
+      assert.equal(named("Approve for game modes"), undefined);
+      await render(h(WorldsPage, {...props,view:{...props.view,permissions:{game_master:true}}}));
+      await act(async()=>useWorldCatalog.setState({maps:mapCatalog}));
+      await act(async()=>named("Approve for game modes").click());
+      assert.deepEqual(calls.pop(), ["world_approve",{world_id:77,enabled:true}]);
+
+      const driver = driversForVehicle("brz")[0];
+      await render(h(CharacterRosterEditor, {overrides:[],command}));
+      const select = document.querySelector("select");
+      await act(async()=>{select.value=driver.id;select.dispatchEvent(new window.Event("change",{bubbles:true}));});
+      await act(async()=>named("Save character").click());
+      assert.deepEqual(calls.pop(), ["roster_save",{driver}]);
+    });
+
     await t.test("Open World joins the configured listed hub while Play still opens matchmaking", async () => {
       const { MAIN_MENU_ITEMS } = await load("game/menus/menuItems.ts");
       const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");

@@ -201,6 +201,7 @@ mod tests {
 
     fn server() -> Server {
         Server {
+            staff: Default::default(),
             accounts: None,
             operations: Mutex::new(()), chat: Mutex::new(Default::default()),
             matches: Mutex::new(Default::default()), revivals: Mutex::new(Default::default()),
@@ -241,6 +242,7 @@ mod tests {
             mode: Some(Mode::Quickplay), id: WORLD, name: "Recovery test".into(), map: "road_precision".into(),
             owner_id: None, listed: true, max_players: 10, password_hash: None, invite_code: id(),
         });
+        crate::server::tests::approve_fixture_match(&s, WORLD).await;
         {
             let mut alpha = s.alpha.lock().await;
             alpha.enabled = true; alpha.enforce_roles = false; alpha.worlds.insert(WORLD, Mode::Quickplay.into());

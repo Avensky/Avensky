@@ -73,6 +73,10 @@ test("welcome registers a profile, saves one roster driver and waits for confirm
       vehicle.value="brz";
       vehicle.dispatchEvent(new Event("change",{bubbles:true}));
     });
+    const authored = { ...driversForVehicle("brz")[0], id:"custom-" + "a".repeat(32) + "-female", name:"Alex Rivera" };
+    await act(async()=>client.receiveSocialState({ ...view, roster:[authored] }));
+    assert.ok([...document.querySelectorAll(".welcome-character")].some(card=>card.textContent.includes("Alex Rivera")));
+    assert.equal(characterLook(starterDriverChoice(authored)).character.name, authored.name);
     const driver=[...document.querySelectorAll(".welcome-character")].find(card=>card.textContent.includes("Miles Chen"));
     await act(async()=>driver.click());
     await act(async()=>button("Enter main menu").click());

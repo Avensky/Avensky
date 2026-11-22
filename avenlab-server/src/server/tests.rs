@@ -2,6 +2,7 @@ use super::*;
 
 fn server(active: usize, players: usize) -> Server {
     Server {
+        staff: Default::default(),
         operations: Mutex::new(()),
         accounts: None,
         chat: Mutex::new(Default::default()),
@@ -17,6 +18,17 @@ fn server(active: usize, players: usize) -> Server {
         max_active_worlds: active,
         max_players: players,
     }
+}
+// These gameplay fixtures already have a live match; model its approved source as well.
+pub(super) async fn approve_fixture_match(s: &Server, room: usize) {
+    let mut data = s.data.lock().await;
+    let mut source = data.worlds[&room].clone();
+    source.id = room + 1;
+    source.mode = None;
+    let revision = id();
+    data.authored.approved.insert(source.id, revision.clone());
+    data.authored.match_sources.insert(room, (source.id, revision));
+    data.worlds.insert(source.id, source);
 }
 async fn client(server: &Server, name: &str) -> (String, Value, watch::Receiver<Option<String>>) {
     let player = id();
@@ -280,6 +292,17 @@ async fn profile_credentials_and_saved_worlds_survive_a_restart_without_plaintex
 fn alpha_server() -> Server {
     let s = server(3, 12);
     s.alpha.try_lock().unwrap().enabled = true;
+    // Matchmaking fixtures explicitly opt in the installed CTF worlds.
+    {
+        let mut data = s.data.try_lock().unwrap();
+        for map in crate::harbor::quickplay_maps() {
+            let id = data.next_world;
+            data.next_world += 1;
+            data.worlds.insert(id, World { id, map, name: "Test arena".into(), tire_thermals: false, mode: None,
+                owner_id: None, listed: true, max_players: 10, password_hash: None, invite_code: String::new() });
+            data.authored.approved.insert(id, crate::social::model::id());
+        }
+    }
     s
 }
 #[tokio::test]
@@ -508,6 +531,20 @@ async fn live_editor_only_swaps_its_own_world_and_rejects_an_invalid_draft() {
     s.handle(&e, json!({"action":"editor_apply","document":doc}))
         .await
         .unwrap();
+    assert!(s.data.lock().await.saved_maps.is_empty(), "preview must not publish a global map");
+    let mine = world(&s, &e, "My personal build", "", true).await;
+    let theirs = world(&s, &p, "Another builder", "", true).await;
+    assert!(s.handle(&e, json!({"action":"editor_apply","world_id":theirs,"document":doc})).await.is_err());
+    s.data.lock().await.authored.approved.insert(mine, id());
+    s.handle(&e, json!({"action":"editor_apply","world_id":mine,"document":doc})).await.unwrap();
+    let loaded = s.handle(&e, json!({"action":"editor_document_get","world_id":mine,"map":"road_precision"})).await.unwrap();
+    assert_eq!(loaded["document"], doc);
+    {
+        let data = s.data.lock().await;
+        assert!(!data.authored.approved.contains_key(&mine));
+        assert!(!data.authored.documents.contains_key(&theirs));
+        assert!(data.saved_maps.is_empty());
+    }
     assert!(!Arc::ptr_eq(&old, &s.runtime(&e).await.unwrap()));
     assert!(Arc::ptr_eq(&practice, &s.runtime(&p).await.unwrap()));
     assert_eq!(
@@ -1526,5 +1563,57 @@ async fn reads_leave_other_social_subscribers_alone_and_mutations_still_broadcas
     let listed = outsider["data"]["worlds"].as_array().unwrap().iter().find(|w| w["id"] == id).unwrap();
     assert!(listed["invite_code"].is_null());
     assert_eq!(listed["members"], json!([]));
+    cleanup(s).await;
+}
+
+#[tokio::test]
+async fn game_master_controls_roster_main_world_and_matchmaking() {
+    let mut s = server(4, 10);
+    s.accounts = Some(AccountAccess::default());
+    let (owner, identity, _) = client(&s, "Owner").await;
+    let owner_id = identity["profile_id"].as_str().unwrap().to_owned();
+    s.staff.master = owner_id.clone();
+    let (other, other_identity, _) = client(&s, "Owner").await;
+    let driver = json!({"name":"New driver","gender":"female","vehicle":"brz","outfit":"shop-crew","color":"#123456","accent":"#654321"});
+    let create = json!({"action":"roster_save","driver":driver,"game_master":true,"profile_id":owner_id});
+    assert!(s.handle(&owner, create.clone()).await.is_err(), "configured guest must register");
+    let register = |login:&str| json!({"action":"account_register","login":login,"password":"long player passphrase for testing","name":"Owner"});
+    s.handle(&owner, register("game_owner")).await.unwrap();
+    s.handle(&other, register("other_user")).await.unwrap();
+    let character = s.handle(&owner, create.clone()).await.unwrap()["driver_id"].as_str().unwrap().to_string();
+    assert!(s.handle(&other, create.clone()).await.is_err());
+    let mut edit = create.clone(); edit["driver"]["id"] = json!(character); edit["driver"]["name"] = json!("Updated");
+    s.handle(&owner, edit).await.unwrap();
+    let equip = json!({"action":"character_equip","character":{"id":"mara-vega","outfit":"shop-crew","driver_id":character}});
+    s.handle(&other, equip.clone()).await.unwrap();
+    let mut invalid = equip; invalid["character"]["driver_id"] = json!("custom-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-female");
+    assert!(s.handle(&other, invalid).await.is_err());
+
+    let map = crate::harbor::quickplay_maps().into_iter().next().unwrap();
+    let world_id = s.handle(&other, json!({"action":"world_create","name":"My arena","map":map,"listed":true})).await.unwrap()["world_id"].as_u64().unwrap();
+    let authorize = |action,enabled| json!({"action":action,"world_id":world_id,"enabled":enabled,"game_master":true});
+    assert!(s.handle(&other,authorize("world_set_main",true)).await.is_err());
+    assert!(s.handle(&other,authorize("world_approve",true)).await.is_err());
+    assert!(s.handle(&other,json!({"action":"mode_join","mode":"quickplay","map":map})).await.is_err());
+    s.handle(&owner,authorize("world_set_main",true)).await.unwrap();
+    let handling = json!({"action":"world_tire_thermals","world_id":world_id,"enabled":true});
+    assert!(s.handle(&other,handling.clone()).await.is_err());
+    assert!(s.handle(&other,json!({"action":"world_delete","world_id":world_id})).await.is_err());
+    s.staff.worlds.insert(other_identity["profile_id"].as_str().unwrap().to_owned());
+    s.handle(&other,handling).await.unwrap();
+    assert!(s.handle(&other,create).await.is_err());
+    assert!(s.handle(&other,authorize("world_approve",true)).await.is_err());
+    s.handle(&owner,authorize("world_approve",true)).await.unwrap();
+    let joined = s.handle(&other,json!({"action":"mode_join","mode":"quickplay","map":"forged"})).await.unwrap();
+    assert_eq!(joined["map"],map);
+    let room = joined["world_id"].as_u64().unwrap() as usize;
+    assert_eq!(s.data.lock().await.match_source(room),Some(world_id as usize));
+    let stored = database::load_or_import(&s.path.with_extension("sqlite3"),&s.path).unwrap();
+    assert_eq!(stored.authored.drivers[&character].name,"Updated");
+    assert_eq!(stored.match_source(room),Some(world_id as usize));
+    s.handle(&owner,authorize("world_approve",false)).await.unwrap();
+    assert!(s.handle(&owner,json!({"action":"world_join","world_id":room})).await.is_err());
+    s.handle(&owner,authorize("world_approve",true)).await.unwrap();
+    assert_eq!(s.data.lock().await.match_source(room), None, "old revision stays out of rotation");
     cleanup(s).await;
 }
