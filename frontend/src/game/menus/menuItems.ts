@@ -1,3 +1,13 @@
+import { OPEN_WORLD_ID } from "../social/openWorld.ts";
+
+const openWorld = {
+  id: "open_world",
+  label: "Open World",
+  description: "Drive with other players in the shared hub.",
+  screen: "social",
+  available: true,
+} as const;
+
 // Labels, routing and controller item counts share the same source of truth.
 export const MAIN_MENU_ITEMS = [
   {
@@ -7,6 +17,7 @@ export const MAIN_MENU_ITEMS = [
     screen: "mode_select",
     available: true,
   },
+  ...(OPEN_WORLD_ID === undefined ? [] : [openWorld]),
   {id:"explore",label:"Explore",description:"Drive in the sandbox or build a world.",screen:"mode_select",available:true},
   {id:"heroes",label:"Heroes",description:"Choose and customize heroes, vehicles and drivers.",screen:"heroes",available:true},
   {

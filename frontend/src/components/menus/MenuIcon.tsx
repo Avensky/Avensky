@@ -7,6 +7,7 @@ const paths = {
   back: "m11 5-7 7 7 7m-7-7h16",
   play,
   resume: play,
+  open_world: globe,
   explore: "m3 18 6-10 4 6 2-3 6 7ZM15 6h6m-3-3v6",
   heroes: "m12 3 8 3v5c0 5-4 8-8 10-4-2-8-5-8-10V6zm0 5 1 2 2 1-2 1-1 2-1-2-2-1 2-1Z",
   career: "M4 20h16M6 16v-4m6 4V8m6 8V4",

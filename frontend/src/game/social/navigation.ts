@@ -15,7 +15,7 @@ export function enterWorld(result: Record<string, unknown>) {
   const world = view?.worlds.find(
     (world) => world.id === (result.world_id ?? view.current_world_id),
   );
-  if (world?.mode) useAlphaStore.getState().chooseMode(world.mode);
+  if (world) useAlphaStore.getState().chooseMode(world.mode ?? "sandbox");
   else if (view?.alpha?.active)
     useAlphaStore.getState().chooseMode(view.alpha.active.mode);
   else useAlphaStore.getState().chooseMode("sandbox");
