@@ -4,7 +4,7 @@ Avensky splits three kinds of work. The Rust game server handles live multiplaye
 
 ## Servers and request paths
 
-The two Rust WebSocket services are running on Vultr. The staging frontend and asset gateway below are the rollout design for Cloud Asset Streaming.
+The two Rust WebSocket services and the private staging asset gateway run on Vultr. The initial staging smoke test returned `206 Partial Content` and the four-byte `glTF` header for the narrow one-way road model through the loopback gateway. The owner confirmed the staging site loaded. The diagram shows the staging request paths, including the account storage path available when the account-capable Rust build is deployed.
 
 ```mermaid
 flowchart LR
@@ -65,4 +65,4 @@ Account hashing and database writes run off the simulation path. Track write lat
 
 Run the same garage-to-city route with a cold browser cache, then repeat it with a warm cache on the same browser and device. Keep the build, map and quality settings fixed. Record time to first usable scene, model bytes transferred, frame time and the staging WebSocket connection time. For a second comparison, reset the cache and repeat with Original and Fast quality. Track which requests change along with the frame times so a smaller download and a faster frame are measured independently.
 
-This release proves the staging build can complete with LFS pointers. The baseline manifest describes about 2.18 GiB of assets, all kept out of the deploy directory. The gateway still carries model traffic through Vultr on browser cache misses, so watch its outbound bandwidth, upstream response latency and error rate separately from Rust CPU and WebSocket latency. The live bucket match and device performance need staging measurements.
+The staging build completes with LFS pointers. The verified staging manifest `0ce3600db01f00ee84805662ab8fd5f7679b4ad79dbd1dac0410b45c7212bc4e` describes about 2.18 GiB of assets, all kept out of the deploy directory. The gateway carries model traffic through Vultr on browser cache misses, so watch its outbound bandwidth, upstream response latency and error rate separately from Rust CPU and WebSocket latency. Compare cold and warm browser performance on actual staging devices to quantify the effect.
