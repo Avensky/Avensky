@@ -351,6 +351,7 @@ test("social requests, world transitions and assisted text have independent owne
       const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");
       const { WorldsPage } = await load("game/social/WorldsPage.tsx");
       const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
+      const { useAlphaStore: alpha } = await load("store/alpha/alphaStore.ts");
       assert.equal(OPEN_WORLD_ID, 7);
       assert.equal(parseOpenWorldId("1e2"), undefined);
       const world = {
@@ -371,6 +372,9 @@ test("social requests, world transitions and assisted text have independent owne
       assert.equal(ui.getState().screen, "social");
 
       const calls = [];
+      await act(async () => social.setState({ view: {
+        ...view, worlds: [world], alpha: { active: { mode: "quickplay" } },
+      } }));
       await render(h(WorldsPage, {
         view: { ...view, worlds: [world] },
         command: async (...args) => {
@@ -385,6 +389,7 @@ test("social requests, world transitions and assisted text have independent owne
       await act(async () => join.click());
       assert.deepEqual(calls[0].slice(0, 2), ["world_join", { world_id: 7, password: "" }]);
       assert.equal(ui.getState().screen, "hero_select");
+      assert.equal(alpha.getState().mode, "sandbox", "a late lobby update cannot carry the previous match into the hub");
     });
     await t.test(
       "switching locked world targets clears the previous password before sending a join",
