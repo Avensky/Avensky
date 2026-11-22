@@ -29,7 +29,7 @@ jobs:
           node-version: "24"
       - run: npm --prefix frontend ci
       - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
-      - run: node --test tests/player-onboarding.test.mjs
+      - run: node --test tests/player-onboarding.test.mjs tests/character-workshop.test.mjs
         working-directory: frontend
       - run: npm --prefix frontend run build -- --mode staging
         env:

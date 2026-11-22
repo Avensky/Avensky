@@ -10,9 +10,12 @@ on:
       - "avenlab-server/src/main.rs"
       - "avenlab-server/src/server.rs"
       - "avenlab-server/src/server/**"
+      - "avenlab-server/src/alpha/character.rs"
+      - "avenlab-server/src/net.rs"
       - "avenlab-server/src/social/**"
       - "avenlab-server/Cargo.*"
       - "packages/wardrobe-catalog/vehicle-drivers.json"
+      - "packages/wardrobe-catalog/character-appearance.json"
       - "compose.staging.yaml"
       - ".github/workflows/environment-isolation.yml"
   workflow_dispatch:
@@ -44,5 +47,7 @@ jobs:
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml deployment_env::tests
       - name: Verify account migration and outfit recovery
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml account_survives_a_restart
+      - name: Verify saved body customization
+        run: cargo test --locked --manifest-path avenlab-server/Cargo.toml body_tattoo_is_optional
       - name: Validate isolated staging Docker Compose file
         run: docker compose -f compose.staging.yaml config --quiet

@@ -17,6 +17,10 @@
     { "id": "warm", "label": "Warm", "color": "#bb7953" },
     { "id": "deep", "label": "Deep", "color": "#85513c" }
   ],
+  "tattoo": [
+    { "id": "none", "label": "None" },
+    { "id": "twin-band", "label": "Twin upper-arm bands" }
+  ],
   "headwear": [
     { "id": "none", "label": "None" },
     { "id": "hat", "label": "Hat" }

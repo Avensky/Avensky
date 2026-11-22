@@ -96,6 +96,7 @@ function hasCosmeticsRevision(cosmetics: unknown): cosmetics is Cosmetics & { co
 export const useSocialStore = create<{
   available: boolean;
   accountsAvailable: boolean;
+  bodyTattoosAvailable: boolean;
   registeredProfile: boolean;
   profileStatus: "idle" | "restoring" | "ready" | "error";
   profileScope: "device" | "tab" | null;
@@ -112,6 +113,7 @@ export const useSocialStore = create<{
 }>((set) => ({
   available: false,
   accountsAvailable: false,
+  bodyTattoosAvailable: false,
   registeredProfile: false,
   profileStatus: "idle",
   profileScope: null,
@@ -125,6 +127,7 @@ export const useSocialStore = create<{
     set({
       available: false,
       accountsAvailable: false,
+      bodyTattoosAvailable: false,
       registeredProfile: false,
       profileStatus: "idle",
       profileScope: null,

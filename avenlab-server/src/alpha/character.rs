@@ -162,6 +162,8 @@ pub struct CharacterAppearance {
     brow_color: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     glasses: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tattoo: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -335,6 +337,7 @@ impl CharacterChoice {
                 ("eye_color", appearance.eye_color.as_deref()),
                 ("brow_color", appearance.brow_color.as_deref()),
                 ("glasses", appearance.glasses.as_deref()),
+                ("tattoo", appearance.tattoo.as_deref()),
             ]
             .into_iter()
             .all(|(field, value)| value.is_none_or(|value| {
@@ -351,6 +354,22 @@ impl CharacterChoice {
 mod wardrobe_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn body_tattoo_is_optional_and_only_accepts_catalog_styles() {
+        let mut value = json!({"id":"mara-vega","outfit":"dockwear","appearance":{
+            "hair":"natural","hair_color":"original","skin":"warm","headwear":"none","color":"original"
+        }});
+        let legacy: CharacterChoice = serde_json::from_value(value.clone()).unwrap();
+        assert!(legacy.is_equippable());
+        value["appearance"]["tattoo"] = json!("twin-band");
+        let equipped: CharacterChoice = serde_json::from_value(value.clone()).unwrap();
+        assert!(equipped.is_equippable());
+        assert_eq!(serde_json::to_value(equipped).unwrap()["appearance"]["tattoo"], "twin-band");
+        value["appearance"]["tattoo"] = json!("unknown");
+        let unknown: CharacterChoice = serde_json::from_value(value).unwrap();
+        assert!(!unknown.is_equippable());
+    }
 
     #[test]
     fn roster_choices_match_valid_rigs_and_outfits() {

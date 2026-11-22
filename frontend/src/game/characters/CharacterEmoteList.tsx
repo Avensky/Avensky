@@ -8,11 +8,12 @@ import { EMOTE_GROUPS, emoteCollection, findGaragePreviewEmote, garagePreviewCol
 import { GARAGE_LEAN_ID, GARAGE_LEAN_NAME } from "./garageLean";
 import { MIRROR_MAKEUP_EMOTES } from "./mirrorCheck";
 
-export type PreviewEmoteGroup = EmoteGroup | CharacterPersonality | "Best" | "All" | "Personality";
+export type PreviewEmoteGroup = EmoteGroup | CharacterPersonality | "Best" | "All" | "Personality" | "Favorites" | "Gestures";
 export type PreviewEmote = { id: string; name: string };
 
 export const CharacterEmoteList = memo(function CharacterEmoteList({
-  choice, group, search, station, insideCar, disabled, mirrorAvailable, leanAvailable, selectedId, onSearch, onSelect,
+  choice, group, search, station, insideCar, disabled, mirrorAvailable, leanAvailable, selectedId, favorites = [],
+  onSearch, onSelect, onFavorite,
 }: {
   choice: CharacterChoice;
   group?: PreviewEmoteGroup;
@@ -23,8 +24,10 @@ export const CharacterEmoteList = memo(function CharacterEmoteList({
   mirrorAvailable: boolean;
   leanAvailable: boolean;
   selectedId?: string;
+  favorites?: string[];
   onSearch: (search: string) => void;
   onSelect: (emote: PreviewEmote) => void;
+  onFavorite?: (id: string) => void;
 }) {
   const bag = Boolean(choice.prop);
   const road = station?.kind === "wheel";
@@ -37,11 +40,14 @@ export const CharacterEmoteList = memo(function CharacterEmoteList({
       return cockpitTakesForWheel(Boolean(station.steeringParts), Boolean(station.drivingSet));
     }
     if (personality) return personality.emotes.flatMap(id => findGaragePreviewEmote(id, bag) ?? []);
+    if (group === "Favorites") return favorites.flatMap(id => findGaragePreviewEmote(id, bag) ?? []);
+    if (group === "Gestures") return garagePreviewCollection("Best", bag);
     if (group === "All") return [...new Map(EMOTE_GROUPS.flatMap(group => emoteCollection(group, bag)).map(item => [item.id, item])).values()];
     if (group === "Best" || EMOTE_GROUPS.includes(group as EmoteGroup)) return garagePreviewCollection(group as EmoteGroup | "Best", bag);
     return [];
-  }, [insideCar, group, bag, road, station, personality]);
+  }, [insideCar, group, bag, road, station, personality, favorites]);
   const query = search.trim().toLowerCase();
+  const favoritable = new Set(picked.map(item => item.id));
   const visible = [
     ...(!insideCar && mirrorAvailable && (group === "Garage" || group === "All") ? MIRROR_MAKEUP_EMOTES : []),
     ...(!insideCar && leanAvailable && group === "Garage" ? [{ id: GARAGE_LEAN_ID, name: GARAGE_LEAN_NAME }] : []),
@@ -55,12 +61,17 @@ export const CharacterEmoteList = memo(function CharacterEmoteList({
         placeholder="Name or number…" onChange={event => onSearch(event.target.value)} /></label>
       <small>{visible.length} emotes</small>
       <div className="character-emotes" aria-label={label}>
-        {visible.map(item => <button key={item.id} type="button" className="menu-control" data-controller-row data-emote-id={item.id}
-          disabled={disabled} aria-pressed={selectedId === item.id} onClick={() => onSelect(item)}>
-          <span className="emote-name">{item.name}</span><FitBadge choice={choice} pose={item.id} />
-        </button>)}
+        {visible.map(item => <div key={item.id} className="character-emote-row" data-controller-row>
+          <button type="button" className="menu-control" data-emote-id={item.id}
+            disabled={disabled} aria-pressed={selectedId === item.id} onClick={() => onSelect(item)}>
+            <span className="emote-name">{item.name}</span><FitBadge choice={choice} pose={item.id} />
+          </button>
+          {onFavorite && !insideCar && favoritable.has(item.id) && <button type="button" className="menu-control character-emote-star"
+            aria-label={`${favorites.includes(item.id) ? "Remove favorite" : "Favorite"} ${item.name}`} aria-pressed={favorites.includes(item.id)}
+            onClick={() => onFavorite(item.id)}>{favorites.includes(item.id) ? "★" : "☆"}</button>}
+        </div>)}
       </div>
-      {!visible.length && <p role="status">No emotes match this filter.</p>}
+      {!visible.length && <p role="status">{group === "Favorites" && !query ? "Star a gesture to add it here." : "No emotes match this filter."}</p>}
     </div>
   </>;
 });

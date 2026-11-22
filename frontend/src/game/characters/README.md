@@ -2,10 +2,10 @@
 
 Heroes and Garage use the portrait at the right of the header to open Character.
 The editor previews changes on the same turntable as the vehicle. New profiles
-confirm a character model before editing. Identity, Appearance, and Emotes share
+confirm a character model before editing. Details, Body, Appearance, and Emotes share
 the Character header tab list, which opens on Appearance on the first visit.
-Use the shoulder buttons or Q and E to switch tabs. Choose the model in Identity
-to preview its saved outfit and appearance in the other tabs. Identity saves
+Use the shoulder buttons or Q and E to switch tabs. Where model selection is available, choose it in Details
+to preview its saved outfit and appearance in the other tabs. Details saves
 Male, Female, or Nonbinary independently of the equipped model. The server saves
 edits automatically, and the editor keeps pending changes through a reconnect to
 the same profile.
@@ -655,3 +655,11 @@ braid and waistband in idle, then raise both arms with Overhead heart. The
 previous horizontal opening was absent in both review renders. A faint fabric
 fold remains. The garage and portrait skin-mask checks found no missing
 exposed skin in five sampled poses per tier.
+
+## Body and emotes
+
+**Details** holds the character identity and personality. **Body** holds hair, eye and eyebrow color, skin tone, and an upper-arm band tattoo. The tattoo uses the skin material and follows the existing rig. Connected profiles save it when the server advertises tattoo support.
+
+**Emotes** opens the library with gestures, favorites, poses, and garage interactions. The creator saves named pose sequences on the current browser for the active player. Each keyframe has a body pose and optional hand shape with a hold time, transition speed, and facing. Playing the sequence uses the existing pose solver.
+
+The garage's **Open driver door** action uses the fitted driver's side and handle, stopping before entry. **Sit down** targets the garage chair's seat marker and aligns the driver to it. These are garage previews. Contact, clothing fit, and playback still need visual verification with the installed models on desktop and a phone.
