@@ -4,7 +4,7 @@ Avensky splits three kinds of work. The Rust game server handles live multiplaye
 
 ## Servers and request paths
 
-The two Rust WebSocket services are running on Vultr. The staging frontend and asset gateway below are the rollout design for Cloud Asset Streaming.
+The two Rust WebSocket services and the private staging asset gateway run on Vultr. The initial staging smoke test returned `206 Partial Content` and the four-byte `glTF` header for the narrow one-way road model through the loopback gateway. The owner confirmed the staging site loaded. The diagram shows the staging request paths, including the account storage path available when the account-capable Rust build is deployed.
 
 ```mermaid
 flowchart LR
@@ -38,6 +38,8 @@ See the [environment configuration](DEPLOYMENT_ENVIRONMENTS.md), [staging Compos
 
 ## Build and delivery pipelines
 
+GitHub Actions can build staging after merges to main and publish it after checking the private gateway. The manual live release uses the staged commit and its separately reviewed production bundle. Vultr switches the frontend root to a versioned directory after validation. [Frontend release and rollback runbook](FRONTEND_RELEASES.md)
+
 1. **Author asset variants.** City tooling generates smaller textures and reduced geometry. Optional frontend scripts produce lighter character, wardrobe, Harbor and vehicle preview assets on a workstation with the approved inputs. These steps move generation work out of staging deployment. [City LOD tooling](../scripts/city-lod/README.md) · [Asset preparation](CLOUD_ASSETS.md#prebuilt-previews-and-generated-tiers)
 2. **Compile with metadata.** Node 24 and Vite build the staging site from source, Git LFS pointers and prebuilt collider metadata. The build checks the collider lock against its source and output hashes and writes a manifest of expected model paths, sizes and digests. The public build directory contains zero GLBs. [Build configuration](../frontend/vite.config.ts) · [Collider verification](../frontend/scripts/prebuilt-colliders.mjs)
 3. **Verify in CI and against storage.** GitHub Actions builds on Linux with LFS downloads disabled and checks the output. Before rollout, an operator verifies every manifest object against Lightsail. The verifier streams up to six objects at a time to check their SHA-256, sizes and relative GLB dependencies, then records their ETags. This reads the release over the network once per verification run and writes no model payloads to disk. [GitHub Actions workflow](../.github/workflows/cloud-assets.yml) · [Object verification](../deploy/staging-assets/verify-release.mjs)
@@ -63,4 +65,4 @@ Account hashing and database writes run off the simulation path. Track write lat
 
 Run the same garage-to-city route with a cold browser cache, then repeat it with a warm cache on the same browser and device. Keep the build, map and quality settings fixed. Record time to first usable scene, model bytes transferred, frame time and the staging WebSocket connection time. For a second comparison, reset the cache and repeat with Original and Fast quality. Track which requests change along with the frame times so a smaller download and a faster frame are measured independently.
 
-This release proves the staging build can complete with LFS pointers. The baseline manifest describes about 2.18 GiB of assets, all kept out of the deploy directory. The gateway still carries model traffic through Vultr on browser cache misses, so watch its outbound bandwidth, upstream response latency and error rate separately from Rust CPU and WebSocket latency. The live bucket match and device performance need staging measurements.
+The staging build completes with LFS pointers. The verified staging manifest `0ce3600db01f00ee84805662ab8fd5f7679b4ad79dbd1dac0410b45c7212bc4e` describes about 2.18 GiB of assets, all kept out of the deploy directory. The gateway carries model traffic through Vultr on browser cache misses, so watch its outbound bandwidth, upstream response latency and error rate separately from Rust CPU and WebSocket latency. Compare cold and warm browser performance on actual staging devices to quantify the effect.
