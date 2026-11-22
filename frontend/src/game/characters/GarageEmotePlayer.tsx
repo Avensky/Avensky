@@ -22,6 +22,8 @@ import { personalityEmote, type CharacterPersonality } from "./characterPersonal
 import type { PieceColors } from "./clothingPieces";
 import { keepHeldProp } from "./emotePropNotes";
 import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./posePack";
+import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
+import { InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip } from "./garageInteractions";
 
 const FADE_SECONDS = .52;
 
@@ -31,6 +33,7 @@ type CabinState = {
   cabin: CockpitPlayback | null;
   driveSeconds: number;
   take: { clip: CockpitTake; seconds: number } | null;
+  doorOnly: boolean;
   preview: ReturnType<typeof useCharacterPreviewStore.getState>["emote"];
   idle: AnimationAction;
   rest: number;
@@ -40,6 +43,7 @@ function leaveCabin(current: CabinState | null, restSeconds: number) {
   if (!current?.cabin) return;
   current.cabin.stop();
   current.cabin = null;
+  current.doorOnly = false;
   current.driveSeconds = 0;
   current.take = null;
   current.preview = null;
@@ -58,6 +62,12 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   const contextFit = useRef("");
   const lastInteraction = useRef<string | undefined>(undefined);
   const heldProp = useRef<Group>(null);
+  const chairSeat = useRef<Group>(null);
+  const chairRequested = useCharacterPreviewStore(s => previewPacks && s.emote?.id === SIT_IN_CHAIR);
+  const chairShown = useRef(false);
+  useLayoutEffect(() => {
+    if (previewPacks) return () => { chairShown.current = false; };
+  }, [previewPacks]);
   const baseClips = useRef<{ root: Object3D; bag: boolean; clips: ReturnType<typeof buildGarageEmotes> }>(null);
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
   const restSeconds = previewPacks ? 4.5 : 2.35;
@@ -132,7 +142,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     const active = celebration ? actions.get(celebration.id)!.reset().setEffectiveWeight(0).play() : null;
     const props = new Map<EmoteProp, EmotePropModel>();
     player.current = { mixer, idle, actions, props,
-      automatic, active, release: null, cabin: null, driveSeconds: 0, take: null, rest: restSeconds, next: 0, clicked: null, blink, elapsed: 0, preview: null };
+      automatic, active, release: null, cabin: null, doorOnly: false, driveSeconds: 0, take: null, rest: restSeconds, next: 0, clicked: null, blink, elapsed: 0, preview: null };
     return () => {
       player.current?.cabin?.stop();
       player.current = null;
@@ -160,9 +170,14 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     const driveOut = garageStation && drive.stage !== "station";
     const preview = previewPacks ? view.emote : garageStation ? drive.steering : current.clicked;
     const driving = garageStation || (previewPacks && view.insideCar);
+    const doorOnly = previewPacks && !view.insideCar && preview?.id === OPEN_DRIVER_DOOR && drive.hasDoor;
+    if (current.cabin && (current.doorOnly !== doorOnly || (doorOnly && current.preview !== preview))) {
+      leaveCabin(current, restSeconds);
+    }
     if (heldProp.current) heldProp.current.visible = keepHeldProp(
-      current.active?.getClip().name.split(" ")[0] ?? (preview !== current.preview ? preview?.id : null), driving);
-    if (cockpit && (garageStation || (previewPacks && view.cockpitAvailable && view.insideCar)) && !victory) {
+      current.active?.getClip().name.split(" ")[0] ?? (preview !== current.preview ? preview?.id : null),
+      driving || doorOnly || preview?.id === SIT_IN_CHAIR);
+    if (cockpit && (garageStation || (previewPacks && view.cockpitAvailable && (view.insideCar || doorOnly))) && !victory) {
       if (!current.cabin) {
         current.active?.stop();
         current.active = null;
@@ -171,10 +186,13 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         current.clicked = null;
         current.preview = null;
         current.cabin = cockpit(root, previewPacks);
-        if (!current.cabin) {
+        current.doorOnly = doorOnly;
+        if (!current.cabin || (doorOnly && !current.cabin.hasDoor)) {
+          leaveCabin(current, restSeconds);
           current.idle.reset().setEffectiveWeight(1).play();
           const error = "This driver could not be fitted to the selected vehicle.";
           if (garageStation) useGarageDrive.setState({ stage: "idle", error });
+          else if (doorOnly) useCharacterPreviewStore.setState({ emote: null, cockpitError: error });
           else failCockpitPreview(error);
           return;
         }
@@ -183,6 +201,12 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         current.preview = preview;
         const clip = COCKPIT_TAKES.find(take => take.id === preview?.id);
         current.take = clip ? { clip, seconds: 0 } : null;
+      }
+      if (doorOnly) {
+        // Stop before entry begins so the actor opens the door and stays outside.
+        current.driveSeconds = Math.min(current.driveSeconds + step, 1.2);
+        current.cabin.sample(null, 0, sampleDriveOut(current.driveSeconds));
+        return;
       }
       const enteringCharacter = previewPacks && current.cabin.hasDoor && current.driveSeconds < GARAGE_ENTRY_DURATION;
       const take = current.take;
@@ -211,6 +235,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       current.idle.setEffectiveWeight(1);
     }
     const sequence = previewPacks ? view.emote?.sequence : undefined;
+    const created = previewPacks ? view.emote?.created : undefined;
     let continueFromHold = false;
     if (!victory && preview !== current.preview && current.active) {
       // A matching held pose is already the first frame of the next sequence.
@@ -225,10 +250,12 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     if (!victory && preview !== current.preview && !current.active) {
       current.preview = preview;
       // One composed take per mixer. Replacing it avoids caching every combination.
-      const previousSequence = current.actions.get(POSE_SEQUENCE_ID);
-      if (previousSequence) {
-        current.mixer.uncacheAction(previousSequence.getClip());
-        current.actions.delete(POSE_SEQUENCE_ID);
+      for (const id of [POSE_SEQUENCE_ID, CREATED_EMOTE_ID, SIT_IN_CHAIR]) {
+        const previous = current.actions.get(id);
+        if (previous) {
+          current.mixer.uncacheAction(previous.getClip());
+          current.actions.delete(id);
+        }
       }
       const nextFit = JSON.stringify([mirrorFit, leanFit]);
       if (nextFit !== contextFit.current) {
@@ -241,7 +268,15 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       let action = preview ? current.actions.get(preview.id) : undefined;
       if (!action && preview) {
         const pose = previewPacks ? posePackEmote(preview.id, sequence) : undefined;
-        const emote = pose ?? (previewPacks ? makeupPreviewEmote(preview.id, mirrorFit) : undefined)
+        if (preview.id === SIT_IN_CHAIR || created) current.idle.stop();
+        const interaction = preview.id === SIT_IN_CHAIR ? chairSitClip(root, chairSeat.current ?? undefined) : undefined;
+        if (preview.id === SIT_IN_CHAIR && !interaction) {
+          useCharacterPreviewStore.setState({ emote: null, cockpitError: "A chair is unavailable for this driver." });
+          current.idle.reset().play();
+          return;
+        }
+        const emote = interaction ?? (created ? createdEmoteClip(created) : pose)
+          ?? (previewPacks ? makeupPreviewEmote(preview.id, mirrorFit) : undefined)
           ?? (preview.id === GARAGE_LEAN_ID && leanFit ? garageLeanPose(leanFit) : findGaragePreviewEmote(preview.id, bag));
         if (emote) {
           // The solver needs the rest skeleton. Release mixer bindings before
@@ -254,7 +289,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
             if (emote.prop === "flag") current.fitFlag = bindFlagPoleGrip(root, prop);
           }
           action = current.mixer.clipAction(buildEmoteClips(root, [emote], current.props)[0]).setLoop(LoopOnce, 1);
-          action.clampWhenFinished = Boolean(pose);
+          action.clampWhenFinished = Boolean(pose || interaction);
           current.actions.set(preview.id, action);
           current.idle.reset().play();
         }
@@ -270,6 +305,11 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       const { active, release } = current;
       const duration = active.getClip().duration;
       const time = active.time + step;
+      if (view.loopEmote && previewPacks && preview && preview === current.preview && !active.clampWhenFinished && !release && time >= duration) {
+        active.reset().setEffectiveWeight(0).play();
+        current.idle.setEffectiveWeight(1);
+        return;
+      }
       if (release) release.elapsed += step;
       if ((!active.clampWhenFinished && time >= duration) || (release && release.elapsed >= FADE_SECONDS)) {
         active.stop();
@@ -297,7 +337,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     current.fitFlag?.();
   }, cockpit ? -.5 : -.125);
 
+  if (chairRequested) chairShown.current = true;
   return <group>
+    {previewPacks && <InteractionChair visible={chairRequested || chairShown.current} seatRef={chairSeat} />}
     <primitive object={root} dispose={null} onClick={(event: import("@react-three/fiber").ThreeEvent<MouseEvent>) => {
       if (paused || victory || reducedMotion || !player.current || player.current.cabin || event.delta > 3 || performance.now() < useFittingTurnStore.getState().suppressClickUntil) return;
       event.stopPropagation();

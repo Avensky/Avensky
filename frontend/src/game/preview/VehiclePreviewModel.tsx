@@ -20,6 +20,7 @@ import {useFrame,useThree} from "@react-three/fiber";
 import {applyWindowTone} from "./windowTones";
 import {vehicleSystems} from "../../vehicles/vehicleSystems";
 import { prepareGarageCockpit, type GarageCockpit } from "./garageCockpit";
+import { OPEN_DRIVER_DOOR } from "../characters/garageInteractions";
 import { GARAGE_STATIONS, garageStationCamera } from "./garageStations";
 import { usePreviewPaint } from "./usePreviewPaint";
 import { splitAe86DriverDoor } from "./ae86DriverDoor";
@@ -214,7 +215,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
       (previewPacks && useCharacterPreviewStore.getState().insideCar)));
     prepared.dashboard?.update();
     const drivenDoor = driverDoor && ((garageOpen && stage !== "idle" && stage !== "station") ||
-      (previewPacks && useCharacterPreviewStore.getState().insideCar)) ? driverDoor.part : undefined;
+      (previewPacks && (useCharacterPreviewStore.getState().insideCar ||
+        useCharacterPreviewStore.getState().emote?.id === OPEN_DRIVER_DOOR))) ? driverDoor.part : undefined;
     const garageLights = garageOpen ? useGarageDiagnostics.getState().tests[model]?.lights : undefined;
     advanceVehiclePartRig(partRig,studio.parts,delta,drivenDoor,studio.parts.headlights || Boolean(garageLights && garageLights !== "off"));
     if (marine) {

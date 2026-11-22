@@ -1,4 +1,5 @@
 import type { PoseSequence } from "./posePack";
+import type { CreatedEmote } from "./emoteAuthoring";
 import type { ClothingPiece } from "./clothingPieces";
 import { create } from "zustand";
 import type { VehicleModelId } from "../../vehicles/tools/vehicleModelPaths";
@@ -16,14 +17,15 @@ export const useCharacterPreviewStore = create<{
   automaticEmotes: boolean;
   camera: Camera;
   zoom: number;
-  emote: { id: string; sequence?: PoseSequence } | null;
+  emote: { id: string; sequence?: PoseSequence; created?: CreatedEmote } | null;
+  loopEmote: boolean;
   cockpitVehicle: VehicleModelId | null;
   cockpitAvailable: boolean;
   cockpitError: string | null;
   insideCar: boolean;
   leanAvailable: boolean;
   mirrorAvailable: boolean;
-}>(() => ({ viewport: null, selectedPiece: "corset", focusRevision: 0, playbackPaused: false, automaticEmotes: true, camera: "Full body", zoom: 1, emote: null, cockpitVehicle: null, cockpitAvailable: false, cockpitError: null, insideCar: false, leanAvailable: false, mirrorAvailable: false }));
+}>(() => ({ viewport: null, selectedPiece: "corset", focusRevision: 0, playbackPaused: false, automaticEmotes: true, camera: "Full body", zoom: 1, emote: null, loopEmote: false, cockpitVehicle: null, cockpitAvailable: false, cockpitError: null, insideCar: false, leanAvailable: false, mirrorAvailable: false }));
 
 export function failCockpitPreview(message: string) {
   if (useCharacterPreviewStore.getState().insideCar) {

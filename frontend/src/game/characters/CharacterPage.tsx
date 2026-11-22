@@ -28,22 +28,27 @@ import { PreviewToolButton } from "../preview/PreviewToolButton";
 import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
+import { useGarageDrive } from "../preview/garageDriveStore";
+import { OPEN_DRIVER_DOOR, SIT_IN_CHAIR } from "./garageInteractions";
+import { EmoteCreator } from "./EmoteCreator";
+import { CREATED_EMOTE_ID, readCreatedEmotes } from "./emoteAuthoring";
 
 export const CHARACTER_TABS = [
-  { id: "identity", label: "Identity" }, { id: "appearance", label: "Appearance" },
+  { id: "details", label: "Details" }, { id: "body", label: "Body" }, { id: "appearance", label: "Appearance" },
   { id: "emotes", label: "Emotes" },
 ] as const;
 export type CharacterTab = typeof CHARACTER_TABS[number]["id"];
 
 const PREVIEW_CAST = CHARACTERS.map(item => ({ name: item.name, gender: item.gender, choice: { id: item.id, outfit: item.outfits[0].id } }));
 const COCKPIT_CAMERAS = ["Full body", "Whole car"] as const;
-const IDENTITY_STYLE = [
+const BODY_STYLE = [
   ["Hair", [["hair", "Hairstyle"], ["hair_color", "Hair color"]]],
   ["Face", [["eye_color", "Eye color"], ["brow_color", "Eyebrow tint"]]],
-  ["Skin tone", [["skin", "Skin tone"]]],
+  ["Skin", [["skin", "Skin tone"], ["tattoo", "Tattoo"]]],
 ] as const;
 const EMOTE_PACKS = EMOTE_GROUPS.filter(group => group !== "Garage");
-type IdentityAppearanceField = typeof IDENTITY_STYLE[number][1][number][0];
+type BodyAppearanceField = typeof BODY_STYLE[number][1][number][0];
+type EmoteSection = PreviewEmoteGroup | "Pose pack" | "Interactions" | "Creator";
 
 function revealCharacterControl(event: FocusEvent<HTMLElement>) {
   event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
@@ -57,6 +62,8 @@ function playEmote(item: PreviewEmote) {
   useCharacterPreviewStore.setState(state => ({
     emote: { id: item.id },
     playbackPaused: false,
+    loopEmote: false,
+    cockpitError: null,
     ...(mirror ? { camera: "Whole car" } : makeup ? { camera: "Face", zoom: 1, focusRevision: state.focusRevision + 1 } : {}),
   }));
 }
@@ -70,11 +77,22 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const page = useRef<HTMLDivElement>(null);
   const owner = useSocialStore(state => state.view?.profile.id ?? state.profileOwner);
   const connectedOwner = useSocialStore(state => state.view?.profile.id);
+  const bodyTattoosAvailable = useSocialStore(state => state.bodyTattoosAvailable);
   const saved = useSocialStore(selectEquippedCharacter);
   // Null is a supported profile awaiting setup. Older servers omit the field.
   const saveToProfile = Boolean(owner) && saved !== undefined;
   const editingAllowed = useUIStore(canEditCharacter);
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
+  const hasDriverDoor = useGarageDrive(state => state.hasDoor);
+  const ownerKey = owner ?? "this-device";
+  const favoritesKey = "avensky-emote-favorites-v1:" + ownerKey;
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    try {
+      const entries: unknown = JSON.parse(localStorage.getItem(favoritesKey) ?? "[]");
+      return Array.isArray(entries) ? entries.filter((id): id is string => typeof id === "string").slice(0, 200) : [];
+    } catch { return []; }
+  });
+  const [createdEmotes, setCreatedEmotes] = useState(() => readCreatedEmotes(ownerKey));
   const [initialChoice] = useState(() => characterLook(saved) ? saved! : readLocalCharacter());
   const [choice, setChoice] = useState(initialChoice ?? DEFAULT_CHARACTER);
   const [trial, setTrial] = useState<CharacterChoice>();
@@ -86,23 +104,24 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const [message, setMessage] = useState("");
   const [emoteBrowserOpen, setEmoteBrowserOpen] = useState(false);
   const [emotePacksOpen, setEmotePacksOpen] = useState(false);
-  const [emoteGroup, setEmoteGroup] = useState<PreviewEmoteGroup | "Pose pack">();
+  const [emoteGroup, setEmoteGroup] = useState<EmoteSection>();
   const [emoteSearch, setEmoteSearch] = useState("");
   const [emoteDetail, setEmoteDetail] = useState<PreviewEmote>();
   const emoteBrowserId = useId();
   const emotePacksId = useId();
   const emoteResultsId = useId();
   const emoteFocus = useRef<string>(null);
+  const selectedPreview = useRef<ReturnType<typeof useCharacterPreviewStore.getState>["emote"]>(null);
   const acknowledged = useRef(locked ? choice : null);
   const queued = useRef(new Map<string, CharacterChoice>());
   const drafts = useRef(new Map<string, CharacterChoice>());
   const running = useRef<Promise<boolean> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { character, outfit, appearance } = characterLook(previewChoice)!;
-  const { camera, zoom, emote, playbackPaused, cockpitVehicle, cockpitAvailable, cockpitError, insideCar, leanAvailable, mirrorAvailable } = useCharacterPreviewStore(useShallow(state => ({
+  const { camera, zoom, emote, playbackPaused, loopEmote, cockpitVehicle, cockpitAvailable, cockpitError, insideCar, leanAvailable, mirrorAvailable } = useCharacterPreviewStore(useShallow(state => ({
     camera: state.camera, zoom: state.zoom, emote: state.emote, playbackPaused: state.playbackPaused,
     cockpitVehicle: state.cockpitVehicle, cockpitAvailable: state.cockpitAvailable, cockpitError: state.cockpitError,
-    insideCar: state.insideCar, leanAvailable: state.leanAvailable, mirrorAvailable: state.mirrorAvailable,
+    insideCar: state.insideCar, leanAvailable: state.leanAvailable, mirrorAvailable: state.mirrorAvailable, loopEmote: state.loopEmote,
   })));
 
   useLayoutEffect(() => {
@@ -169,17 +188,25 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   useLayoutEffect(() => { onReady(locked); }, [locked, onReady]);
   useLayoutEffect(() => {
     if (tab !== "emotes") return;
+    if (locked) {
+      setEmoteBrowserOpen(true);
+      setEmoteGroup("Gestures");
+    }
     useFittingTurnStore.setState({ characterYaw: 0 });
     useCharacterPreviewStore.setState(state => ({ camera: "Full body", zoom: 1, focusRevision: state.focusRevision + 1 }));
-    return () => useCharacterPreviewStore.setState({ emote: null, insideCar: false, cockpitError: null });
-  }, [tab]);
+    return () => useCharacterPreviewStore.setState({ emote: null, loopEmote: false, automaticEmotes: true, insideCar: false, cockpitError: null });
+  }, [tab, locked]);
   useLayoutEffect(() => () => {
     setEmoteBrowserOpen(false);
     setEmotePacksOpen(false);
     setEmoteGroup(undefined);
     setEmoteDetail(undefined);
     setEmoteSearch("");
+    selectedPreview.current = null;
   }, [locked, tab]);
+  useLayoutEffect(() => {
+    if (emote) selectedPreview.current = emote;
+  }, [emote]);
   useLayoutEffect(() => {
     if (!emoteFocus.current) return;
     page.current?.querySelector<HTMLElement>(emoteFocus.current)?.focus();
@@ -306,12 +333,13 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     update({ ...choice, appearance: { ...characterAppearance(choice), item_colors } }, activeTrial ? next : undefined);
   }
 
-  function editIdentityAppearance(field: IdentityAppearanceField, value: string) {
+  function editBodyAppearance(field: BodyAppearanceField, value: string) {
     const next = { ...choice, appearance: { ...characterAppearance(choice), [field]: value } };
     const preview = activeTrial && { ...activeTrial, appearance: { ...appearance, [field]: value } };
     update(next, preview);
-    if (camera !== "Face" || emote) {
-      useCharacterPreviewStore.setState(s => ({ camera: "Face", zoom: 1, emote: null, focusRevision: s.focusRevision + 1 }));
+    const target = field === "skin" || field === "tattoo" ? "Full body" : "Face";
+    if (camera !== target || emote) {
+      useCharacterPreviewStore.setState(s => ({ camera: target, zoom: 1, emote: null, focusRevision: s.focusRevision + 1 }));
     }
   }
 
@@ -361,10 +389,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     useCharacterPreviewStore.setState({ insideCar: !insideCar, emote: null, cockpitError: null, camera: "Full body", zoom: 1 });
   }
   function chooseEmoteGroup(group: typeof emoteGroup) {
+    selectedPreview.current = null;
     setEmoteGroup(emoteGroup === group ? undefined : group);
     setEmoteDetail(undefined);
     setEmoteSearch("");
-    if ((group === "Garage" || group === "Pose pack") && emoteGroup !== group) {
+    if ((group === "Garage" || group === "Pose pack" || group === "Interactions" || group === "Creator") && emoteGroup !== group) {
       useFittingTurnStore.setState({ characterYaw: 0 });
       useCharacterPreviewStore.setState(state => ({
         camera: "Full body", zoom: 1, emote: null, insideCar: false, focusRevision: state.focusRevision + 1,
@@ -378,6 +407,18 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       if (insideCar) toggleCockpit();
     }
     setEmoteBrowserOpen(!emoteBrowserOpen);
+  }
+  const toggleFavorite = useCallback((id: string) => {
+    const next = favorites.includes(id) ? favorites.filter(item => item !== id) : [id, ...favorites].slice(0, 200);
+    setFavorites(next);
+    try { localStorage.setItem(favoritesKey, JSON.stringify(next)); } catch { /* Keep this session's list. */ }
+  }, [favorites, favoritesKey]);
+  function previewInteraction(id: string) {
+    useFittingTurnStore.setState({ characterYaw: 0 });
+    useCharacterPreviewStore.setState(state => ({
+      emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, cockpitError: null,
+      camera: id === OPEN_DRIVER_DOOR ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
+    }));
   }
   function emoteCategory(group: NonNullable<typeof emoteGroup>, label: string = group) {
     return <button key={group} type="button" className="menu-control character-emote-disclosure" data-controller-row data-emote-group={group}
@@ -393,8 +434,16 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       </select></label>}
       {!insideCar && <>
         <div className="character-emote-categories" role="group" aria-label="Emote library">
-          {emoteCategory("Garage")}{emoteCategory("Best")}{emoteCategory("All")}{emoteCategory("Pose pack")}
+          {emoteCategory("Favorites")}{emoteCategory("Gestures")}{emoteCategory("Pose pack", "Poses")}{emoteCategory("Interactions")}
+          {emoteCategory("Garage")}{emoteCategory("Best")}{emoteCategory("All")}
         </div>
+        {emoteCategory("Creator", "Create emote")}
+        {createdEmotes.length > 0 && <label className="character-setting" data-controller-row>My emotes
+          <select className="menu-control" value="" disabled={reducedMotion} onChange={event => {
+            const created = createdEmotes.find(item => item.id === event.target.value);
+            if (created) useCharacterPreviewStore.setState({ emote: { id: CREATED_EMOTE_ID, created }, playbackPaused: false, loopEmote: false, cockpitError: null });
+          }}><option value="">Play a saved emote</option>{createdEmotes.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+        </label>}
         <div className="character-emote-categories" role="group" aria-label="Personality emotes">
           {emoteCategory("Personality", "My personality")}
           {CHARACTER_PERSONALITIES.map(item => emoteCategory(item.id, item.label))}
@@ -431,16 +480,39 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       onClick={() => playEmote(emoteDetail)}>Replay emote</button>
     <FitReview choice={previewChoice} pose={emoteDetail.id} poseLabel={emoteDetail.name}
       subject={{ id: emoteDetail.id, label: emoteDetail.name, kind: "emote" }} />
-  </> : !insideCar && emoteGroup === "Pose pack" ? <CharacterPosePack disabled={reducedMotion} />
-    : <CharacterEmoteList choice={previewChoice} group={emoteGroup === "Pose pack" ? undefined : emoteGroup} search={emoteSearch} station={station} insideCar={insideCar}
+  </> : !insideCar && emoteGroup === "Creator" ? <EmoteCreator disabled={reducedMotion} owner={ownerKey} saved={createdEmotes} onSave={setCreatedEmotes} />
+    : !insideCar && emoteGroup === "Interactions" ? <div className="character-emote-results">
+      <h2>Interactions</h2>
+      <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable}
+        onClick={() => previewInteraction(OPEN_DRIVER_DOOR)}>Open driver door</button>
+      {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
+      <button type="button" className="menu-control" data-controller-row disabled={reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
+      <button type="button" className="menu-control" data-controller-row disabled={!emote}
+        onClick={() => useCharacterPreviewStore.setState({ emote: null, playbackPaused: false, cockpitError: null })}>Reset interaction</button>
+    </div>
+    : !insideCar && emoteGroup === "Pose pack" ? <CharacterPosePack disabled={reducedMotion} />
+    : <CharacterEmoteList choice={previewChoice} group={emoteGroup === "Pose pack" || emoteGroup === "Creator" || emoteGroup === "Interactions" ? undefined : emoteGroup} search={emoteSearch} station={station} insideCar={insideCar}
     disabled={reducedMotion || cockpitPending} mirrorAvailable={mirrorAvailable} leanAvailable={leanAvailable} selectedId={emote?.id}
-    onSearch={setEmoteSearch} onSelect={selectEmote} />);
+    favorites={favorites} onFavorite={toggleFavorite} onSearch={setEmoteSearch} onSelect={selectEmote} />);
   const emoteResultsPanel = <section className={locked ? "character-controls menu-panel-frame character-controls--right" : undefined}
     id={emoteResultsId} aria-label={emoteDetail ? "Emote details" : "Emote results"} hidden={!resultsOpen}>
     {emoteResults}
   </section>;
+  const playback = tab === "emotes" && emoteBrowserOpen && <div className="character-playback" data-controller-row>
+    <button type="button" className="menu-control" disabled={reducedMotion || (!emote && !selectedPreview.current)} onClick={() =>
+      useCharacterPreviewStore.setState({ emote: selectedPreview.current && { ...selectedPreview.current }, playbackPaused: false })
+    }>Play</button>
+    <button type="button" className="menu-control" disabled={reducedMotion || !emote || insideCar || emoteGroup === "Interactions" || emoteGroup === "Pose pack"}
+      aria-pressed={loopEmote}
+      onClick={() => useCharacterPreviewStore.setState(state => ({ loopEmote: !state.loopEmote,
+        emote: state.emote && { ...state.emote }, playbackPaused: false }))
+    }>Loop</button>
+    <button type="button" className="menu-control" disabled={!emote} onClick={() =>
+      useCharacterPreviewStore.setState({ emote: null, loopEmote: false, automaticEmotes: false, playbackPaused: false, cockpitError: null })
+    }>Stop</button>
+  </div>;
   const fitting = tab === "appearance";
-  const rotationDisabled = insideCar || isMirrorMakeupEmote(emote?.id);
+  const rotationDisabled = insideCar || emote?.id === OPEN_DRIVER_DOOR || isMirrorMakeupEmote(emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
   const cameraViews = vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
   const changeCamera = (view: typeof camera) => useCharacterPreviewStore.setState({ camera: view, zoom: 1 });
@@ -500,7 +572,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   );
 
   return (
-    <div ref={page} className={`character-page character-page--editor${tab === "appearance" ? " character-page--dressing" : tab === "emotes" ? " character-page--emotes" : " character-page--identity"}`}
+    <div ref={page} className={`character-page character-page--editor character-page--${fitting ? "dressing" : tab}${emoteGroup === "Creator" && tab === "emotes" ? " character-page--creator" : ""}`}
       role="tabpanel" id="character-editor-panel" aria-labelledby={"character-editor-tab-" + tab}
       onFocus={revealCharacterControl}>
       <div className="character-stage" data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
@@ -509,22 +581,24 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
         onColors={saveClothingColors} />}
-      {tab === "identity" && <section className="character-controls menu-panel-frame character-identity-style" aria-label="Identity appearance">
-        <h2>Features</h2>
-        {IDENTITY_STYLE.map(([section, fields]) => <fieldset key={section}>
+      {tab === "body" && <section className="character-controls menu-panel-frame character-body-style" aria-label="Body customization">
+        <h2>Body</h2>
+        {BODY_STYLE.map(([section, fields]) => <fieldset key={section}>
           <legend>{section}</legend>
           {fields.map(([field, label]) => field === "hair" && choice.id === ROOK_ID && __ROOK_MODEL_URL__ ? null
             : <label className="character-setting" key={field} data-controller-row>{label}
-              <select className="menu-control" aria-label={label} value={appearance[field] ?? (field === "hair" ? "natural" : "original")}
-                onChange={event => editIdentityAppearance(field, event.target.value)}>
+              <select className="menu-control" aria-label={label} value={appearance[field] ?? (field === "hair" ? "natural" : field === "tattoo" ? "none" : "original")}
+                disabled={field === "tattoo" && saveToProfile && !bodyTattoosAvailable}
+                onChange={event => editBodyAppearance(field, event.target.value)}>
                 {CHARACTER_APPEARANCE_OPTIONS[field].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
               </select>
+              {field === "tattoo" && saveToProfile && !bodyTattoosAvailable && <small>Update the game server to save tattoos.</small>}
             </label>)}
         </fieldset>)}
       </section>}
-      {tab !== "appearance" && <section className={`character-controls menu-panel-frame ${tab === "identity" ? "character-identity-details" : "character-controls--left"}`} aria-label={tab === "identity" ? "Character details" : "Emote filters"}>
-        {tab === "identity" && <>
-          <header className="character-description"><h2>Character details</h2></header>
+      {(tab === "details" || tab === "emotes") && <section className={`character-controls menu-panel-frame ${tab === "details" ? "character-details" : "character-controls--left"}`} aria-label={tab === "details" ? "Character details" : "Emote filters"}>
+        {tab === "details" && <>
+          <header className="character-description"><h2>{character.name}</h2><p>{character.title}</p></header>
           {!PLAYER_ONBOARDING && modelPicker}
           <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
             {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
@@ -547,6 +621,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         {tab === "emotes" && emoteBrowser}
       </section>}
       {tab === "emotes" && emoteResultsPanel}
+      {playback}
       {!fitting && <div className="dressing-toolbar">{cameraTools}</div>}
       {previewZoom}
       <section className="character-controls menu-panel-frame character-controls--bottom" aria-label="Save status" hidden={status === "idle"}>

@@ -20,6 +20,7 @@ import { smoothUnderarmSkin } from "./villagerUnderarm";
 import { applyCorsetDye } from "./corsetDye";
 import { getWardrobeGarment, wardrobeGarmentModelUrl, wardrobeRemovalPieces, wardrobeReplacedPieces, type WardrobeRemoval } from "./wardrobeGarments";
 import { getWardrobeActorBody, getWardrobeBodyDonor, isWardrobeBodyDonor } from "./wardrobeBody";
+import { prepareBodyTattoo } from "./bodyTattoo";
 
 export function villagerModelUrl(look: CharacterLook, kind: "garage" | "portrait" = "garage", villageKind = kind) {
   if (look.character.id === ROOK_ID) return kind === "portrait" ? __ROOK_PORTRAIT_URL__ : __ROOK_MODEL_URL__;
@@ -184,9 +185,10 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const shoes = root.getObjectByName(female ? "CLOTH_FEET_SHOES" : "CLOTH_FEET_BOOTS");
   const grounded = removedClothing.includes("shoes") ? root.getObjectByName("fitting-room-body") ?? shoes : shoes;
   if (grounded) root.position.y = -new Box3().setFromObject(grounded, true).min.y;
+  const applyTattoo = prepareBodyTattoo(getWardrobeActorBody(root) ?? actorBody);
   return {
     root, materials, pieceMaterials, crop, scalpCap, applyFaceColors, faceAccessories, wardrobe, trialGarments, detachedCorset,
-    hat, bonnet, neckBows, bundledWaist,
+    hat, bonnet, neckBows, bundledWaist, applyTattoo,
     longHair: root.getObjectByName("HAIR_HAIR20"),
     bow: root.getObjectByName("ACC_BOW"),
     dispose() {
@@ -218,6 +220,7 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
     ? { ...look.wardrobe, waist: look.corset.waist } : look.wardrobe;
   model.wardrobe.apply(savedWardrobe, model.detachedCorset ? 0 : look.overEase);
   model.applyFaceColors(look);
+  model.applyTattoo?.(look.appearance.tattoo);
   model.faceAccessories.setGlasses(look.appearance.glasses);
   model.faceAccessories.setColors(clothingColors(look, "glasses"));
   for (const [source, material] of [...model.materials, ...[...model.pieceMaterials.values()].flatMap(palette => [...palette])]) {

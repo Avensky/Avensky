@@ -85,7 +85,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     })));
     const find = selector => document.querySelector(selector);
     const click = selector => act(async () => find(selector).click());
-    const openEmotes = () => click('.character-emote-toggle[aria-expanded="false"]');
+    const openEmotes = () => find('.character-emote-toggle[aria-expanded="false"]') ? click('.character-emote-toggle') : Promise.resolve();
     const chooseEmoteGroup = group => click(`[data-emote-group="${group}"]`);
     const openCollections = () => act(async () => [...document.querySelectorAll(".character-emote-browser button")].find(button => button.textContent === "Collections").click());
     const playEmote = async selector => {
@@ -158,64 +158,64 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await poseButton('Return to idle');
     assert.equal(preview.getState().emote, null);
     await chooseEmoteGroup('Garage');
-    assert(![...document.querySelectorAll('.character-emotes button')].some(button => button.querySelector('.emote-name')?.textContent === 'Side step and glance'));
-    await playEmote('.character-emotes button:first-child');
+    assert(![...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Side step and glance'));
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '005');
     await chooseEmoteGroup('Best');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 8);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 8);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '035');
     await openCollections();
     await chooseEmoteGroup('Playful');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 11);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 11);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '021');
-    await playEmote('.character-emotes button:last-child');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, 'robot-dance');
     await chooseEmoteGroup('Shy');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 11);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 11);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '035');
-    await playEmote('.character-emotes button:last-child');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, 'oh-no');
     await chooseEmoteGroup('Tsundere');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 10);
-    await playEmote('.character-emotes button:last-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 10);
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '050');
     await chooseEmoteGroup('Expressions');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 10);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 10);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '051');
     await chooseEmoteGroup('Roadside');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 7);
-    assert.equal(find('.character-emotes button:last-child .emote-name').textContent, 'Wave them through');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 7);
+    assert.equal(find('.character-emotes .character-emote-row:last-child [data-emote-id] .emote-name').textContent, 'Wave them through');
     await chooseEmoteGroup('Rivalry');
     assert.equal(find('[data-emote-group="Rivalry"]').textContent, 'Rivalry');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 8);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 8);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '071');
-    await playEmote('.character-emotes button:last-child');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '080');
     await chooseEmoteGroup('Pit Crew');
     assert.equal(find('[data-emote-group="Pit Crew"]').textContent, 'Pit Crew');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 9);
-    await playEmote('.character-emotes button:last-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 9);
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '090');
     await chooseEmoteGroup('After Hours');
     assert.equal(find('[data-emote-group="After Hours"]').textContent, 'After Hours');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 10);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 10);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '091');
-    await playEmote('.character-emotes button:nth-child(5)');
+    await playEmote('.character-emotes .character-emote-row:nth-child(5) [data-emote-id]');
     assert.equal(preview.getState().emote.id, '095');
-    await playEmote('.character-emotes button:last-child');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '100');
     await chooseEmoteGroup('Showroom');
     assert.equal(find('[data-emote-group="Showroom"]').textContent, 'Showroom');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 10);
-    await playEmote('.character-emotes button:first-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 10);
+    await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '103');
-    await playEmote('.character-emotes button:last-child');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '112');
     for (const [name, first, last] of [
       ['Elegant', 113, 120], ['Stoic', 131, 140], ['Explorer', 141, 150],
@@ -223,16 +223,16 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       ['Starter Comedy', 181, 190], ['Race Reactions', 191, 198],
     ]) {
       await chooseEmoteGroup(name);
-      assert.equal(document.querySelectorAll('.character-emotes button').length, last - first + 1);
-      await playEmote('.character-emotes button:first-child');
+      assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, last - first + 1);
+      await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
       assert.equal(preview.getState().emote.id, String(first));
-      await playEmote('.character-emotes button:last-child');
+      await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
       assert.equal(preview.getState().emote.id, String(last));
     }
     await chooseEmoteGroup('Performer');
-    assert.equal(document.querySelectorAll('.character-emotes button').length, 11);
-    assert.equal(find('.character-emotes button:last-child .emote-name').textContent, 'Hands up');
-    await playEmote('.character-emotes button:last-child');
+    assert.equal(document.querySelectorAll('.character-emotes [data-emote-id]').length, 11);
+    assert.equal(find('.character-emotes .character-emote-row:last-child [data-emote-id] .emote-name').textContent, 'Hands up');
+    await playEmote('.character-emotes .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, 'hands-up-crowd');
     await chooseEmoteGroup('Garage');
     await click('[data-character-option="jules-okafor"]');
@@ -256,13 +256,13 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     };
     await acknowledge(requests[0], choice);
     const characterTabs = '[role=tablist][aria-label="CHARACTER sections"]';
-    const identityTab = `${characterTabs} #character-editor-tab-identity`;
+    const identityTab = `${characterTabs} #character-editor-tab-body`;
     const identityControl = find(identityTab);
     assert.deepEqual([...document.querySelectorAll(`${characterTabs} [role=tab]`)].map(node => node.textContent),
-      ['Identity', 'Appearance', 'Emotes']);
+      ['Details', 'Body', 'Appearance', 'Emotes']);
     assert.equal(find(`${characterTabs} [aria-selected="true"]`).id, 'character-editor-tab-appearance');
     await move('previous_tab');
-    assert.equal(characterViews.at(-1), 'identity');
+    assert.equal(characterViews.at(-1), 'body');
     assert.equal(document.activeElement, identityControl);
     assert.equal(identityControl.getAttribute('aria-selected'), 'true');
     assert.equal(identityControl.tabIndex, 0);
@@ -270,7 +270,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(panel.getAttribute('role'), 'tabpanel');
     assert.equal(panel.getAttribute('aria-labelledby'), identityControl.id);
     await move('down');
-    assert(document.activeElement.closest('[aria-label="Identity appearance"]'));
+    assert(document.activeElement.closest('[aria-label="Body customization"]'));
     await move('next_tab');
     assert.equal(characterViews.at(-1), 'appearance');
     assert.equal(identityControl.getAttribute('aria-selected'), 'false');
@@ -279,7 +279,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(document.activeElement, identityControl);
     await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyE', bubbles: true, cancelable: true })));
     assert.equal(document.activeElement, find('#character-editor-tab-appearance'));
-    await click(identityTab);
+    await click('#character-editor-tab-details');
     assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
     assert.deepEqual([...document.querySelectorAll('[aria-label="Character model"] button')].map(node => node.textContent),
       ['Mara Vega', 'Rook Okafor']);
@@ -287,16 +287,16 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find(identityTab), identityControl);
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));
     assert(find('[aria-label="Emote collection"]').closest('.character-controls--left'));
-    assert.equal(find('[data-character-option]'), null, 'Emotes uses the model chosen in Identity');
+    assert.equal(find('[data-character-option]'), null, 'Emotes uses the model chosen in Details');
     assert(find('.dressing-toolbar .fitting-camera-toolbar'), 'Emotes uses the Dressing Room camera toolbar');
     assert(find('.dressing-toolbar button[aria-label="Hide interface"]'));
     assert.equal(find('select[aria-label="Preview camera"]'), null);
     await openEmotes();
     await chooseEmoteGroup('All');
     assert.equal(find('[aria-label="Emote logic review"]'), null, 'fit review opens with the chosen emote');
-    const emoteCount = document.querySelectorAll('.character-emotes button').length;
+    const emoteCount = document.querySelectorAll('.character-emotes [data-emote-id]').length;
     assert(emoteCount > 180);
-    const firstEmote = find('.character-emotes button');
+    const firstEmote = find('.character-emotes [data-emote-id]');
     await act(async () => firstEmote.focus());
     const fitKeyCalls = fitKeys.fitReviewKeyCalls;
     assert(fitKeyCalls >= emoteCount, 'the open list computes a fit key for each emote');
@@ -309,17 +309,17 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'applause');
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    assert(document.querySelectorAll('.character-emotes button').length > 0);
+    assert(document.querySelectorAll('.character-emotes [data-emote-id]').length > 0);
     assert([...document.querySelectorAll('.character-emotes .emote-name')].every(n => n.textContent.toLowerCase().includes('applause')));
-    const emoteName = find('.character-emotes button .emote-name').textContent;
-    await click('[aria-label="Emote results"] .character-emotes button:first-child');
+    const emoteName = find('.character-emotes [data-emote-id] .emote-name').textContent;
+    await click('[aria-label="Emote results"] .character-emotes .character-emote-row:first-child [data-emote-id]');
     const fitReview = find('[aria-label="Emote details"] [aria-label="Emote logic review"]');
     assert(fitReview.textContent.includes(emoteName), 'the review identifies the selected emote');
     assert(fitReview.querySelector("textarea"));
     await click('[aria-label="Emote logic review"] input[type="checkbox"]');
     assert(fitReview.querySelector('input[type="checkbox"]').checked, 'the selected emote review can be edited beside the results');
     await click('.character-emote-back');
-    const reviewedEmote = find('.character-emotes button:first-child');
+    const reviewedEmote = find('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert(reviewedEmote.querySelector('[aria-label="Fit partial"]'), 'the updated review appears in the results');
     assert.equal(document.activeElement, reviewedEmote, 'back restores focus to the reviewed emote');
     const { useFittingTurnStore: turns } = await vite.ssrLoadModule('/src/game/characters/fittingControlsStore.ts');
@@ -340,13 +340,13 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('[aria-label="Emote collection"]'), null);
     assert.equal(find('[aria-label="Driving emotes"] button:first-child').disabled, true);
     await act(async () => preview.setState({ cockpitAvailable: true }));
-    assert.equal(find('[aria-label="Driving emotes"] button:last-child .emote-name').textContent, 'Steering test · Right');
+    assert.equal(find('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id] .emote-name').textContent, 'Steering test · Right');
     assert.equal(find('[aria-label="Driving emotes"] button:first-child').disabled, false);
     const cameraAngles = 'button[aria-label="Camera angles"]';
     await click(cameraAngles);
     assert.equal(cameraView('Driver').getAttribute('aria-pressed'), 'true');
     await chooseCameraView('Whole vehicle');
-    await click('[aria-label="Driving emotes"] button:last-child');
+    await click('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '200');
     assert.equal(preview.getState().camera, 'Whole car');
     assert(find('.fitting-camera-angles').hidden, 'selecting an emote dismisses the camera popover');
@@ -359,14 +359,14 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(preview.getState().emote, null);
     await click(cockpitToggle);
     await click('#character-editor-tab-appearance');
-    assert.equal(find('[data-character-option]'), null, 'the Dressing Room uses the model chosen in Identity');
+    assert.equal(find('[data-character-option]'), null, 'the Dressing Room uses the model chosen in Details');
     await browseWardrobe('outfits');
     assert.equal(cameraView('Coat').getAttribute('aria-pressed'), 'true');
     for (const category of ['hair', 'face', 'skin']) assert.equal(find(`[data-category=${category}]`), null);
     assert(find('.dressing-toolbar button[aria-label="Hide interface"]'), 'dressing room keeps the eye beside its camera');
     assert.equal(preview.getState().insideCar, false);
     assert.equal(preview.getState().emote, null);
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     assert.equal(find('select[aria-label="Eye color"]').value, 'original');
     t.mock.timers.enable({ apis: ['setTimeout'] });
     await select('Eye color', 'obsidian');
@@ -479,9 +479,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('.dressing-color-panel').hidden, true, 'Escape closes the palette before it can leave the fitting room');
     assert.equal(find('.dressing-color-panel').childElementCount, 0);
     assert.equal(document.activeElement, find('[aria-label="Open clothing colors"]'));
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     assert(find('select[aria-label="Eye color"]'));
     assert(find('select[aria-label="Skin tone"]'));
+    await click('#character-editor-tab-details');
     await select('Character personality', 'tsundere');
     await click('#character-editor-tab-emotes');
     await openEmotes();
@@ -508,8 +509,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await openEmotes();
     await chooseEmoteGroup('Garage');
     assert.equal(find(cockpitToggle).disabled, false, 'a prop never prevents driving previews');
-    assert([...document.querySelectorAll('.character-emotes button')].some(button => button.querySelector('.emote-name')?.textContent === 'Lift the bag'));
-    assert([...document.querySelectorAll('.character-emotes button')].some(button => button.querySelector('.emote-name')?.textContent === 'Hands behind back'));
+    assert([...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Lift the bag'));
+    assert([...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Hands behind back'));
     assert.equal(find('input[aria-label="Preview zoom"]').max, '1.25');
     await click(cockpitToggle);
     assert.equal(preview.getState().insideCar, true);
@@ -519,10 +520,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click(cockpitToggle);
     await openCollections();
     await chooseEmoteGroup('Victory');
-    assert([...document.querySelectorAll('.character-emotes button')].some(button => button.querySelector('.emote-name')?.textContent === 'Happy applause'),
+    assert([...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Happy applause'),
       'two-handed gestures remain available with a bag equipped');
     await chooseEmoteGroup('Tech');
-    assert(document.querySelectorAll('.character-emotes button').length > 0, 'gesture-owned props remain available');
+    assert(document.querySelectorAll('.character-emotes [data-emote-id]').length > 0, 'gesture-owned props remain available');
     await click('#character-editor-tab-appearance');
     assert.equal(drafts.at(-1).id, 'jules-okafor', 'switching editor tabs keeps the selected model');
     await acknowledge(requests[1], requests[1].character);
@@ -602,9 +603,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('[data-open-character]');
     assert.equal(find('[data-outfit-preview]').dataset.outfitPreview, 'race-crew');
     assert.equal(find('[data-character-option]'), null);
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     assert.equal(find('select[aria-label="Eye color"]').value, 'obsidian');
     assert.equal(find('select[aria-label="Skin tone"]').value, 'deep');
+    await click('#character-editor-tab-details');
     assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
     const identities = '[aria-label="Character identity"] button';
     assert.deepEqual([...document.querySelectorAll(identities)].map(node => node.textContent), ['Male', 'Female', 'Nonbinary']);
@@ -616,7 +618,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await acknowledge(requests[3], requests[3].character, false);
     await move('back');
     await click('[data-open-character]');
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-details');
     assert.equal(find(identities + ':last-child').getAttribute('aria-pressed'), 'true');
 
     await click('[aria-label="Character model"] [data-character-option="mara-vega"]');
@@ -645,7 +647,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('[aria-label="Open clothing colors"]');
     await click('button[aria-label="Gothic Pink"]');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95');
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     await select('Hairstyle', 'cropped');
     assert.equal(drafts.at(-1).appearance.hair, 'cropped');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95', 'identity edits preserve trial garment colors');
@@ -665,11 +667,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
     assert.equal(requests[4].character.appearance.hair, 'cropped');
     await acknowledge(requests[4], requests[4].character);
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-details');
     await click('[aria-label="Character model"] [data-character-option="jules-okafor"]');
     assert.equal(drafts.at(-1).outfit, 'race-crew');
     assert.equal(drafts.at(-1).appearance.eye_color, 'obsidian');
     await act(async () => social.getState().reset());
+    await click('#character-editor-tab-body');
     await select('Hair color', 'copper');
     await act(async () => t.mock.timers.tick(350));
     assert.equal(requests.length, 5);
@@ -689,7 +692,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert(find('[data-customize-vehicle][aria-current="page"]'));
 
     await click('[data-open-character]');
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     await select('Eye color', 'original');
     assert.equal(drafts.at(-1).appearance.eye_color, 'original');
     const requestCount = requests.length;
@@ -712,7 +715,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       root.render(h(HeroWorkshop));
     });
     await click('[data-open-character]');
-    await click('#character-editor-tab-identity');
+    await click('#character-editor-tab-body');
     await select('Eye color', 'original');
     await act(async () => t.mock.timers.tick(350));
     const inFlight = requests.at(-1);
@@ -730,6 +733,41 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const resumed = requests.at(-1);
     assert.equal(resumed.character.appearance.skin, 'original');
     await acknowledge(resumed, resumed.character, false);
+
+    assert.equal(find('select[aria-label="Tattoo"]').disabled, true, 'legacy servers lack the tattoo capability');
+    await act(async () => social.setState({ bodyTattoosAvailable: true }));
+    await select('Tattoo', 'twin-band');
+    await act(async () => t.mock.timers.tick(350));
+    const tattoo = requests.at(-1);
+    assert.equal(tattoo.character.appearance.tattoo, 'twin-band');
+    await acknowledge(tattoo, tattoo.character, false);
+
+    await click('#character-editor-tab-emotes');
+    assert.equal(find('[data-emote-group="Gestures"]').getAttribute('aria-expanded'), 'true');
+    const namedButton = label => [...document.querySelectorAll('button')].find(button => button.textContent === label);
+    await chooseEmoteGroup('Interactions');
+    assert.equal(namedButton('Open driver door').disabled, true);
+    await act(async () => {
+      useGarageDrive.setState({ hasDoor: true });
+      preview.setState({ cockpitAvailable: true });
+    });
+    await act(async () => namedButton('Open driver door').click());
+    assert.equal(preview.getState().emote.id, 'interact-driver-door');
+    assert.equal(preview.getState().insideCar, false);
+    await act(async () => namedButton('Sit down').click());
+    assert.equal(preview.getState().emote.id, 'interact-chair');
+    await act(async () => namedButton('Reset interaction').click());
+    assert.equal(preview.getState().emote, null);
+
+    await chooseEmoteGroup('Creator');
+    await slide('.emote-creator input[name="name"]', 'Pit crew wave');
+    await act(async () => namedButton('Add pose').click());
+    assert.ok(find('[aria-label^="Body keyframe 3"]'));
+    await act(async () => namedButton('Preview').click());
+    assert.equal(preview.getState().emote.created.frames.length, 3);
+    await act(async () => find('.emote-creator').dispatchEvent(new Event('submit', { bubbles: true, cancelable: true })));
+    const { readCreatedEmotes } = await load('game/characters/emoteAuthoring.ts');
+    assert.equal(readCreatedEmotes('driver')[0].name, 'Pit crew wave');
   } finally {
     t.mock.timers.reset();
     if (root) await act(async () => root.unmount());
@@ -764,7 +802,7 @@ test('device character edits stay local when the connected profile has no charac
     const click = selector => act(async () => document.querySelector(selector).click());
     const button = label => [...document.querySelectorAll('button')].find(node => node.textContent === label);
 
-    await show('identity');
+    await show('details');
     await click('[data-character-option="jules-okafor"]');
     await act(async () => button('Use locally').click());
     assert.equal(readLocalCharacter().id, 'jules-okafor');
@@ -787,7 +825,7 @@ test('device character edits stay local when the connected profile has no charac
     await click('[data-category=saved]');
     await click('[aria-label="Try on Race fit"]');
     assert(!document.querySelector('[aria-label="Clear saved outfit preview"]').disabled);
-    await show('identity');
+    await show('body');
     t.mock.method(dom.window.Storage.prototype, 'setItem', () => { throw new Error('Storage unavailable'); });
     const eyeColor = document.querySelector('select[aria-label="Eye color"]');
     await act(async () => {

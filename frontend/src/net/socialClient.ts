@@ -197,7 +197,7 @@ export async function signOutPlayerProfile() {
 export async function createTabProfile() {
   await identifyProfile("DRIVER 2", "new-tab");
 }
-export function beginSocialSession(serverId: unknown, onFailure?: () => void, accounts = false) {
+export function beginSocialSession(serverId: unknown, onFailure?: () => void, accounts = false, bodyTattoos = false) {
   if (initialized || typeof serverId !== "string") return;
   initialized = true;
   identityKey = `avenlab-social-profile-v1:${serverId}`;
@@ -205,6 +205,7 @@ export function beginSocialSession(serverId: unknown, onFailure?: () => void, ac
   useSocialStore.setState({
     available: true,
     accountsAvailable: accounts,
+    bodyTattoosAvailable: bodyTattoos,
     profileScope: saved?.scope ?? null,
     profileStatus: saved ? "restoring" : "idle",
     message: saved ? "Restoring your player profile…" : "Sign in on this device or continue as a guest.",
