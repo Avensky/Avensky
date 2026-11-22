@@ -111,9 +111,12 @@ function inspectWardrobe(focus: WardrobeFocus) {
 }
 
 /** One live scene; browsing the catalog never changes or saves the equipped look. */
-export function DressingRoom({ choice, onChange, onEquip = onChange, onTryOn, onLoad = onTryOn, onEndPreview, cameraTools, onColors = onChange }: {
+export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
+  equipPreview, onDiscardPreview, onEndPreview, cameraTools, onColors = onChange }: {
   choice: CharacterChoice; onChange: (choice: CharacterChoice) => void;
-  onEquip?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
+  onPreviewOutfit?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
+  equipPreview?: { disabled: boolean; hint?: string; onEquip: () => void };
+  onDiscardPreview?: () => void;
   onLoad?: (choice: CharacterChoice) => void; onEndPreview?: () => void; cameraTools?: ReactNode;
   onColors?: (choice: CharacterChoice) => void;
 }) {
@@ -189,7 +192,7 @@ export function DressingRoom({ choice, onChange, onEquip = onChange, onTryOn, on
     return wardrobe?.set === set && !garments ? wardrobe.waist : FITTED_PRESETS[set]?.waist ?? "tucked";
   }
   function wearOutfit(outfit: string, wardrobe?: WardrobeChoice) {
-    onEquip({ ...choice, outfit, wardrobe, garments: undefined,
+    onPreviewOutfit({ ...choice, outfit, wardrobe, garments: undefined,
       wardrobeTrial: undefined, wardrobeEase: undefined, removedClothing: undefined, bra: undefined });
   }
   function tryCorset(set: string) {
@@ -548,7 +551,7 @@ export function DressingRoom({ choice, onChange, onEquip = onChange, onTryOn, on
                   {item.set && !item.unavailable && (!item.trial || item.selected) && <FitBadge choice={item.trial ? choice : {
                     ...choice, wardrobe: resolveWardrobe({ set: item.set, shirt: "none", waist: waistForSet(item.set) }), garments: undefined, wardrobeTrial: undefined, wardrobeEase: undefined,
                   }} piece="corset" itemId={item.id} />}
-                  {item.icon !== "remove" && <small>{item.unavailable ?? (item.selected ? (item.trial ? "Trying on" : "Wearing") : item.detail ?? "Available to try on")}</small>}
+                  {item.icon !== "remove" && <small>{item.unavailable ?? (item.selected ? (item.trial || onDiscardPreview ? "Trying on" : "Wearing") : item.detail ?? "Available to try on")}</small>}
                 </span>
               </button>)}
             </div>
@@ -571,6 +574,16 @@ export function DressingRoom({ choice, onChange, onEquip = onChange, onTryOn, on
         <FittingWearableShortcuts vertical pieces={wearableOrder.filter(item => pieces.includes(item))}
           active={camera === "Selected item" ? selectedPiece : undefined} onSelect={selectWornPiece} />
       </aside>
+      {onDiscardPreview && (
+        <div className="dressing-preview-actions" data-controller-row>
+          {equipPreview && (
+            <button type="button" className="menu-control" data-equip-outfit title={equipPreview.hint} disabled={equipPreview.disabled} onClick={equipPreview.onEquip}>
+              Equip outfit
+            </button>
+          )}
+          <button type="button" className="menu-control" data-discard-outfit-preview onClick={onDiscardPreview}>Discard preview</button>
+        </div>
+      )}
     </div>
     <aside className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
       {inspected && <>

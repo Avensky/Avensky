@@ -10,7 +10,7 @@ import { requestSocial } from "../../net/socialClient";
 import { selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, characterAppearance, characterLook, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
@@ -232,7 +232,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   }
 
   function hasFittingPreview(next: CharacterChoice) {
-    return loadedOutfit || next.garments || next.wardrobeTrial || next.wardrobeEase || next.removedClothing?.length || next.bra !== undefined
+    return loadedOutfit || next.outfit !== choice.outfit || next.wardrobe !== choice.wardrobe
+      || next.garments || next.wardrobeTrial || next.wardrobeEase || next.removedClothing?.length || next.bra !== undefined
       || (next.appearance?.briefs_style ?? "briefs") !== (choice.appearance?.briefs_style ?? "briefs")
       || UNDERWEAR_PIECES.some(piece => {
         const key = clothingColorKey(next, piece);
@@ -245,6 +246,16 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   function tryOn(next: CharacterChoice) {
     if (!canEditCharacter()) return;
     setTrial(hasFittingPreview(next) ? next : undefined);
+  }
+
+  function previewOutfit(next: CharacterChoice) {
+    if (!canEditCharacter()) return;
+    setLoadedOutfit(false);
+    if (next.outfit === choice.outfit && next.wardrobe === choice.wardrobe) {
+      setTrial(undefined);
+      return;
+    }
+    setTrial(activeTrial && !equipPreview ? { ...choice, outfit: next.outfit, wardrobe: next.wardrobe } : next);
   }
 
   function loadOutfit(next: CharacterChoice) {
@@ -265,11 +276,15 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
 
   function editPreviewAppearance(next: CharacterChoice) {
     if (!canEditCharacter()) return;
-    if (hasFittingPreview(next)) setTrial(next);
-    else equipOutfit(next);
+    if (activeTrial || hasFittingPreview(next)) setTrial(next);
+    else update(next);
   }
 
   function saveClothingColors(next: CharacterChoice) {
+    if (equipPreview) {
+      editPreviewAppearance(next);
+      return;
+    }
     const itemColors = next.appearance?.item_colors;
     const previousColors = characterAppearance(previewChoice).item_colors;
     const keys = ["underwear:bra", "underwear:briefs"] as const;
@@ -296,9 +311,18 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     }
   }
 
-  function equipOutfit(next: CharacterChoice) {
-    update(activeTrial ? { ...choice, outfit: next.outfit, wardrobe: next.wardrobe } : next);
-  }
+  const equipPreview = activeTrial && isEquippableOutfit(activeTrial)
+    && (activeTrial.outfit !== choice.outfit || activeTrial.wardrobe !== choice.wardrobe || loadedOutfit)
+    ? {
+        disabled: !editingAllowed || (saveToProfile && !connectedOwner) || status === "saving",
+        hint: !saveToProfile ? "Saves on this device." : !connectedOwner ? "Reconnect your player profile to equip." : undefined,
+        onEquip: () => {
+          if (!canEditCharacter() || (saveToProfile && !connectedOwner) || running.current) return;
+          update(activeTrial);
+          if (saveToProfile) void flush();
+        },
+      }
+    : undefined;
 
   const modelPicker = <div className={locked ? "character-outfits" : "character-cast"} role="group"
     aria-label={locked ? "Character model" : "Gender"} data-controller-row>
@@ -475,9 +499,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     <div ref={page} className={`character-page character-page--editor${tab === "appearance" ? " character-page--dressing" : tab === "emotes" ? " character-page--emotes" : " character-page--identity"}`}
       role="tabpanel" id="character-editor-panel" aria-labelledby={"character-editor-tab-" + tab}
       onFocus={revealCharacterControl}>
-      <div className="character-stage" data-character-viewport data-character-preview={choice.id} data-outfit-preview={choice.outfit}
+      <div className="character-stage" data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
         aria-label={`Preview of ${character.name}`} />
-      {fitting && <DressingRoom choice={previewChoice} onChange={editPreviewAppearance} onEquip={equipOutfit} onTryOn={tryOn} onLoad={loadOutfit}
+      {fitting && <DressingRoom choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
+        equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
         onColors={saveClothingColors} />}
       {tab === "identity" && <section className="character-controls menu-panel-frame character-identity-style" aria-label="Identity appearance">
@@ -500,10 +525,17 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
           <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
             {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
               aria-pressed={(choice.identity ?? character.gender) === item.id}
-              onClick={() => update({ ...choice, identity: item.id })}>{item.label}</button>)}
+              onClick={() => update(
+                { ...choice, identity: item.id },
+                activeTrial && { ...activeTrial, identity: item.id },
+              )}>{item.label}</button>)}
           </div>
           <label className="character-setting" data-controller-row>Personality<select className="menu-control" aria-label="Character personality" value={choice.appearance?.personality ?? "friendly"}
-            onChange={event => update({ ...choice, appearance: { ...characterAppearance(choice), personality: event.target.value as CharacterPersonality } })}>
+            onChange={event => {
+              const personality = event.target.value as CharacterPersonality;
+              update({ ...choice, appearance: { ...characterAppearance(choice), personality } },
+                activeTrial && { ...activeTrial, appearance: { ...appearance, personality } });
+            }}>
             {CHARACTER_PERSONALITIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
           </select></label>
           <p>Click your character to play one of their personality emotes.</p>

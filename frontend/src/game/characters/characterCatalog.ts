@@ -54,6 +54,16 @@ export const VILLAGER_ID = "mara-vega";
 export const ROOK_ID = "jules-okafor";
 export const DEFAULT_CHARACTER: CharacterChoice = { id: VILLAGER_ID, outfit: CHARACTERS[0].outfits[0].id };
 
+export function isEquippableOutfit(choice: CharacterChoice) {
+  if (choice.garments || choice.wardrobeTrial || choice.wardrobeEase || choice.removedClothing || choice.bra !== undefined) return false;
+  const character = CHARACTERS.find(item => item.id === choice.id);
+  if (!character?.outfits.some(outfit => outfit.id === choice.outfit)) return false;
+  if (choice.wardrobe && (choice.id !== VILLAGER_ID || !resolveWardrobe(choice.wardrobe) ||
+    !__WARDROBE_SET_IDS__.includes(choice.wardrobe.set))) return false;
+  const garment = getWardrobeGarment(choice.outfit);
+  return !garment?.outfit || Boolean(wardrobeGarmentModelUrl(garment, "garage"));
+}
+
 const OUTFIT_REMOVALS = ["hat"] as const;
 const SLEEPWEAR_REMOVALS = ["hat", "shoes"] as const;
 const NO_OUTFIT_REMOVALS: readonly WardrobeRemoval[] = [];
