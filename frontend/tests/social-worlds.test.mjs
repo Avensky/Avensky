@@ -33,6 +33,7 @@ test("social requests, world transitions and assisted text have independent owne
   dom.window.HTMLElement.prototype.attachEvent = () => {};
   dom.window.HTMLElement.prototype.detachEvent = () => {};
   const server = await createServer({
+    define: { "import.meta.env.VITE_OPEN_WORLD_ID": JSON.stringify("7") },
     server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
     logLevel: "error",
@@ -345,10 +346,51 @@ test("social requests, world transitions and assisted text have independent owne
         assert.equal(social.getState().view, previous);
       },
     );
+    await t.test("Open World joins the configured listed hub while Play still opens matchmaking", async () => {
+      const { MAIN_MENU_ITEMS } = await load("game/menus/menuItems.ts");
+      const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");
+      const { WorldsPage } = await load("game/social/WorldsPage.tsx");
+      const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
+      assert.equal(OPEN_WORLD_ID, 7);
+      assert.equal(parseOpenWorldId("1e2"), undefined);
+      const world = {
+        id: 7, name: "Avensky Hub", map: "road_precision", owner_id: "other",
+        listed: true, locked: false, max_players: 6, players: 0, members: [],
+      };
+      assert.equal(findOpenWorld([{ ...world, locked: true }]), undefined);
+      assert.equal(findOpenWorld([{ ...world, listed: false }]), undefined);
+      assert.equal(findOpenWorld([{ ...world, mode: "quickplay" }]), undefined);
+      const select = id => {
+        ui.setState({ screen: "main", overlay: null });
+        ui.getState().setActiveMenuIndex(MAIN_MENU_ITEMS.findIndex(item => item.id === id));
+        routeMenuAction("activate");
+      };
+      select("play");
+      assert.equal(ui.getState().screen, "mode_select");
+      select("open_world");
+      assert.equal(ui.getState().screen, "social");
+
+      const calls = [];
+      await render(h(WorldsPage, {
+        view: { ...view, worlds: [world] },
+        command: async (...args) => {
+          calls.push(args);
+          return { world_id: world.id, map: world.map };
+        },
+        onStatus: () => {},
+      }));
+      await act(async () => useWorldCatalog.setState({ maps: mapCatalog }));
+      const join = document.querySelector('[aria-label="Open World"] button');
+      assert.ok(join);
+      await act(async () => join.click());
+      assert.deepEqual(calls[0].slice(0, 2), ["world_join", { world_id: 7, password: "" }]);
+      assert.equal(ui.getState().screen, "hero_select");
+    });
     await t.test(
       "switching locked world targets clears the previous password before sending a join",
       async () => {
         const { WorldsPage } = await load("game/social/WorldsPage.tsx");
+        const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
         const calls = [];
         const worlds = [1, 2].map((id) => ({
           id,
@@ -378,11 +420,10 @@ test("social requests, world transitions and assisted text have independent owne
             h(OnScreenKeyboard),
           ),
         );
-        // World rows expose their reusable Join action with an Xbox A hint.
-        // Match the labelled control, independent of its rendered glyph text.
+        await act(async () => useWorldCatalog.setState({ maps: mapCatalog }));
+        // The Join action stays in the same control when the input hint changes.
         const joinButtons = () =>
-          [...document.querySelectorAll('.social-world-list article [aria-label="Xbox A"]')]
-            .map((hint) => hint.closest("button"));
+          [...document.querySelectorAll(".social-world-list article button.controller-action")];
         await act(async () => joinButtons()[0].click());
         await click("WORLD PASSWORD");
         await click("Type A");
