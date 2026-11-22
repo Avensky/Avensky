@@ -19,8 +19,6 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GIT_LFS_SKIP_SMUDGE: "1"
-      VITE_DEPLOY_ENV: staging
-      VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
       VITE_PLAYER_ONBOARDING: "1"
     steps:
       - uses: actions/checkout@v4
@@ -34,6 +32,9 @@ jobs:
       - run: node --test tests/player-onboarding.test.mjs
         working-directory: frontend
       - run: npm --prefix frontend run build -- --mode staging
+        env:
+          VITE_DEPLOY_ENV: staging
+          VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
       - name: Verify the build used pointers and excludes cloud payloads
         run: |
           git lfs pointer --check --file=frontend/public/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb
@@ -42,4 +43,9 @@ jobs:
           test ! -e frontend/dist-staging/.asset-release
           test -s frontend/dist-staging/world-builder/catalog.json
           test -s frontend/dist-staging/images/traction-control.svg
+          test -s frontend/dist-staging/images/logo.svg
+          test -s frontend/dist-staging/images/logo.png
+          test -s frontend/dist-staging/images/purple-sunflare.webp
+          test -s frontend/dist-staging/favicon.ico
           test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"
+          test -z "$(find frontend/dist-staging -type f \( -iname '*.mp4' -o -iname '*.webm' \) -print -quit)"
