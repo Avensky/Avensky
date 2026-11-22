@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { isAssetPath } from "../../frontend/src/assets/assetPaths.ts";
 import { validateRelease } from "../../frontend/scripts/staging-release.mjs";
+import { storageKey, storageLayouts } from "./object-store.mjs";
 
 const objectTag = /^"[a-f0-9]{32}(?:-\d+)?"$/i;
 
@@ -10,11 +11,22 @@ export function readVerifiedRelease(file) {
   const checked = validateRelease(release);
   for (const path of Object.keys(checked.assets)) {
     const object = objects?.[path];
-    if (!objectTag.test(object?.etag ?? "") || !["digest", "flat"].includes(object.layout)) {
+    if (!objectTag.test(object?.etag ?? "") || !storageLayouts(path).includes(object.layout)) {
       throw new Error("Missing verified AWS object metadata for " + path);
     }
   }
   return { ...checked, objects };
+}
+
+export async function verifyStoredObject(read, path, entry, assets, { signal, preferModelsRoot }) {
+  const layouts = storageLayouts(path, preferModelsRoot);
+  for (const [index, layout] of layouts.entries()) {
+    const response = await read(storageKey(path, entry.sha256, layout), { signal });
+    if (index === layouts.length - 1 || (response.status !== 403 && response.status !== 404)) {
+      return { layout, etag: await verifyObject(response, path, entry, assets) };
+    }
+    await response.body?.cancel();
+  }
 }
 
 export function checkDependencies(path, json, assets) {

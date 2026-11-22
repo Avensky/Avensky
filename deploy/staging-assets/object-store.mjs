@@ -5,8 +5,16 @@ const exec = promisify(execFile);
 const region = "us-west-2";
 const expiry = 300;
 
+export function storageLayouts(path, preferModelsRoot = false) {
+  if (!path.startsWith("/models/")) return ["digest", "flat"];
+  return preferModelsRoot ? ["models-root", "digest", "flat"] : ["digest", "models-root", "flat"];
+}
+
 export function storageKey(path, sha256, layout) {
-  return layout === "flat" ? "staging" + path : "staging/objects/" + sha256;
+  if (layout === "digest") return "staging/objects/" + sha256;
+  if (layout === "flat") return "staging" + path;
+  if (layout === "models-root" && path.startsWith("/models/")) return "staging" + path.slice("/models".length);
+  throw new Error("Unsupported storage layout for " + path);
 }
 
 export async function presignAsset(key) {

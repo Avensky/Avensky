@@ -6,8 +6,8 @@ import { resolveAssetUrl } from "../src/assets/assetPaths.ts";
 import { sealRelease, validateRelease, stagingRelease } from "../scripts/staging-release.mjs";
 import { checkPrebuiltColliders } from "../scripts/prebuilt-colliders.mjs";
 import { assetGateway } from "../../deploy/staging-assets/gateway.mjs";
-import { checkDependencies, verifyObject } from "../../deploy/staging-assets/verify-release.mjs";
-import { signedObjectReader } from "../../deploy/staging-assets/object-store.mjs";
+import { checkDependencies, verifyObject, verifyStoredObject } from "../../deploy/staging-assets/verify-release.mjs";
+import { signedObjectReader, storageKey } from "../../deploy/staging-assets/object-store.mjs";
 
 const path = "/models/city/a, b.glb";
 const nextLod = "/models/city/a-low.glb";
@@ -64,6 +64,31 @@ test("publication verification checks the GLB, external texture, length, ETag, a
   assert.throws(() => checkDependencies(path, { images: [{ uri: "../../../../textures/a.webp" }] }, release.assets), /missing/);
 });
 
+test("verification reuses the existing model-root keys and falls back only when a key is unavailable", async () => {
+  const keys = [];
+  const model = release.assets[path];
+  const rootKey = "staging/city/a, b.glb";
+  const digestKey = "staging/objects/" + model.sha256;
+  const read = async key => {
+    keys.push(key);
+    return key === rootKey ? new Response(bytes, { headers: { etag } }) : new Response(null, { status: 403 });
+  };
+  const expected = { layout: "models-root", etag };
+  assert.deepEqual(await verifyStoredObject(read, path, model, release.assets, {}), expected);
+  assert.deepEqual(keys.splice(0), [digestKey, rootKey]);
+  assert.deepEqual(
+    await verifyStoredObject(read, path, model, release.assets, { preferModelsRoot: true }), expected,
+  );
+  assert.deepEqual(keys.splice(0), [rootKey]);
+  const corrupt = async key => {
+    keys.push(key);
+    return new Response(bytes.subarray(0, 4), { headers: { etag } });
+  };
+  await assert.rejects(verifyStoredObject(corrupt, path, model, release.assets, {}), /SHA-256 or byte count/);
+  assert.deepEqual(keys, [digestKey]);
+  assert.throws(() => storageKey(texture, release.assets[texture].sha256, "models-root"), /Unsupported storage layout/);
+});
+
 test("private object reader coalesces signing and pins the verified storage ETag", async () => {
   let signCalls = 0;
   const read = signedObjectReader(async () => {
@@ -82,9 +107,9 @@ test("private object reader coalesces signing and pins the verified storage ETag
 test("gateway serves only verified assets and keeps failures and redirects out of cache", async t => {
   let calls = 0;
   let outcome = "ok";
-  const server = assetGateway([{ ...release, objects: { [path]: { etag, layout: "flat" } } }], async (key, request) => {
+  const server = assetGateway([{ ...release, objects: { [path]: { etag, layout: "models-root" } } }], async (key, request) => {
     calls++;
-    assert.equal(key, "staging" + path);
+    assert.equal(key, "staging/city/a, b.glb");
     assert.equal(request.etag, etag);
     if (outcome === "missing") return new Response(null, { status: 404 });
     if (outcome === "redirect") return Response.redirect("https://private.invalid/object?secret=1");

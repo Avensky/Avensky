@@ -47,12 +47,16 @@ The build rejects metadata when its tracked asset inventory or generator inputs 
 
 Keep Lightsail set to **All objects are private** and public overrides disabled. The gateway needs download access only to the staging paths it serves. Use a dedicated IAM identity with scoped `s3:GetObject` access where supported. Lightsail bucket access keys grant read and write for the entire bucket. Set credentials through the AWS CLI credential chain for the gateway service account, and keep the publisher credential separate. [Lightsail bucket permissions](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-understanding-bucket-permissions.html) · [Lightsail IAM policies](https://docs.aws.amazon.com/lightsail/latest/userguide/amazon-lightsail-bucket-management-policies.html)
 
-The existing source is `s3://caring-vegan/staging/`. The baseline release at the initial feature commit expects 530 GLBs and one PNG. The reported bucket inventory contains 546 GLBs. Use the manifest to reconcile each release path, byte count and digest before rollout. Verification tries `staging/objects/<sha256>` first, then `staging/<logical-path>` if the digest key cannot be read. For example, it can reuse the existing object at `staging/models/world/garage_special.glb` if its bytes match. Review extra or differently named bucket objects before selecting any for an updated release. Run the bucket settings inspection with an AWS operator profile that can read Lightsail settings.
+The existing source is `s3://caring-vegan/staging/`. Its keys mirror the contents of `frontend/public/models/`. For example, the logical asset `/models/world/garage_special.glb` maps to `staging/world/garage_special.glb`. All 531 baseline release paths matched existing keys and sizes in the 566-object inventory. The byte and dependency checks below verify that the objects are the ones the build expects.
+
+The verifier normally tries `staging/objects/<sha256>` first, then the models-root layout and then the full logical path under `staging/`. Use `--models-root` to check the existing bucket layout first. A readable object with the wrong bytes fails verification. Run the bucket settings inspection with an AWS operator profile that can read Lightsail settings.
 
 ```sh
 export AVENSKY_ASSET_BUCKET=caring-vegan
 aws lightsail get-buckets --region us-west-2 --bucket-name "$AVENSKY_ASSET_BUCKET" --query 'buckets[0].accessRules'
 ```
+
+For rollout, confirm that the output shows `"getObject": "private"` and `"allowPublicOverrides": false`.
 
 Publish missing or generated models under their digest keys from an authorized workstation. Use the actual asset bytes and the manifest SHA-256 encoded as Base64:
 
@@ -71,7 +75,7 @@ Run verification from a trusted machine with the gateway's read scope. The scrip
 ```sh
 export AWS_PROFILE=avensky-staging-reader
 node deploy/staging-assets/verify.mjs \
-  frontend/.asset-release/staging.json frontend/.asset-release/verified-staging.json
+  frontend/.asset-release/staging.json frontend/.asset-release/verified-staging.json --models-root
 ```
 
 Keep the verified file outside the web root with the matching frontend release. The gateway pins each object to its verified ETag, so an object that changes after verification fails closed.
