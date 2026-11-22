@@ -84,4 +84,6 @@ The URL and data-path checks are only unit tests. Integration tests must still p
 
 ## Model asset caution
 
+See [Private staging assets](CLOUD_ASSETS.md) for the LFS-free staging build and authenticated Lightsail delivery setup.
+
 The private AWS Lightsail `staging/` model bucket remains separate from app player-data staging. This configuration **does not** grant distribution rights or authorize publishing third-party GLBs in the game frontend. Before a public `play.avensky.com` build, review the asset inventory and release allowlist in the licensing tracker.

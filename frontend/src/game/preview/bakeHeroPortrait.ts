@@ -1,3 +1,4 @@
+import { assetUrl } from "../../assets/runtimeAssets";
 /** One-shot personalized portrait using the same materials as the showroom.
  * Requests are serialized/cached by heroPortraitCache; no per-card canvases. */
 import {
@@ -45,7 +46,7 @@ export async function bakeHeroPortrait(model: VehicleModelId, appearance: HeroAp
   let room: RoomEnvironment | undefined;
   let environment: ReturnType<PMREMGenerator["fromScene"]> | undefined;
   try {
-    gltf = await loader.loadAsync(VEHICLE_MODEL_PATHS[model]);
+    gltf = await loader.loadAsync(assetUrl(VEHICLE_MODEL_PATHS[model]));
     // An in-flight menu download can finish after entering the world. Release
     // it without creating a second renderer, compiling shaders or baking PMREM.
     requireMenu();

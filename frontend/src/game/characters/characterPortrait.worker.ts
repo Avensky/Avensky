@@ -1,3 +1,4 @@
+import { assetUrl } from "../../assets/runtimeAssets";
 import {
   ACESFilmicToneMapping, Box3, DirectionalLight, HemisphereLight, LoadingManager, OrthographicCamera,
   Scene, Vector3, WebGLRenderer, type Object3D,
@@ -41,11 +42,11 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
   try {
     const loadScene = async (url: string) => {
       try {
-        return (await loader.loadAsync(url)).scene;
+        return (await loader.loadAsync(assetUrl(url))).scene;
       } catch (error) {
         const original = __CHARACTER_MODEL_FALLBACKS__[url];
         if (!original) throw error;
-        return (await loader.loadAsync(original)).scene;
+        return (await loader.loadAsync(assetUrl(original))).scene;
       }
     };
     const source = modelUrl ? await loadScene(modelUrl).catch(() => undefined) : undefined;

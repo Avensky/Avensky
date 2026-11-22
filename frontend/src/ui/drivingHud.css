@@ -8,6 +8,26 @@
   --wheel-size: clamp(180px, 24vw, 260px);
   --instrument-size: clamp(260px, 33vw, 430px);
 }
+.touch-pause-button {
+  position: fixed;
+  z-index: 21;
+  top: max(8px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 60px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--app-line);
+  border-radius: 5px;
+  background: var(--app-panel);
+  color: var(--app-text);
+  font: inherit;
+  touch-action: manipulation;
+  cursor: pointer;
+}
+.game-wrapper:has(.ctf-match-hud) .touch-pause-button {
+  top: calc(max(8px, env(safe-area-inset-top)) + 68px);
+}
 .driving-hud button {
   user-select: none;
   touch-action: none;

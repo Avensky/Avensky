@@ -24,7 +24,7 @@ import {
 } from "three";
 import { sharedGlassMaterial } from "./tools/createGlassMaterialFactory";
 import { useFrame } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 
 import {
   useNetworkStore,
@@ -97,7 +97,7 @@ export const Brz = forwardRef<Group, BrzProps>(function Brz(
   const tintFirstPerson = new Color(0xffffff); // Clear tint for first-person view
   const tintExterior = new Color(0x556677); // Blue-gray tint (customize as needed)
 
-  const { scene } = useGLTF(MODEL_PATH); // Load the car model
+  const { scene } = useAssetGLTF(MODEL_PATH); // Load the car model
   const isVehiclePreview = useUIStore(
     (state) =>
       state.screen === "sandbox_setup",

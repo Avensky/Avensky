@@ -8,7 +8,7 @@ import {
   useState,
 } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../assets/useAssetGLTF";
 import { Frustum, Matrix4, Vector3, type Object3D } from "three";
 import type { MapSnapshot, VisualAsset } from "../store/world/worldStore";
 import { useNetworkStore } from "../store/session/networkStore";
@@ -179,7 +179,7 @@ export function CityStreaming({
   );
   useEffect(() => {
     if (wantsReduced)
-      useGLTF.preload(CITY_REDUCED_ASSET, "/draco/", true, cityLoader);
+      useAssetGLTF.preload(CITY_REDUCED_ASSET, "/draco/", true, cityLoader);
   }, [wantsReduced]);
   const proxyBoxes = useMemo(
     () =>
@@ -288,7 +288,7 @@ function CityAssetInstances({
 }: AssetProps & { blockLod: boolean }) {
   const { visual, fast } = props;
   const path = cityTextureAsset(visual.asset, fast ? "fast" : "balanced");
-  const { scene } = useGLTF(path, "/draco/", true, cityLoader);
+  const { scene } = useAssetGLTF(path, "/draco/", true, cityLoader);
   const source = useMemo(()=>cityWallScene(scene),[scene]);
   return blockLod ? (
     <AssetBoundary fallback={<PreparedCityAsset source={source} {...props} />}>
@@ -299,7 +299,7 @@ function CityAssetInstances({
   );
 }
 function ReducedCityAsset(props: AssetProps & { source: Object3D }) {
-  const { scene: reducedSource } = useGLTF(
+  const { scene: reducedSource } = useAssetGLTF(
     CITY_REDUCED_ASSET,
     "/draco/",
     true,

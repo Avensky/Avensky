@@ -1,4 +1,4 @@
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame } from "@react-three/fiber";
 import {
   startTransition,
@@ -32,7 +32,7 @@ function Loaded({
   url: string;
   tint?: MeshBasicMaterial;
 }) {
-  const { scene } = useGLTF(url);
+  const { scene } = useAssetGLTF(url);
   const model = useMemo(() => {
     const source = asset.node ? scene.getObjectByName(asset.node) : scene;
     if (!source) throw Error(`Missing map piece ${asset.id} in ${url}`);

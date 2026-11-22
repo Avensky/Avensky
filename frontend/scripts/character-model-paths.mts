@@ -69,7 +69,7 @@ function bundledVillagerPath(gender: "female" | "male") {
   return `${characterPath}villagers/villager-${gender}/villager-${gender}`;
 }
 
-export function findVillagerModel(gender: "female" | "male") {
+export function findVillagerModel(gender: "female" | "male", hasModel = hasCharacterModel) {
   const nestedNames = [`village-${gender}`, `villager-${gender}`];
   const bundledBase = bundledVillagerPath(gender);
   const sources = [
@@ -80,7 +80,7 @@ export function findVillagerModel(gender: "female" | "male") {
   ];
   for (const { root, base } of sources) {
     const source = new URL(base + ".glb", root);
-    if (!hasCharacterModel(source)) continue;
+    if (!hasModel(source)) continue;
     const outputBase = base === bundledBase ? `${villagerPath}villager-${gender}` : base;
     return {
       source,
@@ -89,28 +89,28 @@ export function findVillagerModel(gender: "female" | "male") {
       sourceUrl: root === publicRoot ? `/${base}.glb` : null,
       bundledLod: (kind: "garage" | "portrait") => {
         const path = `${base}.${kind}.glb`;
-        return base === bundledBase && hasCharacterModel(new URL(path, publicRoot)) ? `/${path}` : null;
+        return base === bundledBase && hasModel(new URL(path, publicRoot)) ? `/${path}` : null;
       },
     };
   }
   return null;
 }
 
-export function characterLod(asset: ReturnType<typeof findVillagerModel>, kind: "garage" | "portrait") {
+export function characterLod(asset: ReturnType<typeof findVillagerModel>, kind: "garage" | "portrait", hasModel = hasCharacterModel) {
   if (!asset) return null;
-  return asset.bundledLod(kind) ?? (hasCharacterModel(asset.output(kind)) ? asset.url(kind) : null);
+  return asset.bundledLod(kind) ?? (hasModel(asset.output(kind)) ? asset.url(kind) : null);
 }
 
-export function vesperActorUrls(asset: ReturnType<typeof findVillagerModel>, root = publicRoot) {
+export function vesperActorUrls(asset: ReturnType<typeof findVillagerModel>, root = publicRoot, hasModel = hasCharacterModel) {
   if (asset) {
-    const model = asset.sourceUrl ?? (hasCharacterModel(asset.output("full")) ? asset.url("full") : null);
-    return { model, portrait: characterLod(asset, "portrait") ?? model };
+    const model = asset.sourceUrl ?? (hasModel(asset.output("full")) ? asset.url("full") : null);
+    return { model, portrait: characterLod(asset, "portrait", hasModel) ?? model };
   }
   // A selective LFS checkout can contain the playable tiers without their full-resolution source.
   const base = bundledVillagerPath("female");
   const installed = (kind: "garage" | "portrait") => {
     const path = `${base}.${kind}.glb`;
-    return hasCharacterModel(new URL(path, root)) ? `/${path}` : null;
+    return hasModel(new URL(path, root)) ? `/${path}` : null;
   };
   const garage = installed("garage"), portrait = installed("portrait");
   return { model: garage ?? portrait, portrait: portrait ?? garage };

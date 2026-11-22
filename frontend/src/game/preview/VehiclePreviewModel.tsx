@@ -1,7 +1,7 @@
 import { fitMirrorCheck, nearestSideMirror, type MirrorCheckFit } from "../characters/mirrorCheck";
 import { FACTORY_APPEARANCE, useHeroLoadouts } from "../../vehicles/cosmetics/heroLoadouts";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
-import { useGLTF } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { disposeVehicleAsset } from "./disposeVehicleAsset";
 import { prepareVehicleVisual } from "../../vehicles/tools/vehicleMaterials";
 import {
@@ -85,7 +85,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   const revealActive = materializing && !reducedMotion;
   const invalidate = useThree(state => state.invalidate);
   const savedAppearance = useHeroLoadouts(s => s.draft?.vehicle === model ? s.draft.appearance : s.loadouts[model]);
-  const { scene, animations } = useGLTF(showroomPath ?? VEHICLE_MODEL_PATHS[model], "/draco/");
+  const { scene, animations } = useAssetGLTF(showroomPath ?? VEHICLE_MODEL_PATHS[model], "/draco/");
   // Only this stage uses the generated showroom URL. Retain its decoded data
   // in the loader cache, and release its GPU buffers when the car leaves.
   useEffect(() => {

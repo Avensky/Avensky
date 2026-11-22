@@ -1,0 +1,286 @@
+{
+  "version": 1,
+  "sources": {
+    "/models/roads/Road_Intersection/Road_Intersection_LOD0.glb": {
+      "sha256": "64d27dd63b8512d0056ebb15ade9eab0d4eadf1703ee0c1097ece86c53e40c5a",
+      "size": 1080784
+    },
+    "/models/roads/Road_Intersection/Road_Intersection_LOD1.glb": {
+      "sha256": "b8480dae3538c82301a63d38a1f443fc3f2cec8a8597674ff028df63379fe4dd",
+      "size": 505732
+    },
+    "/models/roads/Road_Intersection/Road_Intersection_LOD2.glb": {
+      "sha256": "3f8ab23766d07775f387c05e924690753d8e0cb632efea33fd9ba9bdb2c53d9a",
+      "size": 188296
+    },
+    "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb": {
+      "sha256": "ec46d4ea0adbab800e6793e0812807a9a11066b87ecb24f0ab24aafb168b1e0c",
+      "size": 1234984
+    },
+    "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD1.glb": {
+      "sha256": "ec6571ed0ac8441231e5313661a061279943aadb1b4bbf1dd50be0a1911664ee",
+      "size": 577592
+    },
+    "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD2.glb": {
+      "sha256": "3955a09b9a92dc7ae43f5d0648cdb787afad5a720634d83823b8b1c4d2f94a47",
+      "size": 252000
+    },
+    "/models/roads/Road_Wide_Twoway/Road_Wide_Twoway_LOD0.glb": {
+      "sha256": "daa1e25b773ea4e917b400555a00c7a950ce41acff93284dd9a9d52e69a71976",
+      "size": 875652
+    },
+    "/models/roads/Road_Wide_Twoway/Road_Wide_Twoway_LOD1.glb": {
+      "sha256": "ad0d6aff3c22c393c372fd50ef4b34c3d55813dfc0989cb4285e85ed658ea6f9",
+      "size": 394088
+    },
+    "/models/roads/Road_Wide_Twoway/Road_Wide_Twoway_LOD2.glb": {
+      "sha256": "0125bd376ab1b63471faca578b9847a87f999d0f7a1785a6c7ce1d58734d67b1",
+      "size": 236684
+    },
+    "/models/roads/highway/highway_25_wide_straight_level/collision.glb": {
+      "sha256": "f15d094e42b7584c3b1aee64031a61a20b7aa3bd318c8fe589373b03cdc6a05e",
+      "size": 2596
+    },
+    "/models/roads/highway/highway_25_wide_straight_level/lod0.glb": {
+      "sha256": "3baf85f6c5f50cb9bb4cd19b78dfb323bc5283c58fb435cc233e72d5a5a7c1ca",
+      "size": 131564
+    },
+    "/models/roads/highway/highway_26_wide_bend44_level/collision.glb": {
+      "sha256": "7cf58446b594b33c30b74ab85cbfb52699952fe9dfb68bc5864f23103d4fe29e",
+      "size": 3900
+    },
+    "/models/roads/highway/highway_26_wide_bend44_level/lod0.glb": {
+      "sha256": "144158ddc297513e83842fac2a4fe302950832f451b692dcaa72fbb07a19041d",
+      "size": 180404
+    },
+    "/models/roads/highway/highway_27_wide_bend87_level/collision.glb": {
+      "sha256": "8bc49f80b2d3981b81be7870c2388b9348d838ee928e16fecc08744f816203c5",
+      "size": 4920
+    },
+    "/models/roads/highway/highway_27_wide_bend87_level/lod0.glb": {
+      "sha256": "bcd8982aeecdde802d8b167682cc70f026f860d6d53fe41498729a09747b341c",
+      "size": 177568
+    },
+    "/models/roads/highway/highway_28_wide_straight_rise10/collision.glb": {
+      "sha256": "0f6f3ee8a20afe1e6550b7af1159fe9a2eeebe9a73fb477aa3bf34d8c12e9d89",
+      "size": 16140
+    },
+    "/models/roads/highway/highway_28_wide_straight_rise10/lod0.glb": {
+      "sha256": "dcce15150d801319dfecd1798c9719ce062b76655d324a9beff328e1b4c55db3",
+      "size": 471480
+    },
+    "/models/roads/highway/highway_29_wide_straight_level/collision.glb": {
+      "sha256": "f2b29f23e6bd8f10b20fc23fe6131436a2454c5159a405722d6d8a008fdd0a28",
+      "size": 10532
+    },
+    "/models/roads/highway/highway_29_wide_straight_level/lod0.glb": {
+      "sha256": "1020cd16a0e51232218415e380379f52e527ce70f9a504ccb0cd6905d3e30277",
+      "size": 320424
+    },
+    "/models/roads/highway/highway_30_wide_straight_rise10/collision.glb": {
+      "sha256": "375736bdc889904531e4cc9aa6db2ef39193efeb3bf3b74f20d02f9f2c7de086",
+      "size": 16748
+    },
+    "/models/roads/highway/highway_30_wide_straight_rise10/lod0.glb": {
+      "sha256": "a4a4bec14e78ae9b7aa3766c79ede8ed79340b1ddcb720c2e7b78a81a76b1652",
+      "size": 476540
+    },
+    "/models/roads/highway/highway_31_wide_straight_level/collision.glb": {
+      "sha256": "47cbaed677fd1c8a1f567363ba6a7971f1b4e5dae68870d04a8b5467ab205657",
+      "size": 10516
+    },
+    "/models/roads/highway/highway_31_wide_straight_level/lod0.glb": {
+      "sha256": "6b00f965377e81ee4b931d61c21b2d78628abd663f67a609c0ee3703347efcfc",
+      "size": 318664
+    },
+    "/models/roads/highway/highway_32_wide_bend90_rise10/collision.glb": {
+      "sha256": "4a6c2a0ab1efe7b6711756fb46ca2a294c8fb79176774ca1d5a4415f05765041",
+      "size": 21884
+    },
+    "/models/roads/highway/highway_32_wide_bend90_rise10/lod0.glb": {
+      "sha256": "875464a394cf20884b859fc4df50361892eabac14e5e5f9b748dd392b7fa41c5",
+      "size": 561272
+    },
+    "/models/roads/highway/highway_33_wide_bend45_rise10/collision.glb": {
+      "sha256": "f573a6e792b9e6f96c267e7387a2a7fa49a62646024dbdd0437b378bb73bad82",
+      "size": 19244
+    },
+    "/models/roads/highway/highway_33_wide_bend45_rise10/lod0.glb": {
+      "sha256": "0a18940090d617af8cd78bfdc6db493846b184a2de39145d2ec65a78b162a588",
+      "size": 518012
+    },
+    "/models/roads/highway/highway_34_wide_bend88_level/collision.glb": {
+      "sha256": "ab47746f27879d2425b58cc903a2b8fa5fb120f5070c7a7404be358a7a27af18",
+      "size": 16648
+    },
+    "/models/roads/highway/highway_34_wide_bend88_level/lod0.glb": {
+      "sha256": "e77ee2c8ba89bd93ae692758f880ef43b976d1823c362bc13a3ae6dbf11b3ccf",
+      "size": 433856
+    },
+    "/models/roads/highway/highway_35_wide_bend90_rise10/collision.glb": {
+      "sha256": "d2ffce34deeb649043fa56898f4e223e69cb5c8b73a52bbb13fba9cbd83d1560",
+      "size": 23052
+    },
+    "/models/roads/highway/highway_35_wide_bend90_rise10/lod0.glb": {
+      "sha256": "4109003e451ffbbdf5b76d906c82f22633c0f619f44c629bf7360cdfd3cc7857",
+      "size": 532704
+    },
+    "/models/roads/highway/highway_36_wide_bend88_level/collision.glb": {
+      "sha256": "5faf8747f0261ab6eb370e97a03c43f309e8481ddb47f0b37d9e264962f32af7",
+      "size": 16628
+    },
+    "/models/roads/highway/highway_36_wide_bend88_level/lod0.glb": {
+      "sha256": "a9fa122e7b23e89b9f811e7b401821c2c2e2a9e5a05b8603e5852ec2e109d0f3",
+      "size": 433192
+    },
+    "/models/roads/highway/highway_37_wide_bend44_level/collision.glb": {
+      "sha256": "c3a24de7c77f592e34d120092b9608077ee8c350711afdb2b1e26320c799470a",
+      "size": 14240
+    },
+    "/models/roads/highway/highway_37_wide_bend44_level/lod0.glb": {
+      "sha256": "1c6887e26db351e7c4e9ecf6f626bda45e89b3a89d3a9a6ad823f6393fafed8e",
+      "size": 427108
+    },
+    "/models/roads/highway/highway_38_wide_bend45_rise10/collision.glb": {
+      "sha256": "ea1f7cc5a1c82db702c969a07466a16859ece6008c9f8b94603ebfa56e215d88",
+      "size": 20028
+    },
+    "/models/roads/highway/highway_38_wide_bend45_rise10/lod0.glb": {
+      "sha256": "5818cf33b9a8a3c90d4bfb3b885c7358b5c33e0cd2b49924eee30eb1a94c203d",
+      "size": 516760
+    },
+    "/models/roads/highway/highway_39_wide_bend44_level/collision.glb": {
+      "sha256": "4de6334051d3010297998c83fa4df26b2dd57754a43d8202efc00edd300c22bf",
+      "size": 14236
+    },
+    "/models/roads/highway/highway_39_wide_bend44_level/lod0.glb": {
+      "sha256": "904ab382bb06c75a67260edffeb8f305ef16f5272750f6636ebb89e4b7147ea8",
+      "size": 426048
+    },
+    "/models/roads/highway/highway_40_ramp_straight_rise10/collision.glb": {
+      "sha256": "c63cd2943857e22a711df8064c3791b5355697fbda904e4a6fe70c31c3fd2bb7",
+      "size": 10588
+    },
+    "/models/roads/highway/highway_40_ramp_straight_rise10/lod0.glb": {
+      "sha256": "ea700aed2ca1552c7316fd5a3614d3feb860c72f25ba6e6f1af382c457349cab",
+      "size": 236180
+    },
+    "/models/roads/highway/highway_41_ramp_bend88_rise10/collision.glb": {
+      "sha256": "5169a8537aab6f93b9343621a1bc014bce011c2ae3ff556b91cb0e364a0f6c04",
+      "size": 13080
+    },
+    "/models/roads/highway/highway_41_ramp_bend88_rise10/lod0.glb": {
+      "sha256": "68eb18134594d2c65e82ff3d58f852b7e764a82e9dddd270cd05a7e947961874",
+      "size": 243244
+    },
+    "/models/roads/highway/highway_42_ramp_straight_rise20/collision.glb": {
+      "sha256": "2f1c044b295c4ec432e79a4fe34fa38486bc531c612b2236b56dc3691ed52467",
+      "size": 14944
+    },
+    "/models/roads/highway/highway_42_ramp_straight_rise20/lod0.glb": {
+      "sha256": "a6feb2f16567782a45a9ee9970acc95e063c5ee5e3fd05db8dee410dd1b0701e",
+      "size": 354608
+    },
+    "/models/roads/highway/highway_43_ramp_bend89_rise20/collision.glb": {
+      "sha256": "5c299417b529066322427777cb0558fcee6db834b7b447cde297476cb04012af",
+      "size": 21156
+    },
+    "/models/roads/highway/highway_43_ramp_bend89_rise20/lod0.glb": {
+      "sha256": "d44686109d95727d5200d4162c36d621818e27cac42c27a48a769819c926f301",
+      "size": 390560
+    },
+    "/models/roads/highway/highway_44_narrow_straight_level/collision.glb": {
+      "sha256": "be5243eb0cc659f8b11c338840edd01a05abd1193974530134e6d81d924600ff",
+      "size": 11492
+    },
+    "/models/roads/highway/highway_44_narrow_straight_level/lod0.glb": {
+      "sha256": "c4c5c445be5473f3f8baa316dd933cb984d98ccde0bfe72594248f376139c64f",
+      "size": 245556
+    },
+    "/models/roads/highway/highway_45_narrow_bend45_level/collision.glb": {
+      "sha256": "7bb6473222d2fdbc8d0517a7fc5485685333778d3bc0e75bab59ea1748e90763",
+      "size": 15352
+    },
+    "/models/roads/highway/highway_45_narrow_bend45_level/lod0.glb": {
+      "sha256": "f612991823bffa6ab0171613515f9893b483a4804306b139e4b37f395d42ad0c",
+      "size": 371288
+    },
+    "/models/roads/highway/highway_46_narrow_bend90_level/collision.glb": {
+      "sha256": "c93bc898fe4a4e426db430f5bb3e497521cfeb2cd5fe3197228aa83d473bb810",
+      "size": 18040
+    },
+    "/models/roads/highway/highway_46_narrow_bend90_level/lod0.glb": {
+      "sha256": "46d26c83666a6a77dcaf5efb8302f6b4e526f9fd4a1a60ef59c0959ff7154f03",
+      "size": 378932
+    },
+    "/models/roads/highway/highway_47_narrow_straight_rise10/collision.glb": {
+      "sha256": "3bedf0e218dd6d66bc8c1d17653305f63c4629ce6955d853a7851f9b0ecec4bc",
+      "size": 13188
+    },
+    "/models/roads/highway/highway_47_narrow_straight_rise10/lod0.glb": {
+      "sha256": "d5f30b1c1b7e285e4e8dee16b2fa8eef1e5bbe98bb4f030ecabf6484a743475a",
+      "size": 339480
+    },
+    "/models/roads/highway/highway_48_narrow_bend45_rise10/collision.glb": {
+      "sha256": "bac1e0a94f0d7461d40e9e1caf186a545012db03a847ffb951d5f76f8cbc6743",
+      "size": 16256
+    },
+    "/models/roads/highway/highway_48_narrow_bend45_rise10/lod0.glb": {
+      "sha256": "b310eef05ee441b6cccb9a6a64f278c00c0600523d50f0ae2515e50d4cca36bf",
+      "size": 380976
+    },
+    "/models/roads/highway/highway_49_narrow_bend90_rise10/collision.glb": {
+      "sha256": "5b9c583a4860ab86493a938a3f00080ede80ef1aaedc9f881f58191c1bf2ba6e",
+      "size": 20512
+    },
+    "/models/roads/highway/highway_49_narrow_bend90_rise10/lod0.glb": {
+      "sha256": "0503a83fb3ec4c7a0f3dd151b2d573f38808eac7ddfc67872b0f18368c7583fa",
+      "size": 387680
+    },
+    "/models/roads/highway/highway_50_narrow_straight_level/collision.glb": {
+      "sha256": "e3173bb57bcc34f16f6078c6c62f2a6bc8a0e87b38e7058aebb4f44333e316c0",
+      "size": 11488
+    },
+    "/models/roads/highway/highway_50_narrow_straight_level/lod0.glb": {
+      "sha256": "67e7c4bb99d647afbcc8e6f6d4aabb0895c935233989cbf113f28f5a5910d198",
+      "size": 245508
+    },
+    "/models/roads/highway/highway_51_narrow_bend45_level/collision.glb": {
+      "sha256": "96804e43ad459e69aa5fc1b8b57965d20668cf778f4cc2734fe74b4029a762b9",
+      "size": 15408
+    },
+    "/models/roads/highway/highway_51_narrow_bend45_level/lod0.glb": {
+      "sha256": "d872b4bb2864d5c1f59a2f6b93dfefc01749124133c0d4c137fcd2965207ea3e",
+      "size": 371036
+    },
+    "/models/roads/highway/highway_52_narrow_bend90_level/collision.glb": {
+      "sha256": "0e1b658c10ab62670b146ccfdcb766db67e5459f50579564a34d4ee3dce68c21",
+      "size": 17936
+    },
+    "/models/roads/highway/highway_52_narrow_bend90_level/lod0.glb": {
+      "sha256": "a550eb22f0a61305dc6f94fa45358b0b59fc2991ac62a3dcf09d5a74c509deb4",
+      "size": 379644
+    },
+    "/models/roads/stone/stone_bridge.collision.glb": {
+      "sha256": "e06697e0de67b01b69519139bc54e4faac9d9638d49de9ec323930aa2cf32201",
+      "size": 52776
+    },
+    "/models/world/garage_special.glb": {
+      "sha256": "f4686f981e5c165d03a8bca20628654bb20db50db5cb91ce67e1a5c583d086ce",
+      "size": 1364240
+    }
+  },
+  "files": {
+    "avenlab-server/src/assets/roads/road-colliders.json": "36a99c191185ba56cc3eba6368d3140d981a31a9a323f9c3c0dbc5d5e72e3451",
+    "avenlab-server/src/assets/models/placement-colliders.json": "85631c483848715067b0edabfb5a1e120d7aa94495c6c7ec1a57dc77d82a6933",
+    "avenlab-server/src/assets/roads/map-kit-colliders.json": "3b9518784dec18d8500e990dc5a57a49827a702e6392512d0cac57089b530932",
+    "frontend/src/worldBuilder/mapKit/outlines.json": "c06fc3c385459704d5d527c8dd42e073aa85e298d9c14f6a3ee91bd8a2feba96",
+    "frontend/public/models/roads/catalog.json": "1b408bf7c1bd75f76a67f1523d080772901971463a980b7f1722a57c367963d5",
+    "scripts/build-road-colliders.mjs": "536faf2ea2008257272bb953d68cf331ce1bfc11f123359238c2be148f5de8cb",
+    "scripts/build-placement-colliders.mjs": "e58c635b7990560147c3e69a1e8aafb5cdd8896a2bcba68d11cba9abcc31704c",
+    "scripts/build-map-kit-colliders.mjs": "20d83111977bb2cd4e4fbd967e68310db2bed904384fc5dcd97ff478b2d53bc3",
+    "frontend/src/worldBuilder/mapKit/catalog.ts": "748f258198a5ae571fcc3cb8fdffe452af62ef9bd4e2e6b30b284acb7bfafab2",
+    "frontend/src/worldBuilder/roadKit/roadKitCore.ts": "ca0f2600d1834c43247bfc05954fb22799edcb6074c542ae299ed8ebf5f4a853",
+    "frontend/src/worldBuilder/roads/roadGeometry.ts": "36436c160a47e60ee4cb3f3444c4cb73656c4f4e653d85737b2713e85528defb"
+  }
+}

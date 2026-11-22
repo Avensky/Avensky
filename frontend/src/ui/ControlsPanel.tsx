@@ -15,15 +15,15 @@ import { HudGroup } from "./HudGroup";
 import Pedals from "./Pedals";
 import { TouchStick } from "../controls/TouchControls";
 
-export default function ControlsPanel() {
+export default function ControlsPanel({ controlsOnly = false }: { controlsOnly?: boolean }) {
   const armed=useCombatStore(s=>s.enabled);
   const groups = usePreferencesStore(s=>s.hudGroups);
   const layout = usePreferencesStore((s) => s.touchLayout);
-  const aimControls=armed&&groups.turret;
-  const expanded=groups.parking||groups.shifter||groups.ignition||groups.assists;
+  const aimControls=!controlsOnly&&armed&&groups.turret;
+  const expanded=groups.parking||groups.shifter||groups.ignition||(!controlsOnly&&groups.assists);
   return (
     <>
-      <UtilityDock />
+      {!controlsOnly && <UtilityDock />}
       <aside
         className="drive-dock"
         data-futuristic={groups.futuristic}
@@ -55,7 +55,7 @@ export default function ControlsPanel() {
         {/* This row defines the shared radio/HVAC width in styles/layout.css. */}
         <div className="console-foot-controls">
           {!groups.futuristic && <DrivingIgnition/>}
-          {(!groups.futuristic &&
+          {(!controlsOnly && !groups.futuristic &&
             <HudGroup
               id="assists"
               title="DRIVING ASSISTS"

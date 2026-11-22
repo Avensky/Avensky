@@ -1,0 +1,42 @@
+name: Cloud asset streaming
+on:
+  pull_request:
+    paths:
+      - "frontend/**"
+      - "deploy/staging-assets/**"
+      - "scripts/build-*-colliders.mjs"
+      - "scripts/sync-*-catalog.mjs"
+      - "scripts/sync-world-builder-map.mjs"
+      - "avenlab-server/src/assets/**"
+      - ".github/workflows/cloud-assets.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  staging-pointer-build:
+    runs-on: ubuntu-latest
+    env:
+      GIT_LFS_SKIP_SMUDGE: "1"
+      VITE_DEPLOY_ENV: staging
+      VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm --prefix frontend ci
+      - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
+      - run: npm --prefix frontend run build -- --mode staging
+      - name: Verify the build used pointers and excludes cloud payloads
+        run: |
+          git lfs pointer --check --file=frontend/public/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb
+          git lfs pointer --check --file=frontend/public/models/world/garage_special.glb
+          test -s frontend/.asset-release/staging.json
+          test ! -e frontend/dist-staging/.asset-release
+          test -s frontend/dist-staging/world-builder/catalog.json
+          test -s frontend/dist-staging/images/traction-control.svg
+          test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"

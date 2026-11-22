@@ -47,6 +47,7 @@ test("mobile HUD groups, assisted shifter and enlarged resource dials", async (t
     } = await load("store/preferences/preferencesStore.ts");
     const { useInputStore: input } = await load("store/input/inputStore.ts"),
       { unpackCockpit } = await load("store/input/protocol/cockpitMasks.ts");
+    const { useHudPanelsStore: hudPanels } = await load("store/hud/hudPanelsStore.ts");
     const { useNetworkStore: network } = await load(
         "store/session/networkStore.ts",
       ),
@@ -57,7 +58,7 @@ test("mobile HUD groups, assisted shifter and enlarged resource dials", async (t
       { updateVehicleTelemetry } = await load(
         "store/telemetry/vehicleTelemetryStore.ts",
       );
-    const { DrivingHUD } = await load("ui/DrivingHUD.tsx"),
+    const { DrivingHUD, DrivingOverlay } = await load("ui/DrivingHUD.tsx"),
       { SettingsMenu } = await load("game/menus/SettingsMenu.tsx");
     const { Keyboard } = await load("controls/Keyboard.ts"),
       { GearSelector, HandbrakeLever } = await load(
@@ -119,6 +120,33 @@ test("mobile HUD groups, assisted shifter and enlarged resource dials", async (t
         Object.assign(e, { pointerId: id, button: 0, clientX: x, clientY: y });
         node.dispatchEvent(e);
       });
+    await t.test("a hidden visual HUD still gives mobile players driving controls and Pause", async () => {
+      await render(h(DrivingOverlay, { hud: false }));
+      assert.equal(by("Pause menu"), null);
+      assert.equal(by("Accelerate"), null);
+
+      const original = Object.getOwnPropertyDescriptor(navigator, "userAgent");
+      Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 (iPhone) Mobile" });
+      try {
+        await render(h(DrivingOverlay, { hud: false }));
+        assert.ok(by("Steering wheel"));
+        assert.ok(by("Accelerate"));
+        assert.equal(by("Vehicle instruments"), null);
+        await pointer(by("Accelerate"), "pointerdown", 0, 0);
+        assert.equal(input.getState().input.throttle, 1);
+        await pointer(by("Accelerate"), "pointercancel", 0, 0);
+        assert.equal(input.getState().input.throttle, 0);
+        await act(async () => prefs.getState().update({ showTouchControls: false }));
+        assert.equal(by("Accelerate"), null);
+        await click("Pause menu");
+        assert.equal(ui.getState().overlay, "pause");
+      } finally {
+        if (original) Object.defineProperty(navigator, "userAgent", original);
+        else delete navigator.userAgent;
+        await render(null);
+        await act(async () => prefs.getState().update({ showTouchControls: true }));
+      }
+    });
     await t.test(
       "saved visibility and wheel bounds survive corrupt/older preference payloads",
       () => {
@@ -261,6 +289,7 @@ test("mobile HUD groups, assisted shifter and enlarged resource dials", async (t
     await t.test(
       "groups occupy separate HUD containers and hidden controls release only their source",
       async () => {
+        hudPanels.setState({ map: false });
         await act(async () =>
           prefs.getState().update({
             hudGroups: { ...DEFAULT_HUD_GROUPS },
@@ -379,6 +408,7 @@ test("mobile HUD groups, assisted shifter and enlarged resource dials", async (t
     await t.test(
       "HUD map size applies live, persists, and supports pointer and controller menu actions",
       async () => {
+        hudPanels.setState({ map: false });
         await act(async () => prefs.getState().update({ minimapScale: 0.75 }));
         await render(h(SettingsMenu));
         const hud = [...document.querySelectorAll('[role="tab"]')].find(

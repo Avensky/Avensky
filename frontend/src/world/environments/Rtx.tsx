@@ -1,5 +1,6 @@
 import React from 'react'
-import { Environment, Sky, useGLTF } from "@react-three/drei"
+import { Environment, Sky } from "@react-three/drei";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
 // import { Layers } from "three"
 // import { levelLayer } from "../../store/store"
 
@@ -10,7 +11,7 @@ export default function Rtx(props: GroupProps) {
     // const layers = new Layers()
     // layers.enable(levelLayer)
 
-    const { scene } = useGLTF('/models/city_rtx.glb')
+    const { scene } = useAssetGLTF('/models/city_rtx.glb')
 
     return (
         <group scale={2.5}>

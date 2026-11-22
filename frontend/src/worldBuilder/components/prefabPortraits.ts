@@ -1,3 +1,4 @@
+import { assetUrl } from "../../assets/runtimeAssets";
 import type { Piece } from "../document/layoutDocument.ts";
 import { kitAsset } from "../mapKit/catalog.ts";
 import { modelAsset } from "../models/modelCatalog.ts";
@@ -71,7 +72,7 @@ async function renderPortrait(source: PortraitSource): Promise<string> {
     target.outputColorSpace = three.SRGBColorSpace;
     target.toneMapping = three.ACESFilmicToneMapping;
     target.toneMappingExposure = 1.15;
-    const gltf = await loader.loadAsync(source.url);
+    const gltf = await loader.loadAsync(assetUrl(source.url));
     const original = source.node
       ? gltf.scene.getObjectByName(source.node)
       : gltf.scene;
