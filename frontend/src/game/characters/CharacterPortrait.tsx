@@ -113,16 +113,18 @@ function PortraitImage({ src, label }: { src: string; label?: string }) {
 }
 
 /** Garage portraits use the selected GLB appearance, with art for unavailable models. */
-export function CharacterPortrait({ choice, compact = false, label }: {
+export function CharacterPortrait({ choice, compact = false, label, welcomePreview }: {
   choice: CharacterChoice | null | undefined;
   compact?: boolean;
   label?: string;
+  welcomePreview?: "candidate" | "selected";
 }) {
   const { id, outfit, appearance, wardrobe } = choice ?? {};
   const look = useMemo(() => characterLook(id && outfit ? { id, outfit, appearance, wardrobe } : null), [id, outfit, appearance, wardrobe]);
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
-  const canRefresh = useUIStore(portraitMenuAllowsWork);
+  const canRefresh = useUIStore(state => portraitMenuAllowsWork(state)
+    || (welcomePreview === "selected" && state.screen === "welcome" && !state.isModeLoading));
   const dressId = look?.garments?.dress;
   const dress = url && dressId ? getWardrobeGarment(dressId) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
@@ -151,7 +153,7 @@ export function CharacterPortrait({ choice, compact = false, label }: {
     }),
     ...(look.appearance.hair_color !== "original" && { "--portrait-hair": look.hair }),
   } as CSSProperties;
-  const fallback = originalOnly
+  const fallback = originalOnly && !welcomePreview
     ? <span className="character-portrait character-portrait--unavailable" role={label ? "img" : undefined}
         aria-label={label} aria-hidden={label ? undefined : true} />
     : <svg className="character-portrait" style={palette ?? undefined} viewBox={compact ? "56 16 128 128" : "0 0 240 260"}
@@ -176,7 +178,7 @@ export function CharacterPortrait({ choice, compact = false, label }: {
         </g>}
       </> : <path fill="var(--app-muted, #889aa9)" opacity=".64" d="M120 42a28 28 0 1 0 0 56 28 28 0 0 0 0-56Zm-54 83c10-16 32-22 54-22s44 6 54 22l14 57H52Z" />}
     </svg>;
-  return needsBake && url
+  return needsBake && url && !welcomePreview
     ? <span className="character-portrait character-portrait--loading" role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} />
     : fallback;
 }

@@ -2,7 +2,7 @@
 
 The staging welcome screen runs before the main menu. Players can register a profile, log in with an account name and password, or enter a display name and play as a guest. The vehicle selector shows a female and male driver for each of the 17 vehicles. Confirming a driver saves the choice before opening the menu. Play and vehicle selection display the saved driver. Match vehicle and role rules still apply.
 
-The 34 named drivers share two existing rigs and use existing outfit IDs with their own color and trim. The catalog lives in [vehicle-drivers.json](../packages/wardrobe-catalog/vehicle-drivers.json). Mara Vega keeps the existing `mara-vega` rig ID. The separate driver ID stays stable when the wardrobe changes. The first release uses the base rigs and palettes so the menu can ship independently of new hair and wardrobe fits.
+The 34 named drivers share two existing rigs and use existing outfit IDs with their own color and trim. The catalog lives in [vehicle-drivers.json](../packages/wardrobe-catalog/vehicle-drivers.json). Mara Vega keeps the existing `mara-vega` rig ID. The separate driver ID stays stable when the wardrobe changes. The picker can generate a model portrait for the selected driver when the browser supports it. It uses lightweight art while the portrait is unavailable. The first release uses the base rigs and palettes so the menu can ship independently of new hair and wardrobe fits.
 
 ## How the save works
 

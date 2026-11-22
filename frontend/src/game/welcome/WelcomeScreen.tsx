@@ -155,7 +155,7 @@ export function WelcomeScreen() {
                   ? { ...saved, driver_id: driver.id } : base;
               return <button type="button" key={driver.id} className="welcome-character" aria-pressed={choice?.driver_id === driver.id}
                 disabled={busy} onClick={() => { setDraft(selection === saved ? undefined : selection); setError(""); }}>
-                <CharacterPortrait choice={selection} />
+                <CharacterPortrait choice={selection} welcomePreview={choice?.driver_id === driver.id ? "selected" : "candidate"} />
                 <strong>{driver.name}</strong>
                 <span>{driver.gender === "female" ? "Female" : "Male"}</span>
                 <span className="welcome-driver-palette" aria-hidden="true">
