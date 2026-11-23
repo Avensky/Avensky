@@ -31,7 +31,7 @@ import { isCompactPreview } from "./previewBudget";
 import { garageCamera, useGarageDrive } from "./garageDriveStore";
 import { GARAGE_STATIONS } from "./garageStations";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
-import { GaragePanelTarget, OPEN_DRIVER_DOOR, garagePanelForEmote } from "../characters/garageInteractions";
+import { GaragePanelTarget, garageDoorForEmote, garagePanelForEmote } from "../characters/garageInteractions";
 
 const DRIVER_STAGE_CAMERA: [number, number, number] = [2.8, 2.5, 5.8];
 const STANDARD_STAGE_CAMERA: [number, number, number] = [0, 3.2, 7.25];
@@ -181,7 +181,7 @@ export function VehiclePreview({
   const emotePose = vehicleFit && (insideCar || fittingToCar || vehicleFit.clearance) ? vehicleFit : parkedDriverFit;
   const activeDriver = wardrobeOpen ? driver : garageDriver;
   const driverPose = vehicleEmotes ? emotePose : garageDriverPose;
-  const panel = panelEmote === OPEN_DRIVER_DOOR ? "driver-door" : garagePanelForEmote(panelEmote);
+  const panel = garageDoorForEmote(panelEmote) ?? garagePanelForEmote(panelEmote);
   const panelPose = panel ? vehicleFit?.panels?.[panel] : undefined;
   const panelTarget = useMemo(() => panelPose ? { hinge: panelPose.hinge, clearance: vehicleFit?.clearance, actor: characterActor } : undefined,
     [panelPose, vehicleFit?.clearance]);

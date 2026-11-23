@@ -23,10 +23,12 @@ export function crossesBrzHull(start: Vector3, end: Vector3, hull: Box3) {
   return enter < leave - 1e-6;
 }
 
-export function brzWalkRoute(start: Vector3, goal: Vector3, hull: Box3): Vector3[] | undefined {
+export function brzWalkRoute(start: Vector3, goal: Vector3, ...hulls: Box3[]): Vector3[] | undefined {
   const nodes = [start, goal];
-  for (const x of [hull.min.x - .105, hull.max.x + .105]) {
-    for (const z of [hull.min.z - .105, hull.max.z + .105]) nodes.push(new Vector3(x, start.y, z));
+  for (const hull of hulls) {
+    for (const x of [hull.min.x - .105, hull.max.x + .105]) {
+      for (const z of [hull.min.z - .105, hull.max.z + .105]) nodes.push(new Vector3(x, start.y, z));
+    }
   }
   const distance = nodes.map(() => Infinity), previous = nodes.map(() => -1);
   const remaining = new Set(nodes.keys());
@@ -42,7 +44,7 @@ export function brzWalkRoute(start: Vector3, goal: Vector3, hull: Box3): Vector3
     remaining.delete(next);
     for (const other of remaining) {
       const cost = distance[next] + nodes[next].distanceTo(nodes[other]);
-      if (cost < distance[other] && !crossesBrzHull(nodes[next], nodes[other], hull)) {
+      if (cost < distance[other] && !hulls.some(hull => crossesBrzHull(nodes[next], nodes[other], hull))) {
         distance[other] = cost;
         previous[other] = next;
       }
@@ -50,7 +52,8 @@ export function brzWalkRoute(start: Vector3, goal: Vector3, hull: Box3): Vector3
   }
 }
 
-export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: BrzClearance, hinge: VehiclePartHinge) {
+export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: BrzClearance, hinge: VehiclePartHinge,
+  closingDoor = false, returnToPark?: () => void) {
   const left = driverArm(root, "l"), right = driverArm(root, "r");
   const parent = actor.parent, handle = hinge.handle;
   if (!left || !right || !parent || !handle) return undefined;
@@ -70,6 +73,20 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   goal[axis] = side < 0 ? safe.min[axis] - .02 : safe.max[axis] + .02;
   if (door) goal.z += freeEnd * .19;
   if (hinge.hoodProp) goal.x = hull.getCenter(new Vector3()).x;
+  const obstacles = [safe];
+  if (closingDoor && hinge.doorSweep) {
+    const sweep = hinge.doorSweep;
+    const pivot = hinge.pivot.position;
+    const up = new Vector3(0, 1, 0);
+    const wing = new Box3().setFromPoints([sweep.min.x, sweep.max.x].flatMap(x => [sweep.min.z, sweep.max.z].map(z =>
+      new Vector3(x, 0, z).applyAxisAngle(up, hinge.angle).add(pivot))));
+    obstacles.push(wing.expandByScalar(radius + .012));
+    const reach = Math.hypot(Math.max(Math.abs(sweep.min.x), Math.abs(sweep.max.x)),
+      Math.max(Math.abs(sweep.min.z), Math.abs(sweep.max.z)));
+    // Stand beyond the arc of the free end to push the open door from behind.
+    goal.copy(hand).sub(pivot).setY(0).normalize().applyAxisAngle(up, side * .26)
+      .multiplyScalar(reach + radius + .022).add(pivot).setY(start.y);
+  }
   // A parked character can start in the extra clearance margin. Move directly
   // out to the nearest edge before routing around the inflated footprint.
   if (start.x > safe.min.x && start.x < safe.max.x && start.z > safe.min.z && start.z < safe.max.z) {
@@ -77,14 +94,14 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
       start.clone().setZ(safe.min.z - .015), start.clone().setZ(safe.max.z + .015)];
     start.copy(exits.reduce((a, b) => a.distanceToSquared(origin) < b.distanceToSquared(origin) ? a : b));
   }
-  const path = brzWalkRoute(start, goal, safe);
+  const path = brzWalkRoute(start, goal, ...obstacles);
   if (!path) return undefined;
   if (start.distanceToSquared(origin) > 1e-6) path.unshift(origin);
   const rounded = path.flatMap((corner, i) => {
     if (i === 0 || i === path.length - 1) return [corner];
     const before = corner.clone().lerp(path[i-1], Math.min(.46, .22 / corner.distanceTo(path[i-1])));
     const after = corner.clone().lerp(path[i+1], Math.min(.46, .22 / corner.distanceTo(path[i+1])));
-    return crossesBrzHull(before, after, safe) ? [corner] : [before, after];
+    return obstacles.some(hull => crossesBrzHull(before, after, hull)) ? [corner] : [before, after];
   });
   const segments = rounded.slice(1).map((to, i) => ({ from: rounded[i], to, distance: rounded[i].distanceTo(to) })).filter(step => step.distance > 1e-4);
   const length = segments.reduce((total, step) => total + step.distance, 0);
@@ -123,6 +140,7 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   let moving = Boolean(gait);
 
   return {
+    part: hinge.part,
     duration: walkSeconds + settleSeconds,
     resumeAtDoor() {
       actor.position.copy(lastPosition);
@@ -147,7 +165,7 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
       if (moving) { gait?.stop(); moving = false; }
       point.copy(goal);
       // Leave room outside the actual swing of the glass, mirror and shell.
-      if (door && hinge.doorSweep) {
+      if (door && hinge.doorSweep && !closingDoor) {
         const plane = hinge.doorSweep;
         hinge.pivot.getWorldQuaternion(pivotRotation);
         car.getWorldQuaternion(carRotation).invert();
@@ -161,10 +179,17 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
       }
       const contact = car.worldToLocal(handle.getWorldPosition(new Vector3()));
       if (door) {
-        guide.subVectors(contact, point).setY(0).normalize().lerp(entryFacing, MathUtils.smoothstep(seconds - walkSeconds - settleSeconds, .99, 1.72));
+        guide.subVectors(contact, point).setY(0).normalize();
+        if (!closingDoor) guide.lerp(entryFacing, MathUtils.smoothstep(seconds - walkSeconds - settleSeconds, .99, 1.72));
       } else guide.copy(startFacing);
       face(point, look.copy(point).add(guide), blend);
     },
-    stop() { gait?.stop(); actor.position.copy(parked); actor.quaternion.copy(facing); actor.updateWorldMatrix(true, true); },
+    stop() {
+      gait?.stop();
+      actor.position.copy(parked);
+      actor.quaternion.copy(facing);
+      actor.updateWorldMatrix(true, true);
+      returnToPark?.();
+    },
   };
 }

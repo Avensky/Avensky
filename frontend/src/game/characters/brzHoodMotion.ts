@@ -6,11 +6,11 @@ export const INSPECT_BRZ_ENGINE = "inspect-engine";
 export const TWEAK_BRZ_ENGINE = "tweak-engine";
 export const BRZ_HOOD_SECONDS = 3.75;
 export const BRZ_INSPECT_SECONDS = 2.9;
-export const BRZ_TWEAK_SECONDS = 3.5;
+export const BRZ_TWEAK_SECONDS = 5.15;
 
 export function sampleBrzEngine(time: number, tweaking: boolean) {
-  const duration = tweaking ? BRZ_TWEAK_SECONDS : BRZ_INSPECT_SECONDS;
-  const ease = (start: number, end: number) => MathUtils.smoothstep(time, start, end);
+  const duration = tweaking ? 3.5 : BRZ_INSPECT_SECONDS;
+  const ease = (start: number, end: number) => MathUtils.smoothstep(time - (tweaking ? .85 : 0), start, end);
   const turn = tweaking ? ease(1.1, 1.55) - 1.65 * ease(1.60, 2.03) + .65 * ease(2.13, 2.48) : 0;
   const brace = ease(.22, .80) * (1 - ease(duration - .58, duration - .21));
   const reach = ease(.37, 1.05) * (1 - ease(duration - .56, duration - .22));
@@ -21,6 +21,8 @@ export function sampleBrzEngine(time: number, tweaking: boolean) {
     hover: .16 * (1 - ease(.72, 1.08) + ease(duration - .62, duration - .36)),
     turn: .35 * turn,
     curl: tweaking ? .46 * ease(.86, 1.17) * (1 - ease(2.42, 2.73)) : .12 * reach,
+    pickup: tweaking ? MathUtils.smoothstep(time, .10, .58) * (1 - MathUtils.smoothstep(time, 4.75, 5.10)) : 0,
+    carried: tweaking && time >= .58 && time < 4.75,
   };
 }
 

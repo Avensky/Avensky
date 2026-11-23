@@ -29,7 +29,8 @@ import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import { useGarageDrive } from "../preview/garageDriveStore";
-import { OPEN_DRIVER_DOOR, PANEL_INTERACTIONS, SIT_IN_CHAIR, garagePanelForEmote } from "./garageInteractions";
+import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_PASSENGER, OPEN_DRIVER_DOOR, OPEN_PASSENGER_DOOR,
+  PANEL_INTERACTIONS, SIT_IN_CHAIR, garageDoorForEmote, garagePanelForEmote } from "./garageInteractions";
 import { CLOSE_BRZ_HOOD, OPEN_BRZ_HOOD, TWEAK_BRZ_ENGINE } from "./brzHoodMotion";
 import { BRZ_GARAGE_ENABLED } from "../preview/brzCabin";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
@@ -89,7 +90,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const hasDriverDoor = useGarageDrive(state => state.hasDoor);
   const availableParts = useVehicleStudioStore(state => state.availableParts);
   const hoodOpen = useVehicleStudioStore(state => state.parts.hood);
+  const leftDoorOpen = useVehicleStudioStore(state => state.parts["door-left"]);
+  const rightDoorOpen = useVehicleStudioStore(state => state.parts["door-right"]);
   const brzDoorReady = useCharacterPreviewStore(state => state.brzDoorReady);
+  const brzDoorBusy = useCharacterPreviewStore(state => state.brzDoorBusy);
+  const passengerAvailable = useCharacterPreviewStore(state => state.brzPassengerAvailable);
+  const passengerSeated = useCharacterPreviewStore(state => state.insideCar && state.brzPassenger);
   const brzEngineAvailable = useCharacterPreviewStore(state => state.brzEngineAvailable);
   const brzHoodBusy = useCharacterPreviewStore(state => state.brzHoodBusy);
   const ownerKey = owner ?? "this-device";
@@ -389,7 +395,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const canEnterCar = !reducedMotion;
   const cockpitPending = insideCar && !cockpitAvailable;
   const station = cockpitVehicle ? GARAGE_STATIONS[cockpitVehicle] : null;
-  const stationName = station?.kind === "bridge" ? "bridge" : station?.kind === "levers" ? "driver station" : "cockpit";
+  const stagingBrz = BRZ_GARAGE_ENABLED && cockpitVehicle === "brz";
+  const stationName = passengerSeated ? "passenger seat" : station?.kind === "bridge" ? "bridge" : station?.kind === "levers" ? "driver station" : "cockpit";
   const selectEmote = useCallback((item: PreviewEmote) => {
     playEmote(item);
     emoteFocus.current = ".character-emote-back";
@@ -398,7 +405,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   function toggleCockpit() {
     setEmoteDetail(undefined);
     setEmoteSearch("");
-    useCharacterPreviewStore.setState({ insideCar: !insideCar, emote: null, cockpitError: null, camera: "Full body", zoom: 1 });
+    useCharacterPreviewStore.setState({ insideCar: !insideCar, brzPassenger: false, emote: null, cockpitError: null, camera: "Full body", zoom: 1 });
   }
   function chooseEmoteGroup(group: typeof emoteGroup) {
     selectedPreview.current = null;
@@ -428,8 +435,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   function previewInteraction(id: string) {
     useFittingTurnStore.setState({ characterYaw: 0 });
     useCharacterPreviewStore.setState(state => ({
-      emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, cockpitError: null, brzDoorReady: false,
-      camera: id === OPEN_DRIVER_DOOR || garagePanelForEmote(id) ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
+      emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, brzPassenger: false, cockpitError: null, brzDoorReady: false,
+      camera: garageDoorForEmote(id) || garagePanelForEmote(id) ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
     }));
   }
   function emoteCategory(group: NonNullable<typeof emoteGroup>, label: string = group) {
@@ -492,13 +499,25 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       onClick={() => playEmote(emoteDetail)}>Replay emote</button>
     <FitReview choice={previewChoice} pose={emoteDetail.id} poseLabel={emoteDetail.name}
       subject={{ id: emoteDetail.id, label: emoteDetail.name, kind: "emote" }} />
-  </> : !insideCar && emoteGroup === "Creator" ? <EmoteCreator disabled={reducedMotion} owner={ownerKey} saved={createdEmotes} onSave={setCreatedEmotes} />
+  </> : passengerSeated ? <h2>Passenger seat</h2>
+    : !insideCar && emoteGroup === "Creator" ? <EmoteCreator disabled={reducedMotion} owner={ownerKey} saved={createdEmotes} onSave={setCreatedEmotes} />
     : !insideCar && emoteGroup === "Interactions" ? <div className="character-emote-results">
       <h2>Interactions</h2>
-      <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable}
-        onClick={() => previewInteraction(OPEN_DRIVER_DOOR)}>Open driver door</button>
-      {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && brzDoorReady && <button type="button" className="menu-control"
+      <button type="button" className="menu-control" data-controller-row
+        disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable || (stagingBrz && brzDoorBusy)}
+        onClick={() => previewInteraction(stagingBrz && leftDoorOpen ? CLOSE_DRIVER_DOOR : OPEN_DRIVER_DOOR)}>
+        {stagingBrz && leftDoorOpen ? "Close driver door" : "Open driver door"}
+      </button>
+      {stagingBrz && brzDoorReady && <button type="button" className="menu-control"
         data-controller-row disabled={!canEnterCar} onClick={toggleCockpit}>Get into the BRZ</button>}
+      {stagingBrz && passengerAvailable && <>
+        <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || brzDoorBusy}
+          onClick={() => previewInteraction(rightDoorOpen ? CLOSE_PASSENGER_DOOR : OPEN_PASSENGER_DOOR)}>
+          {rightDoorOpen ? "Close passenger door" : "Open passenger door"}
+        </button>
+        <button type="button" className="menu-control" data-controller-row disabled={!canEnterCar || brzDoorBusy}
+          onClick={() => previewInteraction(ENTER_PASSENGER)}>Get into passenger seat</button>
+      </>}
       {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
       {PANEL_INTERACTIONS.map(action => <button key={action.id} type="button" className="menu-control" data-controller-row
         disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)
@@ -540,7 +559,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     }>Stop</button>
   </div>;
   const fitting = tab === "appearance";
-  const rotationDisabled = insideCar || emote?.id === OPEN_DRIVER_DOOR || isMirrorMakeupEmote(emote?.id);
+  const rotationDisabled = insideCar || Boolean(garageDoorForEmote(emote?.id)) || isMirrorMakeupEmote(emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
   const cameraViews = vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
   const changeCamera = (view: typeof camera) => useCharacterPreviewStore.setState({ camera: view, zoom: 1 });
