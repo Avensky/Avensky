@@ -56,7 +56,7 @@ export function QueueScreen() {
       className="game-ui menu-surface alpha-queue"
       data-controller-form
     >
-      <MenuFlareBackground />
+      <MenuFlareBackground animated />
       <section className="alpha-queue-card" aria-label="Alpha waiting line">
         <small>AVENSKY · LIMITED ALPHA</small>
         <header className="menu-title-with-logo">

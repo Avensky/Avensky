@@ -1,6 +1,6 @@
 # Player accounts and onboarding
 
-The staging welcome screen offers Log in, Register, and Continue as guest. Pick a saved character or create one with a body, a starter style and attitude, and a character name. Registered accounts have four slots. Guests have one and can register the same profile to add slots. Choose a vehicle later in Play or Open World. The selected character stays with the player through vehicle changes. Match vehicle and role rules still apply.
+On the staging welcome screen, new players pick a gender and personality and name their character before registering or playing as a guest. Returning players log in or resume their device profile and select a saved character. Registered accounts have four slots. Guests have one and can register the same profile to add slots. Choose a vehicle later in Play or Open World. The selected character stays with the player through vehicle changes. Match vehicle and role rules still apply.
 
 Street, Workshop, and Night Shift use the existing female and male rigs and approved wardrobe IDs. Styles set the starting outfit palette and emote personality. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) is shared by the browser preview and server. Previously equipped roster looks remain available under **Keep current look** when creating the first character. Players can return to the character picker from the main menu after leaving any active world or queue.
 
@@ -26,7 +26,7 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 
 ## Branding and startup
 
-The triangular Avensky emblem is available as `/images/logo.svg`, `/images/logo.png`, and `/favicon.ico`. The welcome screen uses a compressed render of the same mark. The welcome, queue, and loading screens share the lightweight purple sunflare still.
+The welcome screen shows the transparent triangular A at `/images/logo.svg`. The emblem is also available as `/images/logo.png` and `/favicon.ico`. Welcome, main menu, queue, and loading share a muted 47 kB purple sunflare loop. Players who prefer reduced motion see the 10.5 kB still.
 
 ## Wardrobe follow-up
 

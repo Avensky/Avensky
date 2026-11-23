@@ -10,7 +10,28 @@ import { navigateFormRows } from "../social/formRows";
 import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import "./welcomeScreen.css";
 
-type Entry = "login" | "register" | "guest";
+type Step = "welcome" | "create" | "save" | "register" | "login" | "characters";
+type Draft = { name: string; body: CharacterBody; style: string };
+
+async function waitForProfile(owner: string) {
+  if (useSocialStore.getState().view?.profile.id === owner) return;
+  await new Promise<void>((resolve, reject) => {
+    const unsubscribe = useSocialStore.subscribe(state => {
+      if (state.view?.profile.id === owner) {
+        close();
+        resolve();
+      } else if (!state.available) {
+        close();
+        reject(new Error("Your game connection closed. Try again after reconnecting."));
+      }
+    });
+    const timer = window.setTimeout(() => {
+      close();
+      reject(new Error("Your profile is still loading. Try again."));
+    }, 4000);
+    function close() { clearTimeout(timer); unsubscribe(); }
+  });
+}
 
 export function WelcomeScreen() {
   const connected = useSocialStore(state => state.available);
@@ -19,10 +40,11 @@ export function WelcomeScreen() {
   const restoreError = useSocialStore(state => state.profileStatus === "error" ? state.message : "");
   const profile = useSocialStore(state => state.view?.profile);
   const registered = useSocialStore(state => state.registeredProfile);
-  const [entry, setEntry] = useState<Entry>();
+  const [step, setStep] = useState<Step>("welcome");
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
-  const [creating, setCreating] = useState(false);
+  const [newPlayer, setNewPlayer] = useState(false);
   const [selected, setSelected] = useState<string>();
+  const [name, setName] = useState("");
   const [body, setBody] = useState<CharacterBody>("female");
   const [style, setStyle] = useState<string>();
   const [error, setError] = useState("");
@@ -30,36 +52,34 @@ export function WelcomeScreen() {
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const choosingCharacter = confirmedProfile !== undefined;
-  const player = choosingCharacter && profile?.id === confirmedProfile ? profile : undefined;
+  const player = profile && profile.id === confirmedProfile ? profile : undefined;
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const showCreate = slots !== undefined && (creating || !slots.length);
+  const screen = step === "characters" && slots?.length === 0 ? "create" : step;
   const active = selected ?? player?.active_character_id;
-  const original = showCreate && !slots.length && characterLook(saved) ? saved : undefined;
+  const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
   const selectedStyle = style ?? (original ? "original" : undefined);
+  const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
 
   function back() {
     if (pending.current || restoring) return;
-    if (creating && slots?.length) {
-      setCreating(false);
-      setStyle(undefined);
-      setError("");
-      return;
-    }
+    setError("");
+    if (step === "register" && newPlayer) { setStep("save"); return; }
+    if (step === "save") { setStep("create"); return; }
+    if (screen === "create" && slots?.length) { setStep("characters"); return; }
     setConfirmedProfile(undefined);
-    setEntry(undefined);
-    setCreating(false);
+    setStep("welcome");
+    setNewPlayer(false);
     setSelected(undefined);
     setBody("female");
     setStyle(undefined);
-    setError("");
+    setName("");
   }
 
   useEffect(() => {
-    root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
-  }, [entry, choosingCharacter, showCreate, connected]);
+    if (!busy) root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
+  }, [screen, busy, connected]);
 
   useEffect(() => {
     function navigate(event: Event) {
@@ -91,39 +111,46 @@ export function WelcomeScreen() {
 
   function authenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!entry || !connected || !accounts) return;
+    if ((step !== "login" && step !== "register") || !connected || !accounts) return;
     const form = new FormData(event.currentTarget);
     const login = String(form.get("login") ?? "");
-    const name = entry === "register" ? login.trim() : String(form.get("name") ?? "").trim();
     const password = String(form.get("password") ?? "");
-    if (entry !== "login" && !name) { setError("Enter a display name."); return; }
     void run(async () => {
-      const id = entry === "guest"
-        ? await selectGuestProfile(name)
-        : await selectAccount({ login, password }, entry === "register" ? name : undefined);
-      setConfirmedProfile(id);
-      setEntry(undefined);
+      const owner = await selectAccount({ login, password }, step === "register" ? login.trim() : undefined);
+      if (step === "register" && newPlayer && draft) {
+        await finishDraft(owner, draft);
+      } else {
+        setConfirmedProfile(owner);
+        setStep("characters");
+      }
     });
   }
 
-  function enter(action: "character_create" | "character_select", fields: Record<string, string>) {
-    if (!player || !connected || !accounts) return;
-    const owner = player.id;
-    void run(async () => {
-      if (useSocialStore.getState().view?.profile.id !== owner) throw new Error("Your profile is reconnecting. Try again.");
-      const confirmed = await requestSocial(action, fields);
-      const profile = confirmed.profile as PlayerProfile | undefined;
-      if (profile?.id !== owner || !profile.active_character_id ||
-          !Array.isArray(profile.characters) || !profile.characters.some(slot => slot.id === profile.active_character_id) ||
-          !characterLook(profile.progression?.character)) throw new Error("The server did not confirm your character.");
-      if (useSocialStore.getState().view?.profile.id !== owner) throw new Error("Your profile is reconnecting. Try again.");
-      useSocialStore.getState().acknowledgeCharacter(profile);
-      useUIStore.getState().setScreen("main");
-    });
+  async function enter(owner: string, action: "character_create" | "character_select", fields: Draft | { character_id: string }) {
+    await waitForProfile(owner);
+    const confirmed = await requestSocial(action, fields);
+    const savedProfile = confirmed.profile as PlayerProfile | undefined;
+    if (savedProfile?.id !== owner || !savedProfile.active_character_id ||
+        !Array.isArray(savedProfile.characters) || !savedProfile.characters.some(slot => slot.id === savedProfile.active_character_id) ||
+        !characterLook(savedProfile.progression?.character)) throw new Error("The server did not confirm your character.");
+    if (useSocialStore.getState().view?.profile.id !== owner) throw new Error("Your profile is reconnecting. Try again.");
+    useSocialStore.getState().acknowledgeCharacter(savedProfile);
+    useUIStore.getState().setScreen("main");
   }
 
-  const label = choosingCharacter ? showCreate ? "Create your character" : "Choose your character" : entry === "login" ? "Log in"
-    : entry === "register" ? "Register" : entry === "guest" ? "Continue as guest" : "Welcome to Avensky";
+  function finishDraft(owner: string, newCharacter: Draft) {
+    // If the name is taken, return to the draft with this authenticated account.
+    setConfirmedProfile(owner);
+    setNewPlayer(false);
+    setStep("create");
+    return enter(owner, "character_create", newCharacter);
+  }
+
+  const labels: Record<Step, string> = {
+    welcome: "Welcome to Avensky", create: "Create your character", save: "Save your character",
+    register: "Create an account", login: "Log in", characters: "Choose your character",
+  };
+  const label = labels[screen];
 
   return (
     <main className="welcome-screen" ref={root} data-controller-rows onKeyDown={event => {
@@ -133,30 +160,30 @@ export function WelcomeScreen() {
         navigateFormRows(root.current!, event.target as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
-      <MenuFlareBackground />
+      <MenuFlareBackground animated />
       <div className="welcome-art" aria-hidden="true">
-        <img src="/images/avensky-welcome.webp" width={1280} height={853} alt="" fetchPriority="high" />
+        <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
       </div>
       <section className="welcome-panel" aria-label={label}>
         <h1>{label}</h1>
-        {choosingCharacter ? <>
-          {player && !slots && <p role="status" className="welcome-help">Character selection needs the updated game server.</p>}
-          {showCreate ? <form key="new-character" onSubmit={event => {
+        {screen === "create" ? <form key="new-character" onSubmit={event => {
             event.preventDefault();
-            const name = String(new FormData(event.currentTarget).get("characterName") ?? "").trim();
-            if (selectedStyle) enter("character_create", { name, body, style: selectedStyle });
+            if (!draft || !connected || !accounts) return;
+            if (player) void run(() => enter(player.id, "character_create", draft));
+            else if (newPlayer) setStep("save");
           }}>
             <label data-controller-row>Character name
-              <input name="characterName" autoComplete="nickname" minLength={2} maxLength={24} disabled={busy} required />
+              <input name="characterName" autoComplete="nickname" minLength={2} maxLength={24} disabled={busy} required
+                value={name} onChange={event => { setName(event.target.value); setError(""); }} />
             </label>
-            <div className="welcome-actions" role="group" aria-label="Body" data-controller-row>
+            <div className="welcome-actions" role="group" aria-label="Gender" data-controller-row>
               {(["female", "male"] as const).map(option => <button type="button" key={option} disabled={busy}
                 aria-pressed={selectedStyle !== "original" && body === option} onClick={() => {
                   setBody(option);
                   if (selectedStyle === "original") setStyle(CHARACTER_STYLES[0].id);
                 }}>{option === "female" ? "Female" : "Male"}</button>)}
             </div>
-            <div className="welcome-characters" role="group" aria-label="Styles and attitudes" data-controller-row>
+            <div className="welcome-characters" role="group" aria-label="Personality" data-controller-row>
               {original && <button type="button" className="welcome-character" aria-pressed={selectedStyle === "original"}
                 disabled={busy} onClick={() => setStyle("original")}><CharacterPortrait choice={original} compact /><strong>Keep current look</strong></button>}
               {CHARACTER_STYLES.map(item => {
@@ -164,15 +191,18 @@ export function WelcomeScreen() {
                 return <button type="button" key={item.id} className="welcome-character" aria-pressed={selectedStyle === item.id}
                   disabled={busy} onClick={() => { setStyle(item.id); setError(""); }}>
                   <CharacterPortrait choice={choice} compact />
-                  <strong>{item.name}</strong><span>{attitudeName(item.attitude)}</span>
+                  <strong>{attitudeName(item.attitude)}</strong><span>{item.name}</span>
                 </button>;
               })}
             </div>
             <div className="welcome-actions" data-controller-row>
               <button type="button" onClick={back} disabled={busy}>Back</button>
-              <button type="submit" className="welcome-primary" disabled={!selectedStyle || busy || !connected}>Create character</button>
+              <button type="submit" className="welcome-primary" disabled={!draft || busy || !connected || (!player && !newPlayer)}>
+                {player ? "Create character" : "Continue"}
+              </button>
             </div>
-          </form> : <>
+          </form> : screen === "characters" ? <>
+            {player && !slots && <p role="status" className="welcome-help">Character selection needs the updated game server.</p>}
             {slots && <div className="welcome-characters" role="group" aria-label="Saved characters" data-controller-row>
               {slots.map(slot => <button type="button" key={slot.id} className="welcome-character" disabled={busy}
                 aria-pressed={active === slot.id} onClick={() => { setSelected(slot.id); setError(""); }}>
@@ -183,46 +213,53 @@ export function WelcomeScreen() {
             <div className="welcome-actions" data-controller-row>
               <button type="button" onClick={back} disabled={busy}>Back</button>
               {registered && slots && slots.length < 4 &&
-                <button type="button" onClick={() => { setCreating(true); setStyle(undefined); setError(""); }} disabled={busy}>New character</button>}
+                <button type="button" onClick={() => { setStep("create"); setName(""); setStyle(undefined); setError(""); }} disabled={busy}>New character</button>}
               <button type="button" className="welcome-primary" disabled={!active || !slots || busy || !connected}
-                onClick={() => { if (active) enter("character_select", { character_id: active }); }}>Enter main menu</button>
+                onClick={() => {
+                  if (player && active) void run(() => enter(player.id, "character_select", { character_id: active }));
+                }}>Enter main menu</button>
             </div>
-          </>}
-        </> : entry ? (
-          <form key={entry} method="post" onSubmit={authenticate}>
-            {entry === "guest" && <label data-controller-row>Guest name
-              <input name="name" autoComplete="nickname" maxLength={24} required />
-            </label>}
-            {entry !== "guest" && <>
+          </> : screen === "save" ? <>
+            <p className="welcome-help">Create an account to keep {draft?.name} across devices.</p>
+            <div className="welcome-entry-options" data-controller-row>
+              <button type="button" className="welcome-primary" disabled={busy || !connected}
+                onClick={() => { setError(""); setStep("register"); }}>Create an account</button>
+              <button type="button" disabled={!draft || busy || !connected} onClick={() => {
+                if (draft) void run(async () => finishDraft(await selectGuestProfile("Guest"), draft));
+              }}>Play as guest</button>
+              <button type="button" disabled={busy} onClick={back}>Back</button>
+            </div>
+        </> : screen === "login" || screen === "register" ? (
+          <form key={screen} method="post" onSubmit={authenticate}>
               <label data-controller-row>Account name
                 <input name="login" autoComplete="username" autoCapitalize="none" spellCheck={false}
                   minLength={3} maxLength={24} pattern={"[A-Za-z0-9_\\-]{3,24}"} required />
               </label>
               <label data-controller-row>Password
-                <input name="password" type="password" autoComplete={entry === "register" ? "new-password" : "current-password"}
-                  minLength={entry === "register" ? 15 : undefined} maxLength={256} required />
+                <input name="password" type="password" autoComplete={screen === "register" ? "new-password" : "current-password"}
+                  minLength={screen === "register" ? 15 : undefined} maxLength={256} required />
               </label>
-              {entry === "register" && <p className="welcome-help">Use at least 15 characters. Save your password for signing in on another device.</p>}
-            </>}
+              {screen === "register" && <p className="welcome-help">Use at least 15 characters.</p>}
             <div className="welcome-actions" data-controller-row>
               <button type="button" onClick={back} disabled={busy}>Back</button>
-              <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{entry === "guest" ? "Choose character" : label}</button>
+              <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{label}</button>
             </div>
           </form>
         ) : <>
-          {profile && <div data-controller-row><button type="button" className="welcome-primary" disabled={busy || !accounts}
-            onClick={() => { setError(""); setConfirmedProfile(profile.id); }}>Continue as {profile.name}</button></div>}
           <div className="welcome-entry-options" data-controller-row>
-            <button type="button" disabled={busy || !accounts} onClick={() => { setError(""); setEntry("login"); }}>Log in</button>
-            <button type="button" disabled={busy || !accounts || registered} onClick={() => { setError(""); setEntry("register"); }}>
-              {profile && !registered ? "Register this profile" : "Register"}
-            </button>
-            <button type="button" disabled={busy || !accounts} onClick={() => { setError(""); setEntry("guest"); }}>Continue as guest</button>
+            {profile ? <button type="button" className="welcome-primary" disabled={busy || !accounts} onClick={() => {
+              setError(""); setConfirmedProfile(profile.id); setStep("characters");
+            }}>Continue as {profile.name}</button> :
+              <button type="button" className="welcome-primary" disabled={busy || !accounts} onClick={() => {
+                setError(""); setNewPlayer(true); setStep("create");
+              }}>Create a character</button>}
+            <button type="button" disabled={busy || !accounts} onClick={() => { setError(""); setStep("login"); }}>Log in</button>
+            {profile && !registered && <button type="button" disabled={busy || !accounts}
+              onClick={() => { setError(""); setStep("register"); }}>Register this profile</button>}
           </div>
-          {accounts && !profile && <p className="welcome-help">Create an account to keep your character and outfits across devices.</p>}
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
-        {(busy || !connected || (choosingCharacter && !player)) && <p role="status" className="welcome-help">
+        {(busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
           {working ? "Saving…" : restoring ? "Restoring your profile…" : "Connecting to the game server…"}
         </p>}
         {(error || restoreError) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
