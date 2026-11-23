@@ -1,4 +1,4 @@
-import { MathUtils, Mesh, Quaternion, Vector3, type Group } from "three";
+import { Group, MathUtils, Mesh, Quaternion, Vector3, type Object3D } from "three";
 import { splitVehicleAssembly } from "./splitGarageSteering";
 
 // Fingerprints and triangle ranges from the streamed BRZ export. Splits remain
@@ -14,6 +14,13 @@ const PARKING_BRAKE = { sourceName: "Mesh117_black1_0", material: "black1", coun
 const SHIFT_KNOB = { sourceName: "Mesh117_black1_0", material: "black1", count: 10719, vertex: 56,
   point: [-.002882, .586392, -.284395], ranges: [[30, 62], [85, 91], [109, 113], [170, 174], [201, 251], [772, 1116],
     [1732, 1760], [1784, 1814], [2093, 2149], [2469, 2527]] } as const;
+
+export type BrzHoodProp = {
+  grip: Object3D;
+  tip: Object3D;
+  fit(frame: Object3D): Object3D;
+  place(amount: number): void;
+};
 
 export function prepareBrzHardware(root: Group) {
   const assemblies: NonNullable<ReturnType<typeof splitVehicleAssembly>>[] = [];
@@ -32,10 +39,39 @@ export function prepareBrzHardware(root: Group) {
   root.updateWorldMatrix(true, true);
   const rodSource = root.getObjectByName(SUPPORT.sourceName);
   const rod = split(SUPPORT, "brz-hood-prop-rod", [.239, .637, -1.935]);
-  const parked = rod && rodSource instanceof Mesh ? localPoint(rodSource, [-.490, .650, -1.808]).sub(rod.position).normalize() : undefined;
-  const upright = rod && rodSource instanceof Mesh ? localPoint(rodSource, [-.184, 1.151, -1.599]).sub(rod.position).normalize() : undefined;
-  const propRotation = parked && upright ? new Quaternion().setFromUnitVectors(parked, upright) : new Quaternion();
-  const rest = new Quaternion();
+  const prop: BrzHoodProp | undefined = rod && rodSource instanceof Mesh ? (() => {
+    const end = localPoint(rodSource, [-.490, .650, -1.808]).sub(rod.position);
+    const grip = new Group(), tip = new Group();
+    grip.position.copy(end).multiplyScalar(.92);
+    tip.position.copy(end);
+    grip.name = "brz-prop-grip";
+    tip.name = "brz-prop-tip";
+    rod.add(grip, tip);
+    const upright = new Vector3(0, 1, 0), parked = end.normalize(), target = new Vector3();
+    const raised = new Quaternion().setFromUnitVectors(parked, upright), rest = new Quaternion(), inserted = new Quaternion();
+    let socket: Object3D | undefined;
+    return {
+      grip, tip,
+      fit(frame) {
+        socket = new Group();
+        socket.name = "brz-hood-prop-socket";
+        // Underside vertex on HOOD_FRAME. At 39 degrees the original rod
+        // spans this point to within 2 mm without changing its length.
+        socket.position.set(.309387, .633555, -1.968785);
+        frame.add(socket);
+        return socket;
+      },
+      place(amount) {
+        if (amount <= .76 || !socket) {
+          rod.quaternion.slerpQuaternions(rest, raised, MathUtils.clamp(amount / .76, 0, 1));
+          return;
+        }
+        target.copy(root.worldToLocal(socket.getWorldPosition(target))).sub(rod.position).normalize();
+        inserted.setFromUnitVectors(parked, target);
+        rod.quaternion.slerpQuaternions(raised, inserted, (amount - .76) / .24);
+      },
+    };
+  })() : undefined;
   const wiperSource = root.getObjectByName(WIPER_LEFT.sourceName);
   const axis = wiperSource instanceof Mesh
     ? localPoint(wiperSource, [0, .73, -.68]).sub(localPoint(wiperSource, [0, 0, 0])).normalize()
@@ -46,7 +82,7 @@ export function prepareBrzHardware(root: Group) {
   split(SHIFT_KNOB, "brz-shift-knob", [-.002, .54, -.255]);
   return {
     objects: assemblies.map(item => item.root),
-    prop: rod ? (opening: number) => rod.quaternion.slerpQuaternions(rest, propRotation, MathUtils.smoothstep(opening, .82, 1)) : undefined,
+    prop,
     wipers: left && right ? (amount: number) => {
       left.quaternion.setFromAxisAngle(axis, -amount * 1.01);
       right.quaternion.setFromAxisAngle(axis, -amount * .86);

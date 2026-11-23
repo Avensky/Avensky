@@ -1,6 +1,7 @@
 import { Box3, MathUtils, Quaternion, Vector3, type Group, type Object3D } from "three";
 import { driverArm } from "../characters/garageEmotes";
 import type { VehiclePartHinge } from "./vehiclePartRig";
+import { prepareBrzGait } from "./brzGait";
 
 export type BrzClearance = { car: Group; hull: Box3 };
 
@@ -24,8 +25,8 @@ export function crossesBrzHull(start: Vector3, end: Vector3, hull: Box3) {
 
 export function brzWalkRoute(start: Vector3, goal: Vector3, hull: Box3): Vector3[] | undefined {
   const nodes = [start, goal];
-  for (const x of [hull.min.x - .015, hull.max.x + .015]) {
-    for (const z of [hull.min.z - .015, hull.max.z + .015]) nodes.push(new Vector3(x, start.y, z));
+  for (const x of [hull.min.x - .105, hull.max.x + .105]) {
+    for (const z of [hull.min.z - .105, hull.max.z + .105]) nodes.push(new Vector3(x, start.y, z));
   }
   const distance = nodes.map(() => Infinity), previous = nodes.map(() => -1);
   const remaining = new Set(nodes.keys());
@@ -64,8 +65,11 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   const goal = hand.clone().setY(start.y);
   const side = Math.sign(door ? hand.x : hand.z - hull.getCenter(new Vector3()).z) || 1;
   const axis = door ? "x" : "z";
+  const freeEnd = door && hinge.doorSweep
+    ? Math.sign(hand.z - hinge.pivot.position.z) || -1 : 0;
   goal[axis] = side < 0 ? safe.min[axis] - .02 : safe.max[axis] + .02;
-  if (door) goal.z += .17;
+  if (door) goal.z += freeEnd * .19;
+  if (hinge.hoodProp) goal.x = hull.getCenter(new Vector3()).x;
   // A parked character can start in the extra clearance margin. Move directly
   // out to the nearest edge before routing around the inflated footprint.
   if (start.x > safe.min.x && start.x < safe.max.x && start.z > safe.min.z && start.z < safe.max.z) {
@@ -76,11 +80,22 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   const path = brzWalkRoute(start, goal, safe);
   if (!path) return undefined;
   if (start.distanceToSquared(origin) > 1e-6) path.unshift(origin);
-  const segments = path.slice(1).map((to, i) => ({ from: path[i], to, distance: path[i].distanceTo(to) })).filter(step => step.distance > 1e-4);
-  const speed = 1.12;
-  const walkSeconds = segments.reduce((time, step) => time + step.distance / speed, 0);
-  const settleSeconds = .32;
+  const rounded = path.flatMap((corner, i) => {
+    if (i === 0 || i === path.length - 1) return [corner];
+    const before = corner.clone().lerp(path[i-1], Math.min(.46, .22 / corner.distanceTo(path[i-1])));
+    const after = corner.clone().lerp(path[i+1], Math.min(.46, .22 / corner.distanceTo(path[i+1])));
+    return crossesBrzHull(before, after, safe) ? [corner] : [before, after];
+  });
+  const segments = rounded.slice(1).map((to, i) => ({ from: rounded[i], to, distance: rounded[i].distanceTo(to) })).filter(step => step.distance > 1e-4);
+  const length = segments.reduce((total, step) => total + step.distance, 0);
+  const walkSeconds = length > .04 ? length / 1.18 + .48 : 0;
+  const settleSeconds = .26;
   const point = new Vector3(), forward = new Vector3(), up = new Vector3(0, 1, 0), pivotRotation = new Quaternion();
+  const startFacing = door ? new Vector3(-side, 0, 0) : new Vector3(0, 0, -side);
+  // Align the driver's right side with a left-hand opening, mirrored for a
+  // right-hand door. Stay behind the free end of the swinging panel.
+  const entryFacing = door ? new Vector3(-side * .56, 0, -freeEnd * .83).normalize() : startFacing;
+  const look = new Vector3(), guide = new Vector3();
   const actorYaw = new Quaternion(), carRotation = new Quaternion(), parentRotation = new Quaternion();
   const face = (position: Vector3, look: Vector3, blend: number) => {
     actor.position.copy(parent.worldToLocal(car.localToWorld(position.clone())));
@@ -91,6 +106,18 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
     actor.quaternion.slerp(parentRotation.multiply(carRotation).multiply(actorYaw), blend);
     actor.updateWorldMatrix(true, true);
   };
+  function samplePath(distance: number, position: Vector3, direction: Vector3) {
+    for (const step of segments) {
+      if (distance >= step.distance) { distance -= step.distance; continue; }
+      position.lerpVectors(step.from, step.to, distance / step.distance);
+      direction.subVectors(step.to, step.from).setY(0).normalize();
+      return;
+    }
+    position.copy(goal);
+    direction.copy(startFacing);
+  }
+  const gait = prepareBrzGait(root, car, length, samplePath, startFacing);
+  let moving = Boolean(gait);
 
   return {
     duration: walkSeconds + settleSeconds,
@@ -98,15 +125,18 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
       car.getWorldQuaternion(carRotation);
       return target.set(0, 0, 0).setComponent(door ? 0 : 2, side).applyQuaternion(carRotation);
     },
-    walking(seconds: number) { return seconds < walkSeconds; },
     sample(seconds: number, delta: number) {
-      let distance = Math.min(seconds, walkSeconds) * speed;
-      const blend = 1 - Math.exp(-14 * delta);
-      for (const step of segments) {
-        if (distance >= step.distance) { distance -= step.distance; continue; }
-        face(point.lerpVectors(step.from, step.to, distance / step.distance), step.to, blend);
+      const blend = 1 - Math.exp(-9 * delta);
+      if (seconds < walkSeconds) {
+        const distance = length * MathUtils.smootherstep(seconds, 0, walkSeconds);
+        samplePath(distance, point, guide);
+        samplePath(Math.min(length, distance + .28), look, forward);
+        if (look.distanceToSquared(point) < .0001) look.copy(point).add(guide);
+        face(point, look, blend);
+        gait?.sample(distance);
         return;
       }
+      if (moving) { gait?.stop(); moving = false; }
       point.copy(goal);
       // Leave room outside the actual swing of the glass, mirror and shell.
       if (door && hinge.doorSweep) {
@@ -114,15 +144,19 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
         hinge.pivot.getWorldQuaternion(pivotRotation);
         car.getWorldQuaternion(carRotation).invert();
         pivotRotation.premultiply(carRotation);
-        const xEdge = plane[side < 0 ? "min" : "max"].x;
         const wing = [plane.min.x, plane.max.x].flatMap(x => [plane.min.z, plane.max.z].map(z =>
-          new Vector3(x, 0, z).applyQuaternion(pivotRotation).add(hinge.pivot.position).x));
-        const limit = (side < 0 ? Math.min(...wing, xEdge + hinge.pivot.position.x) : Math.max(...wing, xEdge + hinge.pivot.position.x)) + side * (radius + .04);
-        point.x = side < 0 ? Math.min(point.x, limit) : Math.max(point.x, limit);
+          new Vector3(x, 0, z).applyQuaternion(pivotRotation).add(hinge.pivot.position)));
+        const limit = Math.max(...wing.map(corner => corner.x * side)) + radius + .04;
+        const rear = Math.max(...wing.map(corner => corner.z * freeEnd)) + radius + .05;
+        const inside = MathUtils.smoothstep(goal.z * freeEnd - rear, 0, .16);
+        point.x = MathUtils.lerp(side * Math.max(goal.x * side, limit), goal.x, inside);
       }
       const contact = car.worldToLocal(handle.getWorldPosition(new Vector3()));
-      face(point, contact, seconds > walkSeconds + settleSeconds ? 1 : MathUtils.clamp(blend, 0, 1));
+      if (door) {
+        guide.subVectors(contact, point).setY(0).normalize().lerp(entryFacing, MathUtils.smoothstep(seconds - walkSeconds - settleSeconds, .99, 1.72));
+      } else guide.copy(startFacing);
+      face(point, look.copy(point).add(guide), blend);
     },
-    stop() { actor.position.copy(parked); actor.quaternion.copy(facing); actor.updateWorldMatrix(true, true); },
+    stop() { gait?.stop(); actor.position.copy(parked); actor.quaternion.copy(facing); actor.updateWorldMatrix(true, true); },
   };
 }
