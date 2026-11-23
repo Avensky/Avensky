@@ -54,7 +54,7 @@ GitHub Actions can build staging after merges to main and publish it after check
 | Fleet LOD queue | Duplicate and simultaneous model requests. The fleet loader coalesces requests, permits two active loads and uses already available models or compact seed geometry while a tier loads. | Requests in flight and time to visible vehicles |
 | Prebuilt previews and browser workers | Preview geometry to decode, and main-thread work when the portrait runs in an offscreen worker | Time to first visible preview and main-thread stalls |
 | Versioned browser cache | Model bytes fetched again on repeat visits to the same release | Cold versus warm model bytes and time to the first usable scene |
-| Static menu art | Removes two bundled videos (75.2 MB combined) and replaces their playback with one 10.5 kB WebP background | Cold menu bytes and time until the first button responds |
+| Menu background | Replaces two bundled videos (75.2 MB combined) with a 47 kB muted main-menu loop and a 10.5 kB WebP fallback used by reduced-motion and loading screens | Cold menu bytes and time until the first button responds |
 | Embedded player database | Avoids a database network hop while the staging game runs as one writer | Account response time, SQLite commit time, and volume growth independently of simulation frame time |
 
 Implementation references include [city tier selection](../frontend/src/world/cityLod.ts), [fleet loading](../frontend/src/vehicles/fleetAssets.ts) and the [portrait worker](../frontend/src/game/characters/characterPortrait.worker.ts).

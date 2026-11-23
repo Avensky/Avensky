@@ -192,7 +192,8 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       async () => {
         await reset();
         assert.ok(document.querySelector(".main-menu .menu-flare-background"));
-        assert.equal(document.querySelector(".main-menu video"), null);
+        const loop = document.querySelector(".main-menu video");
+        assert.ok(loop.autoplay && loop.loop && loop.muted && loop.playsInline);
         await key("Enter", "Enter");
         assert.equal(ui.getState().screen, "mode_select");
         await reset();
@@ -206,7 +207,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
           preferences.getState().update({ reducedMotion: false }),
         );
         assert.ok(document.querySelector(".main-menu .menu-flare-background"));
-        assert.equal(document.querySelector(".main-menu video"), null);
+        assert.ok(document.querySelector(".main-menu video"));
       },
     );
     await t.test(

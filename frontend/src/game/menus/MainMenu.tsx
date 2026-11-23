@@ -33,7 +33,7 @@ export function MainMenu() {
 
   return (
     <div className="game-ui menu-surface menu-home main-menu relative z-30">
-      <MenuFlareBackground />
+      <MenuFlareBackground animated />
       <MainMenuProfile focusMenu={focusSelection} />
       <div className="menu-home-content">
         <section className="main-menu-identity" aria-label="Avensky">
