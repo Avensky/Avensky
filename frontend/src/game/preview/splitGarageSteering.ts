@@ -14,6 +14,7 @@ type MeshPartition = { original: BufferGeometry; triangles: Uint32Array };
 const partitions = new WeakMap<Mesh, MeshPartition>();
 
 type AssemblyPart = {
+  sourceName?: string;
   material: string; count: number; vertex: number;
   point: readonly number[]; ranges: readonly (readonly [number, number])[];
 };
@@ -25,7 +26,8 @@ export function splitVehicleAssembly(root: Object3D, parts: readonly AssemblyPar
   });
   const matches = parts.map(part => {
     const candidates = meshes.filter(mesh => !Array.isArray(mesh.material) &&
-      mesh.material.name === part.material && (partitions.get(mesh)?.original ?? mesh.geometry).index?.count === part.count);
+      mesh.material.name === part.material && (!part.sourceName || mesh.name === part.sourceName) &&
+      (partitions.get(mesh)?.original ?? mesh.geometry).index?.count === part.count);
     return candidates.find(mesh => {
       const source = partitions.get(mesh)?.original ?? mesh.geometry;
       const positions = source.attributes.position;

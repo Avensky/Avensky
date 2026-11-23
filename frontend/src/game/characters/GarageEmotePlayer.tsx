@@ -2,7 +2,7 @@ import { MIRROR_MAKEUP_EMOTES, makeupPreviewEmote, type MirrorCheckFit } from ".
 import { useFittingTurnStore } from "./fittingControlsStore";
 import { useContext, useEffect, useLayoutEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { AnimationMixer, LoopOnce, MathUtils, type AnimationAction, type Group, type Object3D } from "three";
+import { AnimationMixer, LoopOnce, LoopRepeat, MathUtils, type AnimationAction, type Group, type Object3D } from "three";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { AUTOMATIC_GARAGE_EMOTE_IDS, buildEmoteClips, buildGarageEmotes, findGaragePreviewEmote, garageBreathing } from "./garageEmotes";
 import { driverFaceTargets } from "./villagerFace";
@@ -24,6 +24,8 @@ import { keepHeldProp } from "./emotePropNotes";
 import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./posePack";
 import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
 import { GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip, garagePanelForEmote, preparePanelOpening } from "./garageInteractions";
+import { prepareBrzApproach } from "../preview/brzApproach";
+import { GARAGE_APPROACH_WALK } from "./walkingEmotes";
 
 const FADE_SECONDS = .52;
 
@@ -64,7 +66,12 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   const heldProp = useRef<Group>(null);
   const chairSeat = useRef<Group>(null);
   const panel = useContext(GaragePanelTarget);
-  const panelPlayback = useRef<(NonNullable<ReturnType<typeof preparePanelOpening>> & { seconds: number }) | null>(null);
+  const panelPlayback = useRef<{
+    opening: NonNullable<ReturnType<typeof preparePanelOpening>>;
+    approach?: ReturnType<typeof prepareBrzApproach>;
+    stride?: AnimationAction;
+    seconds: number;
+  } | null>(null);
   const chairRequested = useCharacterPreviewStore(s => previewPacks && s.emote?.id === SIT_IN_CHAIR);
   const chairShown = useRef(false);
   useLayoutEffect(() => {
@@ -92,7 +99,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   }, [root, previewPacks]);
 
   useLayoutEffect(() => () => {
-    panelPlayback.current?.stop();
+    panelPlayback.current?.stride?.stop();
+    panelPlayback.current?.opening.stop();
+    panelPlayback.current?.approach?.stop();
     panelPlayback.current = null;
     const current = player.current;
     if (panel && current) current.idle.reset().setEffectiveWeight(1).play();
@@ -180,26 +189,46 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     const preview = previewPacks ? view.emote : garageStation ? drive.steering : current.clicked;
     const driving = garageStation || (previewPacks && view.insideCar);
     const doorOnly = previewPacks && !view.insideCar && preview?.id === OPEN_DRIVER_DOOR && drive.hasDoor;
-    if (panel && preview && garagePanelForEmote(preview.id) === panel.part) {
+    if (panel && preview && (garagePanelForEmote(preview.id) === panel.hinge.part || (doorOnly && panel.hinge.part.startsWith("door-")))) {
       if (!panelPlayback.current || current.preview !== preview) {
         leaveCabin(current, restSeconds);
-        panelPlayback.current?.stop();
+        panelPlayback.current?.stride?.stop();
+        panelPlayback.current?.opening.stop();
+        panelPlayback.current?.approach?.stop();
         current.active?.stop();
         current.active = null;
         current.release = null;
         current.idle.stop();
         current.preview = preview;
-        const playback = preparePanelOpening(root, panel, preview.id === "inspect-engine");
-        if (!playback) {
+        const approach = panel.clearance && panel.actor.current ? prepareBrzApproach(root, panel.actor.current, panel.clearance, panel.hinge) : undefined;
+        let stride: AnimationAction | undefined;
+        if (approach) {
+          stride = current.actions.get(GARAGE_APPROACH_WALK.id);
+          if (!stride) {
+            stride = current.mixer.clipAction(buildEmoteClips(root, [GARAGE_APPROACH_WALK], current.props)[0]).setLoop(LoopRepeat, Infinity);
+            current.actions.set(GARAGE_APPROACH_WALK.id, stride);
+          }
+          stride.reset().play();
+        }
+        const opening = preparePanelOpening(root, panel.hinge, preview.id === "inspect-engine", Boolean(approach));
+        if (!opening || (panel.clearance && !approach)) {
+          stride?.stop();
           useCharacterPreviewStore.setState({ emote: null, cockpitError: "This driver cannot reach the selected panel." });
           return;
         }
-        panelPlayback.current = { ...playback, seconds: 0 };
+        panelPlayback.current = { opening, approach, stride, seconds: 0 };
       }
       if (heldProp.current) heldProp.current.visible = false;
       const playback = panelPlayback.current;
-      playback.sample(playback.seconds = Math.min(1.8, playback.seconds + step));
-      if (playback.seconds < 1.8) invalidate();
+      const travel = playback.approach?.duration ?? 0;
+      playback.seconds = Math.min(travel + 1.8, playback.seconds + step);
+      const walking = playback.approach?.walking(playback.seconds);
+      if (playback.stride && !walking) { playback.stride.stop(); playback.stride = undefined; }
+      const positionDriver = () => playback.approach?.sample(playback.seconds, step);
+      if (playback.seconds >= travel) playback.opening.sample(playback.seconds - travel, positionDriver);
+      else positionDriver();
+      if (walking) current.mixer.update(step);
+      if (playback.seconds < travel + 1.8) invalidate();
       return;
     }
     if (current.cabin && (current.doorOnly !== doorOnly || (doorOnly && current.preview !== preview))) {

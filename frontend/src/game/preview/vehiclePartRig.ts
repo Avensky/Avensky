@@ -1,9 +1,11 @@
 import {Box3,Group,Matrix4,Mesh,Vector3,type Object3D} from "three";
 import type {VehicleStudioPart} from "../heroes/vehicleStudioStore";
 import {AE_HINGE} from "../../vehicles/tools/roadLamps";
+import {BRZ_GARAGE_ENABLED} from "./brzCabin";
 
 export type VehiclePartHinge={part:VehicleStudioPart;pivot:Group;axis:"x"|"y"|"z";closed:number;open:number;angle:number;handle?:Object3D;
-  stance?: { point: Vector3; yaw: number }; latch?: Group };
+  stance?: { point: Vector3; yaw: number }; latch?: Group; latchGrip?: Object3D;
+  support?: (opening: number) => void; doorSweep?: Box3 };
 const frontDoor = (side: "left" | "right", letter: "l" | "r") => new RegExp(
   `^(?:.*_)?door(?:_?glass)?[_ .-]*(?:(?:front[_ .-]*)?(?:${side}|${letter})|f${letter}|${letter}f)(?:[_ .-].*)?$`, "i",
 );
@@ -27,7 +29,7 @@ export function boundsInRoot(root:Object3D,objects:Object3D[]){
 }
 function meshCandidates(root:Object3D,part:VehicleStudioPart,model:string){
  const brzPattern = part === "door-left" || part === "door-right" ? brzDoorMeshes[part]
-  : part === "hood" ? /^HOOD(?:_FRAME|_VENT(?:_FRAME)?)?$/i : undefined;
+  : part === "hood" ? (BRZ_GARAGE_ENABLED ? /^HOOD(?:_FRAME|_ARM|_VENT(?:_FRAME)?)?$/i : /^HOOD(?:_FRAME|_VENT(?:_FRAME)?)?$/i) : undefined;
  const pattern = rules[part];
  if (!pattern) return [] as Mesh[];
  const found:Mesh[]=[];
@@ -48,8 +50,11 @@ function meshCandidates(root:Object3D,part:VehicleStudioPart,model:string){
 }
 export function measureDriverDoor(root: Object3D, model?: string) {
  if (model === "brz") {
-  const driver = meshCandidates(root, "door-right", model);
-  if (driver.length) return boundsInRoot(root, driver);
+  const side = brzDriverSide(root);
+  for (const part of ["door-left", "door-right"] as const) {
+   const bounds = boundsInRoot(root, meshCandidates(root, part, model));
+   if (!bounds.isEmpty() && Math.sign(bounds.getCenter(new Vector3()).x) === side) return bounds;
+  }
  }
  const frontLeft = /(?:driver.*door|door.*driver|(?:front|f)[_ .-]*(?:left|l).*door|(?:left|l)[_ .-]*(?:front|f).*door|door[_ .-]*(?:fl|front[_ .-]*left|left[_ .-]*front))/i;
  const explicit: Mesh[] = [], left: Mesh[] = [];
@@ -80,6 +85,11 @@ export function measureDriverDoor(root: Object3D, model?: string) {
  const front = lamp ? root.worldToLocal(lamp.getWorldPosition(new Vector3())).z : cab.max.z;
  const point = new Vector3(cab.min.x, center.y, center.z + Math.sign(front - center.z) * .16 * (cab.max.z - cab.min.z));
  return new Box3(point, point.clone());
+}
+
+export function brzDriverSide(root: Object3D) {
+ const wheel = BRZ_GARAGE_ENABLED && root.getObjectByName("Mesh128_black1_0");
+ return wheel ? Math.sign(boundsInRoot(root, [wheel]).getCenter(new Vector3()).x) || 1 : 1;
 }
 
 function moveUnderPivot(root:Object3D,objects:Mesh[],hinge:Vector3,part:VehicleStudioPart,axis:"x"|"y"|"z",open:number):VehiclePartHinge|null{
@@ -165,12 +175,26 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
    angle = freeEdge * (longAxis === "z" ? -1 : 1) * Math.PI / 5;
   }
   const hinge=moveUnderPivot(root,objects,point,part,axis,angle);if (hinge) {
-   if (part === "door-left" || part === "door-right") bindDoorHandle(root, hinge, bounds, frontSign, longAxis);
+   if (part === "door-left" || part === "door-right") {
+    bindDoorHandle(root, hinge, bounds, frontSign, longAxis);
+    if (model === "brz" && BRZ_GARAGE_ENABLED && hinge.handle) {
+     const handle = root.getObjectByName(part === "door-left" ? "Mesh141_body_0" : "Mesh156_body_0");
+     if (handle instanceof Mesh) {
+      const grip = boundsInRoot(root, [handle]);
+      const target = grip.getCenter(new Vector3());
+      target.x = target.x < 0 ? grip.min.x : grip.max.x;
+      hinge.handle.position.copy(hinge.pivot.worldToLocal(root.localToWorld(target)));
+      hinge.doorSweep = boundsInRoot(hinge.pivot, objects);
+     }
+    }
+   }
    else {
     const freeEdge = part === "hood" ? frontSign : -frontSign;
     const grip = center.clone();
     grip[longAxis] = freeEdge < 0 ? bounds.min[longAxis] : bounds.max[longAxis];
     grip.y = bounds.min.y + (bounds.max.y - bounds.min.y) * .7;
+    const trunkRelease = BRZ_GARAGE_ENABLED && model === "brz" && part === "trunk" && root.getObjectByName("TRUNK_04");
+    if (trunkRelease) boundsInRoot(root, [trunkRelease]).getCenter(grip);
     hinge.handle = new Group();
     hinge.handle.name = `garage-${part}-grip`;
     hinge.handle.position.copy(grip).sub(point);
@@ -181,8 +205,15 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
     const latch = model === "brz" && part === "hood" ? root.getObjectByName("HOOD_LATCH_LOCK") : undefined;
     if (latch instanceof Mesh) {
      const lock = boundsInRoot(root, [latch]).getCenter(new Vector3());
+     const catchPoint = latch.localToWorld(new Vector3(.020, .629, -1.957));
      hinge.latch = moveUnderPivot(root, [latch], lock, part, axis, 0)?.pivot;
      if (hinge.latch) hinge.latch.name = "garage-pivot-hood-latch";
+     if (BRZ_GARAGE_ENABLED && hinge.latch) {
+      hinge.latchGrip = new Group();
+      hinge.latchGrip.name = "brz-hood-safety-catch";
+      hinge.latchGrip.position.copy(hinge.latch.worldToLocal(catchPoint));
+      hinge.latch.add(hinge.latchGrip);
+     }
     }
    }
    hinges.push(hinge);
@@ -193,7 +224,7 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
 
 export function advanceVehiclePartRig(hinges:VehiclePartHinge[],parts:Record<VehicleStudioPart,boolean>,delta:number,controlled?:VehicleStudioPart,headlights=parts.headlights){
  const blend=1-Math.exp(-Math.max(0,delta)*8);
- for(const hinge of hinges){if(hinge.part===controlled)continue;const opened=hinge.part==="headlights"?headlights:parts[hinge.part];const target=opened?hinge.open:hinge.closed;hinge.angle+= (target-hinge.angle)*blend;hinge.pivot.rotation[hinge.axis]=hinge.angle;}
+ for(const hinge of hinges){if(hinge.part===controlled)continue;const opened=hinge.part==="headlights"?headlights:parts[hinge.part];const target=opened?hinge.open:hinge.closed;hinge.angle+= (target-hinge.angle)*blend;hinge.pivot.rotation[hinge.axis]=hinge.angle;hinge.support?.(hinge.angle/hinge.open);}
 }
 
 export function availableVehicleParts(hinges:VehiclePartHinge[]){return new Set(hinges.map(hinge=>hinge.part));}

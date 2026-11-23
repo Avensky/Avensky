@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { BoxGeometry, Group, Mesh, Vector3 } from "three";
+import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
 import { createServer } from "vite";
 
 test("workshop authoring saves bounded pose tracks and resolves fitted chair targets", async () => {
@@ -106,6 +106,32 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     assert.equal(hood.angle, hood.open);
     opening.stop();
     assert.equal(hood.latch.rotation[hood.axis], 0);
+
+    const { brzWalkRoute, crossesBrzHull } = await vite.ssrLoadModule("/src/game/preview/brzApproach.ts");
+    const envelope = new Box3(new Vector3(-1.3, 0, -2.5), new Vector3(1.3, 1.2, 2.5));
+    const from = new Vector3(1.5, 0, 0), to = new Vector3(-1.5, 0, 0);
+    assert.equal(crossesBrzHull(from, to, envelope), true);
+    const route = brzWalkRoute(from, to, envelope);
+    assert.ok(route.length >= 4, "crossing to the other door must go around the body");
+    for (let i = 1; i < route.length; i++) assert.equal(crossesBrzHull(route[i-1], route[i], envelope), false);
+    assert.equal(brzWalkRoute(from, new Vector3(0, 0, 0), envelope), undefined, "reject a stopping point inside the vehicle");
+
+    const { prepareBrzCabin, validBrzCabinColors } = await vite.ssrLoadModule("/src/game/preview/brzCabin.ts");
+    const shared = new MeshStandardMaterial({ color: "#6c0e24" });
+    const leftSeat = mesh("Mesh132_red1_0", [1, 1, 1], [0, 1, 0]);
+    const rightSeat = mesh("Mesh134_red1_0", [1, 1, 1], [1, 1, 0]);
+    const fixed = mesh("DASH_TRIM", [1, 1, 1], [0, 1, 1]);
+    leftSeat.material = rightSeat.material = fixed.material = shared;
+    const cabin = prepareBrzCabin(car);
+    assert.deepEqual(leftSeat.userData.brzPart, { id: "seat-fabric", label: "Seat upholstery", side: "left", sourceName: "Mesh132_red1_0" });
+    assert.deepEqual(validBrzCabinColors({ "seat-fabric": "#22bb66", "seat-shell": "red", dashboard: "#ffffff" }), { "seat-fabric": "#22bb66" });
+    cabin.apply({ "seat-fabric": "#22bb66" }, "factory");
+    assert.equal(leftSeat.material.color.getHex(), 0x22bb66);
+    assert.equal(rightSeat.material.color.getHex(), 0x22bb66);
+    assert.equal(fixed.material.color.getHex(), 0x6c0e24);
+    cabin.apply({}, "factory");
+    assert.equal(leftSeat.material.color.getHex(), 0x6c0e24);
+    cabin.dispose();
   } finally {
     await vite.close();
     if (before) Object.defineProperty(globalThis, "localStorage", before);

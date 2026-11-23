@@ -1,5 +1,6 @@
 import {create} from "zustand";
 import {DEFAULT_WINDOW_TONE,type WindowTone} from "../preview/windowTones";
+import {validBrzCabinColors,type BrzCabinColors} from "../preview/brzCabin";
 
 export type VehicleStudioPart="door-left"|"door-right"|"hood"|"trunk"|"headlights";
 export type VehicleStudioPartState=Record<VehicleStudioPart,boolean>;
@@ -7,6 +8,23 @@ export type VehicleStudioTab="abilities"|"performance"|"paint"|"body"|"lighting"
 export type MarineLamp="navigation"|"searchlights";
 const CLOSED:VehicleStudioPartState={"door-left":false,"door-right":false,hood:false,trunk:false,headlights:false};
 const DARK={navigation:false,searchlights:false};
+const CABIN_KEY="avensky-brz-cabin-colors-v1";
+function readCabinColors():BrzCabinColors {
+ try { return validBrzCabinColors(JSON.parse(localStorage.getItem(CABIN_KEY)??"null")); }
+ catch { return {}; }
+}
+export const useBrzCabinStudio=create<{
+ colors:BrzCabinColors; wipersReady:boolean; sweep:number;
+ setColor:(part:keyof BrzCabinColors,color?:string)=>void; requestSweep:()=>void;
+}>((set)=>( {
+ colors:readCabinColors(),wipersReady:false,sweep:0,
+ setColor:(part,color)=>set(state=>{
+  const colors=validBrzCabinColors({...state.colors,[part]:color});
+  try { localStorage.setItem(CABIN_KEY,JSON.stringify(colors)); } catch { /* Keep the preview usable with browser storage disabled. */ }
+  return {colors};
+ }),
+ requestSweep:()=>set(state=>state.wipersReady?{sweep:state.sweep+1}:state),
+}));
 export const useVehicleStudioStore=create<{parts:VehicleStudioPartState;availableVehicle:string|null;availableParts:VehicleStudioPart[];activeTab:VehicleStudioTab|null;glassStyle:WindowTone;marineLights:Record<MarineLamp,boolean>;transmissions:Record<string,"manual"|"automatic">;setActiveTab:(tab:VehicleStudioTab|null)=>void;setGlassStyle:(style:WindowTone)=>void;toggleMarineLamp:(lamp:MarineLamp)=>void;setTransmission:(vehicle:string,mode:"manual"|"automatic")=>void;setPart:(part:VehicleStudioPart,open:boolean)=>void;setAvailable:(vehicle:string|null,parts?:VehicleStudioPart[])=>void;closeParts:()=>void;reset:()=>void}>(set=>({
  parts:CLOSED,availableVehicle:null,availableParts:[],activeTab:null,glassStyle:DEFAULT_WINDOW_TONE,marineLights:DARK,transmissions:{},
  setActiveTab:activeTab=>set(state=>state.activeTab===activeTab?state:{activeTab}),

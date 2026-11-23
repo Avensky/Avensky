@@ -1,8 +1,9 @@
-import { createContext, type Ref } from "react";
+import { createContext, type Ref, type RefObject } from "react";
 import { MathUtils, Quaternion, Vector3, type Group, type Object3D } from "three";
 import { posePackEmote } from "./posePack";
-import { aimLimb, driverArm, type Emote } from "./garageEmotes";
+import { aimDriverJoint, aimLimb, driverArm, driverHand, type Emote } from "./garageEmotes";
 import type { VehiclePartHinge } from "../preview/vehiclePartRig";
+import type { BrzClearance } from "../preview/brzApproach";
 
 export const OPEN_DRIVER_DOOR = "interact-driver-door";
 export const SIT_IN_CHAIR = "interact-chair";
@@ -13,38 +14,103 @@ export const PANEL_INTERACTIONS = [
 ] as const;
 export type GaragePanel = typeof PANEL_INTERACTIONS[number]["part"];
 export const garagePanelForEmote = (id?: string) => PANEL_INTERACTIONS.find(action => action.id === id)?.part;
-export const GaragePanelTarget = createContext<VehiclePartHinge | undefined>(undefined);
+export const GaragePanelTarget = createContext<{
+  hinge: VehiclePartHinge;
+  clearance?: BrzClearance;
+  actor: RefObject<Group | null>;
+} | undefined>(undefined);
 
-export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, inspectEngine = false) {
+export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, inspectEngine = false, fittedReach = false) {
   const grip = hinge.handle;
   const arm = driverArm(root, "r");
   if (!grip || !arm) return undefined;
+  const hand = fittedReach ? driverHand(root, "r") : undefined;
+  const safetyCatch = fittedReach ? hinge.latchGrip : undefined;
   const neck = root.getObjectByName("neck_01") ?? root.getObjectByName("head");
-  const torso = inspectEngine ? root.getObjectByName("spine_03") : undefined;
-  const rest = [arm.shoulder, arm.elbow, arm.hand, ...(neck ? [neck] : []), ...(torso ? [torso] : [])]
+  const torso = fittedReach || inspectEngine ? root.getObjectByName("spine_02") : undefined;
+  const legs = fittedReach ? ["l", "r"].flatMap(side => {
+    const thigh = root.getObjectByName(`thigh_${side}`), calf = root.getObjectByName(`calf_${side}`), foot = root.getObjectByName(`foot_${side}`);
+    return thigh && calf && foot ? [{ thigh, calf, foot, anchor: new Vector3(), facing: new Quaternion() }] : [];
+  }) : [];
+  const restHeight = root.position.y;
+  const rest = [arm.shoulder, arm.elbow, arm.hand, ...(neck ? [neck] : []), ...(torso ? [torso] : []),
+    ...legs.flatMap(({thigh,calf,foot}) => [thigh,calf,foot])]
     .map(joint => ({joint, rotation: joint.quaternion.clone()}));
-  const reset = () => rest.forEach(({joint, rotation}) => joint.quaternion.copy(rotation));
+  const reset = () => { root.position.y = restHeight; rest.forEach(({joint, rotation}) => joint.quaternion.copy(rotation)); };
   const axis = hinge.axis;
   const initial = hinge.angle;
-  const target = new Vector3(), wrist = new Vector3(), down = new Vector3(0, -1, 0);
+  const target = new Vector3(), wrist = new Vector3(), catchPoint = new Vector3(), shoulder = new Vector3(), elbow = new Vector3();
+  const down = new Vector3(0, -1, 0), knee = new Vector3(), rotation = new Quaternion(), scale = new Vector3();
+  const pitchAxis = new Vector3(), parentRotation = new Quaternion(), bendRotation = new Quaternion();
+  const fingers = new Vector3(), palm = new Vector3(), handRest = new Quaternion();
   return {
-    sample(seconds: number) {
+    sample(seconds: number, positionDriver?: () => void) {
       reset();
-      const opening = MathUtils.smoothstep(seconds, .47, 1.42);
+      const lift = safetyCatch ? MathUtils.smoothstep(seconds, .74, 1.54) : MathUtils.smoothstep(seconds, .47, 1.42);
+      const caught = safetyCatch ? .13 * MathUtils.smoothstep(seconds, .56, .70) : 0;
+      const opening = lift + (1 - lift) * caught;
       hinge.angle = MathUtils.lerp(initial, hinge.open, opening);
       hinge.pivot.rotation[axis] = hinge.angle;
-      if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * MathUtils.smoothstep(seconds, .28, .46);
-      const reach = MathUtils.smoothstep(seconds, .08, .43) * (1 - MathUtils.smoothstep(seconds, 1.22, 1.78));
+      hinge.support?.(hinge.angle / hinge.open);
+      if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * (safetyCatch
+        ? MathUtils.smoothstep(seconds, .48, .59) : MathUtils.smoothstep(seconds, .28, .46));
+      positionDriver?.();
+      const reach = MathUtils.smoothstep(seconds, .08, .43) * (1 - MathUtils.smoothstep(seconds, safetyCatch ? 1.42 : 1.22, 1.78));
       if (reach > 0) {
-        arm.hand.getWorldPosition(wrist).lerp(grip.getWorldPosition(target), reach);
+        grip.getWorldPosition(target);
+        if (safetyCatch && seconds < .74) {
+          safetyCatch.getWorldPosition(catchPoint);
+          target.lerp(catchPoint, 1 - MathUtils.smoothstep(seconds, .58, .74));
+        }
+        if (fittedReach && torso?.parent) {
+          root.getWorldQuaternion(rotation);
+          torso.parent.getWorldQuaternion(parentRotation).invert();
+          pitchAxis.set(1, 0, 0).applyQuaternion(rotation).applyQuaternion(parentRotation);
+          torso.quaternion.premultiply(bendRotation.setFromAxisAngle(pitchAxis, (safetyCatch && seconds < .74 ? .44 : .37) * reach));
+        }
+        if (hand) {
+          arm.shoulder.getWorldPosition(shoulder);
+          arm.hand.getWorldPosition(wrist);
+          const span = hand.middle.getWorldPosition(palm).distanceTo(wrist);
+          fingers.subVectors(target, shoulder).normalize();
+          target.addScaledVector(fingers, -span);
+        }
+        if (legs.length) {
+          arm.shoulder.getWorldPosition(shoulder);
+          arm.elbow.getWorldPosition(elbow);
+          arm.hand.getWorldPosition(wrist);
+          const armLength = shoulder.distanceTo(elbow) + elbow.distanceTo(wrist);
+          const horizontal = Math.hypot(shoulder.x - target.x, shoulder.z - target.z);
+          const vertical = Math.sqrt(Math.max(.015, (armLength * .94) ** 2 - horizontal ** 2));
+          root.parent?.getWorldScale(scale);
+          const drop = MathUtils.clamp((shoulder.y - target.y - vertical) / (scale.y || 1), 0, safetyCatch ? .46 : .36) * reach;
+          for (const leg of legs) {
+            leg.foot.getWorldPosition(leg.anchor);
+            leg.foot.getWorldQuaternion(leg.facing);
+          }
+          root.position.y -= drop;
+          root.getWorldQuaternion(rotation);
+          for (const leg of legs) {
+            knee.set(0, 0, 1).applyQuaternion(rotation);
+            aimLimb(leg.thigh, leg.calf, leg.foot, leg.anchor.clone(), knee);
+            leg.foot.quaternion.copy(leg.calf.getWorldQuaternion(new Quaternion()).invert().multiply(leg.facing));
+          }
+        }
+        arm.hand.getWorldPosition(wrist).lerp(target, reach);
         aimLimb(arm.shoulder, arm.elbow, arm.hand, wrist, down.clone());
+        if (hand) {
+          handRest.copy(arm.hand.quaternion);
+          aimDriverJoint(arm.hand, hand.middle, fingers);
+          arm.hand.quaternion.slerp(handRest, 1 - reach);
+        }
       }
       const settle = MathUtils.smoothstep(seconds, 1.3, 1.8);
       if (neck) neck.rotateX((inspectEngine ? .3 : .12) * settle);
-      if (torso) torso.rotateX(.19 * settle);
+      if (torso && inspectEngine) torso.rotateX(.19 * settle);
     },
     stop() {
       reset();
+      hinge.support?.(0);
       if (hinge.latch) hinge.latch.rotation[axis] = 0;
     },
   };

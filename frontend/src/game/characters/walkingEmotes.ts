@@ -116,3 +116,15 @@ export const WALK_TO_MARK: Emote = {
 export const WALK_EMOTES = [
   { id: "walk-casual", name: "Casual walk", duration: 5.3, keys: garageWalk(0, 1, .12, true) },
 ] as const satisfies readonly Emote[];
+
+/** In-place gait for a root moving along a measured garage path. */
+export const GARAGE_APPROACH_WALK: Emote = {
+  id: "garage-approach-stride", name: "Approach vehicle", duration: .88,
+  keys: [
+    [0, { ...leftStep, feet: { l: [0, 0, .19], r: [0, 0, -.19] }, rise: -.032 }],
+    [.25, { ...leftStep, feet: { l: [0, 0, 0], r: [0, .085, 0] }, rise: -.01 }],
+    [.5, { ...rightStep, feet: { l: [0, 0, -.19], r: [0, 0, .19] }, rise: -.032 }],
+    [.75, { ...rightStep, feet: { l: [0, .085, 0], r: [0, 0, 0] }, rise: -.01 }],
+    [1, { ...leftStep, feet: { l: [0, 0, .19], r: [0, 0, -.19] }, rise: -.032 }],
+  ],
+};
