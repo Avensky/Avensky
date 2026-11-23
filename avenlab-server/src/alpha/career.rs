@@ -49,7 +49,12 @@ pub enum CareerOutcome{Win,Loss,Draw,Completed,Abandoned}
 #[serde(default)]
 pub struct CareerParticipant {
     pub profile_id:String,pub name:String,pub team:Option<String>,pub hero:String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_profile_id: Option<String>,
     pub appearance:HeroAppearance,pub stats:CareerStats,pub abandoned:bool,pub awards:Vec<CareerAward>,
+}
+impl CareerParticipant {
+    pub fn owner(&self) -> &str { self.account_profile_id.as_deref().unwrap_or(&self.profile_id) }
 }
 #[derive(Clone,Debug,Default,PartialEq,Serialize,Deserialize)]
 #[serde(default)]
@@ -87,7 +92,7 @@ impl CareerMatch {
         if self.progression_eligible&&(self.training||self.mode.bucket()!=0){return Err("Practice results cannot grant progression.".into());}
         let mut seen=BTreeSet::new();
         for p in &self.participants{
-            valid_identifier(&p.profile_id)?;valid_identifier(&p.hero)?;
+            valid_identifier(&p.profile_id)?;valid_identifier(p.owner())?;valid_identifier(&p.hero)?;
             if !seen.insert(&p.profile_id){return Err("A career participant cannot appear twice.".into());}
             if p.name.is_empty()||p.name.chars().count()>64||p.name.chars().any(char::is_control){return Err("Invalid career player name.".into());}
             if p.team.as_deref().is_some_and(|team|team!="red"&&team!="blue"){return Err("Invalid participant team.".into());}

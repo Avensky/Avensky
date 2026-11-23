@@ -82,6 +82,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const page = useRef<HTMLDivElement>(null);
   const owner = useSocialStore(state => state.view?.profile.id ?? state.profileOwner);
   const connectedOwner = useSocialStore(state => state.view?.profile.id);
+  const characterSlot = useSocialStore(state => state.view?.profile.active_character_id ? state.view.profile : undefined);
   const bodyTattoosAvailable = useSocialStore(state => state.bodyTattoosAvailable);
   const saved = useSocialStore(selectEquippedCharacter);
   // Null is a supported profile awaiting setup. Older servers omit the field.
@@ -643,7 +644,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       role="tabpanel" id="character-editor-panel" aria-labelledby={"character-editor-tab-" + tab}
       onFocus={revealCharacterControl}>
       <div className="character-stage" data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
-        aria-label={`Preview of ${character.name}`} />
+        aria-label={`Preview of ${characterSlot?.name ?? character.name}`} />
       {fitting && <DressingRoom choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
@@ -665,8 +666,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       </section>}
       {(tab === "details" || tab === "emotes") && <section className={`character-controls menu-panel-frame ${tab === "details" ? "character-details" : "character-controls--left"}`} aria-label={tab === "details" ? "Character details" : "Emote filters"}>
         {tab === "details" && <>
-          <header className="character-description"><h2>{character.name}</h2><p>{character.title}</p></header>
-          {!PLAYER_ONBOARDING && modelPicker}
+          <header className="character-description"><h2>{characterSlot?.name ?? character.name}</h2>{!characterSlot && <p>{character.title}</p>}</header>
+          {!PLAYER_ONBOARDING && !characterSlot && modelPicker}
           <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
             {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
               aria-pressed={(choice.identity ?? character.gender) === item.id}

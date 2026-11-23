@@ -37,19 +37,17 @@
 .welcome-panel button:disabled { cursor: default; opacity: .56; }
 .welcome-panel .welcome-primary { background: #d6b9ff; color: #160d27; border-color: #d6b9ff; font-weight: 700; }
 .welcome-panel .welcome-primary:not(:disabled):hover { background: #e7d4ff; }
-.welcome-panel form, .welcome-panel label, .welcome-entry-options, .welcome-vehicle { display: grid; gap: .55rem; }
+.welcome-panel form, .welcome-panel label, .welcome-entry-options { display: grid; gap: .55rem; }
 .welcome-panel form { gap: .85rem; }
 .welcome-panel form label { font-size: .9rem; font-weight: 600; }
 .welcome-entry-options { margin-top: .6rem; }
-.welcome-help, .welcome-player { color: #c9bcda; margin: .65rem 0; font-size: .875rem; }
+.welcome-help { color: #c9bcda; margin: .65rem 0; font-size: .875rem; }
 .welcome-error { color: #ffc3cc; margin: .65rem 0; font-size: .875rem; }
 .welcome-actions, .welcome-characters { display: flex; flex-wrap: wrap; align-items: stretch; gap: .65rem; margin-top: .5rem; }
 .welcome-character { flex: 1 1 7.5rem; display: grid; justify-items: center; gap: .2rem; }
 .welcome-character .character-portrait { width: min(100%, 5rem); aspect-ratio: 1; }
 .welcome-character span { font-size: .8rem; }
-.welcome-driver-palette { display: flex; gap: .25rem; }
-.welcome-driver-palette i { display: block; width: 1rem; height: .35rem; border-radius: .2rem; }
-.welcome-character[aria-pressed="true"] { border-color: #d6b9ff; background: #392a50; box-shadow: inset 0 0 0 1px #d6b9ff; }
+.welcome-panel button[aria-pressed="true"] { border-color: #d6b9ff; background: #392a50; box-shadow: inset 0 0 0 1px #d6b9ff; }
 @media (max-width: 680px) and (orientation: portrait) {
   .welcome-screen { grid-template-columns: 1fr; grid-template-rows: auto 1fr; align-items: start; }
   .welcome-art img { max-height: 31svh; }

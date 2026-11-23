@@ -24,6 +24,7 @@ const TABS = ["WORLDS", "TEAMMATES", "GROUPS", "INVITES", "PROFILE"] as const;
 
 function ProfilePage({
   name,
+  namedCharacter,
   code,
   available,
   onSave,
@@ -31,6 +32,7 @@ function ProfilePage({
   onNew,
 }: {
   name: string;
+  namedCharacter: boolean;
   code?: string;
   available: boolean;
   onSave: (name: string) => void;
@@ -44,7 +46,7 @@ function ProfilePage({
     <div className="social-grid">
       <section className="social-card">
         <h2>YOUR PLAYER PROFILE</h2>
-        <form
+        {namedCharacter ? <p>{name}</p> : <form
           onSubmit={(event) => {
             event.preventDefault();
             onSave(draft);
@@ -59,7 +61,7 @@ function ProfilePage({
           <button type="submit" className="menu-control" disabled={!available}>
             SAVE PLAYER NAME
           </button>
-        </form>
+        </form>}
         {code && (
           <>
             <p>YOUR PLAYER CODE</p>
@@ -273,8 +275,9 @@ export function SocialPanel() {
             )}
             {(!view || tab === "PROFILE") && (
               <ProfilePage
-                key={view?.profile.id ?? "unavailable"}
+                key={view?.profile.active_character_id ?? view?.profile.id ?? "unavailable"}
                 name={view?.profile.name ?? "DRIVER"}
+                namedCharacter={Boolean(view?.profile.active_character_id)}
                 code={view?.profile.id}
                 available={available}
                 onSave={(name) =>

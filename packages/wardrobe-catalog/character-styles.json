@@ -1,0 +1,23 @@
+[
+  {
+    "id": "street",
+    "name": "Street",
+    "attitude": "racer",
+    "female": { "outfit": "shop-crew", "color": "#2c5066", "accent": "#a0e2d4" },
+    "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4" }
+  },
+  {
+    "id": "workshop",
+    "name": "Workshop",
+    "attitude": "friendly",
+    "female": { "outfit": "dockwear", "color": "#5e5949", "accent": "#dfb879" },
+    "male": { "outfit": "race-crew", "color": "#505d4d", "accent": "#dfb879" }
+  },
+  {
+    "id": "night-shift",
+    "name": "Night Shift",
+    "attitude": "stoic",
+    "female": { "outfit": "shop-crew", "color": "#373146", "accent": "#c9a7e6" },
+    "male": { "outfit": "night-run", "color": "#38334c", "accent": "#c9a7e6" }
+  }
+]
