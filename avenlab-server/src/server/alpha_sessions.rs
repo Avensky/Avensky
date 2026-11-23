@@ -20,6 +20,8 @@ impl Server {
         }
         let clients = self.connections.lock().await.clone();
         let mode = a.worlds.get(&world_id).copied().unwrap_or(Mode::Sandbox.into());
+        let hub_capacity = self.data.lock().await.worlds.get(&world_id)
+            .filter(|world| crate::hub::available(world)).map(|world| world.max_players);
         if mode.bucket() == 0 && !a.pending_team.contains_key(player) {
             return Err("Join a match through its hero selection queue.".into());
         }
@@ -47,7 +49,7 @@ impl Server {
             .filter_map(|(_, c)| c.world_id)
             .chain(reserved.iter().map(|(_, r)| r.member.world))
             .collect();
-        if mode.bucket()!=0 && occupied.iter().any(|id| {
+        if mode.bucket()!=0 && hub_capacity.is_none() && occupied.iter().any(|id| {
             *id != world_id
                 && a.worlds.get(id).copied().unwrap_or(Mode::Sandbox.into()).bucket() == mode.bucket()
         }) {
@@ -64,7 +66,7 @@ impl Server {
                 .iter()
                 .filter(|(_, r)| r.member.world == world_id)
                 .count();
-        if population >= mode.capacity() {
+        if population >= hub_capacity.unwrap_or_else(|| mode.capacity()) {
             return Err("This alpha world is full or has a reconnect reservation.".into());
         }
         let total = clients

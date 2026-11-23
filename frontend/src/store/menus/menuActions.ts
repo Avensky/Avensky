@@ -2,6 +2,7 @@ import { useAlphaStore } from "../alpha/alphaStore";
 import type { StateCreator } from "zustand";
 import { useSocialStore } from "../social/socialStore";
 import { mainMenuItems, PAUSE_MENU_ITEMS, PAUSE_RESUME_INDEX, pauseMenuRails } from "../../game/menus/menuItems";
+import { openWorldForView } from "../../game/social/openWorld";
 import { canOpenVehicleSelection } from "../alpha/matchHeroChange";
 import { useSelectionStore } from "../selection/selectionStore";
 import { useNetworkStore } from "../session/networkStore";
@@ -14,7 +15,7 @@ import {
   type UIState,
 } from "./types";
 const menuItemCounts: Record<MenuId, number> = {
-  get main() { return mainMenuItems(useSocialStore.getState().view?.main_world_id).length; },
+  get main() { return mainMenuItems(openWorldForView(useSocialStore.getState().view)).length; },
   pause: PAUSE_MENU_ITEMS.length,
   settings: 3,
   sandbox_setup: 4,
@@ -105,7 +106,7 @@ export const createMenuActions: StateCreator<
     const index = get().selectedMenuIndexById[activeMenu] ?? 0;
 
     if (activeMenu === "main") {
-      const item = mainMenuItems(useSocialStore.getState().view?.main_world_id)[index];
+      const item = mainMenuItems(openWorldForView(useSocialStore.getState().view))[index];
       if (item?.available) {
         if(item.id==='play')useAlphaStore.getState().chooseMode(useAlphaStore.getState().lastMatchMode);
         else if(item.id==='explore')useAlphaStore.getState().chooseMode('sandbox');

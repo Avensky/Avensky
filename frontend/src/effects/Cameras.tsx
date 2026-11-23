@@ -11,6 +11,8 @@ import { PerspectiveCamera, OrbitControls } from "@react-three/drei";
 import { InspectionCameraControls } from "../components/InspectionCameraControls";
 import { specialCameraPreset } from "../utils/drivingViews";
 import { RotatingCamera } from "./RotatingCamera";
+import { HubCamera } from "../game/hub/HubCamera";
+import { useHubStore } from "../game/hub/hubStore";
 import { useEffect, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import { OrbitControls as ThreeOrbitControls } from "three-stdlib";
@@ -132,6 +134,7 @@ export default function Cameras() {
   const camMode = useGameStore((state) => state.camera);
   const editor = useGameStore((state) => state.editor);
   const playerId = useConnectionView(state => state.playerId);
+  const walking = useHubStore(state => Boolean(playerId && state.actors[playerId]));
   const playerVehicleId = useMotionView(
     (state) =>
       snapshotEntity(state.snapshot, state.playerId)
@@ -176,6 +179,10 @@ export default function Cameras() {
     p.y=Math.max(p.y,sinkingWreck?cameraSeabed(map):cameraGround(map,p.x,p.z));
   }, -.01);
 
+  if (walking && playerId && screen === "sandbox" && !editor) return <>
+    <PerspectiveCamera makeDefault fov={fov} near={.05} />
+    <HubCamera player={playerId} />
+  </>;
   if(scope&&screen==='sandbox'&&overlay===null&&playerVehicleId)return <TankScopeRig playerId={playerId}/>;
 
   if (editor && screen === "sandbox" && !cameraEditing && overlay !== "vehicle_select") {

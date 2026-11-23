@@ -43,6 +43,7 @@ mod deployment_env;
 mod server;
 mod social;
 mod world_sessions;
+mod hub;
 mod world_scheduler;
 
 use crate::{physics::SIMULATION_HZ, server::Server};

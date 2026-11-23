@@ -18,6 +18,7 @@ import {DEFAULT_COCKPIT_MASK} from '../store/input/protocol/cockpitMasks';
 import {encodePackedInput} from './packedInput';
 import {InputSendGate} from './inputSendGate';
 import {useDebugViewStore} from '../store/presentation/debugViewStore';
+import { releaseHubMove, sendHubMotion } from "../game/hub/hubControls";
 export { getInputSenderStats } from "./rustSocket";
 
 let seq = 0;
@@ -47,6 +48,7 @@ function transmitInput(allowQueuedNeutral = false) {
   }
   if (document.visibilityState === "hidden")
     useInputStore.getState().releaseControls();
+  if (sendHubMotion(connection, now, allowQueuedNeutral)) return;
   const dt = Math.max(0, Math.min((now - lastSendTime) / 1000, 0.1));
   const turretVehicle=useNetworkStore.getState().getMe();
   // Lobby/menu sockets still heartbeat, but have no driving mailbox to feed.
@@ -105,6 +107,7 @@ export function sendInputPacket() {
 }
 
 function releaseHeldControls() {
+  releaseHubMove();
   clearTankFireInputs(tankFireInputs);
   useInputStore.getState().releaseControls();
   transmitInput(true);

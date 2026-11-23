@@ -1,4 +1,5 @@
 import {barrageReady, requestTankBarrage} from "../combat/tankBarrage";
+import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove, turnHubCamera } from "../game/hub/hubControls";
 import {requestNearestRevive,isMechanicPlayer} from '../combat/reviveTargets';
 import {isGuardDpsPlayer,requestGuardBoost,requestTankBarrier,requestDiveShield,isDiveShieldPlayer} from '../combat/guardBoost';
 import {useScoreboardStore} from "../store/hud/scoreboardStore";
@@ -55,6 +56,7 @@ export function GameController() {
     let previousButtons: boolean[] = [];
     let padKey: string | null = null;
     let armed = false;
+    let onFoot = false;
     let menuArmed = true;
     let resetTimer: number | null = null;
     let lastVertical = -Infinity;
@@ -73,6 +75,7 @@ export function GameController() {
       routePhysicalMenuPress(false, cancelled);
     };
     const release = () => {
+      releaseHubMove("gamepad");
       barragePressStarted = null;
       releaseWeaponSource("gamepad");combatIntent.gamepadRam=false;combatIntent.gamepadFire=false;
       armed = false;
@@ -355,6 +358,21 @@ export function GameController() {
         return;
       }
       const preferences = usePreferencesStore.getState();
+      const mode = hubMode();
+      if (mode && edges[3]) {
+        interactInHub();
+        return;
+      }
+      if (mode === "foot") {
+        if (!onFoot) release();
+        onFoot = true;
+        setHubMove("gamepad", axis(pad.axes[0], preferences.controllerDeadzone),
+          -axis(pad.axes[1], preferences.controllerDeadzone), pressed(10));
+        turnHubCamera(-axis(pad.axes[2], preferences.controllerDeadzone) * .045);
+        if (edges[0]) jumpInHub();
+        return;
+      }
+      onFoot = false;
       const steer = calibratedSteering(pad.axes[0], preferences);
       const tank=useNetworkStore.getState().getMe()?.vehicle_id==='tank';
       const mechanic=isMechanicPlayer();

@@ -161,6 +161,7 @@ pub struct PhysicsFrame {
     pub driver: Option<crate::snapshot_wire::DriverLane>,
     pub keyframe: Option<Arc<crate::snapshot_delta::Keyframe>>,
     pub debug: Arc<str>,
+    pub hub: Option<Arc<str>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -316,6 +317,7 @@ pub struct SharedGameState {
     /// Authoritative simulation tick counter
     pub tick: u64,
     pub server_timing: ServerTiming,
+    pub hub_frame: Option<Arc<str>>,
 
     /// All connected entities keyed by player_id
     pub entities: HashMap<String, EntityState>,
@@ -346,6 +348,7 @@ impl SharedGameState {
             room_id: 0,
             tick: 0,
             server_timing: ServerTiming::default(),
+            hub_frame: None,
             entities: HashMap::new(),
             spawns: SpawnManager::new(10),
             clients: HashMap::new(),
@@ -567,7 +570,7 @@ impl SharedGameState {
                 };
                 bytes += wire.len();
                 let wire:Arc<str>=wire.into();
-                let quiet=Arc::new(PhysicsFrame{snapshot:wire,keyframe,tick:self.tick,driver:None,debug:"".into()});
+                let quiet=Arc::new(PhysicsFrame{snapshot:wire,keyframe,tick:self.tick,driver:None,debug:"".into(),hub:self.hub_frame.clone()});
                 for (id,tx,_) in recipients {
                     let driver=if compact {snapshot.entities.binary_search_by(|e|e.id.cmp(id.as_str())).ok()
                         .map(|i|crate::snapshot_wire::DriverLane::sample(self.room_id,&snapshot.entities[i]))} else {None};
@@ -579,7 +582,7 @@ impl SharedGameState {
                         let packet=FrameEnvelope{kind:"debug",world_id:self.room_id,tick:Some(self.tick),data:&view}.encode();
                         bytes+=packet.len();Arc::from(packet)
                     }).clone()} else {quiet.debug.clone()};
-                    tx.send_replace(Some(Arc::new(PhysicsFrame{snapshot:quiet.snapshot.clone(),keyframe:quiet.keyframe.clone(),tick:self.tick,driver,debug})));
+                    tx.send_replace(Some(Arc::new(PhysicsFrame{snapshot:quiet.snapshot.clone(),keyframe:quiet.keyframe.clone(),tick:self.tick,driver,debug,hub:quiet.hub.clone()})));
                 }
             }
         }

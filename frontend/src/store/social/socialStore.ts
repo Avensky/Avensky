@@ -18,6 +18,7 @@ export type SocialGroup = {
 };
 export type SocialWorld = {
   can_edit?: boolean;
+  walkable?: boolean;
   mode_approved?: boolean;
   tire_thermals?: boolean;
   mode?: GameMode | null;

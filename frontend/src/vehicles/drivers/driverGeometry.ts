@@ -26,7 +26,7 @@ function merge(parts: BufferGeometry[]) {
   return geometry;
 }
 
-function torso(shoulder: number, waist: number, chest: number) {
+function torso(shoulder: number, waist: number, chest: number, seated = true) {
   // Four eight-sided rings give the three body silhouettes a waist and shoulders
   // without morph targets, joints, subdivision, or a material for every garment.
   const rings = [[.04, .15, .10, 0], [.19, waist, .085, -.015], [.38, chest, .115, -.025], [.47, shoulder, .085, -.04]];
@@ -49,12 +49,22 @@ function torso(shoulder: number, waist: number, chest: number) {
   chestGeometry.setIndex(indices);
   chestGeometry.computeVertexNormals();
   const parts = [chestGeometry];
-  for (const side of [-1, 1]) {
+  for (const side of seated ? [-1, 1] : []) {
     const elbow: Point = [side * .20, .19, .17];
     parts.push(limb([side * shoulder, .43, -.025], elbow, .055, .044));
     parts.push(limb(elbow, [side * .17, .30, .39], .044, .033));
   }
   return merge(parts);
+}
+
+export function createWalkingDriverGeometries() {
+  return {
+    female: torso(.16, .115, .167, false),
+    male: torso(.205, .16, .20, false),
+    neutral: torso(.182, .138, .184, false),
+    shortHair: hair(false),
+    longHair: hair(true),
+  };
 }
 
 function hair(long: boolean) {

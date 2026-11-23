@@ -1,4 +1,6 @@
 import { resolveRustWebSocketUrl } from "./deploymentEnvironment";
+import { receiveHubActors, resetHub } from "../game/hub/hubStore";
+import { receiveHubResult, resetHubControls } from "../game/hub/hubControls";
 import {SnapshotDecoder} from './snapshotDecoder';
 import {isDriverAppearance} from '../game/characters/driverAppearance';
 import {SnapshotDelivery, type SnapshotReceipt} from './snapshotDelivery';
@@ -461,6 +463,8 @@ export function connectRustServer(): WebSocket {
 
   const handleLoss = () => {
     if (!isCurrent()) return;
+    resetHub();
+    resetHubControls();
     loginRecovery = null;
     rememberDeployment();
     if(resumeIntent)resumeIntent.step="waiting";
@@ -558,6 +562,12 @@ export function connectRustServer(): WebSocket {
       );
     const state = useNetworkStore.getState();
     switch (message.type) {
+      case "hub_actors":
+        receiveHubActors(message, state.room_id);
+        return;
+      case "hub_result":
+        receiveHubResult(message);
+        return;
       case "driver":
         if(message.world_id===state.room_id && decoder.receiveDriver(message)) acknowledgeInput(message.data[0],receivedMs);
         return;
@@ -629,6 +639,8 @@ export function connectRustServer(): WebSocket {
         }
         return;
       case "world_changed":
+        resetHub();
+        resetHubControls();
         resetSnapshotDelivery();
         decoder.reset();
         if(!message.world&&hadLocalBody&&!resumeIntent&&useUIStore.getState().screen==='sandbox'&&!['leave_game','match_results'].includes(useUIStore.getState().overlay??''))failRecovery('The server closed your physics world. Your previous game mode is selected; deploy when ready.');

@@ -8,11 +8,13 @@ import { useVisualAlignmentStore } from "../store/presentation/visualAlignmentSt
 import type { RosterEntity } from "./rosterSelector";
 import { modelOffset } from "./tools/roadLamps";
 import { createDriverFleet } from "./drivers/driverFleet";
+import { useHubStore } from "../game/hub/hubStore";
 
 // bake-vehicle-lods.py grounds the tank at this tire/track floor. The road
 // profiles already carry their source floors; the tank has no road lamp profile.
 const TANK_SOURCE_FLOOR = .013059604912996;
-const currentAppearance = (id: string) => snapshotEntity(useNetworkStore.getState().snapshot, id)?.driver;
+const currentAppearance = (id: string) => useHubStore.getState().actors[id]
+  ? null : snapshotEntity(useNetworkStore.getState().snapshot, id)?.driver;
 function currentOffset(car: RosterEntity, out: Vector3) {
   modelOffset(car, out);
   if (car.vehicle_id === "tank" && useVisualAlignmentStore.getState().reports[car.id]?.model !== "tank") out.y -= TANK_SOURCE_FLOOR;

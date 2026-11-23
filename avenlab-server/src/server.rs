@@ -364,6 +364,7 @@ impl Server {
                 .await
                 .map_err(|_| "Could not load the world.")??;
             loaded.physics.set_tire_thermals(world.tire_thermals);
+            if crate::hub::available(&world) { loaded.enable_hub(); }
             Arc::new(Mutex::new(loaded))
         };
         if let Some(mode) = world.mode {

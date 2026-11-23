@@ -1,4 +1,5 @@
 import { useMotionView } from "../store/session/networkViews";
+import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove } from "../game/hub/hubControls";
 import {requestTankBarrage} from "../combat/tankBarrage";
 import {useSocialStore} from '../store/social/socialStore';
 import {isMatchMode} from '../store/alpha/alphaStore';
@@ -88,12 +89,20 @@ const PLAYER_TOGGLES: Record<string, number> = {
 export function Keyboard() {
   useEffect(() => {
     const keys = new Set<string>();
+    const footKeys = new Set<string>();
+    const updateFoot = () => {
+      const held = (...names: string[]) => Number(names.some(name => footKeys.has(name)));
+      setHubMove("keyboard", held("KeyD", "ArrowRight") - held("KeyA", "ArrowLeft"),
+        held("KeyW", "ArrowUp") - held("KeyS", "ArrowDown"), Boolean(held("ShiftLeft", "ShiftRight")));
+    };
     let focused = document.hasFocus();
     let fireKey:string|null=null;
     let secondaryFireKey:string|null=null;
     let resetTimer: number | null = null;
     let tractionHold: number | null = null;
     const release = () => {
+      footKeys.clear();
+      releaseHubMove("keyboard");
       useScoreboardStore.getState().close();
       releaseWeaponSource("keyboard");
       combatIntent.keyboardRam=false;combatIntent.keyboardFire=false;fireKey=null;secondaryFireKey=null;
@@ -304,6 +313,21 @@ export function Keyboard() {
         }
         return;
       }
+      const mode = hubMode();
+      if (mode && event.code === "KeyF" && !event.ctrlKey && !event.altKey && !event.metaKey) {
+        event.preventDefault();
+        interactInHub();
+        return;
+      }
+      if (mode === "foot" && event.code !== "Escape") {
+        if (event.code === "Space") jumpInHub();
+        else if (["KeyW", "KeyA", "KeyS", "KeyD", "ArrowUp", "ArrowLeft", "ArrowDown", "ArrowRight", "ShiftLeft", "ShiftRight"].includes(event.code)) {
+          footKeys.add(event.code);
+          updateFoot();
+        } else return;
+        event.preventDefault();
+        return;
+      }
       const store = useInputStore.getState();
       const combatKeys=usePreferencesStore.getState().bindings;
       if(event.code===combatKeys.ultimate){if(!event.repeat)void requestTankBarrage();event.preventDefault();return;}
@@ -391,6 +415,7 @@ export function Keyboard() {
       }
     };
     const onKeyUp = (event: KeyboardEvent) => {
+      if (footKeys.delete(event.code)) updateFoot();
       if(event.code===fireKey){setWeaponHeld('keyboard','primary',false);combatIntent.keyboardFire=false;fireKey=null;}
       if(event.code===secondaryFireKey){setWeaponHeld('keyboard','secondary',false);secondaryFireKey=null;}
       // Release a key even if focus moved into an input after its keydown.
