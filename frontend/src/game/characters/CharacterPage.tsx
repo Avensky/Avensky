@@ -30,7 +30,7 @@ import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import { useGarageDrive } from "../preview/garageDriveStore";
 import { OPEN_DRIVER_DOOR, PANEL_INTERACTIONS, SIT_IN_CHAIR, garagePanelForEmote } from "./garageInteractions";
-import { CLOSE_BRZ_HOOD, OPEN_BRZ_HOOD } from "./brzHoodMotion";
+import { CLOSE_BRZ_HOOD, OPEN_BRZ_HOOD, TWEAK_BRZ_ENGINE } from "./brzHoodMotion";
 import { BRZ_GARAGE_ENABLED } from "../preview/brzCabin";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
 import { EmoteCreator } from "./EmoteCreator";
@@ -90,6 +90,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const availableParts = useVehicleStudioStore(state => state.availableParts);
   const hoodOpen = useVehicleStudioStore(state => state.parts.hood);
   const brzDoorReady = useCharacterPreviewStore(state => state.brzDoorReady);
+  const brzEngineAvailable = useCharacterPreviewStore(state => state.brzEngineAvailable);
+  const brzHoodBusy = useCharacterPreviewStore(state => state.brzHoodBusy);
   const ownerKey = owner ?? "this-device";
   const favoritesKey = "avensky-emote-favorites-v1:" + ownerKey;
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -500,10 +502,14 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
       {PANEL_INTERACTIONS.map(action => <button key={action.id} type="button" className="menu-control" data-controller-row
         disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)
-          || (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && hoodOpen && action.id === OPEN_BRZ_HOOD)}
+          || (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && action.part === "hood"
+            && (brzHoodBusy || hoodOpen && action.id === OPEN_BRZ_HOOD))}
         onClick={() => previewInteraction(action.id)}>{action.label}</button>)}
+      {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && brzEngineAvailable && availableParts.includes("hood") && <button type="button"
+        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen || brzHoodBusy}
+        onClick={() => previewInteraction(TWEAK_BRZ_ENGINE)}>Tweak engine</button>}
       {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && availableParts.includes("hood") && <button type="button"
-        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen}
+        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen || brzHoodBusy}
         onClick={() => previewInteraction(CLOSE_BRZ_HOOD)}>Close hood</button>}
       <button type="button" className="menu-control" data-controller-row disabled={reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
       <button type="button" className="menu-control" data-controller-row disabled={!emote}
