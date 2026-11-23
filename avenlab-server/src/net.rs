@@ -91,6 +91,7 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                 let mut sent_base=None;
                 let mut sent_driver:Option<crate::snapshot_wire::DriverLane>=None;
                 let mut driver_window=0;
+                let mut sent_hub: Option<Arc<str>> = None;
                 let mut reset_seen=0;
                 // Browsers answer protocol pings even when background JS timers are throttled.
                 let mut heartbeat = tokio::time::interval(Duration::from_secs(8));
@@ -127,6 +128,12 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                                 } else {messages.push(frame.snapshot.to_string());}
                             } else {sent_base=None;messages.push(frame.snapshot.to_string());}
                             if !frame.debug.is_empty(){messages.push(frame.debug.to_string());}
+                            if let Some(hub) = &frame.hub {
+                                if sent_hub.as_ref().is_none_or(|previous| !Arc::ptr_eq(previous, hub)) {
+                                    messages.push(hub.to_string());
+                                    sent_hub = Some(hub.clone());
+                                }
+                            } else { sent_hub = None; }
                             messages
                         }
                     };
@@ -165,6 +172,8 @@ pub async fn start_websocket_server(server: Arc<Server>) {
             let mut commands = RateLimit::new(12, 10);
             let mut passwords = RateLimit::new(4, 30);
             let mut pings = RateLimit::new(2, 1);
+            let mut hub_motion = RateLimit::new(28, 1);
+            let mut hub_actions = RateLimit::new(5, 2);
             let mut ingress = ingress::IngressBudget::new(Instant::now());
             // Protocol pongs keep idle menus alive, but must not reserve an
             // unidentified connection forever. No per-packet registry lookup.
@@ -222,6 +231,26 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                 if message_type == "input" {
                     if let Ok(packet) = serde_json::from_value::<InputPacket>(value) {
                         input_tx.send_replace(Some(packet));
+                    }
+                    continue;
+                }
+                if matches!(message_type, "hub_motion" | "hub_interact") {
+                    let allowed = if message_type == "hub_motion" { hub_motion.allow() } else { hub_actions.allow() };
+                    if !allowed || text.len() > 512 { continue; }
+                    let Some(world) = value.get("world_id").and_then(Value::as_u64).and_then(|id| usize::try_from(id).ok())
+                        else { continue; };
+                    let Ok(runtime) = server.runtime(&player).await else { continue; };
+                    let mut room = runtime.lock().await;
+                    if message_type == "hub_motion" {
+                        if let Ok(input) = serde_json::from_value(value) { room.hub_input(&player, world, input); }
+                    } else {
+                        let target = value.get("target").and_then(Value::as_str);
+                        let request = value.get("request").and_then(Value::as_u64);
+                        let reply = match room.hub_interact(&player, world, target) {
+                            Ok(walking) => json!({"type":"hub_result","world_id":world,"request":request,"walking":walking}),
+                            Err(message) => json!({"type":"hub_result","world_id":world,"request":request,"message":message}),
+                        };
+                        let _ = tx.send(reply.to_string());
                     }
                     continue;
                 }
@@ -293,6 +322,7 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                                 let mut room = runtime.lock().await;
                                 let allowed = server.validate_alpha_vehicle(&player, vehicle).await;
                                 match allowed.and_then(|_| {
+                                    if room.hub_walking(&player) { return Err("Get back into your BRZ before changing vehicles.".into()); }
                                     room.validate_hero_change_location(&player)?;
                                     room.physics.change_vehicle_for_player(&player, vehicle)
                                 }) {

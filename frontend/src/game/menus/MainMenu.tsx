@@ -9,9 +9,10 @@ import { MainMenuProfile } from "./MainMenuProfile";
 
 import { useSocialStore } from "../../store/social/socialStore";
 import { mainMenuItems } from "./menuItems";
+import { openWorldForView } from "../social/openWorld";
 
 export function MainMenu() {
-  const mainWorld = useSocialStore(s => s.view?.main_world_id);
+  const mainWorld = useSocialStore(s => openWorldForView(s.view));
   const selectedIndex = useUIStore((s) => s.selectedMenuIndexById.main);
   const setActiveMenuIndex = useUIStore((s) => s.setActiveMenuIndex);
   const activate = useUIStore((s) => s.activateActiveMenuSelection);

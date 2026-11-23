@@ -8,7 +8,9 @@ use crate::{
 };
 use rapier3d::prelude::RigidBodyHandle;
 use serde_json::json;
-use std::{sync::Arc, collections::HashMap};
+use std::collections::HashMap;
+#[cfg(test)]
+use std::sync::Arc;
 use tokio::sync::{watch};
 
 #[derive(Debug, Clone)]
@@ -32,6 +34,7 @@ pub struct WorldRuntime {
     round_completion: Option<CompletedRound>,
     completion_captured: bool,
     harbor_intel: crate::harbor::HarborIntel,
+    hub: Option<crate::hub::Hub>,
 }
 impl WorldRuntime {
     pub fn new(id: usize, map: &str) -> Result<Self, String> {
@@ -47,7 +50,27 @@ impl WorldRuntime {
         Ok(Self::from_parts(game, physics))
     }
     pub fn from_parts(game: SharedGameState, physics: PhysicsWorld) -> Self {
-        Self { game, physics, round: None, round_players: HashMap::new(), round_completion: None, completion_captured: false, harbor_intel: Default::default() }
+        Self { game, physics, round: None, round_players: HashMap::new(), round_completion: None, completion_captured: false,
+            harbor_intel: Default::default(), hub: None }
+    }
+    pub fn enable_hub(&mut self) { self.hub = Some(crate::hub::Hub::default()); }
+    pub fn hub_walking(&self, id: &str) -> bool { self.hub.as_ref().is_some_and(|hub| hub.walking(id)) }
+    pub fn hub_input(&mut self, id: &str, world: usize, input: crate::hub::Motion) {
+        if world == self.game.room_id && self.game.clients.contains_key(id) {
+            if let Some(hub) = &mut self.hub { hub.input(id, input, self.game.tick); }
+        }
+    }
+    pub fn hub_interact(&mut self, id: &str, world: usize, target: Option<&str>) -> Result<bool, &'static str> {
+        if world != self.game.room_id || !self.game.clients.contains_key(id) { return Err("Join the staging hub first."); }
+        let hub = self.hub.as_mut().ok_or("Walking is available in the staging Open World.")?;
+        let entity = self.game.entities.get_mut(id).ok_or("Spawn your BRZ first.")?;
+        if entity.vehicle_id.as_deref() != Some("brz") { return Err("Select the BRZ in the garage first."); }
+        hub.interact(id, target, &mut self.physics)?;
+        entity.last_packet = None;
+        if let Some(frame) = hub.frame(self.game.room_id, self.game.tick, |id| self.game.clients.contains_key(id)) {
+            self.game.hub_frame = Some(frame.into());
+        }
+        Ok(hub.walking(id))
     }
     /// Server admission owns eligibility and calls start only after its roster gate.
     pub fn configure_round(&mut self, mode: crate::alpha::Mode, training: bool) -> Result<(),String> {
@@ -143,6 +166,7 @@ impl WorldRuntime {
     }
     /// No transport remains for a leased practice body. Clear all held intent.
     pub fn detach(&mut self,id:&str){
+        if let Some(hub) = &mut self.hub { hub.suspend(id); }
         self.harbor_intel.forget_connection(id);
         self.game.unregister_client(id);
         self.physics.suspend_shields(id);
@@ -154,12 +178,14 @@ impl WorldRuntime {
         if !self.game.entities.contains_key(old)||!self.physics.vehicles.contains_key(old){return false;}
         self.leave(new); // Release the temporary admission entity, not the leased body.
         if !self.physics.reassign_player(old,new){return false;}
+        if let Some(hub) = &mut self.hub { hub.resume(old, new); }
         self.round_players.remove(old); // the resumed driver now has the replacement connection ID
         let mut entity=self.game.entities.remove(old).unwrap();entity.id=new.into();entity.last_packet=None;
         self.game.entities.insert(new.into(),entity);
         self.game.register_client(new.into(),connection.tx.clone(),connection.frame.clone(),connection.input.clone());true
     }
     pub fn leave(&mut self, id: &str) {
+        if let Some(hub) = &mut self.hub { hub.remove(id); }
         self.harbor_intel.forget_connection(id);
         if self.round.as_ref().is_some_and(|r|r.phase==crate::ctf::CtfPhase::Running){self.capture_round_player(id);}
         if let Some(round)=&mut self.round{round.remove_player(id);}
@@ -215,6 +241,11 @@ impl WorldRuntime {
         self.game.collect_input_packets();
         let mut debug = DebugFlags::NONE;
         for entity in self.game.entities.values_mut() {
+            if self.hub.as_ref().is_some_and(|hub| hub.walking(&entity.id)) {
+                entity.last_packet = None;
+                crate::hub::park(&mut self.physics, &entity.id);
+                continue;
+            }
             // Consume dead inputs without caching them across respawn. A held
             // packet from before defeat must never restart driving or firing.
             if self.physics.is_defeated(&entity.id) {entity.last_packet=None;continue;}
@@ -233,6 +264,14 @@ impl WorldRuntime {
         let physics_started = std::time::Instant::now();
         self.physics.move_drawbridges(self.game.tick as u64 + 1);
         self.physics.step(SIMULATION_DT);
+        if let Some(hub) = &mut self.hub {
+            hub.step(&self.physics, self.game.tick);
+            if (self.game.tick % 4 == 0 || self.game.hub_frame.is_none())
+                && let Some(frame) = hub.frame(self.game.room_id, self.game.tick, |id| self.game.clients.contains_key(id))
+            {
+                self.game.hub_frame = Some(frame.into());
+            }
+        }
         self.harbor_intel.tick(&self.game,&self.physics);
         self.physics.advance_field_service(SIMULATION_DT, |id| self.game.clients.contains_key(id));
         self.physics.advance_guard_boosts(SIMULATION_DT, |id| self.game.clients.contains_key(id));

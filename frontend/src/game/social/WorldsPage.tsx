@@ -12,7 +12,7 @@ import {
   type SocialWorld,
 } from "../../store/social/socialStore";
 import type { SocialCommand } from "./types";
-import { findOpenWorld, OPEN_WORLD_ID } from "./openWorld";
+import { findOpenWorld, openWorldForView } from "./openWorld";
 
 /** Joining reserves a slot and selects this world's authoritative map. Vehicle
  * selection remains the existing garage flow; no second spawn command owner. */
@@ -49,7 +49,7 @@ export function WorldsPage({
   const current = view.worlds.find(
     (world) => world.id === view.current_world_id,
   );
-  const hubId = view.main_world_id === undefined ? OPEN_WORLD_ID : view.main_world_id;
+  const hubId = openWorldForView(view);
   const hub = hubId == null ? undefined : findOpenWorld(view.worlds, hubId);
   const join = async (world?: SocialWorld) => {
     const target = world ?? selected;
@@ -121,6 +121,7 @@ export function WorldsPage({
           {hub && availableMaps.includes(hub.map) ? (
             <>
               <p>{hub.name} · {hub.players}/{hub.max_players} players</p>
+              {hub.walkable && <p>Choose a BRZ to drive or explore on foot.</p>}
               <ControllerAction button="A" type="button" className="menu-control"
                 disabled={current?.id !== hub.id && hub.players >= hub.max_players}
                 onClick={() => current?.id === hub.id ? enterWorld({ map: hub.map }) : void join(hub)}>

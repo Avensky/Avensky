@@ -25,13 +25,22 @@ import { useRenderSettingsStore } from "../store/presentation/renderSettingsStor
 import { useMenuInputDevice } from "../components/controller/useMenuInputDevice";
 import { isMobileBrowser } from "../controls/inputDevice";
 import { useUIStore } from "../store/menus/uiStore";
+import { HubHud } from "../game/hub/HubHud";
+import { useHubStore } from "../game/hub/hubStore";
+import { useNetworkStore } from "../store/session/networkStore";
 
 export function DrivingOverlay({ hud }: { hud: boolean }) {
   const device = useMenuInputDevice();
   const touch = device === "touch" || isMobileBrowser();
+  const player = useNetworkStore(s => s.playerId);
+  const room = useNetworkStore(s => s.room_id);
+  const vehicle = useNetworkStore(s => s.getMe()?.vehicle_id);
+  const walking = useHubStore(s => s.world === room && Boolean(s.actors[player]));
+  const drivingBrz = useHubStore(s => s.world !== null && s.world === room && vehicle === "brz" && !s.actors[player]);
   return (
     <>
-      {(hud || touch) && <DrivingHUD controlsOnly={!hud} />}
+      {!walking && (hud || touch) && <DrivingHUD controlsOnly={!hud} />}
+      <HubHud drivingBrz={drivingBrz} walking={walking} />
       {touch && (
         <button className="touch-pause-button" type="button" aria-label="Pause menu" onClick={useUIStore.getState().openPause}>
           Pause
