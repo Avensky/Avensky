@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Group } from "three";
+import { BoxGeometry, Group, Mesh, Vector3 } from "three";
 import { createServer } from "vite";
 
 test("workshop authoring saves bounded pose tracks and resolves fitted chair targets", async () => {
@@ -59,6 +59,53 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     seat.position.z = -3;
     assert.equal(chairSitClip(actor, seat), undefined);
     assert.equal(chairSitClip(actor, undefined), undefined);
+
+    const { createVehiclePartRig } = await vite.ssrLoadModule("/src/game/preview/vehiclePartRig.ts");
+    const { preparePanelOpening } = await load("garageInteractions.tsx");
+    const car = new Group();
+    const mesh = (name, dimensions, position) => {
+      const part = new Mesh(new BoxGeometry(...dimensions));
+      part.name = name;
+      part.position.set(...position);
+      car.add(part);
+      return part;
+    };
+    mesh("BODY", [1.8, 1, 4.4], [0, .5, 0]);
+    mesh("HEADLIGHT_LEFT_LENS_COVER", [.4, .15, .3], [-.6, .6, -1.8]);
+    mesh("HOOD", [1.4, .19, 1.1], [0, .72, -1.47]);
+    const vent = mesh("HOOD_VENT_FRAME", [.8, .06, .3], [0, .78, -1.47]);
+    const latch = mesh("HOOD_LATCH_LOCK", [.22, .04, .05], [0, .6, -1.85]);
+    const trunk = mesh("TRUNK", [1.3, .16, .6], [0, .8, 1.85]);
+    const right = mesh("Mesh155_body_0", [.13, .65, 1.4], [.82, .5, -.07]);
+    const glass = mesh("WINDOW_RIGHT_TINT", [.04, .35, .95], [.78, 1, 0]);
+    const rigs = createVehiclePartRig(car, "brz");
+    const hood = rigs.find(hinge => hinge.part === "hood");
+    const boot = rigs.find(hinge => hinge.part === "trunk");
+    const door = rigs.find(hinge => hinge.part === "door-right");
+    assert.equal(vent.parent, hood.pivot);
+    assert.equal(latch.parent, hood.latch);
+    assert.equal(trunk.parent, boot.pivot);
+    assert.equal(right.parent, door.pivot);
+    assert.equal(glass.parent, door.pivot);
+    assert.ok(hood.stance.point.z < -2.2 && boot.stance.point.z > 2.2, "approach points clear the vehicle bounds");
+    for (const hinge of [hood, boot]) {
+      const height = hinge.handle.getWorldPosition(new Vector3()).y;
+      hinge.pivot.rotation[hinge.axis] = hinge.open;
+      assert.ok(hinge.handle.getWorldPosition(new Vector3()).y > height + .15);
+      hinge.pivot.rotation[hinge.axis] = hinge.closed;
+    }
+    const arm = new Group(), elbow = new Group(), hand = new Group();
+    arm.name = "upperarm_r"; elbow.name = "lowerarm_r"; hand.name = "hand_r";
+    arm.position.set(.14, 1.2, -2.5); elbow.position.y = -.38; hand.position.y = -.32;
+    actor.add(arm); arm.add(elbow); elbow.add(hand);
+    const opening = preparePanelOpening(actor, hood);
+    opening.sample(.45);
+    assert.equal(hood.angle, 0, "release the latch before lifting the hood");
+    assert.notEqual(hood.latch.rotation[hood.axis], 0);
+    opening.sample(1.8);
+    assert.equal(hood.angle, hood.open);
+    opening.stop();
+    assert.equal(hood.latch.rotation[hood.axis], 0);
   } finally {
     await vite.close();
     if (before) Object.defineProperty(globalThis, "localStorage", before);

@@ -31,6 +31,7 @@ import { isCompactPreview } from "./previewBudget";
 import { garageCamera, useGarageDrive } from "./garageDriveStore";
 import { GARAGE_STATIONS } from "./garageStations";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
+import { GaragePanelTarget, garagePanelForEmote } from "../characters/garageInteractions";
 
 const DRIVER_STAGE_CAMERA: [number, number, number] = [2.8, 2.5, 5.8];
 const STANDARD_STAGE_CAMERA: [number, number, number] = [0, 3.2, 7.25];
@@ -121,6 +122,7 @@ export function VehiclePreview({
   const selected = HEROES.find(hero => hero.id === (picked ?? savedHero))?.vehicle;
   const vehicleEmotes = wardrobeOpen && !characterOnly;
   const insideCar = useCharacterPreviewStore(s => vehicleEmotes && s.insideCar);
+  const panel = useCharacterPreviewStore(s => vehicleEmotes ? garagePanelForEmote(s.emote?.id) : undefined);
   const fittingToCar = useCharacterPreviewStore(s => vehicleEmotes && (s.emote?.id === GARAGE_LEAN_ID || isMirrorMakeupEmote(s.emote?.id)));
   const vehicleId = awaitingHero ? selected ?? (driverStage ? favorite : undefined) : favorite;
   const lastVehicle = useRef(vehicleId);
@@ -179,6 +181,7 @@ export function VehiclePreview({
   const emotePose = (insideCar || fittingToCar) && vehicleFit ? vehicleFit : parkedDriverFit;
   const activeDriver = wardrobeOpen ? driver : garageDriver;
   const driverPose = vehicleEmotes ? emotePose : garageDriverPose;
+  const panelPose = panel ? vehicleFit?.panels?.[panel] : undefined;
   const aspect = width / Math.max(1, height);
   const verticalFov = (horizontal: number) => (2 * Math.atan(Math.tan((horizontal * Math.PI) / 360) / aspect) * 180) / Math.PI;
   // Look into the authored corner from inside the room. The tighter horizontal
@@ -364,13 +367,16 @@ export function VehiclePreview({
         <group rotation={[0, Math.PI / 2, 0]}>
           <group ref={motion}>
             {activeDriver && (characterOnly || driverPose) && <group ref={characterActor} matrixAutoUpdate={!characterOnly}
-              position={driverPose?.position} scale={driverPose?.scale} rotation={[0, driverPose?.yaw ?? 0, 0]}>
+              position={panelPose?.position ?? driverPose?.position} scale={driverPose?.scale}
+              rotation={[0, panelPose?.yaw ?? driverPose?.yaw ?? 0, 0]}>
               <group name={wardrobeOpen ? "character-driver-shadow" : "garage-driver-shadow"}>
                 <PreviewContactShadow footprint={[.55, .46]} offset={[0, 0]} />
               </group>
-              <GarageDriver choice={activeDriver} previewPacks={wardrobeOpen} upright={characterOnly}
-                leanFit={vehicleEmotes ? vehicleFit?.lean : undefined} mirrorFit={vehicleEmotes ? vehicleFit?.mirror : undefined}
-                cockpit={!characterOnly && (vehicleEmotes || garageOpen) ? vehicleFit?.cockpit : undefined} />
+              <GaragePanelTarget.Provider value={panelPose?.hinge}>
+                <GarageDriver choice={activeDriver} previewPacks={wardrobeOpen} upright={characterOnly || Boolean(panelPose)}
+                  leanFit={vehicleEmotes ? vehicleFit?.lean : undefined} mirrorFit={vehicleEmotes ? vehicleFit?.mirror : undefined}
+                  cockpit={!characterOnly && (vehicleEmotes || garageOpen) ? vehicleFit?.cockpit : undefined} />
+              </GaragePanelTarget.Provider>
             </group>}
             {vehicleId && <AssetBoundary
               key={vehicleId}
