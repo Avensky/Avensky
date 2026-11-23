@@ -10,7 +10,8 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
   const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
   try {
     const { prepareGarageCockpit, sampleCockpitMotion } = await vite.ssrLoadModule('/src/game/preview/garageCockpit.ts');
-    const { BRZ_EXIT_SECONDS, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS, sampleBrzExit, sampleDriveOut } =
+    const { BRZ_ENTRY_SECONDS, BRZ_EXIT_SECONDS, GARAGE_ENTRY_START_SECONDS,
+      sampleBrzEntry, sampleBrzExit, sampleDriveOut } =
       await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
     const { GARAGE_STATIONS } = await vite.ssrLoadModule('/src/game/preview/garageStations.ts');
     for (const gender of ['female', 'male']) for (const side of [-1, 1]) {
@@ -168,28 +169,42 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
     passenger.stop();
 
     for (const side of [1, -1]) {
-      const exit = new Group(), release = new Group();
+      const exit = new Group(), lever = new Group(), release = new Group(), pull = new Group();
       exit.position.set(side * .82, .52, .76);
-      release.position.set(side * -.098, .187, -.534);
-      exit.add(release);
+      lever.position.set(side * -.098, .187, -.499);
+      release.position.z = -.035;
+      lever.add(release);
+      pull.position.set(side * -.12, .097, -.553);
+      exit.add(lever, pull);
       brz.add(exit);
       brzStand.position.set(side * 1.29, .023, -.65);
       brzStand.rotation.y = side * -.59;
-      const hinge = { pivot: exit, axis: 'y', closed: 0, open: side * -Math.PI / 3, angle: 0, interiorHandle: release };
+      const hinge = { pivot: exit, axis: 'y', closed: 0, open: side * -Math.PI / 3, angle: 0,
+        interiorHandle: release, interiorPull: pull, releaseLever: { place: amount => { lever.rotation.y = side * .44 * amount; } } };
       const outside = [ankle('l'), ankle('r')];
       const cabin = prepareGarageCockpit(brz, [], hinge, GARAGE_STATIONS.brz, side < 0 ? passengerSeat : undefined)
         (brzDriver, brzMotion, true, true);
       assert.equal(cabin.exitDoor, hinge);
-      cabin.sample(null, 0, sampleDriveOut(GARAGE_ENTRY_DURATION));
-      const seated = [ankle('l'), ankle('r')];
-      cabin.sample(null, 0, undefined, sampleBrzExit(.45));
-      assert.equal(hinge.angle, 0, 'the hand reaches the lever before the door opens');
       const hand = side > 0 ? 'middle_01_l' : 'middle_01_r';
+      cabin.sample(null, 0, sampleBrzEntry(3.62));
+      assert.equal(hinge.angle, hinge.open, 'the hand gets to the inside pull before closing');
+      assert(joint(hand).distanceTo(pull.getWorldPosition(new Vector3())) < .03);
+      cabin.sample(null, 0, sampleBrzEntry(4.1));
+      assert(side * hinge.angle < 0 && Math.abs(hinge.angle) < Math.abs(hinge.open));
+      assert(joint(hand).distanceTo(pull.getWorldPosition(new Vector3())) < .03, 'the hand follows the inside pull');
+      cabin.sample(null, 0, sampleBrzEntry(BRZ_ENTRY_SECONDS));
+      assert.equal(hinge.angle, hinge.closed);
+      const seated = [ankle('l'), ankle('r')];
+      cabin.sample(null, 0, undefined, sampleBrzExit(.57));
+      assert.equal(hinge.angle, 0, 'the hand reaches the lever before the door opens');
+      assert(Math.abs(lever.rotation.y) > .4, 'the release lever moves before the door');
       assert(joint(hand).distanceTo(release.getWorldPosition(new Vector3())) < .025, 'the near hand reaches the interior release');
-      cabin.sample(null, 0, undefined, sampleBrzExit(1.40));
+      cabin.sample(null, 0, undefined, sampleBrzExit(1.06));
+      assert(Math.abs(lever.rotation.y) < .001 && Math.abs(hinge.angle) > .1, 'the release springs back as the door swings');
+      cabin.sample(null, 0, undefined, sampleBrzExit(1.50));
       assert.equal(hinge.angle, hinge.open, 'the door opens all the way before stepping out');
       for (const [index, foot] of ['l', 'r'].entries()) assert(ankle(foot).distanceTo(seated[index]) < .001);
-      cabin.sample(null, 0, undefined, sampleBrzExit(2.43));
+      cabin.sample(null, 0, undefined, sampleBrzExit(2.53));
       assert(side * ankle(side > 0 ? 'l' : 'r').x > 1.02, 'the near foot clears the sill first');
       assert(side * ankle(side > 0 ? 'r' : 'l').x < 1.02, 'the other foot remains in the footwell');
       cabin.sample(null, 0, undefined, sampleBrzExit(BRZ_EXIT_SECONDS));
@@ -202,7 +217,7 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
     const { scene: broadDriver } = await new GLTFLoader().parseAsync(await readFile('tests/fixtures/villager-male-rig.json', 'utf8'), '');
     const wideStand = new Group(), openPanel = new Group(), outsideHandle = new Group();
     brzMotion.add(wideStand);
-    wideStand.position.set(1.43, .023, -.65);
+    wideStand.position.set(1.43, .023, -.31);
     wideStand.add(broadDriver);
     brz.add(openPanel);
     openPanel.position.set(.822, .52, .765);
@@ -215,8 +230,12 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
       part: 'door-left', pivot: openPanel, axis: 'y', angle: openPanel.rotation.y, handle: outsideHandle, doorSweep: wing,
     }, true);
     assert(closing, 'a wider rig can walk behind the open door to close it');
+    const initialStand = wideStand.position.clone();
+    closing.sample(0, .06);
+    assert(wideStand.position.distanceTo(initialStand) < .001, 'closing begins at the last action position');
     closing.sample(closing.duration, .06);
     assert(wideStand.position.x > 1.8);
+    assert(Math.abs(wideStand.position.y - initialStand.y) < .001, 'opening the door never changes the ground height');
     closing.stop();
 
     const { cockpitTakesForWheel } = await vite.ssrLoadModule('/src/game/characters/cockpitEmotes.ts');

@@ -15,8 +15,8 @@ import { COCKPIT_TAKES, type CockpitTake } from "./cockpitEmotes";
 import { createEmoteProp, type EmoteProp, type EmotePropModel } from "./emoteProps";
 import { bindFlagPoleGrip } from "./flagPoleGrip";
 import type { CockpitPlayback, GarageCockpit } from "../preview/garageCockpit";
-import { BRZ_EXIT_SECONDS, DRIVE_OUT_DURATION, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS,
-  sampleBrzExit, sampleDriveOut } from "../preview/garageDriveMotion";
+import { BRZ_ENTRY_SECONDS, BRZ_EXIT_SECONDS, DRIVE_OUT_DURATION, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS,
+  sampleBrzEntry, sampleBrzExit, sampleDriveOut } from "../preview/garageDriveMotion";
 import { useGarageDrive } from "../preview/garageDriveStore";
 
 import { personalityEmote, type CharacterPersonality } from "./characterPersonality";
@@ -76,6 +76,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     finished: boolean;
   } | null>(null);
   const openDoorApproach = useRef<ReturnType<typeof prepareBrzApproach>>(undefined);
+  const exteriorHandoff = useRef<ReturnType<typeof prepareBrzApproach>>(undefined);
   const exitSeconds = useRef(0);
   const chairRequested = useCharacterPreviewStore(s => previewPacks && s.emote?.id === SIT_IN_CHAIR);
   const chairShown = useRef(false);
@@ -110,6 +111,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     playback?.opening.stop();
     if (panel?.hinge.part.startsWith("door-") && playback?.finished && playback.approach && view.insideCar && current) {
       openDoorApproach.current = playback.approach;
+    } else if (playback?.approach && view.emote && !view.insideCar && !reducedMotion) {
+      playback.approach.releasePose();
+      exteriorHandoff.current = playback.approach;
     } else playback?.approach?.stop();
     if (view.brzDoorReady) useCharacterPreviewStore.setState({ brzDoorReady: false });
     if (view.brzDoorBusy) useCharacterPreviewStore.setState({ brzDoorBusy: false });
@@ -121,6 +125,8 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   useLayoutEffect(() => () => {
     openDoorApproach.current?.stop();
     openDoorApproach.current = undefined;
+    exteriorHandoff.current?.stop();
+    exteriorHandoff.current = undefined;
     exitSeconds.current = 0;
     if (previewPacks) useCharacterPreviewStore.setState({ brzExitReady: false, brzExiting: false });
   }, [root, previewPacks]);
@@ -208,6 +214,10 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     const driving = garageStation || (previewPacks && view.insideCar);
     if (!view.insideCar && view.brzExitReady) useCharacterPreviewStore.setState({ brzExitReady: false });
     if (!view.brzExiting) exitSeconds.current = 0;
+    if (exteriorHandoff.current && !view.emote && !view.insideCar) {
+      exteriorHandoff.current.stop();
+      exteriorHandoff.current = undefined;
+    }
     if (openDoorApproach.current && !view.insideCar && !view.brzExiting) {
       leaveCabin(current, restSeconds);
       openDoorApproach.current.stop();
@@ -232,17 +242,22 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
           exitApproach.resumeAtDoor();
           openDoorApproach.current = undefined;
         }
-        const previousApproach = (panel.hinge.hoodProp || fittedDoor) && previous?.finished ? previous.approach : exitApproach;
-        const alreadyAtPanel = closingDoor || isDoorClosing(current.preview?.id) ? undefined : previousApproach;
+        const previousApproach = previous?.approach ?? exitApproach ?? exteriorHandoff.current;
+        const alreadyAtPanel = previous?.finished && (panel.hinge.hoodProp || fittedDoor)
+          && !closingDoor && !isDoorClosing(current.preview?.id) ? previous.approach : undefined;
+        exteriorHandoff.current = undefined;
         previous?.opening.stop();
-        if (!previousApproach) previous?.approach?.stop();
+        if (previousApproach && !alreadyAtPanel) {
+          previousApproach.releasePose();
+          previousApproach.resumeAtDoor();
+        }
         current.active?.stop();
         current.active = null;
         current.release = null;
         current.idle.stop();
         current.preview = preview;
         const approach = alreadyAtPanel ?? (panel.clearance && panel.actor.current
-          ? prepareBrzApproach(root, panel.actor.current, panel.clearance, panel.hinge, closingDoor, previousApproach?.stop) : undefined);
+          ? prepareBrzApproach(root, panel.actor.current, panel.clearance, panel.hinge, closingDoor, previousApproach?.restoreParked) : undefined);
         const opening = preparePanelOpening(root, panel.hinge, preview.id === INSPECT_BRZ_ENGINE, Boolean(approach), approach?.outward, preview.id);
         if (!opening || (panel.clearance && !approach)) {
           (approach ?? previousApproach)?.stop();
@@ -340,25 +355,28 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
           emote: { id: view.brzPassenger ? CLOSE_PASSENGER_DOOR : CLOSE_DRIVER_DOOR } });
         return;
       }
-      const enteringCharacter = previewPacks && current.cabin.hasDoor && current.driveSeconds < GARAGE_ENTRY_DURATION;
+      const fittedEntry = previewPacks && view.insideCar && Boolean(exitDoor?.interiorPull);
+      const seatDuration = fittedEntry ? BRZ_ENTRY_SECONDS : GARAGE_ENTRY_DURATION;
+      const enteringCharacter = previewPacks && current.cabin.hasDoor && current.driveSeconds < seatDuration;
       const take = current.take;
       if (take && !enteringCharacter) {
         take.seconds += step;
         if (take.seconds >= take.clip.duration) current.take = null;
       }
-      const duration = drive.sequence === "entry" || enteringCharacter ? GARAGE_ENTRY_DURATION : DRIVE_OUT_DURATION;
+      const duration = drive.sequence === "entry" || enteringCharacter ? seatDuration : DRIVE_OUT_DURATION;
       const alreadyParked = current.driveSeconds >= duration && !take;
       if (driveOut && alreadyParked) return;
+      const sampleEntry = fittedEntry && enteringCharacter ? sampleBrzEntry : sampleDriveOut;
       const drivePose = driveOut || enteringCharacter
-        ? sampleDriveOut(current.driveSeconds = Math.min(current.driveSeconds + step, duration)) : undefined;
+        ? sampleEntry(current.driveSeconds = Math.min(current.driveSeconds + step, duration)) : undefined;
       const stage = drive.sequence === "entry" && current.driveSeconds >= GARAGE_ENTRY_DURATION ? "station" : drivePose?.stage;
       if (!previewPacks && stage && stage !== drive.stage) useGarageDrive.setState({ stage });
       current.cabin.sample(enteringCharacter ? null : current.take?.clip.id ?? null,
         current.take ? current.take.seconds / current.take.clip.duration : 0, drivePose);
-      if (exitDoor && view.insideCar && current.driveSeconds >= GARAGE_ENTRY_DURATION && !view.brzExitReady) {
+      if (exitDoor && view.insideCar && current.driveSeconds >= seatDuration && !view.brzExitReady) {
         useCharacterPreviewStore.setState({ brzExitReady: true });
       }
-      if (enteringCharacter && current.driveSeconds < GARAGE_ENTRY_DURATION) invalidate();
+      if (enteringCharacter && current.driveSeconds < seatDuration) invalidate();
       return;
     }
     leaveCabin(current, restSeconds);

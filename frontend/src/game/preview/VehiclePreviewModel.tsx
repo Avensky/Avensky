@@ -38,6 +38,7 @@ import { BRZ_GARAGE_ENABLED, prepareBrzCabin } from "./brzCabin";
 import { fitBrzEngineBay } from "./brzEngineBay";
 import { prepareBrzHardware } from "./brzHardware";
 import type { BrzClearance } from "./brzApproach";
+import { useCommittedResource } from "../characters/useCommittedResource";
 
 export type VehiclePreviewDriverFit = {
   model: VehicleModelId;
@@ -60,6 +61,7 @@ type VehicleLayout = {
 // the current platform scale. Let the GLTF cache own their lifetime.
 const layouts = new WeakMap<Object3D, VehicleLayout>();
 const leanFits = new WeakMap<VehicleLayout, { fit: ReturnType<typeof measureDriverLean> }>();
+const NO_PARTS: VehiclePartHinge[] = [];
 
 function setLampEmission(material: MeshStandardMaterial, color: number | Color, intensity: number) {
   material.emissive.set(color);
@@ -135,9 +137,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     if (progress === 1) setMaterializing(false);
     else invalidate();
   }, -.8);
-  const partRig=useMemo(() => {
-    if (showroomPath) return [];
-    const parts = createVehiclePartRig(prepared.root, model);
+  const createPartRig = useCallback(() => {
+    const parts = showroomPath ? [] : createVehiclePartRig(prepared.root, model);
     const hood = parts.find(part => part.part === "hood");
     const prop = prepared.brzHardware?.prop;
     const frame = prop && prepared.root.getObjectByName("HOOD_FRAME");
@@ -152,10 +153,13 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
         hood.handle.position.copy(hood.pivot.worldToLocal(bonnetSkin.localToWorld(new Vector3(.229, .659, -1.985))));
       }
     }
-    if (prepared.gullwing) parts.push(prepared.gullwing.hinge);
-    return parts;
+    if (!showroomPath && prepared.gullwing) parts.push(prepared.gullwing.hinge);
+    return { parts, dispose() { for (const hinge of parts) hinge.releaseLever?.dispose(); } };
   }, [prepared, model, showroomPath]);
+  const rig = useCommittedResource(createPartRig);
+  const partRig = rig?.parts ?? NO_PARTS;
   useLayoutEffect(() => {
+    if (!rig) return;
     // Door/steering splits require the original primitive indices. Batch only
     // after those splits and hinges, leaving every interactive part separate.
     const batches = batchStaticVehicleMeshes(prepared.root, {
@@ -165,7 +169,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
       animations,
     });
     return batches.dispose;
-  }, [prepared, partRig, station, animations]);
+  }, [prepared, rig, partRig, station, animations]);
   const driverDoor = useMemo(() => {
     if (station.kind !== "wheel") return undefined;
     const side = model === "brz" ? brzDriverSide(prepared.root) : Math.sign(station.seat[0]);
@@ -323,7 +327,9 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     return result;
   }, [scene, prepared, model]);
   const { measurements, door: doorBounds } = layout;
-  const clearance = useMemo(() => prepared.brzHardware ? { car: prepared.root, hull: measurements.bounds.clone() } : undefined, [prepared, measurements]);
+  const clearance = useMemo(() => prepared.brzHardware ? {
+    car: prepared.root, hull: measurements.bounds.clone(), doors: partRig.filter(part => part.doorSweep),
+  } : undefined, [prepared, measurements, partRig]);
   const display = useMemo(
     () => fitPreviewToPlatform(measurements, platform),
     [measurements, platform],
@@ -358,7 +364,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     const fit = driverReady ? leanFits.get(layout)?.fit : undefined;
     return { side, edge, along, fit };
   }, [doorBounds, measurements, prepared, hasDriver, driverReady, layout, station, clearance]);
-  const inset = inspectBody ? 0 : Math.min(staging.fit?.offset ?? 0, rook ? .14 : .06);
+  const inset = inspectBody || clearance ? 0 : Math.min(staging.fit?.offset ?? 0, rook ? .14 : .06);
   const lean = useMemo(() => {
     const fit = staging.fit;
     return !rook || inspectBody || !previewPacks || driver?.prop || !fit ? undefined : { ...fit, offset: fit.offset - inset };

@@ -3,7 +3,18 @@ import { driverArm } from "../characters/garageEmotes";
 import type { VehiclePartHinge } from "./vehiclePartRig";
 import { prepareBrzGait } from "./brzGait";
 
-export type BrzClearance = { car: Group; hull: Box3 };
+export type BrzClearance = { car: Group; hull: Box3; doors?: readonly VehiclePartHinge[] };
+
+function doorFootprint(hinge: VehiclePartHinge, padding: number) {
+  const sweep = hinge.doorSweep;
+  if (!sweep) return;
+  const up = new Vector3(0, 1, 0);
+  return new Box3().setFromPoints([sweep.min.x, sweep.max.x].flatMap(x => [sweep.min.z, sweep.max.z].map(z =>
+    new Vector3(x, 0, z).applyAxisAngle(up, hinge.angle).add(hinge.pivot.position)))).expandByScalar(padding);
+}
+
+const insideFootprint = (point: Vector3, hull: Box3) =>
+  point.x > hull.min.x && point.x < hull.max.x && point.z > hull.min.z && point.z < hull.max.z;
 
 /** Liang–Barsky on the garage XZ plane. A tangent can follow a clearance edge. */
 export function crossesBrzHull(start: Vector3, end: Vector3, hull: Box3) {
@@ -52,12 +63,17 @@ export function brzWalkRoute(start: Vector3, goal: Vector3, ...hulls: Box3[]): V
   }
 }
 
-export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: BrzClearance, hinge: VehiclePartHinge,
+export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull, doors = [] }: BrzClearance, hinge: VehiclePartHinge,
   closingDoor = false, returnToPark?: () => void) {
   const left = driverArm(root, "l"), right = driverArm(root, "r");
   const parent = actor.parent, handle = hinge.handle;
   if (!left || !right || !parent || !handle) return undefined;
   const parked = actor.position.clone(), facing = actor.quaternion.clone();
+  const restoreParked = returnToPark ?? (() => {
+    actor.position.copy(parked);
+    actor.quaternion.copy(facing);
+    actor.updateWorldMatrix(true, true);
+  });
   const origin = car.worldToLocal(actor.getWorldPosition(new Vector3()));
   const shoulders = [left.shoulder, right.shoulder].map(shoulder => car.worldToLocal(shoulder.getWorldPosition(new Vector3())));
   const radius = Math.max(.22, shoulders[0].distanceTo(shoulders[1]) * .5 + .09);
@@ -74,20 +90,24 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   if (door) goal.z += freeEnd * .19;
   if (hinge.hoodProp) goal.x = hull.getCenter(new Vector3()).x;
   const obstacles = [safe];
+  for (const other of doors) {
+    if (other === hinge || Math.abs(other.angle - other.closed) < .08) continue;
+    const box = doorFootprint(other, radius + .012);
+    if (box) obstacles.push(box);
+  }
   if (closingDoor && hinge.doorSweep) {
     const sweep = hinge.doorSweep;
     const pivot = hinge.pivot.position;
     const up = new Vector3(0, 1, 0);
-    const wing = new Box3().setFromPoints([sweep.min.x, sweep.max.x].flatMap(x => [sweep.min.z, sweep.max.z].map(z =>
-      new Vector3(x, 0, z).applyAxisAngle(up, hinge.angle).add(pivot))));
-    obstacles.push(wing.expandByScalar(radius + .012));
+    const wing = doorFootprint(hinge, radius + .012)!;
+    obstacles.push(wing);
     const reach = Math.hypot(Math.max(Math.abs(sweep.min.x), Math.abs(sweep.max.x)),
       Math.max(Math.abs(sweep.min.z), Math.abs(sweep.max.z)));
     // Stand beyond the arc of the free end to push the open door from behind.
     const swingRadius = reach + radius + .022;
     goal.copy(hand).sub(pivot).setY(0).normalize().applyAxisAngle(up, side * .26)
       .multiplyScalar(swingRadius).add(pivot).setY(start.y);
-    if (goal.x > wing.min.x && goal.x < wing.max.x && goal.z > wing.min.z && goal.z < wing.max.z) {
+    if (insideFootprint(goal, wing)) {
       // A wider rig needs more room behind the open panel. Keep the push
       // stance on the same arc so that the hand can still reach the handle.
       goal.z = freeEnd < 0 ? wing.min.z - .014 : wing.max.z + .014;
@@ -96,12 +116,16 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
       goal.x = side < 0 ? Math.min(across, safe.min.x - .02) : Math.max(across, safe.max.x + .02);
     }
   }
-  // A parked character can start in the extra clearance margin. Move directly
-  // out to the nearest edge before routing around the inflated footprint.
-  if (start.x > safe.min.x && start.x < safe.max.x && start.z > safe.min.z && start.z < safe.max.z) {
-    const exits = [start.clone().setX(safe.min.x - .015), start.clone().setX(safe.max.x + .015),
-      start.clone().setZ(safe.min.z - .015), start.clone().setZ(safe.max.z + .015)];
-    start.copy(exits.reduce((a, b) => a.distanceToSquared(origin) < b.distanceToSquared(origin) ? a : b));
+  // A new action can begin within the padding around an already open door.
+  // Walk to a clear edge at floor height before continuing around the panel.
+  const overlapping = obstacles.filter(box => insideFootprint(start, box));
+  if (overlapping.length) {
+    const exits = overlapping.flatMap(box => [start.clone().setX(box.min.x - .015), start.clone().setX(box.max.x + .015),
+      start.clone().setZ(box.min.z - .015), start.clone().setZ(box.max.z + .015)])
+      .filter(point => !obstacles.some(box => insideFootprint(point, box)));
+    exits.sort((a, b) => a.distanceToSquared(origin) - b.distanceToSquared(origin));
+    if (!exits[0]) return undefined;
+    start.copy(exits[0]);
   }
   const path = brzWalkRoute(start, goal, ...obstacles);
   if (!path) return undefined;
@@ -151,6 +175,8 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   return {
     part: hinge.part,
     duration: walkSeconds + settleSeconds,
+    restoreParked,
+    releasePose() { gait?.stop(); },
     resumeAtDoor() {
       actor.position.copy(lastPosition);
       actor.quaternion.copy(lastRotation);
@@ -195,10 +221,7 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
     },
     stop() {
       gait?.stop();
-      actor.position.copy(parked);
-      actor.quaternion.copy(facing);
-      actor.updateWorldMatrix(true, true);
-      returnToPark?.();
+      restoreParked();
     },
   };
 }

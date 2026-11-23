@@ -23,17 +23,28 @@ export function sampleDriveOut(seconds: number) {
   };
 }
 
-export type DriveOutPose = ReturnType<typeof sampleDriveOut>;
+export type DriveOutPose = ReturnType<typeof sampleDriveOut> & { insidePull?: number };
 
-export const BRZ_EXIT_SECONDS = 3.65;
+export const BRZ_ENTRY_SECONDS = 4.85;
+export const BRZ_EXIT_SECONDS = 3.75;
+
+export function sampleBrzEntry(seconds: number): DriveOutPose {
+  const base = sampleDriveOut(seconds);
+  const ease = (start: number, end: number) => MathUtils.smoothstep(seconds, start, end);
+  const closeDoor = ease(3.64, 4.55);
+  return { ...base, door: ease(.48, 1.16) - closeDoor, closeDoor,
+    insidePull: ease(3.05, 3.62) * (1 - ease(4.48, 4.80)), travel: 0, brake: 0,
+    stage: seconds >= 3.05 ? "closing" : base.stage };
+}
 
 export function sampleBrzExit(seconds: number) {
   const ease = (start: number, end: number) => MathUtils.smoothstep(seconds, start, end);
   return {
     // Release the latch and push the door before the near foot crosses the sill.
-    door: .31 * ease(.48, .94) + .69 * ease(.91, 1.38),
-    insideGrip: ease(.06, .45) * (1 - ease(.71, 1.10)),
-    enter: 1 - MathUtils.clamp((seconds - 1.44) / 1.94, 0, 1),
+    release: ease(.39, .57) * (1 - ease(.77, 1.02)),
+    door: .29 * ease(.59, .99) + .71 * ease(.96, 1.48),
+    insideGrip: ease(.06, .39) * (1 - ease(.77, 1.04)),
+    enter: 1 - MathUtils.clamp((seconds - 1.54) / 1.94, 0, 1),
   };
 }
 

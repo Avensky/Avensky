@@ -211,6 +211,8 @@ export function VehiclePreview({
     const rotation = fittingOrbit.current!;
     const { position, target, offset, anchorRotation, pivot, eye, nextEye, orbit, swing, lookAt } = aim;
     const wardrobe = wardrobeOpen ? useCharacterPreviewStore.getState() : null;
+    const emotesInGarage = Boolean(wardrobe && !characterOnly &&
+      (import.meta.env.DEV || import.meta.env.MODE === "staging"));
     const area = !insideCar && !panelsHidden ? wardrobe?.viewport : null;
     const viewKey = wardrobe ? `wardrobe:${wardrobe.camera}:${wardrobe.focusRevision}:${insideCar}:${characterOnly}` : `garage:${garageView}`;
     const firstFrame = aim.initializedCamera !== camera;
@@ -258,6 +260,15 @@ export function VehiclePreview({
         drivingSetShot = cockpit.userData.drivingSetShot;
         cockpit.children[0].getWorldPosition(position);
         cockpit.getWorldPosition(target);
+      } else if (wide && emotesInGarage && panelPose && vehicleFit?.clearance) {
+        const { car } = vehicleFit.clearance;
+        car.getWorldPosition(target);
+        panelPose.hinge.pivot.getWorldPosition(offset).sub(target).setY(0).normalize();
+        if (offset.lengthSq() > .001) {
+          target.addScaledVector(offset, .62).setY(1.15);
+          offset.applyAxisAngle(camera.up, -.38).multiplyScalar(aspect < 1 ? 5.3 : 4.6);
+          position.copy(target).add(offset).addScaledVector(camera.up, 1.46);
+        }
       } else if (anchor) {
         const eyeHeight = view.camera === "Face" ? 1.56 : view.camera === "Hands" ? 1.12 : .9;
         const distance = view.camera === "Face" ? .52 : view.camera === "Hands" ? 1.95 : characterOnly ? 3.6 : 4.25;
@@ -306,13 +317,14 @@ export function VehiclePreview({
     const orbiting = fittingOrbitEnabled && (rotation.yaw !== 0 || rotation.pitch !== 0);
     if (orbiting) rotation.pitch = orbitFittingCamera(position, target, rotation.yaw, rotation.pitch, rotation.sphere);
     let boundedCamera = false;
-    if (!aim.held && (garageView !== "Showroom" || insideCar || orbiting)) {
+    if (emotesInGarage || !aim.held && (garageView !== "Showroom" || insideCar || orbiting)) {
       const bounds = findPreviewAnchor(aim.anchors, scene, "garage-camera-envelope")?.userData.bounds;
       if (bounds && !bounds.isEmpty()) {
         aim.cameraMin.copy(bounds.min).addScalar(.30);
         aim.cameraMax.copy(bounds.max).addScalar(-.35);
         aim.cameraMin.y = Math.max(.30, aim.cameraMin.y);
         position.clamp(aim.cameraMin, aim.cameraMax);
+        if (emotesInGarage) target.clamp(aim.cameraMin, aim.cameraMax);
         boundedCamera = true;
       }
     }
