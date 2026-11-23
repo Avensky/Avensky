@@ -84,8 +84,17 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
     const reach = Math.hypot(Math.max(Math.abs(sweep.min.x), Math.abs(sweep.max.x)),
       Math.max(Math.abs(sweep.min.z), Math.abs(sweep.max.z)));
     // Stand beyond the arc of the free end to push the open door from behind.
+    const swingRadius = reach + radius + .022;
     goal.copy(hand).sub(pivot).setY(0).normalize().applyAxisAngle(up, side * .26)
-      .multiplyScalar(reach + radius + .022).add(pivot).setY(start.y);
+      .multiplyScalar(swingRadius).add(pivot).setY(start.y);
+    if (goal.x > wing.min.x && goal.x < wing.max.x && goal.z > wing.min.z && goal.z < wing.max.z) {
+      // A wider rig needs more room behind the open panel. Keep the push
+      // stance on the same arc so that the hand can still reach the handle.
+      goal.z = freeEnd < 0 ? wing.min.z - .014 : wing.max.z + .014;
+      const longitudinal = goal.z - pivot.z;
+      const across = pivot.x + side * Math.sqrt(Math.max(0, swingRadius ** 2 - longitudinal ** 2));
+      goal.x = side < 0 ? Math.min(across, safe.min.x - .02) : Math.max(across, safe.max.x + .02);
+    }
   }
   // A parked character can start in the extra clearance margin. Move directly
   // out to the nearest edge before routing around the inflated footprint.

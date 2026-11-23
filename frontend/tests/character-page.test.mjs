@@ -759,6 +759,21 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await act(async () => namedButton('Reset interaction').click());
     assert.equal(preview.getState().emote, null);
 
+    const priorPreview = preview.getState();
+    for (const passenger of [false, true]) {
+      await act(async () => preview.setState({ cockpitVehicle: 'brz', cockpitAvailable: true, insideCar: true,
+        brzPassenger: passenger, brzExitSupported: true, brzExitReady: false, brzExiting: false }));
+      const exit = () => find(`button[aria-label="Get out of ${passenger ? 'passenger' : 'driver'} seat"]`);
+      assert.equal(exit().disabled, true, 'wait until the seated pose is ready');
+      await act(async () => preview.setState({ brzExitReady: true }));
+      await act(async () => exit().click());
+      assert.equal(preview.getState().brzExiting, true);
+      assert.equal(preview.getState().insideCar, true, 'the cockpit animation owns the actor until she clears the sill');
+      assert.equal(preview.getState().camera, 'Whole car');
+      assert.equal(exit().disabled, true, 'prevent a duplicate exit during playback');
+    }
+    await act(async () => preview.setState(priorPreview));
+
     await chooseEmoteGroup('Creator');
     await slide('.emote-creator input[name="name"]', 'Pit crew wave');
     await act(async () => namedButton('Add pose').click());

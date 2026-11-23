@@ -24,3 +24,17 @@ export function sampleDriveOut(seconds: number) {
 }
 
 export type DriveOutPose = ReturnType<typeof sampleDriveOut>;
+
+export const BRZ_EXIT_SECONDS = 3.65;
+
+export function sampleBrzExit(seconds: number) {
+  const ease = (start: number, end: number) => MathUtils.smoothstep(seconds, start, end);
+  return {
+    // Release the latch and push the door before the near foot crosses the sill.
+    door: .31 * ease(.48, .94) + .69 * ease(.91, 1.38),
+    insideGrip: ease(.06, .45) * (1 - ease(.71, 1.10)),
+    enter: 1 - MathUtils.clamp((seconds - 1.44) / 1.94, 0, 1),
+  };
+}
+
+export type BrzExitPose = ReturnType<typeof sampleBrzExit>;

@@ -12,9 +12,10 @@ export const OPEN_DRIVER_DOOR = "interact-driver-door";
 export const CLOSE_DRIVER_DOOR = "close-driver-door";
 export const OPEN_PASSENGER_DOOR = "open-passenger-door";
 export const CLOSE_PASSENGER_DOOR = "close-passenger-door";
+export const ENTER_DRIVER = "enter-driver";
 export const ENTER_PASSENGER = "enter-passenger";
 export function garageDoorForEmote(id?: string) {
-  if (id === OPEN_DRIVER_DOOR || id === CLOSE_DRIVER_DOOR) return "driver-door";
+  if (id === OPEN_DRIVER_DOOR || id === CLOSE_DRIVER_DOOR || id === ENTER_DRIVER) return "driver-door";
   if (id === OPEN_PASSENGER_DOOR || id === CLOSE_PASSENGER_DOOR || id === ENTER_PASSENGER) return "passenger-door";
 }
 export const isDoorClosing = (id?: string) => id === CLOSE_DRIVER_DOOR || id === CLOSE_PASSENGER_DOOR;

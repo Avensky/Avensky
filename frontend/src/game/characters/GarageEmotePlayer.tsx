@@ -15,7 +15,8 @@ import { COCKPIT_TAKES, type CockpitTake } from "./cockpitEmotes";
 import { createEmoteProp, type EmoteProp, type EmotePropModel } from "./emoteProps";
 import { bindFlagPoleGrip } from "./flagPoleGrip";
 import type { CockpitPlayback, GarageCockpit } from "../preview/garageCockpit";
-import { DRIVE_OUT_DURATION, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS, sampleDriveOut } from "../preview/garageDriveMotion";
+import { BRZ_EXIT_SECONDS, DRIVE_OUT_DURATION, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS,
+  sampleBrzExit, sampleDriveOut } from "../preview/garageDriveMotion";
 import { useGarageDrive } from "../preview/garageDriveStore";
 
 import { personalityEmote, type CharacterPersonality } from "./characterPersonality";
@@ -23,7 +24,7 @@ import type { PieceColors } from "./clothingPieces";
 import { keepHeldProp } from "./emotePropNotes";
 import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./posePack";
 import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
-import { ENTER_PASSENGER, GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip,
+import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_DRIVER, ENTER_PASSENGER, GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip,
   garageDoorForEmote, garagePanelForEmote, isDoorClosing, preparePanelOpening } from "./garageInteractions";
 import { prepareBrzApproach } from "../preview/brzApproach";
 import { CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE, TWEAK_BRZ_ENGINE } from "./brzHoodMotion";
@@ -75,6 +76,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     finished: boolean;
   } | null>(null);
   const openDoorApproach = useRef<ReturnType<typeof prepareBrzApproach>>(undefined);
+  const exitSeconds = useRef(0);
   const chairRequested = useCharacterPreviewStore(s => previewPacks && s.emote?.id === SIT_IN_CHAIR);
   const chairShown = useRef(false);
   useLayoutEffect(() => {
@@ -112,10 +114,16 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     if (view.brzDoorReady) useCharacterPreviewStore.setState({ brzDoorReady: false });
     if (view.brzDoorBusy) useCharacterPreviewStore.setState({ brzDoorBusy: false });
     if (view.brzHoodBusy) useCharacterPreviewStore.setState({ brzHoodBusy: false });
+    if (playback && !view.insideCar && view.brzExiting) useCharacterPreviewStore.setState({ brzExiting: false });
     panelPlayback.current = null;
     if (panel && current) current.idle.reset().setEffectiveWeight(1).play();
   }, [root, panel, reducedMotion]);
-  useLayoutEffect(() => () => { openDoorApproach.current?.stop(); openDoorApproach.current = undefined; }, [root]);
+  useLayoutEffect(() => () => {
+    openDoorApproach.current?.stop();
+    openDoorApproach.current = undefined;
+    exitSeconds.current = 0;
+    if (previewPacks) useCharacterPreviewStore.setState({ brzExitReady: false, brzExiting: false });
+  }, [root, previewPacks]);
 
   useLayoutEffect(() => {
     if (!cockpit || reducedMotion) return;
@@ -198,24 +206,33 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     const driveOut = garageStation && drive.stage !== "station";
     const preview = previewPacks ? view.emote : garageStation ? drive.steering : current.clicked;
     const driving = garageStation || (previewPacks && view.insideCar);
-    if (openDoorApproach.current && !view.insideCar) {
+    if (!view.insideCar && view.brzExitReady) useCharacterPreviewStore.setState({ brzExitReady: false });
+    if (!view.brzExiting) exitSeconds.current = 0;
+    if (openDoorApproach.current && !view.insideCar && !view.brzExiting) {
       leaveCabin(current, restSeconds);
       openDoorApproach.current.stop();
       openDoorApproach.current = undefined;
     }
     const doorOnly = previewPacks && !view.insideCar && preview?.id === OPEN_DRIVER_DOOR && drive.hasDoor;
+    const enterPassenger = preview?.id === ENTER_PASSENGER;
+    const enterSeat = enterPassenger || preview?.id === ENTER_DRIVER;
     const fittedDoor = panel?.clearance && panel.hinge.part.startsWith("door-") && garageDoorForEmote(preview?.id);
     if (panel && preview && (garagePanelForEmote(preview.id) === panel.hinge.part || fittedDoor)) {
       if (!panelPlayback.current || current.preview !== preview) {
         leaveCabin(current, restSeconds);
         const previous = panelPlayback.current;
-        if (preview.id === ENTER_PASSENGER && previous?.finished && previous.approach
+        if (enterSeat && previous?.finished && previous.approach
           && Math.abs(panel.hinge.angle - panel.hinge.open) < .005) {
-          useCharacterPreviewStore.setState({ insideCar: true, brzPassenger: true, emote: null });
+          useCharacterPreviewStore.setState({ insideCar: true, brzPassenger: enterPassenger, emote: null });
           return;
         }
         const closingDoor = isDoorClosing(preview.id);
-        const previousApproach = (panel.hinge.hoodProp || fittedDoor) && previous?.finished ? previous.approach : undefined;
+        const exitApproach = view.brzExiting && closingDoor ? openDoorApproach.current : undefined;
+        if (exitApproach) {
+          exitApproach.resumeAtDoor();
+          openDoorApproach.current = undefined;
+        }
+        const previousApproach = (panel.hinge.hoodProp || fittedDoor) && previous?.finished ? previous.approach : exitApproach;
         const alreadyAtPanel = closingDoor || isDoorClosing(current.preview?.id) ? undefined : previousApproach;
         previous?.opening.stop();
         if (!previousApproach) previous?.approach?.stop();
@@ -230,7 +247,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         if (!opening || (panel.clearance && !approach)) {
           (approach ?? previousApproach)?.stop();
           current.idle.reset().setEffectiveWeight(1).play();
-          useCharacterPreviewStore.setState({ emote: null, cockpitError: preview.id === TWEAK_BRZ_ENGINE
+          useCharacterPreviewStore.setState({ emote: null, brzExiting: false, cockpitError: preview.id === TWEAK_BRZ_ENGINE
             ? "Open and prop the BRZ hood before tweaking the engine." : "This driver cannot reach the selected panel." });
           return;
         }
@@ -255,9 +272,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         if (view.brzHoodBusy) useCharacterPreviewStore.setState({ brzHoodBusy: false });
         if (fittedDoor && (panel.hinge.part === "door-left" || panel.hinge.part === "door-right")) {
           useVehicleStudioStore.getState().setPart(panel.hinge.part, !isDoorClosing(preview.id));
-          useCharacterPreviewStore.setState({ brzDoorBusy: false });
+          useCharacterPreviewStore.setState({ brzDoorBusy: false, brzExiting: false });
         }
-        if (preview.id === ENTER_PASSENGER) useCharacterPreviewStore.setState({ insideCar: true, brzPassenger: true, emote: null });
+        if (enterSeat) useCharacterPreviewStore.setState({ insideCar: true, brzPassenger: enterPassenger, emote: null });
         if (doorOnly && playback.approach) useCharacterPreviewStore.setState({ brzDoorReady: true });
       }
       return;
@@ -304,6 +321,25 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         if (current.driveSeconds < 1.2) invalidate();
         return;
       }
+      const exitDoor = current.cabin.exitDoor;
+      if (view.brzExiting && view.insideCar && exitDoor) {
+        exitSeconds.current = Math.min(BRZ_EXIT_SECONDS, exitSeconds.current + step);
+        current.cabin.sample(null, 0, undefined, sampleBrzExit(exitSeconds.current));
+        if (exitSeconds.current < BRZ_EXIT_SECONDS) {
+          invalidate();
+          return;
+        }
+        // The last exit frame is the same exterior stance used to enter.
+        // Release the cockpit without returning the actor to the parked pose.
+        leaveCabin(current, restSeconds);
+        openDoorApproach.current?.resumeAtDoor();
+        exitDoor.angle = exitDoor.open;
+        exitDoor.pivot.rotation[exitDoor.axis] = exitDoor.open;
+        useVehicleStudioStore.getState().setPart(exitDoor.part, true);
+        useCharacterPreviewStore.setState({ insideCar: false, brzPassenger: false, brzExitReady: false,
+          emote: { id: view.brzPassenger ? CLOSE_PASSENGER_DOOR : CLOSE_DRIVER_DOOR } });
+        return;
+      }
       const enteringCharacter = previewPacks && current.cabin.hasDoor && current.driveSeconds < GARAGE_ENTRY_DURATION;
       const take = current.take;
       if (take && !enteringCharacter) {
@@ -319,6 +355,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       if (!previewPacks && stage && stage !== drive.stage) useGarageDrive.setState({ stage });
       current.cabin.sample(enteringCharacter ? null : current.take?.clip.id ?? null,
         current.take ? current.take.seconds / current.take.clip.duration : 0, drivePose);
+      if (exitDoor && view.insideCar && current.driveSeconds >= GARAGE_ENTRY_DURATION && !view.brzExitReady) {
+        useCharacterPreviewStore.setState({ brzExitReady: true });
+      }
       if (enteringCharacter && current.driveSeconds < GARAGE_ENTRY_DURATION) invalidate();
       return;
     }
@@ -438,7 +477,8 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   return <group>
     {previewPacks && <InteractionChair visible={chairRequested || chairShown.current} seatRef={chairSeat} />}
     <primitive object={root} dispose={null} onClick={(event: import("@react-three/fiber").ThreeEvent<MouseEvent>) => {
-      if (paused || victory || reducedMotion || !player.current || player.current.cabin || event.delta > 3 || performance.now() < useFittingTurnStore.getState().suppressClickUntil) return;
+      if (paused || victory || reducedMotion || !player.current || player.current.cabin || useCharacterPreviewStore.getState().brzExiting
+        || event.delta > 3 || performance.now() < useFittingTurnStore.getState().suppressClickUntil) return;
       event.stopPropagation();
       const id = personalityEmote(personality, lastInteraction.current);
       lastInteraction.current = id;

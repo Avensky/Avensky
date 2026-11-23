@@ -240,12 +240,15 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     if (!showroomPath) useVehicleStudioStore.getState().setAvailable(model,[...availableVehicleParts(partRig)]);
     useGarageDrive.setState({ hasDoor: Boolean(driverDoor) });
     const engineAvailable = partRig.some(part => part.engineBay);
+    const exitSupported = Boolean(driverDoor?.interiorHandle && passenger?.door.interiorHandle);
     if (engineAvailable) useCharacterPreviewStore.setState({ brzEngineAvailable: true });
     if (passenger) useCharacterPreviewStore.setState({ brzPassengerAvailable: true });
+    if (exitSupported) useCharacterPreviewStore.setState({ brzExitSupported: true });
     return () => {
       if (useVehicleStudioStore.getState().availableVehicle === model) useVehicleStudioStore.getState().setAvailable(null);
       if (engineAvailable) useCharacterPreviewStore.setState({ brzEngineAvailable: false, brzHoodBusy: false });
       if (passenger) useCharacterPreviewStore.setState({ brzPassengerAvailable: false, brzPassenger: false });
+      if (exitSupported) useCharacterPreviewStore.setState({ brzExitSupported: false, brzExitReady: false, brzExiting: false });
     };
   },[model,partRig,driverDoor,passenger,showroomPath]);
   useEffect(()=>{
