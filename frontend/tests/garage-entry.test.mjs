@@ -10,7 +10,8 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
   const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
   try {
     const { prepareGarageCockpit, sampleCockpitMotion } = await vite.ssrLoadModule('/src/game/preview/garageCockpit.ts');
-    const { GARAGE_ENTRY_START_SECONDS, sampleDriveOut } = await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
+    const { BRZ_EXIT_SECONDS, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS, sampleBrzExit, sampleDriveOut } =
+      await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
     const { GARAGE_STATIONS } = await vite.ssrLoadModule('/src/game/preview/garageStations.ts');
     for (const gender of ['female', 'male']) for (const side of [-1, 1]) {
       const { scene: driver } = await new GLTFLoader().parseAsync(await readFile(`tests/fixtures/villager-${gender}-rig.json`, 'utf8'), '');
@@ -165,6 +166,37 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
     assert(joint('hand_l').x < 0 && joint('hand_r').x < 0, 'passenger hands rest on her own side');
     assert.equal(brzDoor.rotation.y, 0);
     passenger.stop();
+
+    for (const side of [1, -1]) {
+      const exit = new Group(), release = new Group();
+      exit.position.set(side * .82, .52, .76);
+      release.position.set(side * -.098, .187, -.534);
+      exit.add(release);
+      brz.add(exit);
+      brzStand.position.set(side * 1.29, .023, -.65);
+      brzStand.rotation.y = side * -.59;
+      const hinge = { pivot: exit, axis: 'y', closed: 0, open: side * -Math.PI / 3, angle: 0, interiorHandle: release };
+      const outside = [ankle('l'), ankle('r')];
+      const cabin = prepareGarageCockpit(brz, [], hinge, GARAGE_STATIONS.brz, side < 0 ? passengerSeat : undefined)
+        (brzDriver, brzMotion, true, true);
+      assert.equal(cabin.exitDoor, hinge);
+      cabin.sample(null, 0, sampleDriveOut(GARAGE_ENTRY_DURATION));
+      const seated = [ankle('l'), ankle('r')];
+      cabin.sample(null, 0, undefined, sampleBrzExit(.45));
+      assert.equal(hinge.angle, 0, 'the hand reaches the lever before the door opens');
+      const hand = side > 0 ? 'middle_01_l' : 'middle_01_r';
+      assert(joint(hand).distanceTo(release.getWorldPosition(new Vector3())) < .025, 'the near hand reaches the interior release');
+      cabin.sample(null, 0, undefined, sampleBrzExit(1.40));
+      assert.equal(hinge.angle, hinge.open, 'the door opens all the way before stepping out');
+      for (const [index, foot] of ['l', 'r'].entries()) assert(ankle(foot).distanceTo(seated[index]) < .001);
+      cabin.sample(null, 0, undefined, sampleBrzExit(2.43));
+      assert(side * ankle(side > 0 ? 'l' : 'r').x > 1.02, 'the near foot clears the sill first');
+      assert(side * ankle(side > 0 ? 'r' : 'l').x < 1.02, 'the other foot remains in the footwell');
+      cabin.sample(null, 0, undefined, sampleBrzExit(BRZ_EXIT_SECONDS));
+      for (const [index, foot] of ['l', 'r'].entries()) assert(ankle(foot).distanceTo(outside[index]) < .001, 'the exit hands off to a planted stand');
+      cabin.stop();
+      exit.removeFromParent();
+    }
 
     const { cockpitTakesForWheel } = await vite.ssrLoadModule('/src/game/characters/cockpitEmotes.ts');
     assert(!cockpitTakesForWheel(true, false).some(take => take.id === 'drive-race-start'));

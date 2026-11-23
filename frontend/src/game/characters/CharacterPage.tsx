@@ -29,7 +29,7 @@ import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import { useGarageDrive } from "../preview/garageDriveStore";
-import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_PASSENGER, OPEN_DRIVER_DOOR, OPEN_PASSENGER_DOOR,
+import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_DRIVER, ENTER_PASSENGER, OPEN_DRIVER_DOOR, OPEN_PASSENGER_DOOR,
   PANEL_INTERACTIONS, SIT_IN_CHAIR, garageDoorForEmote, garagePanelForEmote } from "./garageInteractions";
 import { CLOSE_BRZ_HOOD, OPEN_BRZ_HOOD, TWEAK_BRZ_ENGINE } from "./brzHoodMotion";
 import { BRZ_GARAGE_ENABLED } from "../preview/brzCabin";
@@ -59,6 +59,7 @@ function revealCharacterControl(event: FocusEvent<HTMLElement>) {
 }
 
 function playEmote(item: PreviewEmote) {
+  if (useCharacterPreviewStore.getState().brzExiting) return;
   if (item.id === "drive-honk") unlockVehicleAudio();
   const mirror = isMirrorMakeupEmote(item.id);
   const makeup = MAKEUP_EMOTES.some(emote => emote.id === item.id);
@@ -96,6 +97,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const brzDoorBusy = useCharacterPreviewStore(state => state.brzDoorBusy);
   const passengerAvailable = useCharacterPreviewStore(state => state.brzPassengerAvailable);
   const passengerSeated = useCharacterPreviewStore(state => state.insideCar && state.brzPassenger);
+  const brzExitSupported = useCharacterPreviewStore(state => state.brzExitSupported);
+  const brzExitReady = useCharacterPreviewStore(state => state.brzExitReady);
+  const brzExiting = useCharacterPreviewStore(state => state.brzExiting);
   const brzEngineAvailable = useCharacterPreviewStore(state => state.brzEngineAvailable);
   const brzHoodBusy = useCharacterPreviewStore(state => state.brzHoodBusy);
   const ownerKey = owner ?? "this-device";
@@ -396,18 +400,32 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const cockpitPending = insideCar && !cockpitAvailable;
   const station = cockpitVehicle ? GARAGE_STATIONS[cockpitVehicle] : null;
   const stagingBrz = BRZ_GARAGE_ENABLED && cockpitVehicle === "brz";
+  const animatedExit = insideCar && stagingBrz && brzExitSupported && !reducedMotion;
   const stationName = passengerSeated ? "passenger seat" : station?.kind === "bridge" ? "bridge" : station?.kind === "levers" ? "driver station" : "cockpit";
+  const exitLabel = animatedExit ? passengerSeated ? "Get out of passenger seat" : "Get out of driver seat" : `Exit ${stationName}`;
+  const exitDisabled = brzExiting || (animatedExit && !brzExitReady);
   const selectEmote = useCallback((item: PreviewEmote) => {
     playEmote(item);
     emoteFocus.current = ".character-emote-back";
     setEmoteDetail(item);
   }, []);
   function toggleCockpit() {
+    if (brzExiting || (animatedExit && !brzExitReady)) return;
     setEmoteDetail(undefined);
     setEmoteSearch("");
-    useCharacterPreviewStore.setState({ insideCar: !insideCar, brzPassenger: false, emote: null, cockpitError: null, camera: "Full body", zoom: 1 });
+    if (animatedExit) {
+      useCharacterPreviewStore.setState({ brzExiting: true, emote: null, cockpitError: null, playbackPaused: false, camera: "Whole car", zoom: 1 });
+      return;
+    }
+    if (!insideCar && stagingBrz && brzExitSupported && hasDriverDoor && !brzDoorReady) {
+      previewInteraction(ENTER_DRIVER);
+      return;
+    }
+    useCharacterPreviewStore.setState({ insideCar: !insideCar, brzPassenger: false, brzExitReady: false,
+      emote: null, cockpitError: null, camera: "Full body", zoom: 1 });
   }
   function chooseEmoteGroup(group: typeof emoteGroup) {
+    if (brzExiting) return;
     selectedPreview.current = null;
     setEmoteGroup(emoteGroup === group ? undefined : group);
     setEmoteDetail(undefined);
@@ -433,6 +451,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     try { localStorage.setItem(favoritesKey, JSON.stringify(next)); } catch { /* Keep this session's list. */ }
   }, [favorites, favoritesKey]);
   function previewInteraction(id: string) {
+    if (brzExiting) return;
     useFittingTurnStore.setState({ characterYaw: 0 });
     useCharacterPreviewStore.setState(state => ({
       emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, brzPassenger: false, cockpitError: null, brzDoorReady: false,
@@ -475,14 +494,15 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         <div id={emotePacksId} className="character-emote-categories" role="group" aria-label="Emote collection" hidden={!emotePacksOpen}>
           {EMOTE_PACKS.map(group => emoteCategory(group))}
         </div>
-        <button type="button" className="menu-control" data-controller-row data-cockpit-toggle disabled={!canEnterCar || !cockpitVehicle}
+        <button type="button" className="menu-control" data-controller-row data-cockpit-toggle disabled={!canEnterCar || !cockpitVehicle || brzDoorBusy}
           onClick={toggleCockpit}>Enter {stationName}</button>
       </>}
       {insideCar && !locked && <button type="button" className="menu-control" data-controller-row data-cockpit-toggle
-        onClick={toggleCockpit}>Exit {stationName}</button>}
+        disabled={exitDisabled} onClick={toggleCockpit}>{exitLabel}</button>}
       {reducedMotion && <p>Emote playback is paused by Reduced Motion.</p>}
       {cockpitError && <p role="status">{cockpitError}</p>}
       {cockpitPending && <p role="status">Preparing the {stationName}…</p>}
+      {brzExiting && <p role="status">Getting out…</p>}
       {insideCar && bag && <p>Handheld props are stowed while driving.</p>}
     </div>
   </>;
@@ -504,34 +524,34 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     : !insideCar && emoteGroup === "Interactions" ? <div className="character-emote-results">
       <h2>Interactions</h2>
       <button type="button" className="menu-control" data-controller-row
-        disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable || (stagingBrz && brzDoorBusy)}
+        disabled={brzExiting || reducedMotion || !hasDriverDoor || !cockpitAvailable || (stagingBrz && brzDoorBusy)}
         onClick={() => previewInteraction(stagingBrz && leftDoorOpen ? CLOSE_DRIVER_DOOR : OPEN_DRIVER_DOOR)}>
         {stagingBrz && leftDoorOpen ? "Close driver door" : "Open driver door"}
       </button>
       {stagingBrz && brzDoorReady && <button type="button" className="menu-control"
-        data-controller-row disabled={!canEnterCar} onClick={toggleCockpit}>Get into the BRZ</button>}
+        data-controller-row disabled={!canEnterCar || brzExiting} onClick={toggleCockpit}>Get into the BRZ</button>}
       {stagingBrz && passengerAvailable && <>
-        <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || brzDoorBusy}
+        <button type="button" className="menu-control" data-controller-row disabled={brzExiting || reducedMotion || brzDoorBusy}
           onClick={() => previewInteraction(rightDoorOpen ? CLOSE_PASSENGER_DOOR : OPEN_PASSENGER_DOOR)}>
           {rightDoorOpen ? "Close passenger door" : "Open passenger door"}
         </button>
-        <button type="button" className="menu-control" data-controller-row disabled={!canEnterCar || brzDoorBusy}
+        <button type="button" className="menu-control" data-controller-row disabled={brzExiting || !canEnterCar || brzDoorBusy}
           onClick={() => previewInteraction(ENTER_PASSENGER)}>Get into passenger seat</button>
       </>}
       {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
       {PANEL_INTERACTIONS.map(action => <button key={action.id} type="button" className="menu-control" data-controller-row
-        disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)
+        disabled={brzExiting || reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)
           || (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && action.part === "hood"
             && (brzHoodBusy || hoodOpen && action.id === OPEN_BRZ_HOOD))}
         onClick={() => previewInteraction(action.id)}>{action.label}</button>)}
       {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && brzEngineAvailable && availableParts.includes("hood") && <button type="button"
-        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen || brzHoodBusy}
+        className="menu-control" data-controller-row disabled={brzExiting || reducedMotion || !hoodOpen || brzHoodBusy}
         onClick={() => previewInteraction(TWEAK_BRZ_ENGINE)}>Tweak engine</button>}
       {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && availableParts.includes("hood") && <button type="button"
-        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen || brzHoodBusy}
+        className="menu-control" data-controller-row disabled={brzExiting || reducedMotion || !hoodOpen || brzHoodBusy}
         onClick={() => previewInteraction(CLOSE_BRZ_HOOD)}>Close hood</button>}
-      <button type="button" className="menu-control" data-controller-row disabled={reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
-      <button type="button" className="menu-control" data-controller-row disabled={!emote}
+      <button type="button" className="menu-control" data-controller-row disabled={brzExiting || reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
+      <button type="button" className="menu-control" data-controller-row disabled={brzExiting || !emote}
         onClick={() => {
           if (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz") useVehicleStudioStore.getState().setPart("hood", false);
           useCharacterPreviewStore.setState({ emote: null, playbackPaused: false, cockpitError: null, brzDoorReady: false });
@@ -539,14 +559,14 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     </div>
     : !insideCar && emoteGroup === "Pose pack" ? <CharacterPosePack disabled={reducedMotion} />
     : <CharacterEmoteList choice={previewChoice} group={emoteGroup === "Pose pack" || emoteGroup === "Creator" || emoteGroup === "Interactions" ? undefined : emoteGroup} search={emoteSearch} station={station} insideCar={insideCar}
-    disabled={reducedMotion || cockpitPending} mirrorAvailable={mirrorAvailable} leanAvailable={leanAvailable} selectedId={emote?.id}
+    disabled={brzExiting || reducedMotion || cockpitPending} mirrorAvailable={mirrorAvailable} leanAvailable={leanAvailable} selectedId={emote?.id}
     favorites={favorites} onFavorite={toggleFavorite} onSearch={setEmoteSearch} onSelect={selectEmote} />);
   const emoteResultsPanel = <section className={locked ? "character-controls menu-panel-frame character-controls--right" : undefined}
     id={emoteResultsId} aria-label={emoteDetail ? "Emote details" : "Emote results"} hidden={!resultsOpen}>
     {emoteResults}
   </section>;
   const playback = tab === "emotes" && emoteBrowserOpen && <div className="character-playback" data-controller-row>
-    <button type="button" className="menu-control" disabled={reducedMotion || (!emote && !selectedPreview.current)} onClick={() =>
+    <button type="button" className="menu-control" disabled={brzExiting || reducedMotion || (!emote && !selectedPreview.current)} onClick={() =>
       useCharacterPreviewStore.setState({ emote: selectedPreview.current && { ...selectedPreview.current }, playbackPaused: false })
     }>Play</button>
     <button type="button" className="menu-control" disabled={reducedMotion || !emote || insideCar || emoteGroup === "Interactions" || emoteGroup === "Pose pack"}
@@ -554,7 +574,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       onClick={() => useCharacterPreviewStore.setState(state => ({ loopEmote: !state.loopEmote,
         emote: state.emote && { ...state.emote }, playbackPaused: false }))
     }>Loop</button>
-    <button type="button" className="menu-control" disabled={!emote} onClick={() =>
+    <button type="button" className="menu-control" disabled={brzExiting || !emote} onClick={() =>
       useCharacterPreviewStore.setState({ emote: null, loopEmote: false, automaticEmotes: false, playbackPaused: false, cockpitError: null })
     }>Stop</button>
   </div>;
@@ -575,7 +595,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   </div>;
   const zoomBy = (step: number) => setZoom(Math.min(CHARACTER_ZOOM_MAX, Math.max(CHARACTER_ZOOM_MIN, +(zoom + step).toFixed(2))));
   const togglePose = () => useCharacterPreviewStore.setState({ playbackPaused: !playbackPaused });
-  const exitCockpit = insideCar && <PreviewToolButton label={`Exit ${stationName}`} data-cockpit-toggle onClick={toggleCockpit}>
+  const exitCockpit = insideCar && <PreviewToolButton label={exitLabel} disabled={exitDisabled} data-cockpit-toggle onClick={toggleCockpit}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M11 4H4v16h7m2-12 4 4-4 4m4-4H8" /></svg>
   </PreviewToolButton>;
   const cameraTools = <FittingCameraToolbar key={tab} camera={fitting ? undefined : cameraSelect} splitCamera
