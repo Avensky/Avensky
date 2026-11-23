@@ -97,6 +97,7 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
   const entryFacing = door ? new Vector3(-side * .56, 0, -freeEnd * .83).normalize() : startFacing;
   const look = new Vector3(), guide = new Vector3();
   const actorYaw = new Quaternion(), carRotation = new Quaternion(), parentRotation = new Quaternion();
+  const lastPosition = parked.clone(), lastRotation = facing.clone();
   const face = (position: Vector3, look: Vector3, blend: number) => {
     actor.position.copy(parent.worldToLocal(car.localToWorld(position.clone())));
     forward.subVectors(look, position).setY(0);
@@ -104,6 +105,8 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
     car.getWorldQuaternion(carRotation);
     parent.getWorldQuaternion(parentRotation).invert();
     actor.quaternion.slerp(parentRotation.multiply(carRotation).multiply(actorYaw), blend);
+    lastPosition.copy(actor.position);
+    lastRotation.copy(actor.quaternion);
     actor.updateWorldMatrix(true, true);
   };
   function samplePath(distance: number, position: Vector3, direction: Vector3) {
@@ -121,6 +124,11 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
 
   return {
     duration: walkSeconds + settleSeconds,
+    resumeAtDoor() {
+      actor.position.copy(lastPosition);
+      actor.quaternion.copy(lastRotation);
+      actor.updateWorldMatrix(true, true);
+    },
     outward(target: Vector3) {
       car.getWorldQuaternion(carRotation);
       return target.set(0, 0, 0).setComponent(door ? 0 : 2, side).applyQuaternion(carRotation);

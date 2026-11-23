@@ -175,13 +175,13 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   }, [partRig, prepared, station, model]);
   const popup = partRig.find(part => part.part === "headlights");
   const cockpitSetup = useRef<{ source: Object3D; prepare: ReturnType<typeof prepareGarageCockpit> }>(null);
-  const playCockpit = useCallback<GarageCockpit>((driverRoot, characterPreview) => {
+  const playCockpit = useCallback<GarageCockpit>((driverRoot, characterPreview, fromOpenDoor) => {
     const motionGroup = motion.current;
     if (!motionGroup) return null;
     if (cockpitSetup.current?.source !== prepared.root) {
       cockpitSetup.current = { source: prepared.root, prepare: prepareGarageCockpit(prepared.root, prepared.glassMaterials, driverDoor, station) };
     }
-    return cockpitSetup.current.prepare?.(driverRoot, motionGroup, characterPreview) ?? null;
+    return cockpitSetup.current.prepare?.(driverRoot, motionGroup, characterPreview, fromOpenDoor) ?? null;
   }, [prepared, driverDoor, station, motion]);
   const cockpit = !revealActive && (previewPacks || garageOpen) ? playCockpit : undefined;
   const marine=vehicleSystems(model)==="marine";
