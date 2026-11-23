@@ -83,6 +83,11 @@ async fn account_survives_a_restart_and_restores_the_same_character_and_outfit()
     assert_eq!(registered["profile_id"], profile_id);
     let desktop_token = registered["token"].as_str().unwrap();
     server.handle(&desktop, json!({"action":"character_outfit_save","name":"Weekend","character":rook})).await.unwrap();
+    let workwear = json!({"id":"jules-okafor","outfit":"race-crew","driver_id":"ae86-male",
+        "appearance":{"hair":"natural","hair_color":"original","skin":"original","headwear":"none","color":"original",
+            "item_colors":{"race-crew:coat":{"color":"#223344"}}}});
+    let equipped = server.handle(&desktop, json!({"action":"character_equip","character":workwear})).await.unwrap();
+    assert_eq!(equipped["character"]["outfit"], "race-crew");
     let published = view.borrow_and_update().clone().unwrap();
     assert!(!published.contains("password_hash") && !published.contains(desktop_token) && !published.contains("river_7"));
     server.disconnect(&desktop).await;
@@ -111,6 +116,9 @@ async fn account_survives_a_restart_and_restores_the_same_character_and_outfit()
         assert!(!account.password_hash.contains(password));
         assert_eq!(profile.progression.character.as_ref().unwrap().id,"jules-okafor");
         assert_eq!(profile.progression.character.as_ref().unwrap().driver_id.as_deref(),Some("ae86-male"));
+        let appearance = serde_json::to_value(profile.progression.character.as_ref().unwrap()).unwrap();
+        assert_eq!(appearance["outfit"], "race-crew");
+        assert_eq!(appearance["appearance"]["item_colors"]["race-crew:coat"]["color"], "#223344");
         assert_eq!(profile.progression.character_outfits["Weekend"].outfit,"night-run");
     }
     server.handle(&phone,json!({"action":"account_logout","token":phone_token})).await.unwrap();

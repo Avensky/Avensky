@@ -5,6 +5,7 @@ on:
       - "frontend/src/net/deploymentEnvironment.ts"
       - "frontend/src/net/rustSocket.ts"
       - "frontend/tests/deployment-environment.test.mjs"
+      - "frontend/tests/session-recovery.test.mjs"
       - "frontend/.env*"
       - "avenlab-server/src/deployment_env.rs"
       - "avenlab-server/src/main.rs"
@@ -37,6 +38,9 @@ jobs:
         run: npm --prefix frontend ci
       - name: Type-check frontend integration
         run: npm --prefix frontend run typecheck
+      - name: Verify game recovery after reconnect and fresh sign-in
+        run: node --test tests/session-recovery.test.mjs
+        working-directory: frontend
 
   server-environment:
     runs-on: ubuntu-latest
