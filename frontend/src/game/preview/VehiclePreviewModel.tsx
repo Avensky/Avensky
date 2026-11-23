@@ -12,7 +12,7 @@ import { fitPreviewToPlatform, measureDriverLean, measurePreviewBounds } from ".
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { applyShowroomHighlights, applyShowroomPaint } from "./garageVehiclePaint";
 import { prepareGarageVehiclePaint } from "./garageVehiclePaint";
-import {createVehiclePartRig,advanceVehiclePartRig,availableVehicleParts,measureDriverDoor} from "./vehiclePartRig";
+import {createVehiclePartRig,advanceVehiclePartRig,availableVehicleParts,measureDriverDoor,type VehiclePartHinge} from "./vehiclePartRig";
 import {useVehicleStudioStore} from "../heroes/vehicleStudioStore";
 import {MathUtils,Mesh,MeshStandardMaterial,Vector3,type Color,type Group,type Object3D} from "three";
 import { ROOK_ID, type CharacterChoice } from "../characters/characterCatalog";
@@ -20,7 +20,7 @@ import {useFrame,useThree} from "@react-three/fiber";
 import {applyWindowTone} from "./windowTones";
 import {vehicleSystems} from "../../vehicles/vehicleSystems";
 import { prepareGarageCockpit, type GarageCockpit } from "./garageCockpit";
-import { OPEN_DRIVER_DOOR } from "../characters/garageInteractions";
+import { OPEN_DRIVER_DOOR, garagePanelForEmote, type GaragePanel } from "../characters/garageInteractions";
 import { GARAGE_STATIONS, garageStationCamera } from "./garageStations";
 import { usePreviewPaint } from "./usePreviewPaint";
 import { splitAe86DriverDoor } from "./ae86DriverDoor";
@@ -43,6 +43,7 @@ export type VehiclePreviewDriverFit = {
   lean?: ReturnType<typeof measureDriverLean>;
   mirror?: MirrorCheckFit;
   cockpit?: GarageCockpit;
+  panels?: Partial<Record<GaragePanel, { hinge: VehiclePartHinge; position: [number, number, number]; yaw: number }>>;
 };
 
 type VehicleLayout = {
@@ -133,7 +134,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     // Door/steering splits require the original primitive indices. Batch only
     // after those splits and hinges, leaving every interactive part separate.
     const batches = batchStaticVehicleMeshes(prepared.root, {
-      protectedObjects: partRig.map(part => part.pivot),
+      protectedObjects: partRig.flatMap(part => part.latch ? [part.pivot, part.latch] : [part.pivot]),
       protectedNames: station.kind === "wheel" ? station.steeringParts : undefined,
       animations,
     });
@@ -218,7 +219,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
       (previewPacks && (useCharacterPreviewStore.getState().insideCar ||
         useCharacterPreviewStore.getState().emote?.id === OPEN_DRIVER_DOOR))) ? driverDoor.part : undefined;
     const garageLights = garageOpen ? useGarageDiagnostics.getState().tests[model]?.lights : undefined;
-    advanceVehiclePartRig(partRig,studio.parts,delta,drivenDoor,studio.parts.headlights || Boolean(garageLights && garageLights !== "off"));
+    const drivenPanel = previewPacks && garagePanelForEmote(useCharacterPreviewStore.getState().emote?.id);
+    advanceVehiclePartRig(partRig,studio.parts,delta,drivenDoor || drivenPanel || undefined,studio.parts.headlights || Boolean(garageLights && garageLights !== "off"));
     if (marine) {
       const {navigation,searchlights}=studio.marineLights;
       const key=`${navigation}:${searchlights}`;
@@ -250,6 +252,15 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     [measurements, platform],
   );
   const driverScale = marine ? 1.35 : display.scale;
+  const panels = useMemo(() => {
+    const targets: NonNullable<VehiclePreviewDriverFit["panels"]> = {};
+    for (const hinge of partRig) {
+      if ((hinge.part !== "hood" && hinge.part !== "trunk") || !hinge.stance) continue;
+      const { point, yaw } = hinge.stance;
+      targets[hinge.part] = { hinge, position: [point.x * display.scale + display.position[0], .023, point.z * display.scale + display.position[2]], yaw };
+    }
+    return targets;
+  }, [partRig, display]);
   const hasDriver = Boolean(driver);
   const rook = driver?.id === ROOK_ID;
   const staging = useMemo(() => {
@@ -312,8 +323,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   useLayoutEffect(() => {
     if (!hasDriver || !driverReady) return;
     onDriverFit({ model, position: [driverAcross, .023, driverAlong], scale: driverScale,
-      yaw: staging.side * Math.PI / 2, lean, mirror: mirrorFit, cockpit });
-  }, [hasDriver, driverReady, onDriverFit, model, driverAcross, driverAlong, driverScale, staging.side, lean, mirrorFit, cockpit]);
+      yaw: staging.side * Math.PI / 2, lean, mirror: mirrorFit, cockpit, panels });
+  }, [hasDriver, driverReady, onDriverFit, model, driverAcross, driverAlong, driverScale, staging.side, lean, mirrorFit, cockpit, panels]);
   return (
     <>
       <group ref={revealRoot} scale={revealActive ? .001 : 1} visible={active}>

@@ -29,7 +29,8 @@ import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import { useGarageDrive } from "../preview/garageDriveStore";
-import { OPEN_DRIVER_DOOR, SIT_IN_CHAIR } from "./garageInteractions";
+import { OPEN_DRIVER_DOOR, PANEL_INTERACTIONS, SIT_IN_CHAIR, garagePanelForEmote } from "./garageInteractions";
+import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
 import { EmoteCreator } from "./EmoteCreator";
 import { CREATED_EMOTE_ID, readCreatedEmotes } from "./emoteAuthoring";
 
@@ -84,6 +85,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const editingAllowed = useUIStore(canEditCharacter);
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
   const hasDriverDoor = useGarageDrive(state => state.hasDoor);
+  const availableParts = useVehicleStudioStore(state => state.availableParts);
   const ownerKey = owner ?? "this-device";
   const favoritesKey = "avensky-emote-favorites-v1:" + ownerKey;
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -421,7 +423,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     useFittingTurnStore.setState({ characterYaw: 0 });
     useCharacterPreviewStore.setState(state => ({
       emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, cockpitError: null,
-      camera: id === OPEN_DRIVER_DOOR ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
+      camera: id === OPEN_DRIVER_DOOR || garagePanelForEmote(id) ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
     }));
   }
   function emoteCategory(group: NonNullable<typeof emoteGroup>, label: string = group) {
@@ -490,6 +492,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable}
         onClick={() => previewInteraction(OPEN_DRIVER_DOOR)}>Open driver door</button>
       {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
+      {PANEL_INTERACTIONS.map(action => <button key={action.id} type="button" className="menu-control" data-controller-row
+        disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)}
+        onClick={() => previewInteraction(action.id)}>{action.label}</button>)}
       <button type="button" className="menu-control" data-controller-row disabled={reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
       <button type="button" className="menu-control" data-controller-row disabled={!emote}
         onClick={() => useCharacterPreviewStore.setState({ emote: null, playbackPaused: false, cockpitError: null })}>Reset interaction</button>

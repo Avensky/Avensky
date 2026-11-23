@@ -1,10 +1,54 @@
-import { type Ref } from "react";
-import { Quaternion, Vector3, type Group, type Object3D } from "three";
+import { createContext, type Ref } from "react";
+import { MathUtils, Quaternion, Vector3, type Group, type Object3D } from "three";
 import { posePackEmote } from "./posePack";
-import type { Emote } from "./garageEmotes";
+import { aimLimb, driverArm, type Emote } from "./garageEmotes";
+import type { VehiclePartHinge } from "../preview/vehiclePartRig";
 
 export const OPEN_DRIVER_DOOR = "interact-driver-door";
 export const SIT_IN_CHAIR = "interact-chair";
+export const PANEL_INTERACTIONS = [
+  { id: "interact-hood", label: "Open hood", part: "hood" },
+  { id: "interact-trunk", label: "Open trunk", part: "trunk" },
+  { id: "inspect-engine", label: "Inspect engine", part: "hood" },
+] as const;
+export type GaragePanel = typeof PANEL_INTERACTIONS[number]["part"];
+export const garagePanelForEmote = (id?: string) => PANEL_INTERACTIONS.find(action => action.id === id)?.part;
+export const GaragePanelTarget = createContext<VehiclePartHinge | undefined>(undefined);
+
+export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, inspectEngine = false) {
+  const grip = hinge.handle;
+  const arm = driverArm(root, "r");
+  if (!grip || !arm) return undefined;
+  const neck = root.getObjectByName("neck_01") ?? root.getObjectByName("head");
+  const torso = inspectEngine ? root.getObjectByName("spine_03") : undefined;
+  const rest = [arm.shoulder, arm.elbow, arm.hand, ...(neck ? [neck] : []), ...(torso ? [torso] : [])]
+    .map(joint => ({joint, rotation: joint.quaternion.clone()}));
+  const reset = () => rest.forEach(({joint, rotation}) => joint.quaternion.copy(rotation));
+  const axis = hinge.axis;
+  const initial = hinge.angle;
+  const target = new Vector3(), wrist = new Vector3(), down = new Vector3(0, -1, 0);
+  return {
+    sample(seconds: number) {
+      reset();
+      const opening = MathUtils.smoothstep(seconds, .47, 1.42);
+      hinge.angle = MathUtils.lerp(initial, hinge.open, opening);
+      hinge.pivot.rotation[axis] = hinge.angle;
+      if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * MathUtils.smoothstep(seconds, .28, .46);
+      const reach = MathUtils.smoothstep(seconds, .08, .43) * (1 - MathUtils.smoothstep(seconds, 1.22, 1.78));
+      if (reach > 0) {
+        arm.hand.getWorldPosition(wrist).lerp(grip.getWorldPosition(target), reach);
+        aimLimb(arm.shoulder, arm.elbow, arm.hand, wrist, down.clone());
+      }
+      const settle = MathUtils.smoothstep(seconds, 1.3, 1.8);
+      if (neck) neck.rotateX((inspectEngine ? .3 : .12) * settle);
+      if (torso) torso.rotateX(.19 * settle);
+    },
+    stop() {
+      reset();
+      if (hinge.latch) hinge.latch.rotation[axis] = 0;
+    },
+  };
+}
 export const CHAIR_SEAT = "emote-chair-seat";
 const SEAT_HEIGHT = .45;
 

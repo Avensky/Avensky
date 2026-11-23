@@ -2,7 +2,8 @@ import {Box3,Group,Matrix4,Mesh,Vector3,type Object3D} from "three";
 import type {VehicleStudioPart} from "../heroes/vehicleStudioStore";
 import {AE_HINGE} from "../../vehicles/tools/roadLamps";
 
-export type VehiclePartHinge={part:VehicleStudioPart;pivot:Group;axis:"x"|"y"|"z";closed:number;open:number;angle:number;handle?:Object3D};
+export type VehiclePartHinge={part:VehicleStudioPart;pivot:Group;axis:"x"|"y"|"z";closed:number;open:number;angle:number;handle?:Object3D;
+  stance?: { point: Vector3; yaw: number }; latch?: Group };
 const frontDoor = (side: "left" | "right", letter: "l" | "r") => new RegExp(
   `^(?:.*_)?door(?:_?glass)?[_ .-]*(?:(?:front[_ .-]*)?(?:${side}|${letter})|f${letter}|${letter}f)(?:[_ .-].*)?$`, "i",
 );
@@ -13,13 +14,23 @@ const rules:Partial<Record<VehicleStudioPart,RegExp>>={
  trunk:/^(?:.*_)?(?:trunk|boot)(?:[_ .-](?!arms?).*)?$/i,
  headlights:/^(?:headlights?|headlightlenses)$/i,
 };
+// The BRZ's DOOR_LEFT and DOOR_RIGHT nodes are empty. The moving panels,
+// mirrors, handles, window trim and glass are named sibling meshes in the GLB.
+const brzDoorMeshes = {
+ "door-left": /^(?:Mesh(?:138|139|140|141|142|143|148|149)_.*|WINDOW_(?:FRONT_)?LEFT(?:_TINT)?)$/i,
+ "door-right": /^(?:Mesh(?:150|151|152|153|154|155|156|161|162)_.*|WINDOW_(?:FRONT_)?RIGHT(?:_TINT)?)$/i,
+};
 export function boundsInRoot(root:Object3D,objects:Object3D[]){
  root.updateWorldMatrix(true,true);const inverse=root.matrixWorld.clone().invert(),bounds=new Box3();
  for(const object of objects){const world=new Box3().setFromObject(object,true);world.applyMatrix4(inverse);bounds.union(world);}
  return bounds;
 }
-function meshCandidates(root:Object3D,part:VehicleStudioPart){
- const pattern=rules[part];if(!pattern)return [] as Mesh[];const found:Mesh[]=[];
+function meshCandidates(root:Object3D,part:VehicleStudioPart,model:string){
+ const brzPattern = part === "door-left" || part === "door-right" ? brzDoorMeshes[part]
+  : part === "hood" ? /^HOOD(?:_FRAME|_VENT(?:_FRAME)?)?$/i : undefined;
+ const pattern = rules[part];
+ if (!pattern) return [] as Mesh[];
+ const found:Mesh[]=[];
  root.traverse(object=>{
   if (!(object instanceof Mesh)) return;
   // The AE86 lid is a GLTF group with several material primitives.
@@ -27,13 +38,19 @@ function meshCandidates(root:Object3D,part:VehicleStudioPart){
    for (let node: Object3D | null = object; node && node !== root; node = node.parent) {
     if (pattern.test(node.name)) { found.push(object); break; }
    }
-  } else if (!(part.startsWith("door-") && /rear/i.test(object.name)) && pattern.test(object.name) && !/(?:sticker|decal|latch|arm|frame)$/i.test(object.name)) {
+  } else if ((model === "brz" && brzPattern?.test(object.name))
+    || (pattern.test(object.name) && !(part.startsWith("door-") && /rear/i.test(object.name))
+      && !/(?:sticker|decal|latch|arm|frame)$/i.test(object.name))) {
    found.push(object);
   }
  });
  return found;
 }
 export function measureDriverDoor(root: Object3D, model?: string) {
+ if (model === "brz") {
+  const driver = meshCandidates(root, "door-right", model);
+  if (driver.length) return boundsInRoot(root, driver);
+ }
  const frontLeft = /(?:driver.*door|door.*driver|(?:front|f)[_ .-]*(?:left|l).*door|(?:left|l)[_ .-]*(?:front|f).*door|door[_ .-]*(?:fl|front[_ .-]*left|left[_ .-]*front))/i;
  const explicit: Mesh[] = [], left: Mesh[] = [];
  root.traverse(object => {
@@ -126,7 +143,7 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
  const hinges:VehiclePartHinge[]=[];
  for(const part of ["door-left","door-right","hood","trunk","headlights"] as const){
   if(part==="headlights"&&model!=="ae86")continue;
-  const objects=meshCandidates(root,part);if(!objects.length)continue;
+  const objects=meshCandidates(root,part,model);if(!objects.length)continue;
   if (part === "headlights") {
    const hinge = moveUnderPivot(root, objects, new Vector3(...AE_HINGE), part, "x", -Math.PI / 3);
    if (hinge) hinges.push(hinge);
@@ -140,11 +157,34 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
    angle = outer * frontSign * (longAxis === "z" ? -1 : 1) * Math.PI / 3;
   }else{
    axis=widthAxis;
-   if(part==="hood"){point[longAxis]=frontSign<0?bounds.max[longAxis]:bounds.min[longAxis];angle=frontSign*Math.PI/5;}
-   else if(part==="trunk"){point[longAxis]=frontSign<0?bounds.min[longAxis]:bounds.max[longAxis];angle=-frontSign*Math.PI/5;}
+   const freeEdge = part === "hood" ? frontSign : -frontSign;
+   const skin = model === "brz" && part === "hood" ? objects.find(object => object.name === "HOOD") : undefined;
+   const panel = skin ? boundsInRoot(root, [skin]) : bounds;
+   point[longAxis] = freeEdge < 0 ? panel.max[longAxis] : panel.min[longAxis];
+   // +X rotation sends +Z toward the floor. +Z sends +X upward.
+   angle = freeEdge * (longAxis === "z" ? -1 : 1) * Math.PI / 5;
   }
   const hinge=moveUnderPivot(root,objects,point,part,axis,angle);if (hinge) {
    if (part === "door-left" || part === "door-right") bindDoorHandle(root, hinge, bounds, frontSign, longAxis);
+   else {
+    const freeEdge = part === "hood" ? frontSign : -frontSign;
+    const grip = center.clone();
+    grip[longAxis] = freeEdge < 0 ? bounds.min[longAxis] : bounds.max[longAxis];
+    grip.y = bounds.min.y + (bounds.max.y - bounds.min.y) * .7;
+    hinge.handle = new Group();
+    hinge.handle.name = `garage-${part}-grip`;
+    hinge.handle.position.copy(grip).sub(point);
+    hinge.pivot.add(hinge.handle);
+    const stand = grip.clone();
+    stand[longAxis] = (freeEdge < 0 ? whole.min[longAxis] : whole.max[longAxis]) + freeEdge * .24;
+    hinge.stance = { point: stand, yaw: longAxis === "x" ? freeEdge * Math.PI / 2 : freeEdge < 0 ? Math.PI : 0 };
+    const latch = model === "brz" && part === "hood" ? root.getObjectByName("HOOD_LATCH_LOCK") : undefined;
+    if (latch instanceof Mesh) {
+     const lock = boundsInRoot(root, [latch]).getCenter(new Vector3());
+     hinge.latch = moveUnderPivot(root, [latch], lock, part, axis, 0)?.pivot;
+     if (hinge.latch) hinge.latch.name = "garage-pivot-hood-latch";
+    }
+   }
    hinges.push(hinge);
   }
  }
