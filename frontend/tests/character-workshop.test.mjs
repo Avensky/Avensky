@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
+import { Box3, BoxGeometry, BufferGeometry, Group, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createServer } from "vite";
 
@@ -135,7 +135,8 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     }
     lowReach.stop();
 
-    const { BRZ_HOOD_SECONDS, CLOSE_BRZ_HOOD, sampleBrzHood } = await load("brzHoodMotion.ts");
+    const { BRZ_HOOD_SECONDS, BRZ_INSPECT_SECONDS, BRZ_TWEAK_SECONDS, CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE,
+      TWEAK_BRZ_ENGINE, sampleBrzHood } = await load("brzHoodMotion.ts");
     const { garagePanelForEmote } = await load("garageInteractions.tsx");
     assert.equal(garagePanelForEmote(CLOSE_BRZ_HOOD), "hood");
     assert.equal(sampleBrzHood(.56).hood, 0, "reach the safety catch before lifting");
@@ -173,6 +174,59 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
       assert.ok(drift < .015, `the stance shoe drifted ${drift.toFixed(4)} m at ${distance} m`);
     }
     gait.stop();
+
+    const { fitBrzEngineBay } = await vite.ssrLoadModule("/src/game/preview/brzEngineBay.ts");
+    const engineCar = new Group();
+    engineCar.rotation.y = Math.PI;
+    const surface = (x, y, z) => [new Vector3(x - .019, y, z - .019), new Vector3(x, y, z + .019), new Vector3(x + .019, y, z - .019)];
+    const frontSupport = new Mesh(new BufferGeometry().setFromPoints(surface(.40, .634, -1.95)));
+    const intake = new Mesh(new BufferGeometry().setFromPoints([
+      ...surface(-.10, .662, -1.792), ...surface(-.171, .634, -1.745),
+    ]));
+    frontSupport.name = "ENGINE_04";
+    intake.name = "ENGINE";
+    engineCar.add(frontSupport);
+    assert.equal(fitBrzEngineBay(engineCar), undefined, "an incomplete engine bay gets no interaction targets");
+    assert.equal(engineCar.children.length, 1, "no partial contact locators remain");
+    engineCar.add(intake);
+    const engineBay = fitBrzEngineBay(engineCar);
+    assert.ok(engineBay);
+
+    standing.position.set(0, .023, 2.25);
+    standing.rotation.y = Math.PI;
+    const bonnet = new Group(), bonnetGrip = new Group();
+    bonnetGrip.position.set(.12, .65, 1.96);
+    bonnet.add(bonnetGrip);
+    let support = 0;
+    const engineHood = { part: "hood", pivot: bonnet, handle: bonnetGrip, axis: "x", closed: 0, open: -.68, angle: 0, engineBay,
+      hoodProp: { grip: new Group(), place: amount => { support = amount; } } };
+    const outward = vector => vector.set(0, 0, 1);
+    assert.equal(garagePanelForEmote(TWEAK_BRZ_ENGINE), "hood");
+    assert.equal(preparePanelOpening(rig, engineHood, false, true, outward, TWEAK_BRZ_ENGINE), undefined, "tweak requires a supported hood");
+    const inspect = preparePanelOpening(rig, engineHood, true, true, outward, INSPECT_BRZ_ENGINE);
+    assert.equal(inspect.duration, BRZ_HOOD_SECONDS + BRZ_INSPECT_SECONDS);
+    inspect.sample(BRZ_HOOD_SECONDS + 1.2);
+    const knuckle = side => rig.getObjectByName(`middle_03_${side}`).getWorldPosition(new Vector3());
+    const assertContact = (side, anchor) => assert.ok(knuckle(side).distanceTo(anchor.getWorldPosition(new Vector3())) < .012);
+    assertContact("l", engineBay.brace);
+    assertContact("r", engineBay.intake);
+    assert.equal(engineHood.angle, engineHood.open);
+    assert.equal(support, 1);
+    inspect.stop();
+
+    const work = preparePanelOpening(rig, engineHood, false, true, outward, TWEAK_BRZ_ENGINE);
+    const plant = shoe.getWorldPosition(new Vector3());
+    const wrist = rig.getObjectByName("hand_r");
+    work.sample(1.13);
+    const wristStart = wrist.getWorldQuaternion(new Quaternion());
+    work.sample(1.52);
+    assertContact("r", engineBay.fitting);
+    assert.ok(wrist.getWorldQuaternion(new Quaternion()).angleTo(wristStart) > .26, "the wrist turns at the fitting");
+    assert.ok(shoe.getWorldPosition(new Vector3()).distanceTo(plant) < .008, "the feet stay planted during the reach");
+    work.sample(BRZ_TWEAK_SECONDS);
+    assert.equal(engineHood.angle, engineHood.open);
+    assert.equal(support, 1);
+    work.stop();
 
     const { prepareBrzCabin, validBrzCabinColors } = await vite.ssrLoadModule("/src/game/preview/brzCabin.ts");
     const shared = new MeshStandardMaterial({ color: "#6c0e24" });

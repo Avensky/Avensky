@@ -25,7 +25,7 @@ import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./pose
 import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
 import { GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip, garagePanelForEmote, preparePanelOpening } from "./garageInteractions";
 import { prepareBrzApproach } from "../preview/brzApproach";
-import { CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE } from "./brzHoodMotion";
+import { CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE, TWEAK_BRZ_ENGINE } from "./brzHoodMotion";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
 
 const FADE_SECONDS = .52;
@@ -109,6 +109,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       openDoorApproach.current = playback.approach;
     } else playback?.approach?.stop();
     if (view.brzDoorReady) useCharacterPreviewStore.setState({ brzDoorReady: false });
+    if (view.brzHoodBusy) useCharacterPreviewStore.setState({ brzHoodBusy: false });
     panelPlayback.current = null;
     if (panel && current) current.idle.reset().setEffectiveWeight(1).play();
   }, [root, panel, reducedMotion]);
@@ -218,10 +219,14 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         if (!opening || (panel.clearance && !approach)) {
           approach?.stop();
           current.idle.reset().setEffectiveWeight(1).play();
-          useCharacterPreviewStore.setState({ emote: null, cockpitError: "This driver cannot reach the selected panel." });
+          useCharacterPreviewStore.setState({ emote: null, cockpitError: preview.id === TWEAK_BRZ_ENGINE
+            ? "Open and prop the BRZ hood before tweaking the engine." : "This driver cannot reach the selected panel." });
           return;
         }
         panelPlayback.current = { opening, approach, seconds: alreadyAtHood?.duration ?? 0, finished: false };
+        if (panel.hinge.hoodProp) {
+          useCharacterPreviewStore.setState({ brzHoodBusy: true });
+        }
       }
       if (heldProp.current) heldProp.current.visible = false;
       const playback = panelPlayback.current;
@@ -235,6 +240,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       else if (!playback.finished) {
         playback.finished = true;
         if (panel.hinge.hoodProp) useVehicleStudioStore.getState().setPart("hood", preview.id !== CLOSE_BRZ_HOOD);
+        if (view.brzHoodBusy) useCharacterPreviewStore.setState({ brzHoodBusy: false });
         if (doorOnly && playback.approach) useCharacterPreviewStore.setState({ brzDoorReady: true });
       }
       return;

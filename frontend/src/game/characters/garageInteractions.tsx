@@ -1,10 +1,11 @@
 import { createContext, type Ref, type RefObject } from "react";
 import { MathUtils, Quaternion, Vector3, type Group, type Object3D } from "three";
 import { posePackEmote } from "./posePack";
-import { aimDriverJoint, aimLimb, driverArm, driverHand, type Emote } from "./garageEmotes";
+import { aimDriverJoint, aimLimb, alignJointNormal, driverArm, driverHand, type Emote } from "./garageEmotes";
 import type { VehiclePartHinge } from "../preview/vehiclePartRig";
 import type { BrzClearance } from "../preview/brzApproach";
-import { BRZ_HOOD_SECONDS, CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE, OPEN_BRZ_HOOD, sampleBrzHood } from "./brzHoodMotion";
+import { BRZ_HOOD_SECONDS, BRZ_INSPECT_SECONDS, BRZ_TWEAK_SECONDS, CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE, OPEN_BRZ_HOOD,
+  TWEAK_BRZ_ENGINE, sampleBrzEngine, sampleBrzHood } from "./brzHoodMotion";
 
 export const OPEN_DRIVER_DOOR = "interact-driver-door";
 export const SIT_IN_CHAIR = "interact-chair";
@@ -14,7 +15,8 @@ export const PANEL_INTERACTIONS = [
   { id: INSPECT_BRZ_ENGINE, label: "Inspect engine", part: "hood" },
 ] as const;
 export type GaragePanel = typeof PANEL_INTERACTIONS[number]["part"];
-export const garagePanelForEmote = (id?: string) => id === CLOSE_BRZ_HOOD ? "hood" : PANEL_INTERACTIONS.find(action => action.id === id)?.part;
+export const garagePanelForEmote = (id?: string) => id === CLOSE_BRZ_HOOD || id === TWEAK_BRZ_ENGINE
+  ? "hood" : PANEL_INTERACTIONS.find(action => action.id === id)?.part;
 export const GaragePanelTarget = createContext<{
   hinge: VehiclePartHinge;
   clearance?: BrzClearance;
@@ -27,7 +29,10 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const prop = fittedReach && hinge.part === "hood" ? hinge.hoodProp : undefined;
   const safetyCatch = fittedReach ? hinge.latchGrip : undefined;
   const closing = actionId === CLOSE_BRZ_HOOD;
-  if (!grip || (closing && !prop)) return undefined;
+  const tweaking = actionId === TWEAK_BRZ_ENGINE;
+  const engine = prop && (inspectEngine || tweaking) ? hinge.engineBay : undefined;
+  const hoodIsSupported = Boolean(prop && Math.abs(hinge.angle - hinge.open) < .004);
+  if (!grip || (closing && !prop) || (tweaking && (!engine || !hoodIsSupported))) return undefined;
   const leadSide = prop || (fittedReach && hinge.part === "door-left") ? "l" : "r";
   function armTarget(side: "l" | "r") {
     const arm = driverArm(root, side);
@@ -44,18 +49,21 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
     const thigh = root.getObjectByName(`thigh_${side}`), calf = root.getObjectByName(`calf_${side}`), foot = root.getObjectByName(`foot_${side}`);
     return thigh && calf && foot ? [{ thigh, calf, foot, side, anchor: new Vector3(), facing: new Quaternion() }] : [];
   }) : [];
-  const restHeight = root.position.y;
-  const rest = [...arms.flatMap(({shoulder,elbow,hand}) => [shoulder,elbow,hand]),
+  const restPosition = root.position.clone();
+  const rest = [...arms.flatMap(({ shoulder, elbow, hand, digits }) => [
+    shoulder, elbow, hand, ...(engine ? digits?.fingers.map(({ joint }) => joint) ?? [] : []),
+  ]),
     ...(neck ? [neck] : []), ...(torso ? [torso] : []), ...legs.flatMap(({thigh,calf,foot}) => [thigh,calf,foot])]
     .map(joint => ({joint, rotation: joint.quaternion.clone()}));
-  const reset = () => { root.position.y = restHeight; rest.forEach(({joint, rotation}) => joint.quaternion.copy(rotation)); };
+  const reset = () => { root.position.copy(restPosition); rest.forEach(({joint, rotation}) => joint.quaternion.copy(rotation)); };
   const { axis, angle: initial } = hinge;
-  const inspectOpen = Boolean(prop && inspectEngine && Math.abs(initial / hinge.open) > .93);
+  const inspectOpen = Boolean((inspectEngine || tweaking) && hoodIsSupported);
   const inspectAt = inspectOpen ? 0 : BRZ_HOOD_SECONDS;
-  const duration = prop ? inspectEngine ? inspectAt + .95 : BRZ_HOOD_SECONDS : 1.8;
+  const duration = !prop ? 1.8 : tweaking ? BRZ_TWEAK_SECONDS
+    : inspectEngine ? inspectAt + (engine ? BRZ_INSPECT_SECONDS : .95) : BRZ_HOOD_SECONDS;
   const catchPoint = new Vector3(), wrist = new Vector3(), palm = new Vector3(), shoulder = new Vector3(), elbow = new Vector3(), shoe = new Vector3();
   const down = new Vector3(0, -1, 0), knee = new Vector3(), up = new Vector3(0, 1, 0), outward = new Vector3();
-  const pitchAxis = new Vector3(), scale = new Vector3();
+  const pitchAxis = new Vector3(), scale = new Vector3(), palmNormal = new Vector3();
   const rotation = new Quaternion(), parentRotation = new Quaternion(), bendRotation = new Quaternion(), handRest = new Quaternion();
 
   return {
@@ -64,16 +72,18 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
       reset();
       let lean = 0;
       let leftToLip = 1;
+      const work = engine && seconds >= inspectAt ? sampleBrzEngine(seconds - inspectAt, tweaking) : undefined;
       if (prop && assist) {
         const phase = sampleBrzHood(seconds, closing);
         hinge.angle = inspectOpen ? hinge.open : MathUtils.lerp(hinge.closed, hinge.open, phase.hood);
         hinge.pivot.rotation[axis] = hinge.angle;
         prop.place(inspectOpen ? 1 : phase.prop);
         if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * (inspectOpen ? 0 : phase.catch);
-        lead.weight = inspectOpen ? 0 : phase.leftGrip;
-        assist.weight = inspectOpen ? 0 : phase.rightGrip;
+        lead.weight = work ? work.brace : inspectOpen ? 0 : phase.leftGrip;
+        assist.weight = work ? work.reach : inspectOpen ? 0 : phase.rightGrip;
         leftToLip = phase.leftToLip;
-        lean = (inspectOpen ? 0 : phase.lean) + (inspectEngine ? .40 * MathUtils.smoothstep(seconds, inspectAt, inspectAt + .95) : 0);
+        lean = work?.lean ?? ((inspectOpen ? 0 : phase.lean)
+          + (inspectEngine && !engine ? .40 * MathUtils.smoothstep(seconds, inspectAt, inspectAt + .95) : 0));
       } else {
         const lift = safetyCatch ? MathUtils.smoothstep(seconds, .74, 1.54) : MathUtils.smoothstep(seconds, .47, 1.42);
         const caught = safetyCatch ? .13 * MathUtils.smoothstep(seconds, .56, .70) : 0;
@@ -91,6 +101,22 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
       grip.getWorldPosition(lead.target);
       if (safetyCatch && leftToLip < 1) lead.target.lerp(safetyCatch.getWorldPosition(catchPoint), 1 - leftToLip);
       if (prop && assist) prop.grip.getWorldPosition(assist.target);
+      if (work && engine && assist) {
+        root.parent?.getWorldScale(scale);
+        engine.brace.getWorldPosition(lead.target).addScaledVector(up, work.hover * .68 * scale.y);
+        (tweaking ? engine.fitting : engine.intake).getWorldPosition(assist.target).addScaledVector(up, work.hover * scale.y);
+        if (clearanceOutward && root.parent) {
+          for (const leg of legs) {
+            leg.foot.getWorldPosition(leg.anchor);
+            leg.foot.getWorldQuaternion(leg.facing);
+          }
+          clearanceOutward(outward);
+          root.parent.getWorldQuaternion(parentRotation).invert();
+          // Shift weight over the planted shoes for the deeper intake fitting.
+          root.position.addScaledVector(pitchAxis.copy(outward).applyQuaternion(parentRotation),
+            -work.lean / .56 * (tweaking ? .10 : .04));
+        }
+      }
       if (torso?.parent && (lean || inspectEngine)) {
         root.getWorldQuaternion(rotation);
         torso.parent.getWorldQuaternion(parentRotation).invert();
@@ -104,8 +130,13 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
         arm.hand.getWorldPosition(wrist);
         arm.goal.copy(arm.target);
         if (arm.digits) {
-          const span = arm.digits.middle.getWorldPosition(palm).distanceTo(wrist);
-          arm.fingers.subVectors(arm.target, shoulder).normalize();
+          if (work) for (const { joint, axis, segment } of arm.digits.fingers) {
+            joint.rotateOnAxis(axis, (arm === assist ? work.curl : .10 * work.brace) * (1 - .25 * segment));
+          }
+          const contact = (work && arm.digits.fingertip) || arm.digits.middle;
+          const span = contact.getWorldPosition(palm).distanceTo(wrist);
+          if (work && clearanceOutward) arm.fingers.copy(outward).negate().addScaledVector(down, .19).normalize();
+          else arm.fingers.subVectors(arm.target, shoulder).normalize();
           arm.goal.addScaledVector(arm.fingers, -span);
         }
         arm.elbow.getWorldPosition(elbow);
@@ -114,9 +145,9 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
         const vertical = Math.sqrt(Math.max(.015, (armLength * .94) ** 2 - horizontal ** 2));
         low = Math.max(low, (shoulder.y - arm.goal.y - vertical) * arm.weight);
       }
-      if (legs.length && low > 0) {
+      if (legs.length && (low > 0 || work?.lean)) {
         root.parent?.getWorldScale(scale);
-        for (const leg of legs) {
+        if (!work || !clearanceOutward) for (const leg of legs) {
           leg.foot.getWorldPosition(leg.anchor);
           leg.foot.getWorldQuaternion(leg.facing);
         }
@@ -135,13 +166,26 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
       for (const arm of arms) {
         if (arm.weight <= 0) continue;
         arm.hand.getWorldPosition(wrist).lerp(arm.goal, arm.weight);
-        // The elbow hangs below the grip while the spare hand remains free.
-        aimLimb(arm.shoulder, arm.elbow, arm.hand, wrist, knee.copy(down));
+        // Bring the forearm over the front support before lowering the fingers.
+        if (work && clearanceOutward) knee.copy(outward).addScaledVector(up, .42);
+        else knee.copy(down);
+        aimLimb(arm.shoulder, arm.elbow, arm.hand, wrist, knee);
         if (arm.digits) {
           handRest.copy(arm.hand.quaternion);
-          aimDriverJoint(arm.hand, arm.digits.middle, arm.fingers);
+          const contact = (work && arm.digits.fingertip) || arm.digits.middle;
+          aimDriverJoint(arm.hand, contact, arm.fingers);
+          if (work) {
+            palmNormal.copy(down).applyAxisAngle(arm.fingers, arm === assist ? work.turn : 0);
+            alignJointNormal(arm.hand, arm.fingers, arm.digits.palm, palmNormal);
+          }
           arm.hand.quaternion.slerp(handRest, 1 - arm.weight);
         }
+      }
+      if (work && neck?.parent) {
+        root.getWorldQuaternion(rotation);
+        neck.parent.getWorldQuaternion(parentRotation).invert();
+        pitchAxis.set(1, 0, 0).applyQuaternion(rotation).applyQuaternion(parentRotation);
+        neck.quaternion.premultiply(bendRotation.setFromAxisAngle(pitchAxis, work.look));
       }
       if (neck && !prop) neck.rotateX((inspectEngine ? .3 : .12) * MathUtils.smoothstep(seconds, 1.3, 1.8));
     },

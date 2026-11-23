@@ -35,6 +35,7 @@ import { prepareGarageHeadlightGlass } from "./garageHeadlightGlass";
 import { VehicleMaterialization } from "./VehicleMaterialization";
 import { batchStaticVehicleMeshes } from "../../vehicles/tools/staticVehicleBatches";
 import { BRZ_GARAGE_ENABLED, prepareBrzCabin } from "./brzCabin";
+import { fitBrzEngineBay } from "./brzEngineBay";
 import { prepareBrzHardware } from "./brzHardware";
 import type { BrzClearance } from "./brzApproach";
 
@@ -144,6 +145,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
       hood.open = Math.sign(hood.open) * MathUtils.degToRad(39);
       prop.fit(frame);
       hood.hoodProp = prop;
+      hood.engineBay = fitBrzEngineBay(prepared.root);
       hood.support = opening => prop.place(MathUtils.smoothstep(opening, .82, 1));
       const bonnetSkin = prepared.root.getObjectByName("HOOD");
       if (hood.handle && bonnetSkin) {
@@ -221,7 +223,12 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     useVehicleStudioStore.getState().reset();
     if (!showroomPath) useVehicleStudioStore.getState().setAvailable(model,[...availableVehicleParts(partRig)]);
     useGarageDrive.setState({ hasDoor: Boolean(driverDoor) });
-    return ()=>{if(useVehicleStudioStore.getState().availableVehicle===model)useVehicleStudioStore.getState().setAvailable(null);};
+    const engineAvailable = partRig.some(part => part.engineBay);
+    if (engineAvailable) useCharacterPreviewStore.setState({ brzEngineAvailable: true });
+    return () => {
+      if (useVehicleStudioStore.getState().availableVehicle === model) useVehicleStudioStore.getState().setAvailable(null);
+      if (engineAvailable) useCharacterPreviewStore.setState({ brzEngineAvailable: false, brzHoodBusy: false });
+    };
   },[model,partRig,driverDoor,showroomPath]);
   useEffect(()=>{
     if (!marine) applyWindowTone(prepared.glassMaterials, glassStyle);
