@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createServer } from "vite";
 
-test("welcome creates and selects named characters without choosing a vehicle", async () => {
+test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true });
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
@@ -22,6 +22,7 @@ test("welcome creates and selects named characters without choosing a vehicle", 
     const { WelcomeScreen } = await vite.ssrLoadModule("/src/game/welcome/WelcomeScreen.tsx");
     const { useUIStore: ui } = await vite.ssrLoadModule("/src/store/menus/uiStore.ts");
     const { useSelectionStore: vehicles } = await vite.ssrLoadModule("/src/store/selection/selectionStore.ts");
+    const { usePreferencesStore: preferences } = await vite.ssrLoadModule("/src/store/preferences/preferencesStore.ts");
     const { useSocialStore: social, selectEquippedCharacter } = await vite.ssrLoadModule("/src/store/social/socialStore.ts");
     const { CHARACTER_STYLES, styleLook } = await vite.ssrLoadModule("/src/game/characters/characterStyles.ts");
     const { isEquippableOutfit } = await vite.ssrLoadModule("/src/game/characters/characterCatalog.ts");
@@ -34,6 +35,12 @@ test("welcome creates and selects named characters without choosing a vehicle", 
       limits:{max_active_worlds:2},players:[],teammates:[],requests:[],groups:[],worlds:[],world_invites:[],maps:[],current_world_id:null};
     const reply=(request,data,ok=true,message)=>client.receiveSocialResult({request_id:request.request_id,ok,data,message});
     const button=label=>[...document.querySelectorAll("button")].find(button=>button.textContent.trim() === label);
+    const submit=()=>document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
+    const typeName=name=>{
+      const input=document.querySelector('[name="characterName"]');
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype,"value").set.call(input,name);
+      input.dispatchEvent(new Event("input",{bubbles:true}));
+    };
 
     for (const style of CHARACTER_STYLES)
       for (const body of ["female","male"]) assert.ok(isEquippableOutfit(styleLook(style,body)),style.name);
@@ -45,14 +52,29 @@ test("welcome creates and selects named characters without choosing a vehicle", 
       ui.setState({screen:"welcome"});
       root.render(createElement(WelcomeScreen));
     });
-    assert.equal(document.querySelector("video"),null);
-    assert.ok(document.querySelector(".menu-flare-background"));
-    assert.equal(document.querySelector('[src="/images/avensky-welcome.webp"]').alt,"");
-    await act(async()=>button("Register").click());
+    const flare=document.querySelector(".menu-flare-background video");
+    assert.ok(flare.loop && flare.autoplay && flare.muted && flare.playsInline);
+    assert.equal(flare.getAttribute("src"),"/images/purple-sunflare-loop.mp4");
+    assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
+    await act(async()=>preferences.setState({reducedMotion:true}));
+    assert.equal(document.querySelector(".menu-flare-background video"),null);
+    await act(async()=>preferences.setState({reducedMotion:false}));
+    await act(async()=>button("Create a character").click());
+    assert.equal(document.querySelector("select"),null);
+    assert.equal(button("Continue").disabled,true);
+    await act(async()=>button("Male").click());
+    const style=[...document.querySelectorAll(".welcome-character")].find(card=>card.textContent.includes("Night Shift"));
+    await act(async()=>style.click());
+    await act(async()=>typeName("Track Fox"));
+    assert.equal(button("Continue").disabled,false);
+    await act(async()=>submit());
+    assert.equal(sent.length,0,"draft stays local until the player registers or chooses guest access");
+    assert.ok(button("Play as guest"));
+    await act(async()=>button("Create an account").click());
     const form=document.querySelector("form");
     form.elements.login.value="lightfoot";
     form.elements.password.value="a staging passphrase for test";
-    await act(async()=>form.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true})));
+    await act(async()=>submit());
     const register=sent.at(-1);
     assert.equal(register.action,"account_register");
     assert.equal(register.login,"lightfoot");
@@ -61,15 +83,6 @@ test("welcome creates and selects named characters without choosing a vehicle", 
       reply(register,{profile_id:"registered-player",name:"Lightfoot",token,account:true});
       client.receiveSocialState(view);
     });
-    assert.equal(document.querySelector("select"),null);
-    assert.equal(button("Create character").disabled,true);
-    await act(async()=>button("Male").click());
-    const style=[...document.querySelectorAll(".welcome-character")].find(card=>card.textContent.includes("Night Shift"));
-    await act(async()=>style.click());
-    const creation = document.querySelector("form");
-    creation.elements.characterName.value="Track Fox";
-    const submit=()=>creation.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
-    await act(async()=>submit());
     const create=sent.at(-1);
     assert.equal(create.action,"character_create");
     assert.equal(create.name,"Track Fox");
@@ -80,9 +93,13 @@ test("welcome creates and selects named characters without choosing a vehicle", 
     await act(async()=>reply(create,{},false,"That character name is already in use on this server."));
     assert.match(document.querySelector('[role="alert"]').textContent,/already in use/);
     assert.equal(ui.getState().screen,"welcome");
+    assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
+    await act(async()=>typeName("Track Fox II"));
     await act(async()=>submit());
-    const saved={...view.profile,name:"Track Fox",active_character_id:"registered-player",
-      characters:[{id:"registered-player",name:"Track Fox",style:"night-shift",level:1,appearance:fox}],
+    assert.equal(sent.at(-1).name,"Track Fox II");
+    assert.equal(sent.filter(request=>request.action==="account_register").length,1);
+    const saved={...view.profile,name:"Track Fox II",active_character_id:"registered-player",
+      characters:[{id:"registered-player",name:"Track Fox II",style:"night-shift",level:1,appearance:fox}],
       progression:{character:fox,cosmetics_revision:1}};
     await act(async()=>reply(sent.at(-1),{profile:saved}));
     assert.equal(ui.getState().screen,"main");
@@ -95,7 +112,18 @@ test("welcome creates and selects named characters without choosing a vehicle", 
       ui.setState({screen:"welcome"});
       root.render(createElement(WelcomeScreen,{key:"returning"}));
     });
-    await act(async()=>button("Continue as Track Fox").click());
+    await act(async()=>button("Log in").click());
+    const loginForm=document.querySelector("form");
+    loginForm.elements.login.value="lightfoot";
+    loginForm.elements.password.value="a staging passphrase for test";
+    await act(async()=>submit());
+    const login=sent.at(-1);
+    assert.equal(login.action,"account_login");
+    await act(async()=>{
+      reply(login,{profile_id:"registered-player",name:"Track Fox II",token,account:true});
+      client.receiveSocialState({...view,profile:saved});
+    });
+    assert.equal(document.querySelector('[name="characterName"]'),null);
     assert.match(document.querySelector('.welcome-character[aria-pressed="true"]').textContent,/Track Fox/);
     assert.ok(button("New character"));
     await act(async()=>button("Enter main menu").click());
@@ -126,6 +154,7 @@ test("the Avensky icon formats and lightweight sunflare ship with the frontend",
   assert.match(html.toString(),/<title>Avensky<\/title>/);
   assert.match(html.toString(),/name="description" content="Avensky is a browser-based game engine/);
   assert.match(svg.toString(),/<svg[\s\S]+viewBox="0 0 256 256"/);
+  assert.doesNotMatch(svg.toString(),/<(?:rect|image)\b/);
   assert.equal(png.readUInt32BE(16),512);
   assert.equal(png.readUInt32BE(20),512);
   assert.equal(ico.readUInt16LE(2),1);
