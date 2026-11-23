@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { BoxGeometry, Group, Mesh, Vector3, Quaternion } from 'three';
+import { Box3, BoxGeometry, Group, Mesh, Vector3, Quaternion } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { createServer } from 'vite';
 
@@ -197,6 +197,27 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
       cabin.stop();
       exit.removeFromParent();
     }
+
+    const { prepareBrzApproach } = await vite.ssrLoadModule('/src/game/preview/brzApproach.ts');
+    const { scene: broadDriver } = await new GLTFLoader().parseAsync(await readFile('tests/fixtures/villager-male-rig.json', 'utf8'), '');
+    const wideStand = new Group(), openPanel = new Group(), outsideHandle = new Group();
+    brzMotion.add(wideStand);
+    wideStand.position.set(1.43, .023, -.65);
+    wideStand.add(broadDriver);
+    brz.add(openPanel);
+    openPanel.position.set(.822, .52, .765);
+    openPanel.rotation.y = -Math.PI / 3;
+    outsideHandle.position.set(.073, .14, -1.22);
+    openPanel.add(outsideHandle);
+    const hull = new Box3(new Vector3(-1.025, .02, -2.20), new Vector3(1.025, 1.26, 2.20));
+    const wing = new Box3(new Vector3(-.189, -.327, -1.42), new Vector3(.189, .61, 0));
+    const closing = prepareBrzApproach(broadDriver, wideStand, { car: brz, hull }, {
+      part: 'door-left', pivot: openPanel, axis: 'y', angle: openPanel.rotation.y, handle: outsideHandle, doorSweep: wing,
+    }, true);
+    assert(closing, 'a wider rig can walk behind the open door to close it');
+    closing.sample(closing.duration, .06);
+    assert(wideStand.position.x > 1.8);
+    closing.stop();
 
     const { cockpitTakesForWheel } = await vite.ssrLoadModule('/src/game/characters/cockpitEmotes.ts');
     assert(!cockpitTakesForWheel(true, false).some(take => take.id === 'drive-race-start'));
