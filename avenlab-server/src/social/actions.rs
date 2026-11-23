@@ -69,7 +69,11 @@ impl SocialData {
         self.profile(actor)?;
         match action {
             SocialAction::Rename { name } => {
-                self.profiles.get_mut(actor).unwrap().name = valid_name(&name, 24)?
+                let profile = self.profiles.get_mut(actor).unwrap();
+                if profile.active_character.is_some() {
+                    return Err("The active character keeps its saved name.".into());
+                }
+                profile.name = valid_name(&name, 24)?;
             }
             SocialAction::FriendRequest { target } => {
                 self.profile(&target)?;

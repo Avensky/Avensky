@@ -542,6 +542,7 @@ impl Server {
                 .to_string()
         };
         let result = match action {
+            "character_create" | "character_select" => self.handle_character_slots(player, &value).await?,
             "roster_save" | "world_approve" | "world_set_main" => self.author(player, action, &value).await?,
             "mode_join" | "mode_cancel" | "mode_leave" | "hero_select" | "skin_redeem" | "skin_equip"
             | "hero_loadout_save" | "character_equip" | "character_outfit_save" | "character_outfit_delete"
@@ -714,6 +715,7 @@ impl Server {
 
 mod authoring;
 mod alpha_sessions;
+mod characters;
 mod identity;
 mod matches;
 mod revival;

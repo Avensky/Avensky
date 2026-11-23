@@ -1,5 +1,6 @@
 import type { AlphaView, Progression, GameMode } from "../alpha/alphaStore";
 import type { VehicleDriver } from "../../game/characters/driverRoster";
+import type { CharacterChoice } from "../../game/characters/characterCatalog";
 import { create } from "zustand";
 
 export type SocialPerson = {
@@ -50,11 +51,17 @@ export type WorldInvitation = {
   locked: boolean;
   expires: number;
 };
+export type CharacterSlot = { id: string; name: string; style: string; level: number; appearance?: CharacterChoice | null };
+export type PlayerProfile = {
+  id: string; name: string; progression?: Progression;
+  active_character_id?: string | null; characters?: CharacterSlot[];
+};
+
 export type SocialView = {
   main_world_id?: number | null;
   roster?: VehicleDriver[];
   permissions?: { game_master: boolean; edit_characters: boolean; edit_main_world: boolean };
-  profile: { id: string; name: string; progression?: Progression };
+  profile: PlayerProfile;
   alpha?: AlphaView;
   players: SocialPerson[];
   teammates: SocialPerson[];
@@ -116,6 +123,7 @@ export const useSocialStore = create<{
   entryCode: string;
   reset: () => void;
   receive: (value: unknown) => void;
+  acknowledgeCharacter: (profile: PlayerProfile) => void;
   acknowledgeProgression: (owner: string, fallback: (progression: Progression) => Progression, cosmetics?: unknown) => void;
 }>((set) => ({
   available: false,
@@ -141,6 +149,10 @@ export const useSocialStore = create<{
       view: null,
       message: "Connecting to the game server…",
     }),
+  acknowledgeCharacter: profile => set(state => {
+    if (!state.view || state.view.profile.id !== profile.id || !profile.progression) return state;
+    return { view: { ...state.view, profile }, cachedCosmetics: cosmeticsFrom(profile.progression) };
+  }),
   acknowledgeProgression: (owner, fallback, cosmetics) => set(state => {
     const view = state.view;
     const profile = view?.profile;
@@ -252,7 +264,12 @@ export const useSocialStore = create<{
       const current = state.view?.profile.id === view.profile.id ? state.view.profile.progression : undefined;
       // A reliable reply can arrive before a replaceable snapshot that was captured earlier.
       // Keep newer cosmetics while still consuming the snapshot's world and career data.
-      const profile = hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current)
+      const currentProfile = state.view?.profile;
+      const oldCharacter = currentProfile?.id === view.profile.id &&
+        currentProfile.active_character_id !== view.profile.active_character_id &&
+        hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current) &&
+        incoming.cosmetics_revision < current.cosmetics_revision;
+      const profile = oldCharacter ? currentProfile : hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current)
         && incoming.cosmetics_revision <= current.cosmetics_revision
         ? { ...view.profile, progression: { ...incoming, ...cosmeticsFrom(current) } }
         : view.profile;

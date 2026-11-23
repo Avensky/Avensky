@@ -31,7 +31,8 @@ function show(record:CareerMatch,source:ResultsSource,profileId:string|null){
  useUIStore.setState({overlay:'match_results'});
 }
 export function receiveMatchResult(value:unknown):boolean{
- const record=parseMatchResult(value),profileId=useSocialStore.getState().view?.profile.id??null;
+ const record=parseMatchResult(value),profile=useSocialStore.getState().view?.profile;
+ const profileId=profile?.active_character_id??profile?.id??null;
  if(!record||!profileId||!record.participants.some(player=>player.profile_id===profileId))return false;
  const key=JSON.stringify([profileId,record.match_id]);
  if(received.has(key))return true;
@@ -40,7 +41,8 @@ export function receiveMatchResult(value:unknown):boolean{
 export function openStoredMatch(value:unknown):boolean{
  const record=parseMatchResult(value);
  if(!record)return false;
- show(record,'history',useSocialStore.getState().view?.profile.id??null);return true;
+ const profile=useSocialStore.getState().view?.profile;
+ show(record,'history',profile?.active_character_id??profile?.id??null);return true;
 }
 /** History restores its caller. Live callers close only after mode_leave has
  * succeeded; use the result actions rather than dismissing a live match. */

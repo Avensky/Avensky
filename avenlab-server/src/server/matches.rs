@@ -38,6 +38,7 @@ struct Sample {
     player: String,
     source: String,
     profile: String,
+    account_profile_id: Option<String>,
     name: String,
     team: Team,
     hero: String,
@@ -55,7 +56,8 @@ impl Journal {
     fn sample(&mut self, sample: Sample, elapsed: f64) {
         self.elapsed = self.elapsed.max(elapsed);
         let p = self.people.entry(sample.profile.clone()).or_insert_with(|| CareerParticipant {
-            profile_id: sample.profile.clone(), name: sample.name, team: Some(sample.team.as_str().into()),
+            profile_id: sample.profile.clone(), account_profile_id: sample.account_profile_id,
+            name: sample.name, team: Some(sample.team.as_str().into()),
             hero: sample.hero.clone(), appearance: sample.appearance.clone(), ..Default::default()
         });
         p.hero = sample.hero;
@@ -111,11 +113,12 @@ fn apply_record(data: &mut SocialData, record: &CareerMatch) -> Result<bool, Str
     if data.completed_results.len() >= 16384 { return Err("Result ledger needs archival before more matches can be recorded.".into()); }
     record.validate()?;
     for person in &record.participants {
-        let profile = data.profiles.get_mut(&person.profile_id).ok_or("A match profile is unavailable.")?;
-        profile.progression.career.record(record, &person.profile_id)?;
+        let profile = data.profiles.get_mut(person.owner()).ok_or("A match profile is unavailable.")?;
+        let progression = profile.character_progression(&person.profile_id).ok_or("A match character is unavailable.")?;
+        progression.career.record(record, &person.profile_id)?;
         if record.progression_eligible && !person.abandoned {
             let won = person.team.as_ref() == record.winner.as_ref() && record.winner.is_some();
-            profile.progression.award(record.mode == Mode::Competitive, won);
+            progression.award(record.mode == Mode::Competitive, won);
         }
     }
     data.completed_results.insert(record.match_id.clone());
@@ -173,7 +176,7 @@ impl Server {
             let bridge = self.matches.lock().await;
             let Some(journal) = bridge.journals.get(&world) else { return true; };
             if journal.mode.bucket() != 0 { return true; }
-            journal.people.keys().cloned().collect()
+            journal.people.values().map(|person| person.owner().to_owned()).collect()
         };
         // Reserved or not-yet-deployed seats also reserve archive capacity.
         // They cannot collectively race the bounded terminal record.
@@ -195,7 +198,7 @@ impl Server {
         let record = tokio::task::spawn_blocking(move || career::read_match_archive(&path, &match_id)).await;
         if let Ok(Ok(record)) = record {
             if let Some(client) = self.connections.lock().await.get(player) {
-                if client.profile_id.as_ref().is_some_and(|id| record.participants.iter().any(|p| &p.profile_id == id)) {
+                if client.profile_id.as_ref().is_some_and(|id| record.participants.iter().any(|p| p.owner() == id)) {
                     let _ = client.tx.send(json!({"type":"match_result","data":record}).to_string());
                 }
             }
@@ -207,7 +210,7 @@ impl Server {
     }
     pub(super) async fn played_in_round(&self, world: usize, profile: Option<&String>) -> bool {
         self.matches.lock().await.journals.get(&world)
-            .is_some_and(|journal| profile.is_some_and(|id| journal.people.contains_key(id)))
+            .is_some_and(|journal| profile.is_some_and(|id| journal.people.values().any(|person| person.owner() == id)))
     }
     async fn samples(&self, world: usize, room: &WorldRuntime) -> Vec<Sample> {
         // Capture only identities used by this world. Cloning every connection
@@ -232,7 +235,8 @@ impl Server {
                 .or(entity.vehicle_id.as_deref()).unwrap_or("ae86");
             let health = room.physics.vehicle_health.get(player)?;
             Some(Sample { player: player.clone(), source: format!("{:p}:{:?}", room, vehicle.body),
-                profile: profile.id.clone(), name: profile.name.clone(), team: entity.team,
+                profile: profile.career_id().to_owned(), account_profile_id: profile.character_owner(),
+                name: profile.display_name().to_owned(), team: entity.team,
                 hero: hero.into(), appearance: entity.appearance.clone(), stats: health_stats(health),
                 combat_time_s: health.combat_time_s(), best_moment: health.best_combat_moment().cloned() })
         }).collect()
@@ -342,8 +346,9 @@ impl Server {
         let mut bridge = self.matches.lock().await;
         if bridge.ended.contains_key(&world) { return; }
         if let Some(journal) = bridge.journals.get_mut(&world) {
-            for (id, person) in &mut journal.people {
-                if !connected.contains(id.as_str()) && !alpha.reservations.get(id).is_some_and(|r| r.member.world == world && r.expires > timestamp()) {
+            for person in journal.people.values_mut() {
+                let owner = person.owner();
+                if !connected.contains(owner) && !alpha.reservations.get(owner).is_some_and(|r| r.member.world == world && r.expires > timestamp()) {
                     person.abandoned = true;
                 }
             }
@@ -371,7 +376,9 @@ impl Server {
                 let elapsed = room.round.as_ref().map(|r| r.elapsed_s as f64).unwrap_or_else(|| journal.created.elapsed().as_secs_f64());
                 for sample in samples { journal.sample(sample, elapsed); }
                 if explicit && journal.mode.bucket() == 0 {
-                    if let Some(person) = client.profile_id.as_ref().and_then(|id| journal.people.get_mut(id)) { person.abandoned = true; }
+                    if let Some(id) = &client.profile_id {
+                        if let Some(person) = journal.people.values_mut().find(|person| person.owner() == id) { person.abandoned = true; }
+                    }
                 }
             }
         }
@@ -497,7 +504,7 @@ impl Server {
             if current_round {
                 let payload = json!({"type":"match_result","data":record}).to_string();
                 for client in self.connections.lock().await.values() {
-                    if client.world_id==Some(record.world_id) && client.profile_id.as_ref().is_some_and(|id| record.participants.iter().any(|p| &p.profile_id == id)) {
+                    if client.world_id==Some(record.world_id) && client.profile_id.as_ref().is_some_and(|id| record.participants.iter().any(|p| p.owner() == id)) {
                         let _ = client.tx.send(payload.clone());
                     }
                 }
@@ -507,9 +514,12 @@ impl Server {
         Ok(())
     }
     pub(super) async fn handle_career(&self, player: &str, value: &Value) -> Result<Value, String> {
-        let profile = self.actor(player).await?;
+        let actor = self.actor(player).await?;
         let path = self.path.clone();
-        let committed = self.data.lock().await.completed_results.clone();
+        let (profile, committed) = {
+            let data = self.data.lock().await;
+            (data.profile(&actor)?.career_id().to_owned(), data.completed_results.clone())
+        };
         if value["action"] == "career_history" {
             let cursor = value["cursor"].as_str().map(str::to_owned);
             let limit = value["limit"].as_u64().unwrap_or(20).clamp(1, 50) as usize;

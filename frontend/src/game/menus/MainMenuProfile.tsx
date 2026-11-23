@@ -113,7 +113,7 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
         {PLAYER_ONBOARDING && !registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => useUIStore.getState().setScreen("welcome")}>Player options</button>}
         {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
-          onClick={() => useUIStore.getState().setScreen("welcome")}>Change driver</button>}
+          onClick={() => useUIStore.getState().setScreen("welcome")}>Switch character</button>}
         {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
           onClick={() => void signOut()}>{signingOut ? "Signing out…" : "Sign out"}</button>}
         {!PLAYER_ONBOARDING && !signedIn && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}

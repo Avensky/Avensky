@@ -57,6 +57,56 @@ pub struct Profile {
     pub friends: BTreeSet<String>,
     #[serde(default)]
     pub progression: crate::alpha::progression::Progression,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub active_character: Option<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub characters: BTreeMap<String, SavedCharacter>,
+}
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct SavedCharacter {
+    pub name: String,
+    pub style: String,
+    /// The selected slot uses the profile's existing progression lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inactive: Option<crate::alpha::progression::Progression>,
+}
+
+impl Profile {
+    pub fn career_id(&self) -> &str {
+        self.active_character.as_deref().unwrap_or(&self.id)
+    }
+
+    pub fn display_name(&self) -> &str {
+        self.characters.get(self.career_id()).map_or(&self.name, |slot| &slot.name)
+    }
+
+    pub fn character_owner(&self) -> Option<String> {
+        (self.career_id() != self.id).then(|| self.id.clone())
+    }
+
+    pub fn character_progression(&mut self, id: &str) -> Option<&mut crate::alpha::progression::Progression> {
+        if self.career_id() == id { return Some(&mut self.progression); }
+        self.characters.get_mut(id)?.inactive.as_mut()
+    }
+
+    pub fn player_view(&self, slots_enabled: bool) -> serde_json::Value {
+        let mut view = serde_json::json!({
+            "id": self.id, "name": self.display_name(), "progression": self.progression.view()
+        });
+        if slots_enabled {
+            let characters: Vec<_> = self.characters.iter().map(|(id, slot)| {
+                let progression = slot.inactive.as_ref().unwrap_or(&self.progression);
+                serde_json::json!({
+                    "id": id, "name": slot.name, "style": slot.style, "level": progression.level,
+                    "appearance": progression.equipped_character()
+                })
+            }).collect();
+            view["active_character_id"] = serde_json::json!(self.active_character);
+            view["characters"] = serde_json::json!(characters);
+        }
+        view
+    }
 }
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Group {
@@ -212,6 +262,8 @@ impl SocialData {
                 account: None,
                 friends: BTreeSet::new(),
                 progression: Default::default(),
+                active_character: None,
+                characters: BTreeMap::new(),
             },
         );
         Ok((profile_id, Some(token)))

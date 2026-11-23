@@ -100,7 +100,7 @@ impl Server {
             "lobby".to_string()
         };
         let author = author.clone();
-        let name = profile.name.clone();
+        let name = profile.display_name().to_owned();
         let targets: Vec<_> = clients
             .values()
             .filter(|peer| {

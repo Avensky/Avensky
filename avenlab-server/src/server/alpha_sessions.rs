@@ -395,12 +395,18 @@ impl Server {
                     .map_err(|_| "Choose a character and outfit.")?;
                 if !choice.is_equippable() { return Err("Choose an available character outfit.".into()); }
                 let mut data = self.data.lock().await;
-                let progression = &data.profiles.get(&actor).ok_or("Profile unavailable.")?.progression;
+                let profile = data.profile(&actor)?;
+                let progression = &profile.progression;
                 if choice.driver_id.is_none() {
                     choice.driver_id = progression.character.as_ref()
                         .filter(|current| current.id == choice.id).and_then(|current| current.driver_id.clone());
                 }
                 if !choice.known_driver(&data.authored.drivers) { return Err("Unknown roster character.".into()); }
+                if profile.active_character.is_some() && progression.character.as_ref().is_some_and(|current| {
+                    current.id != choice.id || current.driver_id != choice.driver_id
+                }) {
+                    return Err("Choose this character's outfits in the garage. Switch characters from the welcome screen.".into());
+                }
                 if choice.identity.is_none() {
                     choice.identity = progression.character.as_ref().and_then(|current| current.identity);
                 }
@@ -889,7 +895,8 @@ impl Server {
             let profile = clients.get(player).and_then(|c| c.profile_id.as_ref()).and_then(|id| data.profiles.get(id)).ok_or("An authenticated match profile is unavailable.")?;
             let vehicle = policy::hero(&member.hero)?.vehicle;
             participants.push(crate::alpha::career::CareerParticipant {
-                profile_id: profile.id.clone(), name: profile.name.clone(), team: Some(member.team.as_str().into()),
+                profile_id: profile.career_id().to_owned(), account_profile_id: profile.character_owner(),
+                name: profile.display_name().to_owned(), team: Some(member.team.as_str().into()),
                 hero: member.hero.clone(), appearance: profile.progression.hero_loadouts.get(vehicle).cloned().unwrap_or_default(),
                 ..Default::default()
             });
@@ -938,7 +945,7 @@ impl Server {
             let appearance = policy::hero(showcase).ok()
                 .and_then(|hero| profile.progression.hero_loadouts.get(hero.vehicle))
                 .cloned().unwrap_or_default();
-            json!({"id":profile.id,"name":profile.name,"team":member.team.as_str(),
+            json!({"id":profile.id,"name":profile.display_name(),"team":member.team.as_str(),
                 "hero":if hidden{""}else{&member.hero},"showcase_hero":if hidden{""}else{showcase},"hero_hidden":hidden,"mode":member.mode,"team_size":member.team_size,"world_id":member.world,
                 "reconnecting":reconnecting,"appearance":if hidden{Value::Null}else{json!(appearance)},
                 "character":if hidden{None}else{profile.progression.equipped_character()}})

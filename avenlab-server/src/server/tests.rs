@@ -66,6 +66,57 @@ async fn cleanup(server: Server) {
 }
 
 #[tokio::test]
+async fn account_survives_a_restart_with_named_characters_and_separate_careers() {
+    use crate::alpha::career::{CareerMatch, CareerParticipant, CareerStats};
+    let mut s = server(3, 8);
+    s.accounts = Some(AccountAccess::default());
+    let (a, identity, _) = client(&s, "Player").await;
+    let root = identity["profile_id"].as_str().unwrap();
+    let create = |name:&str, style:&str, body:&str| json!({"action":"character_create","name":name,"style":style,"body":body});
+    let select = |character_id:&str| json!({"action":"character_select","character_id":character_id});
+    let history = json!({"action":"career_history"});
+    let record = |key:&str, character:&str, owner:Option<String>, name:&str, kills:u64| CareerMatch {
+        match_id:key.into(), world_id:1, mode:crate::alpha::Mode::Sandbox,
+        map:"road_precision".into(), ended_at:timestamp(),
+        participants:vec![CareerParticipant{profile_id:character.into(), account_profile_id:owner,
+            name:name.into(), hero:"brz".into(), stats:CareerStats{kills,..Default::default()},..Default::default()}],
+        ..Default::default()
+    };
+    s.persist_record(&record("legacy-road-run",root,None,"Player",4)).await.unwrap();
+    let saved = s.handle(&a,create("  Left   Lane ","street","female")).await.unwrap();
+    assert_eq!(saved["profile"]["active_character_id"], root);
+    assert_eq!(saved["profile"]["name"], "Left Lane");
+    assert_eq!(s.handle(&a,history.clone()).await.unwrap()["matches"][0]["match_id"], "legacy-road-run");
+    assert!(s.handle(&a, create("Extra Guest","street","male")).await.is_err());
+    let (b, _, _) = client(&s, "Another player").await;
+    assert!(s.handle(&b, create("left lane","workshop","male")).await.unwrap_err().contains("already in use"));
+    let account = s.handle(&a,json!({"action":"account_register","login":"restart_racer",
+        "password":"a stable multi character passphrase","name":"Racer"})).await.unwrap();
+    assert_eq!(account["profile_id"], root);
+    let next = s.handle(&a, create("Track Fox","night-shift","male")).await.unwrap();
+    let second = next["profile"]["active_character_id"].as_str().unwrap();
+    assert_ne!(second,root);
+    assert_eq!(next["profile"]["progression"]["career"]["summary"]["sessions"],0);
+    assert!(s.handle(&b,select(second)).await.is_err());
+    assert!(s.handle(&a,json!({"action":"character_equip","character":{"id":"mara-vega","outfit":"shop-crew"}})).await.is_err());
+    s.spawn(&a,"road_precision","brz").await.unwrap();
+    assert!(s.handle(&a,select(root)).await.unwrap_err().contains("Leave your active world"));
+    s.handle(&a,json!({"action":"world_leave"})).await.unwrap();
+    let first = s.handle(&a,select(root)).await.unwrap();
+    assert_eq!(first["profile"]["progression"]["career"]["summary"]["totals"]["kills"],4.0);
+    s.persist_record(&record("late-track-result",second,Some(root.into()),"Track Fox",7)).await.unwrap();
+    assert!(s.handle(&a,json!({"action":"career_match","match_id":"late-track-result"})).await.is_err());
+    let second_view = s.handle(&a,select(second)).await.unwrap();
+    assert_eq!(second_view["profile"]["progression"]["career"]["summary"]["totals"]["kills"],7.0);
+    let matches = s.handle(&a,history).await.unwrap();
+    assert!(matches["matches"].as_array().unwrap().iter().all(|row| row["match_id"] != "legacy-road-run"));
+    let restarted = database::load_or_import(&s.path.with_extension("sqlite3"),&s.path).unwrap();
+    assert_eq!(restarted.profiles[root].career_id(),second);
+    assert_eq!(restarted.profiles[root].characters[root].inactive.as_ref().unwrap().career.summary.totals.kills,4);
+    cleanup(s).await;
+}
+
+#[tokio::test]
 async fn account_survives_a_restart_and_restores_the_same_character_and_outfit() {
     let mut server = server(3, 8);
     let (desktop, legacy, mut view) = client(&server, "River").await;
