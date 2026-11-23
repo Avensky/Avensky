@@ -94,6 +94,10 @@ export function prepareBrzApproach(root: Object3D, actor: Group, { car, hull }: 
 
   return {
     duration: walkSeconds + settleSeconds,
+    outward(target: Vector3) {
+      car.getWorldQuaternion(carRotation);
+      return target.set(0, 0, 0).setComponent(door ? 0 : 2, side).applyQuaternion(carRotation);
+    },
     walking(seconds: number) { return seconds < walkSeconds; },
     sample(seconds: number, delta: number) {
       let distance = Math.min(seconds, walkSeconds) * speed;

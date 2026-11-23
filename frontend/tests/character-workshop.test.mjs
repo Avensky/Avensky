@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Box3, BoxGeometry, Group, Mesh, MeshStandardMaterial, Vector3 } from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createServer } from "vite";
 
 test("workshop authoring saves bounded pose tracks and resolves fitted chair targets", async () => {
@@ -115,6 +117,23 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     assert.ok(route.length >= 4, "crossing to the other door must go around the body");
     for (let i = 1; i < route.length; i++) assert.equal(crossesBrzHull(route[i-1], route[i], envelope), false);
     assert.equal(brzWalkRoute(from, new Vector3(0, 0, 0), envelope), undefined, "reject a stopping point inside the vehicle");
+
+    const { scene: rig } = await new GLTFLoader().parseAsync(await readFile("tests/fixtures/villager-female-rig.json", "utf8"), "");
+    const standing = new Group();
+    standing.position.set(1.30, .07, -.26);
+    standing.rotation.y = -Math.PI / 2;
+    standing.add(rig);
+    const gripPivot = new Group(), driverGrip = new Group();
+    driverGrip.position.set(.889, .656, -.42);
+    gripPivot.add(driverGrip);
+    const lowReach = preparePanelOpening(rig, { part: "door-left", pivot: gripPivot, axis: "y", closed: 0, open: 1,
+      handle: driverGrip, angle: 0 }, false, true, normal => normal.set(1, 0, 0));
+    lowReach.sample(.44);
+    for (const side of ["l", "r"]) {
+      assert.ok(rig.getObjectByName(`calf_${side}`).getWorldPosition(new Vector3()).x > 1.04,
+        `the ${side} knee stays outside the sill during the low reach`);
+    }
+    lowReach.stop();
 
     const { prepareBrzCabin, validBrzCabinColors } = await vite.ssrLoadModule("/src/game/preview/brzCabin.ts");
     const shared = new MeshStandardMaterial({ color: "#6c0e24" });

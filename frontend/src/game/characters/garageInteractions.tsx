@@ -20,7 +20,8 @@ export const GaragePanelTarget = createContext<{
   actor: RefObject<Group | null>;
 } | undefined>(undefined);
 
-export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, inspectEngine = false, fittedReach = false) {
+export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, inspectEngine = false, fittedReach = false,
+  clearanceOutward?: (target: Vector3) => Vector3) {
   const grip = hinge.handle;
   const arm = driverArm(root, "r");
   if (!grip || !arm) return undefined;
@@ -30,7 +31,7 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const torso = fittedReach || inspectEngine ? root.getObjectByName("spine_02") : undefined;
   const legs = fittedReach ? ["l", "r"].flatMap(side => {
     const thigh = root.getObjectByName(`thigh_${side}`), calf = root.getObjectByName(`calf_${side}`), foot = root.getObjectByName(`foot_${side}`);
-    return thigh && calf && foot ? [{ thigh, calf, foot, anchor: new Vector3(), facing: new Quaternion() }] : [];
+    return thigh && calf && foot ? [{ thigh, calf, foot, side, anchor: new Vector3(), facing: new Quaternion() }] : [];
   }) : [];
   const restHeight = root.position.y;
   const rest = [arm.shoulder, arm.elbow, arm.hand, ...(neck ? [neck] : []), ...(torso ? [torso] : []),
@@ -41,6 +42,7 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const initial = hinge.angle;
   const target = new Vector3(), wrist = new Vector3(), catchPoint = new Vector3(), shoulder = new Vector3(), elbow = new Vector3();
   const down = new Vector3(0, -1, 0), knee = new Vector3(), rotation = new Quaternion(), scale = new Vector3();
+  const up = new Vector3(0, 1, 0), outward = new Vector3();
   const pitchAxis = new Vector3(), parentRotation = new Quaternion(), bendRotation = new Quaternion();
   const fingers = new Vector3(), palm = new Vector3(), handRest = new Quaternion();
   return {
@@ -91,7 +93,13 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
           root.position.y -= drop;
           root.getWorldQuaternion(rotation);
           for (const leg of legs) {
-            knee.set(0, 0, 1).applyQuaternion(rotation);
+            // Let the knees open to the sides while crouching at a panel edge.
+            // A forward squat would push the nearer knee through the sill.
+            const side = leg.side === "l" ? 1 : -1;
+            if (clearanceOutward) {
+              clearanceOutward(outward);
+              knee.crossVectors(outward, up).multiplyScalar(side).addScaledVector(outward, .14);
+            } else knee.set(side, 0, .1).applyQuaternion(rotation);
             aimLimb(leg.thigh, leg.calf, leg.foot, leg.anchor.clone(), knee);
             leg.foot.quaternion.copy(leg.calf.getWorldQuaternion(new Quaternion()).invert().multiply(leg.facing));
           }

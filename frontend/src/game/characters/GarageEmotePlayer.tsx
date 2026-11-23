@@ -210,7 +210,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
           }
           stride.reset().play();
         }
-        const opening = preparePanelOpening(root, panel.hinge, preview.id === "inspect-engine", Boolean(approach));
+        const opening = preparePanelOpening(root, panel.hinge, preview.id === "inspect-engine", Boolean(approach), approach?.outward);
         if (!opening || (panel.clearance && !approach)) {
           stride?.stop();
           useCharacterPreviewStore.setState({ emote: null, cockpitError: "This driver cannot reach the selected panel." });
