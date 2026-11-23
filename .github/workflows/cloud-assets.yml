@@ -48,4 +48,5 @@ jobs:
           test -s frontend/dist-staging/images/purple-sunflare.webp
           test -s frontend/dist-staging/favicon.ico
           test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"
-          test -z "$(find frontend/dist-staging -type f \( -iname '*.mp4' -o -iname '*.webm' \) -print -quit)"
+          test -s frontend/dist-staging/images/purple-sunflare-loop.mp4
+          test -z "$(find frontend/dist-staging -type f \( -iname '*.mp4' -o -iname '*.webm' \) ! -path 'frontend/dist-staging/images/purple-sunflare-loop.mp4' -print -quit)"

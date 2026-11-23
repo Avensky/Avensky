@@ -119,9 +119,9 @@ test("welcome registers a profile, saves one roster driver and waits for confirm
 
 test("the Avensky icon formats and lightweight sunflare ship with the frontend", async () => {
   const read=path=>readFile(new URL("../"+path,import.meta.url));
-  const [html, svg, png, ico, flare]=await Promise.all([
+  const [html, svg, png, ico, flare, loop]=await Promise.all([
     read("index.html"),read("public/images/logo.svg"),read("public/images/logo.png"),
-    read("public/favicon.ico"),read("public/images/purple-sunflare.webp"),
+    read("public/favicon.ico"),read("public/images/purple-sunflare.webp"),read("public/images/purple-sunflare-loop.mp4"),
   ]);
   assert.match(html.toString(),/<title>Avensky<\/title>/);
   assert.match(html.toString(),/name="description" content="Avensky is a browser-based game engine/);
@@ -132,4 +132,6 @@ test("the Avensky icon formats and lightweight sunflare ship with the frontend",
   assert.deepEqual([0,1,2,3].map(index=>ico[6+16*index]),[16,32,48,64]);
   assert.equal(flare.toString("ascii",8,12),"WEBP");
   assert.ok(flare.length < 15_000);
+  assert.equal(loop.toString("ascii",4,8),"ftyp");
+  assert.ok(loop.length < 120_000);
 });
