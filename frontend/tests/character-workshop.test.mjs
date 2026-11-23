@@ -137,7 +137,17 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
 
     const { BRZ_HOOD_SECONDS, BRZ_INSPECT_SECONDS, BRZ_TWEAK_SECONDS, CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE,
       TWEAK_BRZ_ENGINE, sampleBrzHood } = await load("brzHoodMotion.ts");
-    const { garagePanelForEmote } = await load("garageInteractions.tsx");
+    const { CLOSE_DRIVER_DOOR, ENTER_PASSENGER, garageDoorForEmote, garagePanelForEmote } = await load("garageInteractions.tsx");
+    assert.equal(garageDoorForEmote(ENTER_PASSENGER), "passenger-door");
+    const openDriverDoor = { part: "door-left", pivot: gripPivot, handle: driverGrip, axis: "y", closed: 0, open: -1, angle: -1 };
+    const closeDoor = preparePanelOpening(rig, openDriverDoor, false, true, normal => normal.set(1, 0, 0), CLOSE_DRIVER_DOOR);
+    closeDoor.sample(.40);
+    assert.equal(openDriverDoor.angle, openDriverDoor.open, "grip the open door before pushing");
+    closeDoor.sample(.72);
+    assert.ok(openDriverDoor.angle > openDriverDoor.open && openDriverDoor.angle < openDriverDoor.closed);
+    closeDoor.sample(closeDoor.duration);
+    assert.equal(openDriverDoor.angle, openDriverDoor.closed);
+    closeDoor.stop();
     assert.equal(garagePanelForEmote(CLOSE_BRZ_HOOD), "hood");
     assert.equal(sampleBrzHood(.56).hood, 0, "reach the safety catch before lifting");
     assert.ok(sampleBrzHood(.56).catch > 0);
@@ -216,17 +226,32 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
 
     const work = preparePanelOpening(rig, engineHood, false, true, outward, TWEAK_BRZ_ENGINE);
     const plant = shoe.getWorldPosition(new Vector3());
-    const wrist = rig.getObjectByName("hand_r");
-    work.sample(1.13);
-    const wristStart = wrist.getWorldQuaternion(new Quaternion());
-    work.sample(1.52);
-    assertContact("r", engineBay.fitting);
-    assert.ok(wrist.getWorldQuaternion(new Quaternion()).angleTo(wristStart) > .26, "the wrist turns at the fitting");
+    const wrench = rig.getObjectByName("brz-engine-wrench");
+    const { BRZ_WRENCH_REACH } = await load("brzWrench.ts");
+    const wrenchGrip = () => wrench.getWorldPosition(new Vector3());
+    const wrenchJaw = () => wrench.localToWorld(new Vector3(0, 0, BRZ_WRENCH_REACH));
+    const fitting = engineBay.fitting.getWorldPosition(new Vector3()).add(new Vector3(0, .013, 0));
+    work.sample(.04);
+    const pocket = wrenchGrip();
+    work.sample(.64);
+    assert.ok(wrenchGrip().distanceTo(pocket) < .035, "the hand picks up the wrench at the hip");
+    const grippingHand = rig.getObjectByName("middle_01_r");
+    work.sample(1.98);
+    const wrenchStart = wrench.getWorldQuaternion(new Quaternion());
+    for (const time of [1.98, 2.20, 2.40, 2.68, 3.0, 3.28]) {
+      work.sample(time);
+      assertContact("l", engineBay.brace);
+      assert.ok(wrenchGrip().distanceTo(grippingHand.getWorldPosition(new Vector3())) < .001);
+      assert.ok(wrenchJaw().distanceTo(fitting) < .012, "the wrench turns about the actual fitting");
+    }
+    work.sample(2.39);
+    assert.ok(wrench.getWorldQuaternion(new Quaternion()).angleTo(wrenchStart) > .27, "the right hand turns the wrench");
     assert.ok(shoe.getWorldPosition(new Vector3()).distanceTo(plant) < .008, "the feet stay planted during the reach");
     work.sample(BRZ_TWEAK_SECONDS);
     assert.equal(engineHood.angle, engineHood.open);
     assert.equal(support, 1);
     work.stop();
+    assert.equal(rig.getObjectByName("brz-engine-wrench"), undefined);
 
     const { prepareBrzCabin, validBrzCabinColors } = await vite.ssrLoadModule("/src/game/preview/brzCabin.ts");
     const shared = new MeshStandardMaterial({ color: "#6c0e24" });

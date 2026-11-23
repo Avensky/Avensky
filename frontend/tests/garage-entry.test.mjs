@@ -146,6 +146,26 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
     assert(ankle('r').y > rightPlant.y + .06, 'the right shoe leads into the left-side seat');
     brzCabin.stop();
 
+    brzStand.position.set(-1.25, .023, -.42);
+    brzStand.rotation.y = .59;
+    brzDoor.position.x *= -1;
+    brzDoor.rotation.y = Math.PI / 3;
+    const passengerSeat = new Vector3(-.358, .40, -.239);
+    const passenger = prepareGarageCockpit(brz, [], { pivot: brzDoor, handle: brzHandle, axis: 'y', closed: 0,
+      open: brzDoor.rotation.y, angle: brzDoor.rotation.y }, GARAGE_STATIONS.brz, passengerSeat)(brzDriver, brzMotion, true, true);
+    assert(passenger);
+    const waitingLeft = ankle('l'), waitingRight = ankle('r');
+    passenger.sample(null, 0, sampleDriveOut(GARAGE_ENTRY_START_SECONDS + .46));
+    assert(ankle('r').distanceTo(waitingRight) < .025, 'the right shoe stays planted at the passenger door');
+    assert(ankle('l').y > waitingLeft.y + .06, 'the passenger steps in with the left foot');
+    passenger.sample(null, 0, sampleDriveOut(4.14));
+    const joint = name => brzDriver.getObjectByName(name).getWorldPosition(new Vector3());
+    const passengerHip = joint('thigh_l').lerp(joint('thigh_r'), .5);
+    assert(Math.hypot(passengerHip.x - passengerSeat.x, passengerHip.z - passengerSeat.z) < .01);
+    assert(joint('hand_l').x < 0 && joint('hand_r').x < 0, 'passenger hands rest on her own side');
+    assert.equal(brzDoor.rotation.y, 0);
+    passenger.stop();
+
     const { cockpitTakesForWheel } = await vite.ssrLoadModule('/src/game/characters/cockpitEmotes.ts');
     assert(!cockpitTakesForWheel(true, false).some(take => take.id === 'drive-race-start'));
     assert(cockpitTakesForWheel(true, true).some(take => take.id === 'drive-race-start'));

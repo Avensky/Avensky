@@ -6,8 +6,18 @@ import type { VehiclePartHinge } from "../preview/vehiclePartRig";
 import type { BrzClearance } from "../preview/brzApproach";
 import { BRZ_HOOD_SECONDS, BRZ_INSPECT_SECONDS, BRZ_TWEAK_SECONDS, CLOSE_BRZ_HOOD, INSPECT_BRZ_ENGINE, OPEN_BRZ_HOOD,
   TWEAK_BRZ_ENGINE, sampleBrzEngine, sampleBrzHood } from "./brzHoodMotion";
+import { BRZ_WRENCH_REACH, createBrzWrench } from "./brzWrench";
 
 export const OPEN_DRIVER_DOOR = "interact-driver-door";
+export const CLOSE_DRIVER_DOOR = "close-driver-door";
+export const OPEN_PASSENGER_DOOR = "open-passenger-door";
+export const CLOSE_PASSENGER_DOOR = "close-passenger-door";
+export const ENTER_PASSENGER = "enter-passenger";
+export function garageDoorForEmote(id?: string) {
+  if (id === OPEN_DRIVER_DOOR || id === CLOSE_DRIVER_DOOR) return "driver-door";
+  if (id === OPEN_PASSENGER_DOOR || id === CLOSE_PASSENGER_DOOR || id === ENTER_PASSENGER) return "passenger-door";
+}
+export const isDoorClosing = (id?: string) => id === CLOSE_DRIVER_DOOR || id === CLOSE_PASSENGER_DOOR;
 export const SIT_IN_CHAIR = "interact-chair";
 export const PANEL_INTERACTIONS = [
   { id: OPEN_BRZ_HOOD, label: "Open hood", part: "hood" },
@@ -29,10 +39,12 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const prop = fittedReach && hinge.part === "hood" ? hinge.hoodProp : undefined;
   const safetyCatch = fittedReach ? hinge.latchGrip : undefined;
   const closing = actionId === CLOSE_BRZ_HOOD;
+  const shuttingDoor = isDoorClosing(actionId);
   const tweaking = actionId === TWEAK_BRZ_ENGINE;
   const engine = prop && (inspectEngine || tweaking) ? hinge.engineBay : undefined;
   const hoodIsSupported = Boolean(prop && Math.abs(hinge.angle - hinge.open) < .004);
-  if (!grip || (closing && !prop) || (tweaking && (!engine || !hoodIsSupported))) return undefined;
+  if (!grip || (closing && !prop) || (shuttingDoor && (!fittedReach || Math.abs(hinge.angle - hinge.closed) < .005))
+    || (tweaking && (!engine || !hoodIsSupported))) return undefined;
   const leadSide = prop || (fittedReach && hinge.part === "door-left") ? "l" : "r";
   function armTarget(side: "l" | "r") {
     const arm = driverArm(root, side);
@@ -43,6 +55,8 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const assist = prop ? armTarget("r") : undefined;
   if (!lead || (prop && !assist)) return undefined;
   const arms = assist ? [lead, assist] : [lead];
+  const tool = tweaking ? createBrzWrench(root) : undefined;
+  const hipPocket = tool ? root.getObjectByName("thigh_r") : undefined;
   const neck = root.getObjectByName("neck_01") ?? root.getObjectByName("head");
   const torso = fittedReach || inspectEngine ? root.getObjectByName("spine_02") : undefined;
   const legs = fittedReach ? ["l", "r"].flatMap(side => {
@@ -64,6 +78,7 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
   const catchPoint = new Vector3(), wrist = new Vector3(), palm = new Vector3(), shoulder = new Vector3(), elbow = new Vector3(), shoe = new Vector3();
   const down = new Vector3(0, -1, 0), knee = new Vector3(), up = new Vector3(0, 1, 0), outward = new Vector3();
   const pitchAxis = new Vector3(), scale = new Vector3(), palmNormal = new Vector3();
+  const pocket = new Vector3(), toolDirection = new Vector3(), toolGrip = new Vector3();
   const rotation = new Quaternion(), parentRotation = new Quaternion(), bendRotation = new Quaternion(), handRest = new Quaternion();
 
   return {
@@ -80,22 +95,23 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
         prop.place(inspectOpen ? 1 : phase.prop);
         if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * (inspectOpen ? 0 : phase.catch);
         lead.weight = work ? work.brace : inspectOpen ? 0 : phase.leftGrip;
-        assist.weight = work ? work.reach : inspectOpen ? 0 : phase.rightGrip;
+        assist.weight = work ? Math.max(work.reach, work.pickup) : inspectOpen ? 0 : phase.rightGrip;
         leftToLip = phase.leftToLip;
         lean = work?.lean ?? ((inspectOpen ? 0 : phase.lean)
           + (inspectEngine && !engine ? .40 * MathUtils.smoothstep(seconds, inspectAt, inspectAt + .95) : 0));
       } else {
         const lift = safetyCatch ? MathUtils.smoothstep(seconds, .74, 1.54) : MathUtils.smoothstep(seconds, .47, 1.42);
         const caught = safetyCatch ? .13 * MathUtils.smoothstep(seconds, .56, .70) : 0;
-        hinge.angle = MathUtils.lerp(initial, hinge.open, lift + (1 - lift) * caught);
+        const push = .34 * MathUtils.smoothstep(seconds, .47, 1.04) + .66 * MathUtils.smoothstep(seconds, .95, 1.45);
+        hinge.angle = MathUtils.lerp(initial, shuttingDoor ? hinge.closed : hinge.open, shuttingDoor ? push : lift + (1 - lift) * caught);
         hinge.pivot.rotation[axis] = hinge.angle;
         hinge.support?.(hinge.angle / hinge.open);
         if (hinge.latch) hinge.latch.rotation[axis] = Math.sign(hinge.open) * .48 * (safetyCatch
           ? MathUtils.smoothstep(seconds, .48, .59) : MathUtils.smoothstep(seconds, .28, .46));
         lead.weight = MathUtils.smoothstep(seconds, .08, .43) *
-          (1 - MathUtils.smoothstep(seconds, safetyCatch ? 1.42 : 1.22, 1.78));
+          (1 - MathUtils.smoothstep(seconds, shuttingDoor ? .89 : safetyCatch ? 1.42 : 1.22, shuttingDoor ? 1.12 : 1.78));
         leftToLip = MathUtils.smoothstep(seconds, .58, .74);
-        lean = fittedReach ? (safetyCatch && seconds < .74 ? .44 : .37) * lead.weight : 0;
+        lean = fittedReach ? (shuttingDoor ? .53 : safetyCatch && seconds < .74 ? .44 : .37) * lead.weight : 0;
       }
       positionDriver?.();
       grip.getWorldPosition(lead.target);
@@ -117,6 +133,18 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
             -work.lean / .56 * (tweaking ? .10 : .04));
         }
       }
+      if (tool && work && engine && assist) {
+        const size = root.getWorldScale(scale).y;
+        root.getWorldQuaternion(rotation);
+        (hipPocket ?? root).getWorldPosition(pocket);
+        pocket.addScaledVector(pitchAxis.set(-.088, .105, .055).applyQuaternion(rotation), size);
+        toolDirection.copy(outward).negate().applyAxisAngle(up, work.turn);
+        engine.fitting.getWorldPosition(assist.target).addScaledVector(up, (.013 + work.hover) * size)
+          .addScaledVector(toolDirection, -BRZ_WRENCH_REACH * size);
+        const time = seconds - inspectAt;
+        const toFitting = MathUtils.smoothstep(time, .70, 1.88) * (1 - MathUtils.smoothstep(time, 3.75, 4.65));
+        assist.target.lerp(pocket, 1 - toFitting);
+      }
       if (torso?.parent && (lean || inspectEngine)) {
         root.getWorldQuaternion(rotation);
         torso.parent.getWorldQuaternion(parentRotation).invert();
@@ -133,9 +161,10 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
           if (work) for (const { joint, axis, segment } of arm.digits.fingers) {
             joint.rotateOnAxis(axis, (arm === assist ? work.curl : .10 * work.brace) * (1 - .25 * segment));
           }
-          const contact = (work && arm.digits.fingertip) || arm.digits.middle;
+          const contact = (work && !(tool && arm === assist) && arm.digits.fingertip) || arm.digits.middle;
           const span = contact.getWorldPosition(palm).distanceTo(wrist);
-          if (work && clearanceOutward) arm.fingers.copy(outward).negate().addScaledVector(down, .19).normalize();
+          if (tool && arm === assist && work) arm.fingers.copy(toolDirection);
+          else if (work && clearanceOutward) arm.fingers.copy(outward).negate().addScaledVector(down, .19).normalize();
           else arm.fingers.subVectors(arm.target, shoulder).normalize();
           arm.goal.addScaledVector(arm.fingers, -span);
         }
@@ -172,14 +201,19 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
         aimLimb(arm.shoulder, arm.elbow, arm.hand, wrist, knee);
         if (arm.digits) {
           handRest.copy(arm.hand.quaternion);
-          const contact = (work && arm.digits.fingertip) || arm.digits.middle;
+          const contact = (work && !(tool && arm === assist) && arm.digits.fingertip) || arm.digits.middle;
           aimDriverJoint(arm.hand, contact, arm.fingers);
           if (work) {
-            palmNormal.copy(down).applyAxisAngle(arm.fingers, arm === assist ? work.turn : 0);
+            palmNormal.copy(down);
             alignJointNormal(arm.hand, arm.fingers, arm.digits.palm, palmNormal);
           }
           arm.hand.quaternion.slerp(handRest, 1 - arm.weight);
         }
+      }
+      if (tool && work && assist) {
+        const gripJoint = assist.digits?.middle ?? assist.hand;
+        tool.place(work.carried ? gripJoint.getWorldPosition(toolGrip) : toolGrip.copy(pocket), toolDirection,
+          seconds - inspectAt < 5.10);
       }
       if (work && neck?.parent) {
         root.getWorldQuaternion(rotation);
@@ -191,6 +225,7 @@ export function preparePanelOpening(root: Object3D, hinge: VehiclePartHinge, ins
     },
     stop() {
       reset();
+      tool?.dispose();
       if (!prop) hinge.support?.(0);
       if (hinge.latch) hinge.latch.rotation[axis] = 0;
     },

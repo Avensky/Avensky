@@ -24,18 +24,22 @@ export const useCharacterPreviewStore = create<{
   cockpitError: string | null;
   insideCar: boolean;
   brzDoorReady: boolean;
+  brzDoorBusy: boolean;
+  brzPassengerAvailable: boolean;
+  brzPassenger: boolean;
   brzEngineAvailable: boolean;
   brzHoodBusy: boolean;
   leanAvailable: boolean;
   mirrorAvailable: boolean;
 }>(() => ({ viewport: null, selectedPiece: "corset", focusRevision: 0, playbackPaused: false, automaticEmotes: true,
   camera: "Full body", zoom: 1, emote: null, loopEmote: false, cockpitVehicle: null, cockpitAvailable: false,
-  cockpitError: null, insideCar: false, brzDoorReady: false, brzEngineAvailable: false, brzHoodBusy: false,
+  cockpitError: null, insideCar: false, brzDoorReady: false, brzDoorBusy: false, brzPassengerAvailable: false,
+  brzPassenger: false, brzEngineAvailable: false, brzHoodBusy: false,
   leanAvailable: false, mirrorAvailable: false }));
 
 export function failCockpitPreview(message: string) {
   if (useCharacterPreviewStore.getState().insideCar) {
-    useCharacterPreviewStore.setState({ insideCar: false, emote: null, cockpitError: message });
+    useCharacterPreviewStore.setState({ insideCar: false, brzPassenger: false, emote: null, cockpitError: message });
   }
 }
 
