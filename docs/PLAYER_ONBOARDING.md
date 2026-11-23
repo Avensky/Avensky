@@ -17,11 +17,14 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 - Use the staging Compose project and its dedicated volume. `AVENLAB_PLAYER_ACCOUNTS=1` creates `/data/staging/social.sqlite3` and imports the existing `social.json` once. The import preserves profile IDs, server ID, worlds, and outfits. The original file remains available as the pre-migration snapshot.
 - Back up the staging volume and career archives before restarting the staging backend. For subsequent cold backups, stop the staging writer and copy the whole data directory. The original JSON file becomes stale once SQLite is active. A rollback to an older JSON-only binary restores the pre-migration state unless an explicit export is prepared. Keep both storage snapshots.
 - Pair the account-enabled backend with a staging frontend built with `VITE_PLAYER_ONBOARDING=1`. The flag is public build configuration. Account passwords, token hashes, and provider keys stay outside build files. Keep the existing staging access controls. The feature currently uses username and password only. Password recovery is pending before a wider release.
+- With automatic staging, set the staging game service's `AVENLAB_PLAYER_ACCOUNTS` to `1` in its operator-managed Compose configuration and follow the [staging backend rollout](FRONTEND_RELEASES.md#include-the-staging-game-server). Confirm that the staging socket's `welcome` message includes `player_accounts: true` before enabling the GitHub repository variable `STAGING_PLAYER_ONBOARDING=1`. Publish a fresh commit with that variable set. The release receiver reuses the installed build when the same commit is published again.
+- Guests can try the game. Use a registered account for cross-device outfits and returning to a reserved session from a fresh sign-in. Equipped catalog outfits save after the game server confirms them. Individual fitting edits remain previews and eligible custom combinations can be kept under Saved outfits.
+- A transport reconnect or a fresh sign-in can recover a deployment when the game server still holds an authenticated reservation. The default reservation is 30 seconds. A completed match or expired reservation requires a new queue or deployment.
 - Verify guest entry, registration, saving a character and an approved outfit, signing out, and logging in on a second device. Confirm the same profile ID and outfit appear after restarting staging. Check the welcome layout in portrait and the Play screen in landscape on a phone.
 
 ## Branding and startup
 
-The triangular Avensky emblem is available as `/images/logo.svg`, `/images/logo.png`, and `/favicon.ico`. The welcome screen uses a compressed render of the same mark. The menu, queue, and loading backgrounds share a still from the purple sunflare clip. The app fetches an image and uses CSS for the layout, which removes the old video downloads and decode work.
+The triangular Avensky emblem is available as `/images/logo.svg`, `/images/logo.png`, and `/favicon.ico`. The welcome screen uses a compressed render of the same mark. The welcome, queue, and loading screens share the lightweight purple sunflare still.
 
 ## Wardrobe follow-up
 

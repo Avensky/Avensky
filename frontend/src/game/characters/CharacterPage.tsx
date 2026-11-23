@@ -152,8 +152,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         try {
           if (!owner || useSocialStore.getState().view?.profile.id !== owner) throw Error("Connect your player profile to save.");
           const result = await requestSocial("character_equip", { character: next });
-          const confirmed = (result.character as CharacterChoice | undefined) ?? next;
-          useSocialStore.getState().acknowledgeProgression(owner, progression => ({ ...progression, character: confirmed }), result);
+          const confirmed = result.character as CharacterChoice | undefined;
+          const profile = useSocialStore.getState();
+          if (profile.view?.profile.id !== owner || !confirmed || confirmed.id !== next.id || !isEquippableOutfit(confirmed)) {
+            throw Error("The server did not confirm the equipped outfit. Reconnect and retry the save.");
+          }
+          profile.acknowledgeProgression(owner, progression => ({ ...progression, character: confirmed }), result);
           acknowledged.current = useSocialStore.getState().view?.profile.progression?.character ?? confirmed;
           if (drafts.current.get(id) === next) drafts.current.delete(id);
           setLocked(true);
@@ -344,10 +348,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   }
 
   const equipPreview = activeTrial && isEquippableOutfit(activeTrial)
-    && (activeTrial.outfit !== choice.outfit || activeTrial.wardrobe !== choice.wardrobe || loadedOutfit)
     ? {
         disabled: !editingAllowed || (saveToProfile && !connectedOwner) || status === "saving",
-        hint: !saveToProfile ? "Saves on this device." : !connectedOwner ? "Reconnect your player profile to equip." : undefined,
+        hint: !saveToProfile ? "This device only. Sign in to save outfits to a player profile."
+          : !connectedOwner ? "Reconnect your player profile to equip." : undefined,
         onEquip: () => {
           if (!canEditCharacter() || (saveToProfile && !connectedOwner) || running.current) return;
           update(activeTrial);

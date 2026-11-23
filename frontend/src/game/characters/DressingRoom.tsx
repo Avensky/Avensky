@@ -582,6 +582,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
             </button>
           )}
           <button type="button" className="menu-control" data-discard-outfit-preview onClick={onDiscardPreview}>Discard preview</button>
+          <small className="dressing-note">{equipPreview?.hint ?? (equipPreview ? "Equip to save this outfit." : "Fitting preview. Use Saved outfits to keep your custom combination.")}</small>
         </div>
       )}
     </div>

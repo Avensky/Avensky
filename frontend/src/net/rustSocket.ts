@@ -27,7 +27,8 @@ import {useSocialStore} from '../store/social/socialStore';
 import {useUIStore} from '../store/menus/uiStore';
 import {useSelectionStore} from '../store/selection/selectionStore';
 import {useWorldCatalog} from '../store/selection/worldCatalog';
-import {heroForVehicle, isMatchMode, useAlphaStore} from '../store/alpha/alphaStore';
+import {HEROES, heroForVehicle, isMatchMode, useAlphaStore} from '../store/alpha/alphaStore';
+import {useRenderSettingsStore} from '../store/presentation/renderSettingsStore';
 const packetEncoder = new TextEncoder();
 
 let socket: WebSocket | null = null;
@@ -48,10 +49,11 @@ const snapshotDelivery = new SnapshotDelivery<PhysicsSnapshot>(publishSnapshot, 
 // Preserve only an already-deployed session; authentication and world permissions
 // are rechecked by the server. Explicit leave/menu navigation cancels recovery.
 let resumeIntent: {profile:string;world:number;vehicle:string;map:string;mode:ReturnType<typeof useAlphaStore.getState>['mode'];teamSize:3|5;matchId?:string;step:"waiting"|"retained"|"redeploy"|"requested"}|null=null;
+let loginRecovery: "retained" | "redeploy" | null = null;
 let recoveryTimer:ReturnType<typeof setTimeout>|null=null;
 let foregroundTimer:ReturnType<typeof setTimeout>|null=null;
 let lastPacketMs=0,foregroundGraceUntil=0,hadLocalBody=false,missingBodySince:number|null=null;
-function forgetRecovery(){resumeIntent=null;if(recoveryTimer!==null)clearTimeout(recoveryTimer);recoveryTimer=null;}
+function forgetRecovery(){resumeIntent=null;loginRecovery=null;if(recoveryTimer!==null)clearTimeout(recoveryTimer);recoveryTimer=null;}
 function failRecovery(message:string){
  const intent=resumeIntent;forgetRecovery();hadLocalBody=false;missingBodySince=null;
  if(useUIStore.getState().screen!=='sandbox')return;
@@ -76,6 +78,29 @@ function rememberDeployment(){
  armRecoveryTimeout(isMatchMode(mode)?(view.alpha?.reconnect_grace_seconds??30)+20:20);
 }
 function resumeDeployment(){
+ if (loginRecovery) {
+  const screen = useUIStore.getState().screen;
+  if (screen !== "welcome" && screen !== "main") { loginRecovery = null; return; }
+  const view = useSocialStore.getState().view, net = useNetworkStore.getState();
+  if (!view || net.room_id === null || view.current_world_id !== net.room_id || !net.worldMap || !useWorldStore.getState().map) return;
+  const active = view.alpha?.active;
+  const hero = active?.world_id === net.room_id ? HEROES.find(item => item.id === active.hero) : undefined;
+  const vehicle = loginRecovery === "retained" ? net.getMe()?.vehicle_id : hero?.vehicle;
+  if (!vehicle) return;
+  if (loginRecovery === "redeploy" && (!active || !isMatchMode(active.mode) || active.match_phase === "ended")) {
+   loginRecovery = null;
+   return;
+  }
+  const mode = active?.mode ?? "sandbox";
+  const teamSize = active?.team_size === 5 ? 5 : 3;
+  resumeIntent = {profile:view.profile.id,world:net.room_id,vehicle,map:net.worldMap,mode,teamSize,
+   matchId:active?.match_id ?? undefined,step:loginRecovery};
+  loginRecovery = null;
+  useAlphaStore.getState().restoreMode(mode, teamSize);
+  useRenderSettingsStore.getState().startSandbox();
+  useUIStore.getState().setScreen("sandbox");
+  armRecoveryTimeout(20);
+ }
  const intent=resumeIntent,view=useSocialStore.getState().view,net=useNetworkStore.getState();
  if(!intent)return;
  if(useUIStore.getState().screen!=='sandbox'){forgetRecovery();return;}
@@ -261,7 +286,7 @@ function publishSnapshot({snapshot, receivedMs}: SnapshotReceipt<PhysicsSnapshot
   if (snapshot.match_state?.match_id && snapshot.match_state.match_id !== state.snapshot?.match_state?.match_id)
     useScoreboardStore.getState().resetView();
   state.setSnapshot(snapshot, receivedMs);
-  if (resumeIntent) resumeDeployment();
+  if (resumeIntent || loginRecovery) resumeDeployment();
   packetDiagnostics.publishMs = Math.max(0, performance.now() - startedMs);
   packetDiagnostics.worstPublishMs = Math.max(packetDiagnostics.worstPublishMs, packetDiagnostics.publishMs);
   recorder.record('publishMs', packetDiagnostics.publishMs, startedMs);
@@ -436,6 +461,7 @@ export function connectRustServer(): WebSocket {
 
   const handleLoss = () => {
     if (!isCurrent()) return;
+    loginRecovery = null;
     rememberDeployment();
     if(resumeIntent)resumeIntent.step="waiting";
     clearTimers();
@@ -595,6 +621,10 @@ export function connectRustServer(): WebSocket {
               :'Your previous deployment could not be restored. Choose a mode to continue.');
             return;
           }
+          resumeDeployment();
+        } else if (!resumeIntent && (message.preserved === true || message.reason === "REDEPLOY")) {
+          // Only the authenticated server can grant a fresh-tab recovery.
+          loginRecovery = message.preserved === true ? "retained" : "redeploy";
           resumeDeployment();
         }
         return;

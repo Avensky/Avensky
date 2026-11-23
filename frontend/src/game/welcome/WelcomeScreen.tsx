@@ -201,6 +201,7 @@ export function WelcomeScreen() {
             </button>
             <button type="button" disabled={busy || !accounts} onClick={() => { setError(""); setEntry("guest"); }}>Continue as guest</button>
           </div>
+          {accounts && !profile && <p className="welcome-help">Create an account to keep your character and outfits across devices.</p>}
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
         {(busy || !connected || (choosingCharacter && !player)) && <p role="status" className="welcome-help">

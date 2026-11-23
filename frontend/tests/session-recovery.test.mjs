@@ -33,5 +33,17 @@ test('authenticated reconnect retains deployment without a replacement spawn, re
  fifth.receive({type:'snapshot',world_id:4,data:{tick:5,entities:[{...entity,id:'fifth'}]}});
  assert.equal(ui.getState().screen,'sandbox');assert.match(chat.getState().notices.at(-1).text,/same team/);
  const {usePreferencesStore:prefs}=await load('store/preferences/preferencesStore.ts'),{aimCombat,combatIntent,useCombatStore:combat}=await load('combat/combatStore.ts');combat.getState().setEnabled(true);combatIntent.orientationLocked=false;combatIntent.yaw=0;combatIntent.pitch=0;prefs.getState().update({turretYawSensitivity:2,turretPitchSensitivity:0.5});aimCombat(.1,.1);assert(Math.abs(combatIntent.yaw+.2)<1e-6);assert(Math.abs(combatIntent.pitch+.05)<1e-6);prefs.getState().update({turretYawSensitivity:999,turretPitchSensitivity:NaN});assert.equal(prefs.getState().turretYawSensitivity,3);assert(Number.isFinite(prefs.getState().turretPitchSensitivity));
+ transport.disconnectRustServer();
+ ui.setState({screen:'welcome'});
+ const restoredLogin=transport.connectRustServer();restoredLogin.open();
+ restoredLogin.receive({type:'welcome',player_id:'returning'});
+ restoredLogin.receive({type:'world_changed',world:{id:4,map:'range'}});
+ restoredLogin.receive({type:'session_restored',preserved:false,reason:'REDEPLOY'});
+ restoredLogin.receive({type:'map_snapshot',data:map});
+ assert.equal(ui.getState().screen,'welcome','gameplay waits for the authenticated account view');
+ restoredLogin.receive({type:'social_state',data:matchView});
+ restoredLogin.receive({type:'social_state',data:matchView});
+ assert.equal(ui.getState().screen,'sandbox');
+ assert.deepEqual(restoredLogin.sent,[{type:'spawn_request',map:'range',vehicle:'tank'}]);
  }finally{transport?.disconnectRustServer();await server?.close();dom.window.close();globalThis.WebSocket=originalSocket;for(const[k,d]of old){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}}
 });
