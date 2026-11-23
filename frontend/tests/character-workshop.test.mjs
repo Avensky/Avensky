@@ -135,6 +135,45 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     }
     lowReach.stop();
 
+    const { BRZ_HOOD_SECONDS, CLOSE_BRZ_HOOD, sampleBrzHood } = await load("brzHoodMotion.ts");
+    const { garagePanelForEmote } = await load("garageInteractions.tsx");
+    assert.equal(garagePanelForEmote(CLOSE_BRZ_HOOD), "hood");
+    assert.equal(sampleBrzHood(.56).hood, 0, "reach the safety catch before lifting");
+    assert.ok(sampleBrzHood(.56).catch > 0);
+    assert.equal(sampleBrzHood(1.5).rightGrip, 0, "the left hand lifts the hood");
+    const readyToBrace = sampleBrzHood(2.38);
+    assert.equal(readyToBrace.hood, 1);
+    assert.equal(readyToBrace.leftGrip, 1);
+    assert.equal(readyToBrace.rightGrip, 1);
+    assert.equal(readyToBrace.prop, 0);
+    assert.equal(sampleBrzHood(BRZ_HOOD_SECONDS).prop, 1);
+    let prior = sampleBrzHood(0, true);
+    for (let t = .025; t < BRZ_HOOD_SECONDS; t += .025) {
+      const closing = sampleBrzHood(t, true);
+      if (closing.hood < prior.hood) assert.equal(closing.prop, 0, "stow the prop before lowering the lid");
+      prior = closing;
+    }
+    assert.equal(sampleBrzHood(BRZ_HOOD_SECONDS, true).hood, 0);
+
+    const { prepareBrzGait } = await vite.ssrLoadModule("/src/game/preview/brzGait.ts");
+    const ground = new Group();
+    standing.position.set(0, .023, 0);
+    standing.rotation.y = 0;
+    ground.add(standing);
+    const shoe = rig.getObjectByName("foot_r");
+    const stance = shoe.getWorldPosition(new Vector3());
+    const gait = prepareBrzGait(rig, ground, 2, (distance, at, direction) => {
+      at.set(0, .023, distance);
+      direction.set(0, 0, 1);
+    }, new Vector3(0, 0, 1));
+    for (const distance of [.08, .16, .22]) {
+      standing.position.z = distance;
+      gait.sample(distance);
+      const drift = shoe.getWorldPosition(new Vector3()).distanceTo(stance);
+      assert.ok(drift < .015, `the stance shoe drifted ${drift.toFixed(4)} m at ${distance} m`);
+    }
+    gait.stop();
+
     const { prepareBrzCabin, validBrzCabinColors } = await vite.ssrLoadModule("/src/game/preview/brzCabin.ts");
     const shared = new MeshStandardMaterial({ color: "#6c0e24" });
     const leftSeat = mesh("Mesh132_red1_0", [1, 1, 1], [0, 1, 0]);

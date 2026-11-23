@@ -10,7 +10,7 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
   const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
   try {
     const { prepareGarageCockpit, sampleCockpitMotion } = await vite.ssrLoadModule('/src/game/preview/garageCockpit.ts');
-    const { sampleDriveOut } = await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
+    const { GARAGE_ENTRY_START_SECONDS, sampleDriveOut } = await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
     const { GARAGE_STATIONS } = await vite.ssrLoadModule('/src/game/preview/garageStations.ts');
     for (const gender of ['female', 'male']) for (const side of [-1, 1]) {
       const { scene: driver } = await new GLTFLoader().parseAsync(await readFile(`tests/fixtures/villager-${gender}-rig.json`, 'utf8'), '');
@@ -121,6 +121,31 @@ test('the door opens independently, entry keeps planted shoes stable, and seated
       cabin.stop();
       assert.equal(pivot.rotation.y, 0);
     }
+    const { scene: brzDriver } = await new GLTFLoader().parseAsync(await readFile('tests/fixtures/villager-female-rig.json', 'utf8'), '');
+    const brzMotion = new Group(), brz = new Group(), brzStand = new Group(), brzDoor = new Group(), brzHandle = new Group();
+    brzMotion.add(brz, brzStand);
+    brzStand.position.set(1.25, .023, -.42);
+    brzStand.rotation.y = -.59;
+    brzStand.add(brzDriver);
+    brz.add(brzDoor);
+    brzDoor.add(brzHandle);
+    brzDoor.position.set(.88, .75, .48);
+    brzHandle.position.set(0, .15, -.72);
+    brzDoor.rotation.y = -Math.PI / 3;
+    const ankle = side => brzDriver.getObjectByName(`foot_${side}`).getWorldPosition(new Vector3());
+    const leftPlant = ankle('l'), rightPlant = ankle('r');
+    const facing = brzDriver.getWorldQuaternion(new Quaternion());
+    const brzCabin = prepareGarageCockpit(brz, [], { pivot: brzDoor, handle: brzHandle, axis: 'y',
+      open: brzDoor.rotation.y, angle: brzDoor.rotation.y }, GARAGE_STATIONS.brz)(brzDriver, brzMotion, true, true);
+    assert(brzCabin);
+    brzCabin.sample(null, 0, sampleDriveOut(GARAGE_ENTRY_START_SECONDS));
+    assert(facing.angleTo(brzDriver.getWorldQuaternion(new Quaternion())) < .001, 'entry starts in the door-opening stance');
+    assert(ankle('l').distanceTo(leftPlant) < .001 && ankle('r').distanceTo(rightPlant) < .001, 'entry begins without moving either shoe');
+    brzCabin.sample(null, 0, sampleDriveOut(GARAGE_ENTRY_START_SECONDS + .46));
+    assert(ankle('l').distanceTo(leftPlant) < .025, 'the left shoe supports the driver during the first step');
+    assert(ankle('r').y > rightPlant.y + .06, 'the right shoe leads into the left-side seat');
+    brzCabin.stop();
+
     const { cockpitTakesForWheel } = await vite.ssrLoadModule('/src/game/characters/cockpitEmotes.ts');
     assert(!cockpitTakesForWheel(true, false).some(take => take.id === 'drive-race-start'));
     assert(cockpitTakesForWheel(true, true).some(take => take.id === 'drive-race-start'));

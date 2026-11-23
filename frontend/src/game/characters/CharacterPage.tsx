@@ -30,6 +30,8 @@ import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import { useGarageDrive } from "../preview/garageDriveStore";
 import { OPEN_DRIVER_DOOR, PANEL_INTERACTIONS, SIT_IN_CHAIR, garagePanelForEmote } from "./garageInteractions";
+import { CLOSE_BRZ_HOOD, OPEN_BRZ_HOOD } from "./brzHoodMotion";
+import { BRZ_GARAGE_ENABLED } from "../preview/brzCabin";
 import { useVehicleStudioStore } from "../heroes/vehicleStudioStore";
 import { EmoteCreator } from "./EmoteCreator";
 import { CREATED_EMOTE_ID, readCreatedEmotes } from "./emoteAuthoring";
@@ -86,6 +88,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
   const hasDriverDoor = useGarageDrive(state => state.hasDoor);
   const availableParts = useVehicleStudioStore(state => state.availableParts);
+  const hoodOpen = useVehicleStudioStore(state => state.parts.hood);
+  const brzDoorReady = useCharacterPreviewStore(state => state.brzDoorReady);
   const ownerKey = owner ?? "this-device";
   const favoritesKey = "avensky-emote-favorites-v1:" + ownerKey;
   const [favorites, setFavorites] = useState<string[]>(() => {
@@ -422,7 +426,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   function previewInteraction(id: string) {
     useFittingTurnStore.setState({ characterYaw: 0 });
     useCharacterPreviewStore.setState(state => ({
-      emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, cockpitError: null,
+      emote: { id }, playbackPaused: false, loopEmote: false, insideCar: false, cockpitError: null, brzDoorReady: false,
       camera: id === OPEN_DRIVER_DOOR || garagePanelForEmote(id) ? "Whole car" : "Full body", zoom: 1, focusRevision: state.focusRevision + 1,
     }));
   }
@@ -491,13 +495,22 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       <h2>Interactions</h2>
       <button type="button" className="menu-control" data-controller-row disabled={reducedMotion || !hasDriverDoor || !cockpitAvailable}
         onClick={() => previewInteraction(OPEN_DRIVER_DOOR)}>Open driver door</button>
+      {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && brzDoorReady && <button type="button" className="menu-control"
+        data-controller-row disabled={!canEnterCar} onClick={toggleCockpit}>Get into the BRZ</button>}
       {!hasDriverDoor && <small>This vehicle has no fitted driver door.</small>}
       {PANEL_INTERACTIONS.map(action => <button key={action.id} type="button" className="menu-control" data-controller-row
-        disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)}
+        disabled={reducedMotion || !cockpitVehicle || !availableParts.includes(action.part)
+          || (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && hoodOpen && action.id === OPEN_BRZ_HOOD)}
         onClick={() => previewInteraction(action.id)}>{action.label}</button>)}
+      {BRZ_GARAGE_ENABLED && cockpitVehicle === "brz" && availableParts.includes("hood") && <button type="button"
+        className="menu-control" data-controller-row disabled={reducedMotion || !hoodOpen}
+        onClick={() => previewInteraction(CLOSE_BRZ_HOOD)}>Close hood</button>}
       <button type="button" className="menu-control" data-controller-row disabled={reducedMotion} onClick={() => previewInteraction(SIT_IN_CHAIR)}>Sit down</button>
       <button type="button" className="menu-control" data-controller-row disabled={!emote}
-        onClick={() => useCharacterPreviewStore.setState({ emote: null, playbackPaused: false, cockpitError: null })}>Reset interaction</button>
+        onClick={() => {
+          if (BRZ_GARAGE_ENABLED && cockpitVehicle === "brz") useVehicleStudioStore.getState().setPart("hood", false);
+          useCharacterPreviewStore.setState({ emote: null, playbackPaused: false, cockpitError: null, brzDoorReady: false });
+        }}>Reset interaction</button>
     </div>
     : !insideCar && emoteGroup === "Pose pack" ? <CharacterPosePack disabled={reducedMotion} />
     : <CharacterEmoteList choice={previewChoice} group={emoteGroup === "Pose pack" || emoteGroup === "Creator" || emoteGroup === "Interactions" ? undefined : emoteGroup} search={emoteSearch} station={station} insideCar={insideCar}

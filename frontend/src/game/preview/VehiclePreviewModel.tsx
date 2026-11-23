@@ -138,7 +138,18 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     if (showroomPath) return [];
     const parts = createVehiclePartRig(prepared.root, model);
     const hood = parts.find(part => part.part === "hood");
-    if (hood) hood.support = prepared.brzHardware?.prop;
+    const prop = prepared.brzHardware?.prop;
+    const frame = prop && prepared.root.getObjectByName("HOOD_FRAME");
+    if (hood && prop && frame) {
+      hood.open = Math.sign(hood.open) * MathUtils.degToRad(39);
+      prop.fit(frame);
+      hood.hoodProp = prop;
+      hood.support = opening => prop.place(MathUtils.smoothstep(opening, .82, 1));
+      const bonnetSkin = prepared.root.getObjectByName("HOOD");
+      if (hood.handle && bonnetSkin) {
+        hood.handle.position.copy(hood.pivot.worldToLocal(bonnetSkin.localToWorld(new Vector3(.229, .659, -1.985))));
+      }
+    }
     if (prepared.gullwing) parts.push(prepared.gullwing.hinge);
     return parts;
   }, [prepared, model, showroomPath]);
@@ -164,13 +175,13 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   }, [partRig, prepared, station, model]);
   const popup = partRig.find(part => part.part === "headlights");
   const cockpitSetup = useRef<{ source: Object3D; prepare: ReturnType<typeof prepareGarageCockpit> }>(null);
-  const playCockpit = useCallback<GarageCockpit>((driverRoot, characterPreview) => {
+  const playCockpit = useCallback<GarageCockpit>((driverRoot, characterPreview, fromOpenDoor) => {
     const motionGroup = motion.current;
     if (!motionGroup) return null;
     if (cockpitSetup.current?.source !== prepared.root) {
       cockpitSetup.current = { source: prepared.root, prepare: prepareGarageCockpit(prepared.root, prepared.glassMaterials, driverDoor, station) };
     }
-    return cockpitSetup.current.prepare?.(driverRoot, motionGroup, characterPreview) ?? null;
+    return cockpitSetup.current.prepare?.(driverRoot, motionGroup, characterPreview, fromOpenDoor) ?? null;
   }, [prepared, driverDoor, station, motion]);
   const cockpit = !revealActive && (previewPacks || garageOpen) ? playCockpit : undefined;
   const marine=vehicleSystems(model)==="marine";

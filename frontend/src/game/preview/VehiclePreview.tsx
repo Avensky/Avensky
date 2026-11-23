@@ -178,7 +178,7 @@ export function VehiclePreview({
   }, []);
   const vehicleFit = currentDriverFit?.model === vehicleId ? currentDriverFit : undefined;
   const garageDriverPose = garageStation && vehicleFit ? vehicleFit : parkedDriverFit;
-  const emotePose = (insideCar || fittingToCar) && vehicleFit ? vehicleFit : parkedDriverFit;
+  const emotePose = vehicleFit && (insideCar || fittingToCar || vehicleFit.clearance) ? vehicleFit : parkedDriverFit;
   const activeDriver = wardrobeOpen ? driver : garageDriver;
   const driverPose = vehicleEmotes ? emotePose : garageDriverPose;
   const panel = panelEmote === OPEN_DRIVER_DOOR ? "driver-door" : garagePanelForEmote(panelEmote);
@@ -377,7 +377,7 @@ export function VehiclePreview({
                 <PreviewContactShadow footprint={[.55, .46]} offset={[0, 0]} />
               </group>
               <GaragePanelTarget.Provider value={panelTarget}>
-                <GarageDriver choice={activeDriver} previewPacks={wardrobeOpen} upright={characterOnly || Boolean(panelPose)}
+                <GarageDriver choice={activeDriver} previewPacks={wardrobeOpen} upright={characterOnly || Boolean(panelPose || insideCar && vehicleFit?.clearance)}
                   leanFit={vehicleEmotes ? vehicleFit?.lean : undefined} mirrorFit={vehicleEmotes ? vehicleFit?.mirror : undefined}
                   cockpit={!characterOnly && (vehicleEmotes || garageOpen) ? vehicleFit?.cockpit : undefined} />
               </GaragePanelTarget.Provider>

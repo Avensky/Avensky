@@ -23,9 +23,10 @@ export const useCharacterPreviewStore = create<{
   cockpitAvailable: boolean;
   cockpitError: string | null;
   insideCar: boolean;
+  brzDoorReady: boolean;
   leanAvailable: boolean;
   mirrorAvailable: boolean;
-}>(() => ({ viewport: null, selectedPiece: "corset", focusRevision: 0, playbackPaused: false, automaticEmotes: true, camera: "Full body", zoom: 1, emote: null, loopEmote: false, cockpitVehicle: null, cockpitAvailable: false, cockpitError: null, insideCar: false, leanAvailable: false, mirrorAvailable: false }));
+}>(() => ({ viewport: null, selectedPiece: "corset", focusRevision: 0, playbackPaused: false, automaticEmotes: true, camera: "Full body", zoom: 1, emote: null, loopEmote: false, cockpitVehicle: null, cockpitAvailable: false, cockpitError: null, insideCar: false, brzDoorReady: false, leanAvailable: false, mirrorAvailable: false }));
 
 export function failCockpitPreview(message: string) {
   if (useCharacterPreviewStore.getState().insideCar) {

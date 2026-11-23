@@ -14,7 +14,7 @@ import { createGarageHorn } from "../../audio/garageHorn";
 type TakeId = CockpitTake["id"];
 type HandControl = keyof ReturnType<typeof garageControlTargets> | "horn";
 export type CockpitPlayback = { hasDoor?: boolean; sample: (id: TakeId | null, phase: number, drive?: DriveOutPose) => void; stop: () => void };
-export type GarageCockpit = (driver: Object3D, characterPreview?: boolean) => CockpitPlayback | null;
+export type GarageCockpit = (driver: Object3D, characterPreview?: boolean, fromOpenDoor?: boolean) => CockpitPlayback | null;
 
 const AXLE = new Vector3(1, 0, 0);
 const UP = new Vector3(0, 1, 0);
@@ -183,7 +183,7 @@ export function prepareGarageCockpit(
   const shot = garageStationCamera(station);
   const controls = road ? garageControlTargets(road) : undefined;
 
-  return (driver: Object3D, motion: Group, characterPreview = false): CockpitPlayback | null => {
+  return (driver: Object3D, motion: Group, characterPreview = false, fromOpenDoor = false): CockpitPlayback | null => {
     const parent = driver.parent;
     const head = driver.getObjectByName("head");
     const torso = driver.getObjectByName("spine_02");
@@ -378,8 +378,8 @@ export function prepareGarageCockpit(
         driver.scale.copy(restScale).multiplyScalar(modelScale);
         const enter = drive?.enter ?? 1;
         const sit = MathUtils.smoothstep(enter, .12, .93);
-        const faceDoor = closedHandle ? drive?.faceDoor ?? 0 : 0;
-        const gripDoor = closedHandle ? drive?.handlesDoor ?? 0 : 0;
+        const faceDoor = closedHandle && !fromOpenDoor ? drive?.faceDoor ?? 0 : 0;
+        const gripDoor = closedHandle && !fromOpenDoor ? drive?.handlesDoor ?? 0 : 0;
         driver.quaternion.copy(seatRotation);
         entryHip.copy(seat);
         standingAtDoor.copy(standingHip).lerp(approachHip, faceDoor);

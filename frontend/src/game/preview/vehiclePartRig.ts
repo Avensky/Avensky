@@ -2,10 +2,11 @@ import {Box3,Group,Matrix4,Mesh,Vector3,type Object3D} from "three";
 import type {VehicleStudioPart} from "../heroes/vehicleStudioStore";
 import {AE_HINGE} from "../../vehicles/tools/roadLamps";
 import {BRZ_GARAGE_ENABLED} from "./brzCabin";
+import type {BrzHoodProp} from "./brzHardware";
 
 export type VehiclePartHinge={part:VehicleStudioPart;pivot:Group;axis:"x"|"y"|"z";closed:number;open:number;angle:number;handle?:Object3D;
   stance?: { point: Vector3; yaw: number }; latch?: Group; latchGrip?: Object3D;
-  support?: (opening: number) => void; doorSweep?: Box3 };
+  support?: (opening: number) => void; hoodProp?: BrzHoodProp; doorSweep?: Box3 };
 const frontDoor = (side: "left" | "right", letter: "l" | "r") => new RegExp(
   `^(?:.*_)?door(?:_?glass)?[_ .-]*(?:(?:front[_ .-]*)?(?:${side}|${letter})|f${letter}|${letter}f)(?:[_ .-].*)?$`, "i",
 );
