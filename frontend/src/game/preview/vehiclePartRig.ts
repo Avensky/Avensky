@@ -1,13 +1,15 @@
-import {Box3,Group,Matrix4,Mesh,Raycaster,Vector3,type Object3D} from "three";
+import {Box3,Group,Matrix4,Mesh,Vector3,type Object3D} from "three";
 import type {VehicleStudioPart} from "../heroes/vehicleStudioStore";
 import {AE_HINGE} from "../../vehicles/tools/roadLamps";
 import {BRZ_GARAGE_ENABLED} from "./brzCabin";
 import type {BrzHoodProp} from "./brzHardware";
 import type {BrzEngineBay} from "./brzEngineBay";
+import {fitBrzDoorHardware} from "./brzDoorHardware";
 
 export type VehiclePartHinge={part:VehicleStudioPart;pivot:Group;axis:"x"|"y"|"z";closed:number;open:number;angle:number;handle?:Object3D;
   stance?: { point: Vector3; yaw: number }; latch?: Group; latchGrip?: Object3D;
-  support?: (opening: number) => void; hoodProp?: BrzHoodProp; engineBay?: BrzEngineBay; doorSweep?: Box3; interiorHandle?: Object3D };
+  support?: (opening: number) => void; hoodProp?: BrzHoodProp; engineBay?: BrzEngineBay; doorSweep?: Box3;
+  interiorHandle?: Object3D; interiorPull?: Object3D; releaseLever?: { place(amount: number): void; dispose(): void } };
 const frontDoor = (side: "left" | "right", letter: "l" | "r") => new RegExp(
   `^(?:.*_)?door(?:_?glass)?[_ .-]*(?:(?:front[_ .-]*)?(?:${side}|${letter})|f${letter}|${letter}f)(?:[_ .-].*)?$`, "i",
 );
@@ -144,23 +146,6 @@ export function bindDoorHandle(root: Object3D, hinge: VehiclePartHinge, bounds: 
  hinge.handle = anchor;
 }
 
-function bindBrzInteriorHandle(root: Group, hinge: VehiclePartHinge) {
- const left = hinge.part === "door-left";
- const trim = root.getObjectByName(left ? "Mesh139_black1_0" : "Mesh162_black1_0");
- if (!(trim instanceof Mesh)) return;
- // The inner release lever is component 246 of the driver's door trim.
- const x = left ? -.724 : .718;
- const origin = trim.localToWorld(new Vector3(x - Math.sign(x) * .09, .707, -.263));
- const direction = trim.localToWorld(new Vector3(x, .707, -.263)).sub(origin).normalize();
- const hit = new Raycaster(origin, direction).intersectObject(trim, false)[0];
- if (!hit || Math.abs(trim.worldToLocal(hit.point.clone()).x - x) > .008) return;
- const grip = new Group();
- grip.name = "brz-interior-release";
- grip.position.copy(hinge.pivot.worldToLocal(hit.point));
- hinge.pivot.add(grip);
- hinge.interiorHandle = grip;
-}
-
 /** Adds temporary presentation hinges only where the GLB has separate panel
  * meshes. This never changes or saves the source GLB or in-game vehicle. */
 export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]{
@@ -204,7 +189,7 @@ export function createVehiclePartRig(root:Group,model:string):VehiclePartHinge[]
       target.x = target.x < 0 ? grip.min.x : grip.max.x;
       hinge.handle.position.copy(hinge.pivot.worldToLocal(root.localToWorld(target)));
       hinge.doorSweep = boundsInRoot(hinge.pivot, objects);
-      bindBrzInteriorHandle(root, hinge);
+      fitBrzDoorHardware(root, hinge);
      }
     }
    }

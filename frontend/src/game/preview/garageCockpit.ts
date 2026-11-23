@@ -396,6 +396,8 @@ export function prepareGarageCockpit(
         driver.scale.copy(restScale).multiplyScalar(modelScale);
         const enter = exit?.enter ?? drive?.enter ?? 1;
         const sit = MathUtils.smoothstep(enter, .12, .93);
+        const insidePull = door?.interiorPull ? drive?.insidePull ?? 0 : 0;
+        const leanToPull = insidePull * (drive?.door ?? 0);
         const faceDoor = closedHandle && !fromOpenDoor ? drive?.faceDoor ?? 0 : 0;
         const gripDoor = closedHandle && !fromOpenDoor ? drive?.handlesDoor ?? 0 : 0;
         driver.quaternion.copy(seatRotation);
@@ -418,14 +420,18 @@ export function prepareGarageCockpit(
           entryHip.z -= duck * .09;
         }
         if (exit) entryHip.x += doorSide * .065 * exit.insideGrip;
+        entryHip.x += doorSide * .20 * leanToPull;
+        entryHip.z += .165 * leanToPull;
         driver.position.copy(parent.worldToLocal(car.localToWorld(entryHip)))
           .sub(hip.clone().multiply(driver.scale).applyQuaternion(driver.quaternion));
         if (drive && door) {
-          door.angle = door.open * drive.door + openDoorAtStart * (1 - drive.door - drive.closeDoor);
+          door.angle = drive.closeDoor === 1 ? door.closed ?? 0
+            : door.open * drive.door + openDoorAtStart * (1 - drive.door - drive.closeDoor);
           door.pivot.rotation[door.axis] = door.angle;
           if (driverShadow) driverShadow.visible = enter < .52;
         }
         if (exit && door) {
+          door.releaseLever?.place(exit.release);
           door.angle = MathUtils.lerp(door.closed, door.open, exit.door);
           door.pivot.rotation[door.axis] = door.angle;
           overviewLens.position.x = doorSide * Math.abs(overviewLens.position.x);
@@ -433,13 +439,14 @@ export function prepareGarageCockpit(
         }
         const bodyPitch = raceStart ? -.055 * pose.throttle + .14 * pose.brake
           : pedalRig && id === "drive-brake" ? .095 * pose.brake : 0;
-        if (torso && (pose.reachControl || bodyPitch)) {
+        if (torso && (pose.reachControl || bodyPitch || leanToPull)) {
           torso.getWorldQuaternion(headAxes).invert().multiply(carRotation);
           const lean = pose.handControl === "horn" ? .17 : .06;
-          torso.rotateOnAxis(localAxis.copy(AXLE).applyQuaternion(headAxes), pose.reachControl * lean + bodyPitch);
+          torso.rotateOnAxis(localAxis.copy(AXLE).applyQuaternion(headAxes), pose.reachControl * lean + bodyPitch + .28 * leanToPull);
+          torso.rotateOnAxis(localAxis.set(0, 0, 1).applyQuaternion(headAxes), -doorSide * .58 * leanToPull);
         }
         head.getWorldQuaternion(headAxes).invert().multiply(carRotation);
-        const checkHandle = exit?.insideGrip ?? 0;
+        const checkHandle = exit?.insideGrip ?? insidePull;
         head.rotateOnAxis(localAxis.copy(UP).applyQuaternion(headAxes), pose.lookYaw + doorSide * .27 * checkHandle);
         const brakeHead = pedalRig && id === "drive-brake" ? .13 * pose.brake : 0;
         head.rotateOnAxis(localAxis.copy(AXLE).applyQuaternion(headAxes), pose.lookPitch + brakeHead + .11 * checkHandle);
@@ -612,19 +619,23 @@ export function prepareGarageCockpit(
             }
           }
         }
-        if (exit?.insideGrip && door?.interiorHandle && releaseHand) {
+        const interiorTarget = insidePull ? door?.interiorPull : door?.interiorHandle;
+        if (checkHandle && interiorTarget && releaseHand) {
           const { shoulder, elbow, hand, rig } = releaseHand;
-          door.interiorHandle.getWorldPosition(releaseTarget);
+          interiorTarget.getWorldPosition(releaseTarget);
           fingerDirection.copy(releaseTarget).sub(shoulder.getWorldPosition(reach)).normalize();
           const span = rig ? rig.middle.getWorldPosition(reach).distanceTo(hand.getWorldPosition(releaseWrist)) : 0;
           releaseWrist.copy(releaseTarget).addScaledVector(fingerDirection, -span)
-            .lerp(hand.getWorldPosition(reach), 1 - exit.insideGrip);
+            .lerp(hand.getWorldPosition(reach), 1 - checkHandle);
           aimLimb(shoulder, elbow, hand, releaseWrist, localAxis.set(doorSide * .22, -1, -.38).applyQuaternion(carRotation));
           if (rig) {
             const restHand = hand.quaternion.clone();
             aimDriverJoint(hand, rig.middle, fingerDirection);
             alignJointNormal(hand, fingerDirection, rig.palm, localAxis.set(doorSide * .6, -1, 0).applyQuaternion(carRotation));
-            hand.quaternion.slerp(restHand, 1 - exit.insideGrip);
+            hand.quaternion.slerp(restHand, 1 - checkHandle);
+            for (const { joint, axis, segment } of rig.fingers) {
+              joint.rotateOnAxis(axis, checkHandle * (.30 + segment * .14));
+            }
           }
         }
         if (road && !passengerSeat) wardrobe.sample(car, center, radius, sit);
@@ -645,6 +656,7 @@ export function prepareGarageCockpit(
         restore(motionRest);
         steering.forEach(restore);
         if (door) {
+          door.releaseLever?.place(0);
           door.angle = fromOpenDoor ? door.closed ?? 0 : openDoorAtStart;
           door.pivot.rotation[door.axis] = door.angle;
         }
