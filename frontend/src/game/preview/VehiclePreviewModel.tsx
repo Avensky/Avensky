@@ -12,8 +12,8 @@ import { fitPreviewToPlatform, measureDriverLean, measurePreviewBounds } from ".
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { applyShowroomHighlights, applyShowroomPaint } from "./garageVehiclePaint";
 import { prepareGarageVehiclePaint } from "./garageVehiclePaint";
-import {createVehiclePartRig,advanceVehiclePartRig,availableVehicleParts,measureDriverDoor,type VehiclePartHinge} from "./vehiclePartRig";
-import {useVehicleStudioStore} from "../heroes/vehicleStudioStore";
+import {createVehiclePartRig,advanceVehiclePartRig,availableVehicleParts,brzDriverSide,measureDriverDoor,type VehiclePartHinge} from "./vehiclePartRig";
+import {useBrzCabinStudio,useVehicleStudioStore} from "../heroes/vehicleStudioStore";
 import {MathUtils,Mesh,MeshStandardMaterial,Vector3,type Color,type Group,type Object3D} from "three";
 import { ROOK_ID, type CharacterChoice } from "../characters/characterCatalog";
 import {useFrame,useThree} from "@react-three/fiber";
@@ -34,6 +34,9 @@ import { garageMounts, useGarageDiagnostics } from "./garageDiagnosticsStore";
 import { prepareGarageHeadlightGlass } from "./garageHeadlightGlass";
 import { VehicleMaterialization } from "./VehicleMaterialization";
 import { batchStaticVehicleMeshes } from "../../vehicles/tools/staticVehicleBatches";
+import { BRZ_GARAGE_ENABLED, prepareBrzCabin } from "./brzCabin";
+import { prepareBrzHardware } from "./brzHardware";
+import type { BrzClearance } from "./brzApproach";
 
 export type VehiclePreviewDriverFit = {
   model: VehicleModelId;
@@ -43,7 +46,8 @@ export type VehiclePreviewDriverFit = {
   lean?: ReturnType<typeof measureDriverLean>;
   mirror?: MirrorCheckFit;
   cockpit?: GarageCockpit;
-  panels?: Partial<Record<GaragePanel, { hinge: VehiclePartHinge; position: [number, number, number]; yaw: number }>>;
+  panels?: Partial<Record<GaragePanel | "driver-door", { hinge: VehiclePartHinge; position: [number, number, number]; yaw: number }>>;
+  clearance?: BrzClearance;
 };
 
 type VehicleLayout = {
@@ -87,6 +91,9 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   const revealActive = materializing && !reducedMotion;
   const invalidate = useThree(state => state.invalidate);
   const savedAppearance = useHeroLoadouts(s => s.draft?.vehicle === model ? s.draft.appearance : s.loadouts[model]);
+  const cabinColors = useBrzCabinStudio(s => model === "brz" ? s.colors : undefined);
+  const wiperRequest = useBrzCabinStudio(s => model === "brz" ? s.sweep : 0);
+  const wiperSweep = useRef({ request: wiperRequest, elapsed: 1.8 });
   const { scene, animations } = useAssetGLTF(showroomPath ?? VEHICLE_MODEL_PATHS[model], "/draco/");
   // Only this stage uses the generated showroom URL. Retain its decoded data
   // in the loader cache, and release its GPU buffers when the car leaves.
@@ -97,17 +104,20 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   const prepared = useMemo(
     () => {
       const visual = prepareVehicleVisual(scene, model);
+      const brzHardware = BRZ_GARAGE_ENABLED && model === "brz" && !showroomPath ? prepareBrzHardware(visual.root) : undefined;
+      const brzCabin = brzHardware ? prepareBrzCabin(visual.root) : undefined;
       const releaseDoor = model === "ae86" ? splitAe86DriverDoor(visual.root) : undefined;
       const releaseSteering = splitGarageSteering(visual.root, model);
       const gullwing = model === "timecar" ? splitTimecarDriverDoor(visual.root) : undefined;
       prepareGarageVehiclePaint(visual.root, model);
       const dashboard = prepareGarageDashboard(visual.root, GARAGE_STATIONS[model]);
       const headlightGlass = prepareGarageHeadlightGlass(visual.root, garageMounts(model, "headlights"));
-      return { ...visual, gullwing, dashboard, headlightGlass, dispose: () => {
+      return { ...visual, gullwing, dashboard, headlightGlass, brzHardware, brzCabin, dispose: () => {
+        brzCabin?.dispose(); brzHardware?.dispose();
         headlightGlass.dispose(); dashboard?.dispose(); gullwing?.dispose(); releaseSteering?.(); releaseDoor?.(); visual.dispose();
       } };
     },
-    [scene, model],
+    [scene, model, showroomPath],
   );
   const vehiclePainted = usePreviewPaint();
   useLayoutEffect(() => {
@@ -127,6 +137,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   const partRig=useMemo(() => {
     if (showroomPath) return [];
     const parts = createVehiclePartRig(prepared.root, model);
+    const hood = parts.find(part => part.part === "hood");
+    if (hood) hood.support = prepared.brzHardware?.prop;
     if (prepared.gullwing) parts.push(prepared.gullwing.hinge);
     return parts;
   }, [prepared, model, showroomPath]);
@@ -134,7 +146,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     // Door/steering splits require the original primitive indices. Batch only
     // after those splits and hinges, leaving every interactive part separate.
     const batches = batchStaticVehicleMeshes(prepared.root, {
-      protectedObjects: partRig.flatMap(part => part.latch ? [part.pivot, part.latch] : [part.pivot]),
+      protectedObjects: [...partRig.flatMap(part => part.latch ? [part.pivot, part.latch] : [part.pivot]),
+        ...(prepared.brzHardware?.objects ?? []), ...(prepared.brzCabin?.objects ?? [])],
       protectedNames: station.kind === "wheel" ? station.steeringParts : undefined,
       animations,
     });
@@ -142,13 +155,13 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   }, [prepared, partRig, station, animations]);
   const driverDoor = useMemo(() => {
     if (station.kind !== "wheel") return undefined;
-    const side = Math.sign(station.seat[0]);
+    const side = model === "brz" ? brzDriverSide(prepared.root) : Math.sign(station.seat[0]);
     return partRig.find(part => {
       if (part.part !== "door-left" && part.part !== "door-right") return false;
       const across = prepared.root.worldToLocal(part.pivot.getWorldPosition(new Vector3())).x;
       return side * across > 0;
     });
-  }, [partRig, prepared, station]);
+  }, [partRig, prepared, station, model]);
   const popup = partRig.find(part => part.part === "headlights");
   const cockpitSetup = useRef<{ source: Object3D; prepare: ReturnType<typeof prepareGarageCockpit> }>(null);
   const playCockpit = useCallback<GarageCockpit>((driverRoot, characterPreview) => {
@@ -182,6 +195,16 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   },[prepared,marine]);
   const lastLampStyle=useRef("");
   useEffect(() => () => prepared.dispose(), [prepared]);
+  useEffect(() => {
+    if (!prepared.brzHardware?.wipers) return;
+    useBrzCabinStudio.setState({wipersReady:true});
+    return () => useBrzCabinStudio.setState({wipersReady:false});
+  }, [prepared]);
+  useEffect(() => {
+    prepared.brzCabin?.apply(cabinColors ?? {}, savedAppearance?.seats ?? "factory");
+    invalidate();
+  }, [prepared, cabinColors, savedAppearance?.seats, invalidate]);
+  useEffect(() => { if (prepared.brzHardware?.wipers) invalidate(); }, [prepared, wiperRequest, invalidate]);
   useEffect(()=>{lastLampStyle.current="";},[lamps]);
   useEffect(()=>{
     useVehicleStudioStore.getState().reset();
@@ -221,6 +244,17 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     const garageLights = garageOpen ? useGarageDiagnostics.getState().tests[model]?.lights : undefined;
     const drivenPanel = previewPacks && garagePanelForEmote(useCharacterPreviewStore.getState().emote?.id);
     advanceVehiclePartRig(partRig,studio.parts,delta,drivenDoor || drivenPanel || undefined,studio.parts.headlights || Boolean(garageLights && garageLights !== "off"));
+    if (prepared.brzHardware?.wipers) {
+      const sweep = wiperSweep.current;
+      const hood = partRig.find(part => part.part === "hood");
+      if (wiperRequest !== sweep.request) { sweep.request = wiperRequest; sweep.elapsed = 0; }
+      if (studio.parts.hood || (hood && Math.abs(hood.angle) > .025) || drivenPanel === "hood") sweep.elapsed = 1.8;
+      if (sweep.elapsed < 1.8) {
+        sweep.elapsed = Math.min(1.8, sweep.elapsed + Math.min(delta, .1));
+        invalidate();
+      }
+      prepared.brzHardware.wipers(MathUtils.smoothstep(sweep.elapsed, 0, .67) * (1 - MathUtils.smoothstep(sweep.elapsed, .75, 1.8)));
+    }
     if (marine) {
       const {navigation,searchlights}=studio.marineLights;
       const key=`${navigation}:${searchlights}`;
@@ -247,6 +281,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     return result;
   }, [scene, prepared, model]);
   const { measurements, door: doorBounds } = layout;
+  const clearance = useMemo(() => prepared.brzHardware ? { car: prepared.root, hull: measurements.bounds.clone() } : undefined, [prepared, measurements]);
   const display = useMemo(
     () => fitPreviewToPlatform(measurements, platform),
     [measurements, platform],
@@ -259,14 +294,16 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
       const { point, yaw } = hinge.stance;
       targets[hinge.part] = { hinge, position: [point.x * display.scale + display.position[0], .023, point.z * display.scale + display.position[2]], yaw };
     }
+    if (clearance && driverDoor?.handle) targets["driver-door"] = { hinge: driverDoor, position: [0, .023, 0], yaw: 0 };
     return targets;
-  }, [partRig, display]);
+  }, [partRig, display, clearance, driverDoor]);
   const hasDriver = Boolean(driver);
   const rook = driver?.id === ROOK_ID;
   const staging = useMemo(() => {
     const vehicleCenter = measurements.centering.getCenter(new Vector3());
     const doorCenter = doorBounds?.getCenter(new Vector3());
-    const side = station.kind === "wheel" ? Math.sign(station.seat[0]) : doorCenter && doorCenter.x > vehicleCenter.x ? 1 : -1;
+    const side = clearance ? brzDriverSide(prepared.root)
+      : station.kind === "wheel" ? Math.sign(station.seat[0]) : doorCenter && doorCenter.x > vehicleCenter.x ? 1 : -1;
     const edge = side < 0
       ? Math.min(doorBounds?.min.x ?? Infinity, measurements.bounds.min.x)
       : Math.max(doorBounds?.max.x ?? -Infinity, measurements.bounds.max.x);
@@ -277,7 +314,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
     }
     const fit = driverReady ? leanFits.get(layout)?.fit : undefined;
     return { side, edge, along, fit };
-  }, [doorBounds, measurements, prepared, hasDriver, driverReady, layout, station]);
+  }, [doorBounds, measurements, prepared, hasDriver, driverReady, layout, station, clearance]);
   const inset = inspectBody ? 0 : Math.min(staging.fit?.offset ?? 0, rook ? .14 : .06);
   const lean = useMemo(() => {
     const fit = staging.fit;
@@ -285,7 +322,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   }, [staging.fit, rook, inspectBody, previewPacks, driver?.prop, inset]);
   const driverAcross = staging.edge * display.scale + display.position[0] + staging.side * (.27 - inset) * driverScale;
   // Vehicles without an authored front door still stage beside the front seat.
-  const driverAlong = staging.along === undefined ? display.footprint[1] * .12 : staging.along * display.scale + display.position[2];
+  const driverAlong = staging.along === undefined ? display.footprint[1] * .12
+    : (staging.along + (clearance && previewPacks ? .58 : 0)) * display.scale + display.position[2];
   const mirrorFit = useMemo<MirrorCheckFit | undefined>(() => {
     if (!previewPacks || !driverReady || station.kind !== "wheel" || staging.along === undefined) return undefined;
     const from = new Vector3(staging.edge + staging.side * (.27 - inset), measurements.support.min.y, staging.along);
@@ -323,8 +361,8 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   useLayoutEffect(() => {
     if (!hasDriver || !driverReady) return;
     onDriverFit({ model, position: [driverAcross, .023, driverAlong], scale: driverScale,
-      yaw: staging.side * Math.PI / 2, lean, mirror: mirrorFit, cockpit, panels });
-  }, [hasDriver, driverReady, onDriverFit, model, driverAcross, driverAlong, driverScale, staging.side, lean, mirrorFit, cockpit, panels]);
+      yaw: staging.side * Math.PI / 2, lean, mirror: mirrorFit, cockpit, panels, clearance });
+  }, [hasDriver, driverReady, onDriverFit, model, driverAcross, driverAlong, driverScale, staging.side, lean, mirrorFit, cockpit, panels, clearance]);
   return (
     <>
       <group ref={revealRoot} scale={revealActive ? .001 : 1} visible={active}>

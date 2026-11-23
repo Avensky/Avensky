@@ -32,7 +32,9 @@ import {PAINT_FINISHES} from "../../vehicles/cosmetics/paintFinishes";
 import {vehicleSystems} from "../../vehicles/vehicleSystems";
 import {DEFAULT_WINDOW_TONE,WINDOW_TONES,type WindowTone} from "../preview/windowTones";
 import {getVehicleStockPerformance} from "./vehiclePerformance";
-import {useVehicleStudioStore,type VehicleStudioPart} from "./vehicleStudioStore";
+import {useBrzCabinStudio,useVehicleStudioStore,type VehicleStudioPart} from "./vehicleStudioStore";
+import {BRZ_GARAGE_ENABLED} from "../preview/brzCabin";
+import {BrzCabinColorControls} from "./BrzCabinColors";
 import {HeroPortrait} from "../alpha/HeroPortrait";
 import {HeroAbilityDetails} from "./HeroAbilities";
 import {HeroConceptGallery} from "./HeroConceptGallery";
@@ -107,6 +109,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const [vehicleModStages,setVehicleModStages]=useState<Record<string,Record<string,number>>>({});
  const availableParts=useVehicleStudioStore(s=>s.availableVehicle===definition?.vehicle?s.availableParts:NO_VEHICLE_PARTS);
  const openedParts=useVehicleStudioStore(s=>s.parts);
+ const wipersReady=useBrzCabinStudio(s=>s.wipersReady);
  const panelsHidden=useGarageDrive(s=>s.panelsHidden);
  const drivingOut=useGarageDrive(s=>s.stage!=="idle");
  const glassStyle=useVehicleStudioStore(s=>s.glassStyle);
@@ -356,11 +359,10 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
         <option value="factory">Factory</option>
         {unlocked.filter(item=>item.id!=="factory").map(item=><option key={item.id} value={item.id}>{item.name}</option>)}
        </select></label>
-       <label>SEAT COLOR<select aria-label="Hero seat color request" disabled={!owner||definition.vehicle!=="brz"}
+       {BRZ_GARAGE_ENABLED&&definition.vehicle==="brz"?<BrzCabinColorControls/>:<label>SEAT COLOR<select aria-label="Hero seat color request" disabled={!owner||definition.vehicle!=="brz"}
         value={appearance.seats} onChange={event=>edit({seats:event.target.value as HeroAppearance["seats"]})}>
         <option value="factory">Factory</option><option value="black">Black · mapping pending</option><option value="red">Red · mapping pending</option>
-       </select></label>
-       <p>Seat colors save as requests while the model's seat materials are being mapped.</p>
+       </select></label>}
       </section>
      </>}
     </>:<section className="vehicle-studio-card"><h3>Factory armor finish</h3><p>This model uses the authored armor materials.</p></section>)}
@@ -371,6 +373,8 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
      : <section className="vehicle-studio-card"><header><small>MODEL-SUPPORTED PANELS</small><h3>Open and inspect</h3></header>
         <p>Controls move the separate panels available on this model.</p>
         <div className="vehicle-studio-feature-list">{partOptions.map(part=><div key={part} data-supported={availableParts.includes(part)}><span>{partLabels[part]}</span><strong>{availableParts.includes(part)?(openedParts[part]?"OPEN":"CLOSED"):"NO MOVING MESH"}</strong></div>)}</div>
+        {BRZ_GARAGE_ENABLED&&definition.vehicle==="brz"&&<button type="button" className="menu-control" data-controller-row
+          disabled={!wipersReady||openedParts.hood||drivingOut} onClick={()=>useBrzCabinStudio.getState().requestSweep()}>Sweep windshield wipers</button>}
        </section>)}
     {studioTab==="lighting"&&(marine
      ? <section className="vehicle-studio-card"><header><small>LOCAL GARAGE TEST</small><h3>Marine lighting</h3></header>
