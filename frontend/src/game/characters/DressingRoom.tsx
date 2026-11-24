@@ -77,6 +77,7 @@ type Item = {
 };
 const ALPHA_STATUSES = {
   "near-pass": { label: "Alpha — Nearly Passing", description: "The fit is close to passing for alpha; final visual review remains." },
+  provisional: { label: "Provisional pass", description: "The fit has passed its initial review." },
   passed: { label: "Alpha Pass", description: "Passing for alpha for now." },
   development: { label: "Under Development", description: "Available for fitting while development continues." },
 } as const;
@@ -237,7 +238,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     const selected = !wardrobe && !corset && !choice.garments && !choice.removedClothing?.length && outfit.id === item.id;
     return {
       id: item.id, label: item.name, section: preset?.section ?? "Complete outfits", icon: "outfits",
-      description: preset?.outfit?.description ?? OUTFIT_DESCRIPTIONS[item.id], pieces: "outfit",
+      description: preset?.outfit?.description ?? OUTFIT_DESCRIPTIONS[item.id], pieces: "outfit", alphaStatus: preset?.outfit?.alphaStatus,
       selected: installed && selected, color: item.jacket, accent: item.trim, focus: preset ? "Full body" : undefined,
       unavailable: installed ? undefined : "Pack not installed",
       remove: selected && preset ? () => onTryOn(setWardrobeRemoval(choice, "dress", true)) : undefined,
@@ -365,7 +366,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
         ? next => setWardrobeRemoval(next, slot, true) : undefined,
     });
   }
-  for (const item of Object.values(allItems).flat()) item.alphaStatus = alphaStatus(item.pieces);
+  for (const item of Object.values(allItems).flat()) item.alphaStatus ??= alphaStatus(item.pieces);
   allItems.layers = Object.values(allItems).flat().filter(item => item.layer);
   const categoryItems = catalogOpen ? allItems[category].filter(item => category !== "layers" || item.layer === layer) : [];
   const query = search.trim().toLocaleLowerCase();

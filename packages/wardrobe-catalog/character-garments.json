@@ -195,7 +195,8 @@
     "piece": "dress",
     "mobileUrl": "/models/characters/female/wardrobe/dress/medieval-06.mobile.glb",
     "outfit": {
-      "description": "A short tunic with its matching belt and pouch."
+      "description": "A short tunic with a dyeable leather utility belt and pouch.",
+      "alphaStatus": "provisional"
     }
   },
   {

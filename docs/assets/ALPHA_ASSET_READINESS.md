@@ -1,6 +1,6 @@
 # Avensky alpha — asset readiness register
 
-Updated 2026-11-19. This is an approval/integration tracker, **not** a statement that every listed asset is released or even installed in the new repository. This tracker belongs to the Avensky game repo and does not imply that previously approved AvenLab assets have been validated here.
+Updated 2026-11-24. This is an approval/integration tracker, **not** a statement that every listed asset is released or even installed in the new repository. This tracker belongs to the Avensky game repo and does not imply that previously approved AvenLab assets have been validated here.
 
 ## Status definitions
 - **Approved**: user accepted the asset's appearance for alpha; individual compatibility issues can still block a combination.
@@ -17,6 +17,7 @@ Updated 2026-11-19. This is an approval/integration tracker, **not** a statement
 | Regular Skirts 01–04 | Provisional / passable | Most recent fitting and shading revisions merged in AvenLab | 27 contact failures across nine skirt/corset combinations, worst 7.7 mm; final rendering |
 | Gothic Skirts 01–05 | Provisional / nearly passing | PR #35 geometry tests report no Gothic pairing failures | Final fold/cloth/waist visual QA on device |
 | Socks 01–04 | Provisional pass | Alpha category graded Pass in wardrobe | In-game look and save/restore |
+| Belted tunic (`medieval-06`) | Provisional pass | User accepted the fit. The leather utility belt and pouch have a saved color. | Verify belt color and reload on a physical phone. |
 | Underwear and bras | Integrated functionality, not independent final sign-off | V-cut/boxer briefs and classic/pushup bra controls merged in AvenLab | Verify skin clipping, colors, saves on phone |
 | Repaired 12-style hair pack | **Provisional appearance pass** | 12 fitted hair meshes; UVs reconstructed; Style 12 exported as a Vesper GLB with strand maps | **In-game color + highlight + roots**, save/reload, caps, hat rules, mobile cost |
 | CC-character detailed hairstyle | Textured fit proof, not final alpha pass | Fitted to Vesper; 13 controls and six material groups; 64,984 triangles | Mobile LODs, hairline, clothing contact and animation |

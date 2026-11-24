@@ -26,7 +26,7 @@ import { getWardrobeActorBody, isWardrobeBodyDonor, sharesWardrobeRig } from "./
 import { HOODED_GOWN, needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
 import { hoodedGownColors, prepareHoodedGown } from "./hoodedGown";
 import { prepareDressSleeves } from "./dressSleeves";
-import { restoreDressMaterial } from "./dressMaterials";
+import { BELTED_TUNIC, restoreDressMaterial } from "./dressMaterials";
 
 export type WardrobeGarmentSource = { item: NonNullable<ReturnType<typeof getWardrobeGarment>>; scene: Object3D; authoredFit?: boolean };
 
@@ -470,6 +470,7 @@ export function prepareWardrobeGarments(
   const group = new Group();
   group.name = "fitting-room-garments";
   const materials = new Map<ClothingPiece, { base: Color; color: Color; accent: boolean }[]>();
+  const utilityBeltLeather: { base: Color; color: Color }[] = [];
   const ownedMaterials = new Set<Material>();
   const fittedGarments: BufferGeometry[] = [];
   const tallSocks: SkinnedMesh[] = [];
@@ -530,7 +531,9 @@ export function prepareWardrobeGarments(
           const base = material.color.clone();
           if (lining) liningColors.push(base);
           else if (channel === "fabric") fabricColor ??= base;
-          if ((!isHoodedGown || lining) && !(isTailoredDress && (channel === "hardware" || /(?:belt|bag)/i.test(source.name)))) {
+          if (item.id === BELTED_TUNIC && /^(?:Belt|Bag)_FRONT_/.test(source.name)) {
+            utilityBeltLeather.push({ base, color: material.color });
+          } else if ((!isHoodedGown || lining) && !(isTailoredDress && (channel === "hardware" || /(?:belt|bag)/i.test(source.name)))) {
             let palette = materials.get(item.piece);
             if (!palette) materials.set(item.piece, palette = []);
             palette.push({ base, color: material.color, accent: !lining && channel !== "fabric" });
@@ -890,6 +893,11 @@ export function prepareWardrobeGarments(
       underwear?.applyColors(piece => underwearColors(look, piece));
       const outfitColor = look.appearance.color !== "original" ? look.fabric : undefined;
       hoodedGown?.apply(hoodedGownColors(look), outfitColor, look.appearance.accent);
+      const utilityBeltColor = look.appearance.item_colors?.[`${BELTED_TUNIC}:belt`]?.color;
+      for (const { color, base } of utilityBeltLeather) {
+        color.copy(base);
+        if (utilityBeltColor) color.set(utilityBeltColor);
+      }
       for (const [piece, palette] of materials) {
         const dye = clothingColors(look, piece);
         const fabric = dye?.color ?? outfitColor;

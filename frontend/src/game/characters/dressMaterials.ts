@@ -1,6 +1,8 @@
 import { Color, DataTexture, LinearFilter, LinearMipmapLinearFilter, MeshStandardMaterial, RepeatWrapping, type Material } from "three";
 
 const brass = new Color("#b39160");
+export const BELTED_TUNIC = "medieval-06";
+export const BELTED_TUNIC_BELT_COLOR = "#8b735a";
 type Finish = "linen" | "twill" | "silk" | "quilt" | "leather" | "cord";
 const finishSettings: Record<Finish, { roughness: number; relief: number; repeat: number }> = {
   linen: { roughness: .89, relief: 1.08, repeat: 12 },

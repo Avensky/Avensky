@@ -5,6 +5,7 @@ import { clothingColors, clothingPieceLabel, isUnderwearPiece, underwearColors, 
 import { getCorsetDyeProfile, resolveCorsetDye, type CorsetDyeGroup } from "./corsetDye";
 import { HOODED_GOWN_DYES, hoodedGownColors } from "./hoodedGown";
 import { HOODED_GOWN } from "./wardrobeDressFit";
+import { BELTED_TUNIC, BELTED_TUNIC_BELT_COLOR } from "./dressMaterials";
 import "./clothingColorToolbar.css";
 
 const colorPresets = CHARACTER_APPEARANCE_OPTIONS.color.map(({ id, label, color }) => ({ label: id === "original" ? "White" : label, color }));
@@ -18,7 +19,9 @@ function PaletteRow({ label, group, children }: { label: string; group: string; 
   </div>;
 }
 
-function ColorRow({ label, value, onChange }: { label: string; value: string; onChange: (color: string) => void }) {
+function ColorRow({ label, value, onChange, onReset }: {
+  label: string; value: string; onChange: (color: string) => void; onReset?: () => void;
+}) {
   const customLabel = `Custom ${label.toLowerCase()} color`;
   return <PaletteRow label={label} group={`${label} color`}>
     {colorPresets.map(preset => <ColorSwatchButton key={preset.color} color={preset.color} className={presetClass}
@@ -26,6 +29,8 @@ function ColorRow({ label, value, onChange }: { label: string; value: string; on
       onClick={() => onChange(preset.color)} />)}
     <input type="color" aria-label={customLabel} title={customLabel} value={value}
       onChange={event => onChange(event.currentTarget.value)} />
+    {onReset && <button type="button" className="menu-control menu-panel-frame dressing-color-finish"
+      aria-label={`Reset ${label.toLowerCase()} color`} onClick={onReset}>Original</button>}
   </PaletteRow>;
 }
 
@@ -41,6 +46,8 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
   const focusPalette = useRef(false);
   const look = characterLook(choice)!;
   const gown = piece === "dress" && look.garments?.dress === HOODED_GOWN;
+  const utilityBelt = piece === "dress" && look.garments?.dress === BELTED_TUNIC;
+  const beltColor = utilityBelt ? look.appearance.item_colors?.[`${BELTED_TUNIC}:belt`]?.color : undefined;
   const gownDyes = gown ? hoodedGownColors(look) : undefined;
   const colors = clothingColors(look, piece);
   const underwear = isUnderwearPiece(piece) ? underwearColors(look, piece) : undefined;
@@ -115,6 +122,9 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
             aria-pressed={(colors?.finish ?? "original") === id}
             onClick={() => dye({ finish: id })}>{label}</button>)}
         </PaletteRow>}
+        {utilityBelt && <ColorRow label="Utility belt" value={beltColor ?? BELTED_TUNIC_BELT_COLOR}
+          onChange={color => onChange(withClothingColors(choice, "belt", { color }, BELTED_TUNIC))}
+          onReset={beltColor ? () => onChange(withClothingColors(choice, "belt", undefined, BELTED_TUNIC)) : undefined} />}
         {rows.map(({ key, label, value }) => <ColorRow key={key} label={label} value={value}
           onChange={color => dye(key === "color" && !profile && !underwear && !gown ? { color, accent: trim } : { [key]: color })} />)}
       </>}
