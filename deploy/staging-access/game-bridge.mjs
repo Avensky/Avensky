@@ -34,10 +34,13 @@ export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
       }, { once: true });
     });
   }
-  async function authenticate(login, password, name, device_token) {
-    const result = await request(name === undefined ? "check" : "register", { login, password, name, device_token });
+  async function profileRequest(action, fields) {
+    const result = await request(action, fields);
     if (!/^[a-f0-9]{32}$/i.test(result.profile_id ?? "")) throw Error("The game profile is unavailable.");
     return result.profile_id;
+  }
+  function authenticate(login, password, name, device_token) {
+    return profileRequest(name === undefined ? "check" : "register", { login, password, name, device_token });
   }
 
   async function registerEmail(email, password, deviceToken) {
@@ -54,6 +57,8 @@ export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
 
   return {
     authenticate,
+    recoveryProfile: login => profileRequest("recovery_profile", { login }),
+    resetPassword: (profile_id, login, password) => request("reset_password", { profile_id, login, password }),
     async enroll(email, password, deviceToken) {
       try {
         return await authenticate(email, password);

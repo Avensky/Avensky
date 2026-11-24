@@ -92,8 +92,10 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
   function signInPage(message, invite = false) {
     return invite ? page("Join the alpha", form("enroll", emailField
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
-      + passwordField(!game), game ? "Continue" : "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message, Boolean(game))
+      + passwordField(!game), game ? "Continue" : "Sign up") + `<nav><a href="${base}/sign-in">Log in</a>
+      <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, Boolean(game))
       : page("Log in", form("sign-in", emailField + passwordField(), "Log in")
+        + `<a href="${base}/forgot-password">Forgot password?</a>`
         + (game ? "<p>Use the email from your staging invitation and your Avensky game password. Open the invite first if you haven’t accepted it yet.</p>"
           : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
   }
@@ -104,7 +106,20 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
       + `<a href="${base}/sign-in">Back to log in</a>`, message, Boolean(game));
   }
 
-  function resetPage(message) {
+  function forgotPasswordPage(message) {
+    return page("Forgot password?", "<p>Use the email from your staging invitation. The staging operator sends reset links privately.</p>"
+      + form("forgot-password", emailField, "Request password reset")
+      + `<nav><a href="${base}/reset">I have a reset link</a><a href="${base}/sign-in">Log in</a></nav>`, message, Boolean(game));
+  }
+
+  function resetPage(message, verification) {
+    if (game) {
+      const contents = verification
+        ? form("reset", hideEmail(verification.email) + `<input type="hidden" name="reset" value="${escape(verification.code)}">`
+          + passwordField(true) + (verification.needsFactor ? codeField(true) : ""), "Set new password")
+        : form("reset/verify", emailField + linkField("reset", "Reset code"), "Continue") + readLinkFragment;
+      return page("Reset game password", contents + `<a href="${base}/forgot-password">Request a new link</a>`, message, true);
+    }
     return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
       + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField(), "Set new password")
       + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message);
@@ -112,16 +127,19 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
 
   function testerPage(viewer, message, extra = "") {
     if (!viewer?.admin) return page("Access denied", '<a href="/">Return to staging</a>');
-    const { testers, invites } = accounts.list();
+    const { testers, invites, resetRequests } = accounts.list();
     const fields = game
       ? emailField + '<details><summary>Preserve a legacy username</summary><label>Existing game username<input name="gameLogin" maxlength="24"></label></details>'
       : emailField;
+    const requests = resetRequests.length ? `<h2>Password reset requests</h2>
+<p>Verify the player's identity before issuing a private reset link on the staging server.</p>
+<ul>${resetRequests.map(({ email }) => `<li>${escape(email)}</li>`).join("")}</ul>` : "";
     return page("Alpha testers", `<nav><a href="/">Enter staging</a><a href="${base}/account">Account</a></nav>
 ${form("testers/invite", fields, mailInvite ? "Send invite" : "Create invite")}${extra}
 <h2>Testers</h2><ul>${testers.map(t => `<li>${escape(t.email)} · ${t.admin ? "Admin" : t.revoked ? "Revoked" : "Active"}${t.has_mfa ? " · 2FA" : ""}
 ${t.admin ? "" : form(t.revoked ? "testers/restore" : "testers/revoke", hideEmail(t.email), t.revoked ? "Grant access" : "Revoke access")}</li>`).join("")}</ul>
 <h2>Pending invitations</h2><ul>${invites.map(i => `<li>${escape(i.email)} · Expires ${new Date(i.expires * 1000).toISOString().slice(0, 10)}
-${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}</ul>`, message);
+${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}</ul>${requests}`, message);
   }
 
   return createServer({ requestTimeout: 12000, headersTimeout: 7000, maxHeaderSize: 8192 }, async (req, res) => {
@@ -197,7 +215,8 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         }`, { "Content-Type": "text/javascript; charset=utf-8" });
       if (path === base + "/sign-in") return viewer ? redirect(base + "/account") : send(200, signInPage());
       if (path === base + "/enroll") return send(200, signInPage("", true));
-      if (path === base + "/reset" && !game) return send(200, resetPage());
+      if (path === base + "/forgot-password") return send(200, forgotPasswordPage());
+      if (path === base + "/reset") return send(200, resetPage());
       if (path === base + "/account") return viewer ? send(200, page("Account", securityPage(viewer))) : redirect(base + "/sign-in");
       if (path === base + "/testers") return send(viewer?.admin ? 200 : 403, testerPage(viewer));
       return send(404);
@@ -209,6 +228,7 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
     const client = req.headers["x-alpha-client"] ?? req.socket.remoteAddress;
     if (!admit(client)) return send(429, page("Try again shortly", `<a href="${base}/sign-in">Log in</a>`), { "Retry-After": "60" });
     active++;
+    let resetInput;
     try {
       const value = await readForm(req);
       if (path === base + "/sign-in") {
@@ -225,9 +245,22 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       }
       if (path === base + "/enroll") return redirect(game ? "/" : base + "/account",
         await accounts.enroll(value("email"), value("invite").trim(), value("password"), value("deviceToken")));
-      if (path === base + "/reset" && !game) {
-        await accounts.resetPassword(value("email"), value("reset").trim(), value("password"), value("code").trim());
-        return redirect(base + "/sign-in", "");
+      if (path === base + "/forgot-password") {
+        accounts.requestPasswordReset(value("email"));
+        return send(200, page("Request received", "<p>If the email matches a staging account, the staging operator can send you a private reset link.</p>"
+          + `<a href="${base}/sign-in">Log in</a>`, "", Boolean(game)));
+      }
+      if (game && path === base + "/reset/verify") {
+        const code = value("reset").trim();
+        return send(200, resetPage("", { ...accounts.inspectGamePasswordReset(value("email"), code), code }));
+      }
+      if (path === base + "/reset") {
+        resetInput = { email: value("email"), code: value("reset").trim() };
+        await accounts.resetPassword(resetInput.email, resetInput.code, value("password"), value("code").trim());
+        return game ? send(200, page("Password updated", "<p>Use your new password to sign in. If you still have an invitation to accept, open the invite first.</p>"
+          + `<a href="${base}/sign-in">Log in</a>`, "", true), {
+          "Set-Cookie": `${cookieName}=; Max-Age=0; ${cookieFlags}`,
+        }) : redirect(base + "/sign-in", "");
       }
       if (!viewer) return send(403);
       if (path === base + "/sign-out") {
@@ -269,7 +302,16 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
       if (path === base + "/sign-in" || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
-      if (path === base + "/reset") return send(400, resetPage(message));
+      if (path === base + "/forgot-password") return send(400, forgotPasswordPage(message));
+      if (path === base + "/reset" || path === base + "/reset/verify") {
+        let verification;
+        if (game && resetInput) {
+          try {
+            verification = { ...accounts.inspectGamePasswordReset(resetInput.email, resetInput.code), code: resetInput.code };
+          } catch {}
+        }
+        return send(400, resetPage(message, verification));
+      }
       if (path?.startsWith(base + "/testers/")) return send(400, testerPage(viewer, message));
       return send(400, page("Account", viewer ? securityPage(viewer) : "", message));
     } finally { active--; }
@@ -314,7 +356,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
       } else if (command === "reset-password" && email && (!option || option === "--email") && !optionValue && !extra.length) {
         const mail = option === "--email" ? configuredMail() : undefined;
         if (option === "--email" && !mail) throw Error("Configure the portal mail relay before using --email.");
-        const reset = accounts.issuePasswordReset(email);
+        const reset = await accounts.issuePasswordReset(email);
         const url = origin + base + "/reset#" + reset.code;
         if (option === "--email") {
           await mail(reset.email, "Reset your Avensky alpha password", `${url}\n\nThis one-use link expires in 30 minutes.`);

@@ -16,6 +16,7 @@ const INVITE_AGE = 3 * 24 * 60 * 60;
 const RESET_AGE = 30 * 60;
 const SIGN_IN_AGE = 5 * 60;
 const SIGN_IN_ATTEMPTS = 5;
+const resetDenied = () => Error("The reset link or authentication code is invalid or expired.");
 
 export function emailAddress(value) {
   const email = value.trim().toLowerCase();
@@ -92,6 +93,13 @@ export function testerAccounts(path, key, game) {
     CREATE TABLE IF NOT EXISTS password_resets (
       email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL, expires INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS game_password_resets (
+      email TEXT PRIMARY KEY, digest TEXT NOT NULL, expires INTEGER NOT NULL,
+      profile_id TEXT NOT NULL, login TEXT NOT NULL, attempts INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS password_reset_requests (
+      email TEXT PRIMARY KEY, requested_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS game_profiles (
       email TEXT PRIMARY KEY REFERENCES testers(email), profile_id TEXT NOT NULL UNIQUE, login TEXT NOT NULL
     );
@@ -104,6 +112,14 @@ export function testerAccounts(path, key, game) {
   const all = sql => db.prepare(sql).all();
   const tester = email => get("SELECT * FROM testers WHERE email = ?", email);
   const gameProfile = email => get("SELECT profile_id, login FROM game_profiles WHERE email = ?", email);
+  const credentialOperations = new Set();
+  async function withCredentials(email, task) {
+    const login = (game && resetIdentity(email)?.login) || email;
+    if (credentialOperations.has(login)) throw Error("Another account request is in progress. Try again shortly.");
+    credentialOperations.add(login);
+    try { return await task(); }
+    finally { credentialOperations.delete(login); }
+  }
   function transaction(task) {
     db.exec("BEGIN IMMEDIATE");
     try { const result = task(); db.exec("COMMIT"); return result; }
@@ -151,6 +167,24 @@ export function testerAccounts(path, key, game) {
     return step !== undefined
       && run("UPDATE testers SET last_step = ? WHERE email = ? AND last_step < ?", step, record.email, step).changes === 1;
   }
+  function resetIdentity(email) {
+    const record = tester(email);
+    if (record) return record.revoked ? undefined : gameProfile(email);
+    const invite = get(`SELECT g.login FROM invitations i JOIN invite_game_logins g ON g.digest = i.digest
+      WHERE i.email = ? AND i.expires > ?`, email, now());
+    return { login: invite?.login ?? email };
+  }
+  function pendingGameReset(email, code) {
+    if (!/^[0-9a-f]{64}$/.test(code)) throw resetDenied();
+    const reset = get(`SELECT * FROM game_password_resets
+      WHERE email = ? AND digest = ? AND expires > ? AND attempts > 0`, email, hash(code), now());
+    const identity = resetIdentity(email);
+    if (!reset || reset.login !== identity?.login ||
+        (identity.profile_id && identity.profile_id !== reset.profile_id)) throw resetDenied();
+    const owner = get("SELECT email FROM game_profiles WHERE profile_id = ?", reset.profile_id);
+    if (owner && owner.email !== email) throw resetDenied();
+    return reset;
+  }
   return {
     close: () => db.close(),
     viewer(value) {
@@ -182,51 +216,55 @@ export function testerAccounts(path, key, game) {
     },
     async enroll(raw, code, password, savedDevice) {
       const email = emailAddress(raw);
-      if (!/^[0-9a-f]{64}$/.test(code)) throw Error("Enter the invitation code from your email.");
-      const digest = hash(code);
-      const invitation = () => get(`SELECT i.*, g.login AS game_login
-        FROM invitations i LEFT JOIN invite_game_logins g ON g.digest = i.digest
-        WHERE i.digest = ? AND i.email = ? AND i.expires > ?`, digest, email, now());
-      const pending = invitation();
-      if (!pending) throw Error("The invitation is invalid or expired.");
-      let link;
-      let salt = "", passwordDigest = "";
-      if (game) {
-        const login = pending.game_login || email;
-        const deviceToken = /^[a-f0-9]{64}$/i.test(savedDevice ?? "") ? savedDevice : undefined;
-        const profileId = pending.game_login
-          ? await game.authenticate(login, password)
-          : await game.enroll(email, password, deviceToken);
-        link = { profileId, login };
-      } else {
-        [salt, passwordDigest] = await newPasswordRecord(password);
-      }
-      return transaction(() => {
-        const invite = invitation();
-        if (!invite || tester(email)) throw Error("The invitation is invalid or expired.");
-        if (link && get("SELECT 1 FROM game_profiles WHERE profile_id = ?", link.profileId))
-          throw Error("This game account already has staging access.");
-        run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt, passwordDigest, invite.admin);
-        if (link) run("INSERT INTO game_profiles (email, profile_id, login) VALUES (?, ?, ?)", email, link.profileId, link.login);
-        run("DELETE FROM invitations WHERE digest = ?", digest);
-        return session(email);
+      return withCredentials(email, async () => {
+        if (!/^[0-9a-f]{64}$/.test(code)) throw Error("Enter the invitation code from your email.");
+        const digest = hash(code);
+        const invitation = () => get(`SELECT i.*, g.login AS game_login
+          FROM invitations i LEFT JOIN invite_game_logins g ON g.digest = i.digest
+          WHERE i.digest = ? AND i.email = ? AND i.expires > ?`, digest, email, now());
+        const pending = invitation();
+        if (!pending) throw Error("The invitation is invalid or expired.");
+        let link;
+        let salt = "", passwordDigest = "";
+        if (game) {
+          const login = pending.game_login || email;
+          const deviceToken = /^[a-f0-9]{64}$/i.test(savedDevice ?? "") ? savedDevice : undefined;
+          const profileId = pending.game_login
+            ? await game.authenticate(login, password)
+            : await game.enroll(email, password, deviceToken);
+          link = { profileId, login };
+        } else {
+          [salt, passwordDigest] = await newPasswordRecord(password);
+        }
+        return transaction(() => {
+          const invite = invitation();
+          if (!invite || tester(email)) throw Error("The invitation is invalid or expired.");
+          if (link && get("SELECT 1 FROM game_profiles WHERE profile_id = ?", link.profileId))
+            throw Error("This game account already has staging access.");
+          run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt, passwordDigest, invite.admin);
+          if (link) run("INSERT INTO game_profiles (email, profile_id, login) VALUES (?, ?, ?)", email, link.profileId, link.login);
+          run("DELETE FROM invitations WHERE digest = ?", digest);
+          return session(email);
+        });
       });
     },
     async beginSignIn(raw, password) {
       const email = emailAddress(raw);
-      const record = tester(email);
-      const denied = () => Error("The email or password is incorrect, or your staging invitation has not been accepted.");
-      if (!await validPassword(record, password)) throw denied();
-      return transaction(() => {
-        const current = tester(email);
-        if (!current || current.revoked || current.password !== record.password) throw denied();
-        if (!current.mfa) return { session: session(email) };
-        const challenge = token();
-        run("DELETE FROM sign_in_challenges WHERE expires <= ?", now());
-        const pending = get(`INSERT INTO sign_in_challenges (email, digest, expires, attempts) VALUES (?, ?, ?, ?)
-          ON CONFLICT(email) DO UPDATE SET digest = excluded.digest RETURNING attempts`,
-          email, hash(challenge), now() + SIGN_IN_AGE, SIGN_IN_ATTEMPTS);
-        return pending.attempts ? { challenge } : { locked: true };
+      return withCredentials(email, async () => {
+        const record = tester(email);
+        const denied = () => Error("The email or password is incorrect, or your staging invitation has not been accepted.");
+        if (!await validPassword(record, password)) throw denied();
+        return transaction(() => {
+          const current = tester(email);
+          if (!current || current.revoked || current.password !== record.password) throw denied();
+          if (!current.mfa) return { session: session(email) };
+          const challenge = token();
+          run("DELETE FROM sign_in_challenges WHERE expires <= ?", now());
+          const pending = get(`INSERT INTO sign_in_challenges (email, digest, expires, attempts) VALUES (?, ?, ?, ?)
+            ON CONFLICT(email) DO UPDATE SET digest = excluded.digest RETURNING attempts`,
+            email, hash(challenge), now() + SIGN_IN_AGE, SIGN_IN_ATTEMPTS);
+          return pending.attempts ? { challenge } : { locked: true };
+        });
       });
     },
     completeSignIn(challenge, code) {
@@ -249,31 +287,78 @@ export function testerAccounts(path, key, game) {
         return {};
       });
     },
-    issuePasswordReset(raw) {
-      if (game) throw Error("This portal uses the game account password.");
+    requestPasswordReset(raw) {
+      const email = emailAddress(raw);
+      transaction(() => {
+        run("DELETE FROM password_reset_requests WHERE requested_at <= ?", now() - INVITE_AGE);
+        run("INSERT OR IGNORE INTO password_reset_requests VALUES (?, ?)", email, now());
+        run(`DELETE FROM password_reset_requests WHERE email IN
+          (SELECT email FROM password_reset_requests ORDER BY requested_at DESC, rowid DESC LIMIT -1 OFFSET 250)`);
+      });
+    },
+    async issuePasswordReset(raw) {
       const email = emailAddress(raw);
       const code = token();
+      if (game) {
+        const identity = resetIdentity(email);
+        if (!identity) throw Error("This email has no active staging access.");
+        const profileId = await game.recoveryProfile(identity.login);
+        transaction(() => {
+          const current = resetIdentity(email);
+          const owner = get("SELECT email FROM game_profiles WHERE profile_id = ?", profileId);
+          if (current?.login !== identity.login || (current.profile_id && current.profile_id !== profileId) ||
+              (owner && owner.email !== email)) throw Error("The account does not match this email.");
+          run("DELETE FROM game_password_resets WHERE expires <= ? OR profile_id = ?", now(), profileId);
+          run("INSERT OR REPLACE INTO game_password_resets VALUES (?, ?, ?, ?, ?, ?)",
+            email, hash(code), now() + RESET_AGE, profileId, current.login, SIGN_IN_ATTEMPTS);
+          run("DELETE FROM password_reset_requests WHERE email = ?", email);
+        });
+        return { email, code };
+      }
       transaction(() => {
         const record = tester(email);
         if (!record || record.revoked) throw Error("There is no active alpha portal account for that email.");
         run("DELETE FROM password_resets WHERE expires <= ?", now());
         run("INSERT OR REPLACE INTO password_resets (email, digest, expires) VALUES (?, ?, ?)",
           email, hash(code), now() + RESET_AGE);
+        run("DELETE FROM password_reset_requests WHERE email = ?", email);
       });
       return { email, code };
     },
-    async resetPassword(raw, code, password, factor) {
-      if (game) throw Error("This portal uses the game account password.");
+    inspectGamePasswordReset(raw, code) {
       const email = emailAddress(raw);
-      const denied = () => Error("The reset link or authentication code is invalid or expired.");
-      if (!/^[0-9a-f]{64}$/.test(code)) throw denied();
+      pendingGameReset(email, code);
+      return { email, needsFactor: Boolean(tester(email)?.mfa) };
+    },
+    async resetPassword(raw, code, password, factor) {
+      const email = emailAddress(raw);
+      if (game) return withCredentials(email, async () => {
+        const length = [...password].length;
+        if (length < 15 || length > 128 || Buffer.byteLength(password) > 512)
+          throw Error("Choose a password with 15–128 characters.");
+        const reset = transaction(() => {
+          const pending = pendingGameReset(email, code);
+          const record = tester(email);
+          if (record?.mfa && !verifySecondFactor(record, factor)) {
+            run("UPDATE game_password_resets SET attempts = attempts - 1 WHERE email = ?", email);
+            return;
+          }
+          run("DELETE FROM game_password_resets WHERE email = ?", email);
+          run("DELETE FROM sessions WHERE email = ?", email);
+          run("DELETE FROM sign_in_challenges WHERE email = ?", email);
+          return pending;
+        });
+        if (!reset) throw resetDenied();
+        await game.resetPassword(reset.profile_id, reset.login, password);
+      });
+      if (!/^[0-9a-f]{64}$/.test(code)) throw resetDenied();
       const digest = hash(code);
       const pending = () => get("SELECT 1 FROM password_resets WHERE email = ? AND digest = ? AND expires > ?", email, digest, now());
-      if (!pending()) throw denied();
+      if (!pending()) throw resetDenied();
       const [salt, passwordDigest] = await newPasswordRecord(password);
       transaction(() => {
         const record = tester(email);
-        if (!pending() || !record || record.revoked || !verifySecondFactor(record, factor)) throw denied();
+        if (!pending() || !record || record.revoked || !verifySecondFactor(record, factor)) throw resetDenied();
         run("UPDATE testers SET salt = ?, password = ? WHERE email = ?", salt, passwordDigest, email);
         run("DELETE FROM sessions WHERE email = ?", email);
         run("DELETE FROM sign_in_challenges WHERE email = ?", email);
@@ -284,6 +369,7 @@ export function testerAccounts(path, key, game) {
       return {
         testers: all("SELECT email, admin, revoked, mfa IS NOT NULL AS has_mfa FROM testers ORDER BY email"),
         invites: db.prepare("SELECT email, expires FROM invitations WHERE expires > ? ORDER BY email").all(now()),
+        resetRequests: db.prepare("SELECT email FROM password_reset_requests WHERE requested_at > ? ORDER BY requested_at DESC").all(now() - INVITE_AGE),
       };
     },
     revoke(raw) {
@@ -292,6 +378,7 @@ export function testerAccounts(path, key, game) {
         if (tester(email)?.admin) throw Error("Manage administrator access through the server operator.");
         run("DELETE FROM invitations WHERE email = ?", email);
         run("DELETE FROM password_resets WHERE email = ?", email);
+        run("DELETE FROM game_password_resets WHERE email = ?", email);
         run("DELETE FROM sessions WHERE email = ?", email);
         run("DELETE FROM sign_in_challenges WHERE email = ?", email);
         run("UPDATE testers SET revoked = 1 WHERE email = ?", email);

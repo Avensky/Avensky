@@ -142,7 +142,7 @@ test("authenticator enrollment requires the password and recovery codes are one-
   pending = await accounts.beginSignIn(invite.email, password);
   assert.deepEqual(accounts.completeSignIn(pending.challenge, codes[0]), { locked: true });
   assert.deepEqual(await accounts.beginSignIn(invite.email, password), { locked: true });
-  const reset = accounts.issuePasswordReset(invite.email);
+  const reset = await accounts.issuePasswordReset(invite.email);
   await assert.rejects(accounts.resetPassword(reset.email, reset.code, newPassword, ""));
   await accounts.resetPassword(reset.email, reset.code, newPassword, codes[1]);
   assert.deepEqual(accounts.completeSignIn(pending.challenge, codes[2]), {});
@@ -159,9 +159,9 @@ test("a reset link replaces the admin password once and invalidates old sessions
 
   const admin = accounts.issueInvite("operator@example.net", true);
   const session = await accounts.enroll(admin.email, admin.code, password);
-  assert.throws(() => accounts.issuePasswordReset("unknown@example.net"));
-  const oldReset = accounts.issuePasswordReset(admin.email);
-  const reset = accounts.issuePasswordReset(admin.email);
+  await assert.rejects(accounts.issuePasswordReset("unknown@example.net"));
+  const oldReset = await accounts.issuePasswordReset(admin.email);
+  const reset = await accounts.issuePasswordReset(admin.email);
   const url = `http://127.0.0.1:${server.address().port}/__alpha/reset`;
   const page = await fetch(url);
   assert.equal(page.headers.get("referrer-policy"), "same-origin");
@@ -286,4 +286,81 @@ test("a moderator can preserve a legacy profile without presenting a second logi
   assert.equal(accounts.viewer(session).game_profile, profile);
   const returning = (await accounts.beginSignIn(invite.email, password)).session;
   assert.equal(accounts.viewer(returning).game_profile, profile);
+});
+
+test("private game reset links preserve the profile and require a separate invitation", async t => {
+  const email = "driver@example.net";
+  const profileId = "a".repeat(32);
+  let currentPassword = password;
+  const game = {
+    async recoveryProfile(login) {
+      if (login !== email) throw Error("No game account was found for this login.");
+      return profileId;
+    },
+    async authenticate(login, attempted) {
+      if (login !== email || attempted !== currentPassword) throw Error(LOGIN_FAILED);
+      return profileId;
+    },
+    enroll(login, attempted) { return this.authenticate(login, attempted); },
+    async resetPassword(id, login, next) {
+      assert.equal(id, profileId);
+      assert.equal(login, email);
+      currentPassword = next;
+    },
+    async serverId() { return "b".repeat(32); },
+  };
+  const accounts = testerAccounts(":memory:", randomBytes(32), game);
+  const server = createPortal({ origin, accounts, game });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); accounts.close(); });
+  const url = `http://127.0.0.1:${server.address().port}/__alpha/`;
+  const post = (path, fields) => fetch(url + path, {
+    method: "POST", redirect: "manual", headers: { origin }, body: new URLSearchParams(fields),
+  });
+  assert.match(await (await fetch(url + "sign-in")).text(), /Forgot password\?/);
+  assert.match(await (await fetch(url + "enroll")).text(), /Forgot password\?/);
+  assert.match(await (await fetch(url + "forgot-password")).text(), /Request password reset/);
+  const known = await post("forgot-password", { email });
+  const unknown = await post("forgot-password", { email: "other@example.net" });
+  assert.equal(known.status, 200);
+  assert.equal(await known.text(), await unknown.text());
+  assert.deepEqual(accounts.list().resetRequests.map(request => request.email).sort(), [email, "other@example.net"]);
+  assert.equal((await fetch(url + "testers")).status, 403);
+  await assert.rejects(accounts.issuePasswordReset("other@example.net"), /No game account/);
+
+  const expired = await accounts.issuePasswordReset(email);
+  const active = await accounts.issuePasswordReset(email);
+  assert.throws(() => accounts.inspectGamePasswordReset(email, expired.code), /invalid or expired/);
+  const reset = { email, reset: active.code };
+  const verify = await post("reset/verify", reset);
+  assert.equal(verify.status, 200);
+  const form = await verify.text();
+  assert.match(form, /Set new password/);
+  assert.doesNotMatch(form, /name="code"/);
+  const completed = await post("reset", { ...reset, password: newPassword });
+  assert.equal(completed.status, 200);
+  assert.match(await completed.text(), /Password updated/);
+  assert.equal((await post("reset", { ...reset, password })).status, 400);
+  assert.equal((await post("sign-in", { email, password: newPassword })).status, 400);
+
+  const invite = accounts.issueInvite(email);
+  const session = await accounts.enroll(email, invite.code, newPassword);
+  assert.equal(accounts.viewer(session).game_profile, profileId);
+  const encoded = await accounts.beginMfa(accounts.viewer(session), newPassword);
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const bits = [...encoded].map(letter => alphabet.indexOf(letter).toString(2).padStart(5, "0")).join("");
+  const seed = Buffer.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
+  const codes = accounts.enableMfa(accounts.viewer(session), totp(seed, Math.floor(Date.now() / 30000)));
+  const enrolled = await accounts.issuePasswordReset(email);
+  const enrolledReset = { email, reset: enrolled.code, password };
+  assert.match(await (await post("reset/verify", enrolledReset)).text(), /Authenticator or recovery code/);
+  assert.equal((await post("reset", enrolledReset)).status, 400);
+  assert.equal((await post("reset", { ...enrolledReset, code: codes[0] })).status, 200);
+  assert.equal(accounts.viewer(session), undefined);
+  await assert.rejects(accounts.beginSignIn(email, newPassword), /password is incorrect/);
+  const { challenge } = await accounts.beginSignIn(email, password);
+  assert.deepEqual(accounts.completeSignIn(challenge, codes[0]), { challenge });
+  const returning = accounts.completeSignIn(challenge, codes[1]).session;
+  assert.equal(accounts.viewer(returning).game_profile, profileId);
 });

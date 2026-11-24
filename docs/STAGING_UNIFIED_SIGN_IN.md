@@ -26,7 +26,7 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 
 ## Invite and existing account behavior
 
-- A manager issues an expiring, single-use invite. Send its link privately or use an optional email relay. The invite approves the intended account for staging.
+- A manager issues an expiring, single-use invite and sends its link privately. The invite approves the intended account for staging.
 - Each player accepts the invite using their email and one password. A new email creates a game account. Use the existing game password if the email already has an account to keep its profile and saves. Returning players go straight to character selection.
 - Sign-in starts with email and password. A password visibility button lets players check their typing on mobile. Accounts with two-factor authentication enabled receive a separate authenticator or recovery-code prompt after their password is verified. The prompt expires after five minutes. Staging currently uses authenticator apps and one-use recovery codes for 2FA.
 - Open the invite in the original browser to retain a saved guest profile. The invite can upgrade an available guest profile to the invited email.
@@ -34,6 +34,24 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 - The staging signup path requires an invite. Revoking alpha access blocks new sessions and private model requests and disconnects the active game session. The player profile and saves are retained.
 
 The unified portal stores admissions in `/var/lib/avensky-alpha/game-access.sqlite3`. The previous preview database is available for rollback. A portal session created when the player accepts an invite also authenticates their game connection. The two public media aliases in the Caddy template serve the purple flare during sign-in. The app, models, and multiplayer endpoint use the same invite gate.
+
+## Recover a staging game password
+
+1. Select **Forgot password?** and submit the email used for the staging invitation. Portal administrators can see recent requests under **Alpha testers**.
+2. After verifying the player's identity, the staging operator issues a one-use reset link from Vultr and sends it privately. Links expire after 30 minutes. Issuing a replacement invalidates any earlier link for that game profile.
+
+   ```sh
+   read -r -p 'Verified staging email: ' alpha_email
+   systemd-run --wait --pipe --quiet --uid=avensky-alpha \
+     -p EnvironmentFile=/etc/avensky/staging-alpha.env \
+     --setenv=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha \
+     /usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs reset-password "$alpha_email"
+   ```
+
+3. Open the link in your browser, enter the same email, and choose a new password. The form asks for an authenticator or recovery code if you enabled 2FA. The game server changes the password on the existing profile and ends prior sessions.
+4. If staging admission is still pending or expired, accept a valid invitation with the new password. For an invite-only guest without a game password, start with a fresh invite in the browser that has the guest save.
+
+Use the updated staging Rust game image before installing the updated portal modules. The recovery commands use the existing private staging bridge. The portal stores request emails and hashed reset tokens. The game server writes only the new credential record into the existing profile. If the bridge fails during redemption, issue a fresh link after resolving the service error.
 
 ## Vultr cutover
 
