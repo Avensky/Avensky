@@ -512,9 +512,9 @@ export function prepareWardrobeGarments(
     for (const { geometry } of skirtSurfaces) geometry.dispose();
     for (const mesh of garmentMeshes) {
       const lining = mesh.userData.wardrobeRole === "shorts";
-      const fit = fitTop ?? fitSkirt ?? fitSocks ?? (lining ? undefined : fitShortSkirt ?? fitDress?.fit);
+      const fit = fitTop ?? fitSkirt ?? fitSocks ?? (lining ? undefined : fitShortSkirt);
       const source = mesh.geometry;
-      const fitted = fit?.(source);
+      const fitted = fit?.(source) ?? (lining ? undefined : fitDress?.fit(source, mesh.name));
       if (fitted) {
         if (fitShortSkirt && mesh.userData.wardrobePart === "fabric") rebuildShortSkirtFabricNormals(mesh.geometry, fitted);
         mesh.geometry = fitted;
