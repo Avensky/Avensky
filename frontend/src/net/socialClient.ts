@@ -174,6 +174,13 @@ export function selectAccount(credentials: AccountCredentials, name?: string) {
   return identifyProfile(name, "new-device", credentials);
 }
 export async function signOutPlayerProfile() {
+  if (useSocialStore.getState().stagingSignIn) {
+    const response = await fetch("/__alpha/sign-out", { method: "POST", body: new URLSearchParams(), redirect: "manual" });
+    if (response.type !== "opaqueredirect" && response.status !== 303 && response.status !== 403)
+      throw new Error("The staging account could not sign out. Try again.");
+    window.location.assign("/__alpha/sign-in");
+    return;
+  }
   const generation = connectionGeneration;
   const key = identityKey;
   const saved = readIdentity();
@@ -197,18 +204,20 @@ export async function signOutPlayerProfile() {
 export async function createTabProfile() {
   await identifyProfile("DRIVER 2", "new-tab");
 }
-export function beginSocialSession(serverId: unknown, onFailure?: () => void, accounts = false, bodyTattoos = false) {
+export function beginSocialSession(serverId: unknown, onFailure?: () => void, accounts = false, bodyTattoos = false, stagingSignIn = false) {
   if (initialized || typeof serverId !== "string") return;
   initialized = true;
   identityKey = `avenlab-social-profile-v1:${serverId}`;
-  const saved = readIdentity();
+  const saved = stagingSignIn ? null : readIdentity();
   useSocialStore.setState({
     available: true,
     accountsAvailable: accounts,
+    stagingSignIn,
+    ...(stagingSignIn ? { registeredProfile: true } : {}),
     bodyTattoosAvailable: bodyTattoos,
-    profileScope: saved?.scope ?? null,
-    profileStatus: saved ? "restoring" : "idle",
-    message: saved ? "Restoring your player profile…" : "Sign in on this device or continue as a guest.",
+    profileScope: stagingSignIn ? "device" : saved?.scope ?? null,
+    profileStatus: saved || stagingSignIn ? "restoring" : "idle",
+    message: saved || stagingSignIn ? "Restoring your player profile…" : "Sign in on this device or continue as a guest.",
   });
   if (saved) void identifySocial().catch(() => onFailure?.());
 }

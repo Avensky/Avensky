@@ -352,11 +352,24 @@ export function getInputSenderStats() {
   };
 }
 
+let useStagingGateway = false;
+
+export async function startRustConnection(signal: AbortSignal) {
+  if (import.meta.env.MODE === "staging" && window.location.origin === "https://staging.avensky.com") {
+    try {
+      const response = await fetch("/__alpha/game-connection", { cache: "no-store", signal: AbortSignal.timeout(2500) });
+      if (signal.aborted) return;
+      useStagingGateway = response.status === 204 && response.headers.get("X-Avensky-Game-Connection") === "same-origin";
+    } catch { /* Older staging releases still use the configured endpoint. */ }
+  }
+  if (!signal.aborted) connectRustServer();
+}
+
 function getRustWsUrl() {
   return resolveRustWebSocketUrl({
     mode: import.meta.env.MODE,
     deployment: import.meta.env.VITE_DEPLOY_ENV,
-    configuredUrl: import.meta.env.VITE_RUST_WS_URL,
+    configuredUrl: useStagingGateway ? "wss://staging.avensky.com/ws/" : import.meta.env.VITE_RUST_WS_URL,
     pageUrl: window.location.href,
   });
 }
@@ -455,7 +468,8 @@ export function connectRustServer(): WebSocket {
   clearSession();
   let snapshotVersion=2;
   const decoder = new SnapshotDecoder();
-  const connection = new WebSocket(getRustWsUrl());
+  const url = getRustWsUrl();
+  const connection = new WebSocket(url);
   socket = connection;
   let pendingResult: unknown;
   // Old callbacks cannot clear or close the replacement session.
@@ -463,6 +477,12 @@ export function connectRustServer(): WebSocket {
 
   const handleLoss = () => {
     if (!isCurrent()) return;
+    if (useStagingGateway) {
+      void fetch("/__alpha/verify", { cache: "no-store" }).then(response => {
+        if (response.status === 401 && reconnectEnabled && (!socket || socket.readyState !== WebSocket.OPEN))
+          window.location.assign("/__alpha/sign-in");
+      }).catch(() => { /* The normal reconnect flow handles network loss. */ });
+    }
     resetHub();
     resetHubControls();
     loginRecovery = null;
@@ -599,7 +619,7 @@ export function connectRustServer(): WebSocket {
           // A half-open old socket may still own the profile. Retry only while
           // this tab is recovering a deployment, within its original deadline.
           if(resumeIntent)retrySocket();
-        }, message.player_accounts === true, message.body_tattoos === true);
+        }, message.player_accounts === true, message.body_tattoos === true, message.staging_sign_in === true);
         return;
       case "match_result":
         if(!receiveMatchResult(message.data)&&!useSocialStore.getState().view)pendingResult=message.data;

@@ -147,6 +147,22 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>reply(select,{profile:saved}));
     assert.equal(ui.getState().screen,"main");
     assert.deepEqual(selectEquippedCharacter(social.getState()),fox);
+    const previouslySent = sent.length;
+    await act(async () => {
+      localStorage.setItem("avenlab-social-profile-v1:unified-test", JSON.stringify({ id: "older-device", token, name: "Older guest" }));
+      client.setSocialConnection(socket);
+      client.beginSocialSession("unified-test", undefined, true, true, true);
+      ui.setState({ screen: "welcome" });
+      root.render(createElement(WelcomeScreen, { key: "shared-sign-in" }));
+      client.receiveSocialState({ ...view, profile: saved });
+    });
+    assert.equal(sent.length, previouslySent, "a staged session skips old device credentials and a second login");
+    assert.equal(button("Log in"), undefined);
+    assert.match(document.querySelector(".welcome-character").textContent, /Track Fox/);
+    assert.deepEqual(selectEquippedCharacter(social.getState()), fox);
+    await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
+    assert.ok(document.querySelector('[name="characterName"]'));
+    assert.equal(button("Log in"), undefined);
   } finally {
     await act(async()=>root.unmount());
     await vite.close();

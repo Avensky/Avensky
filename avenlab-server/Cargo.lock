@@ -65,6 +65,7 @@ dependencies = [
  "avenlab-physics",
  "bitflags",
  "futures",
+ "hmac",
  "nalgebra 0.32.6",
  "rand",
  "rapier3d",
@@ -72,6 +73,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "tokio",
  "tokio-tungstenite",
  "tungstenite",
@@ -482,6 +484,15 @@ checksum = "0bfb9eb618601c89945a70e254898da93b13be0388091d42117462b265bb3fad"
 dependencies = [
  "hash32",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
 ]
 
 [[package]]

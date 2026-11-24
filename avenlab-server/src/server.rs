@@ -34,6 +34,7 @@ pub struct Server {
     pub runtimes: Mutex<HashMap<usize, Runtime>>,
     path: PathBuf,
     accounts: Option<AccountAccess>,
+    staging_disconnects: Mutex<HashMap<String, u64>>,
     pub max_active_worlds: usize,
     pub max_players: usize,
 }
@@ -84,6 +85,7 @@ impl Server {
             runtimes: Mutex::new(HashMap::new()),
             path,
             accounts,
+            staging_disconnects: Mutex::new(HashMap::new()),
             max_active_worlds: limit("AVENLAB_MAX_ACTIVE_WORLDS", 3, 16),
             max_players: limit("AVENLAB_MAX_PLAYERS", 24, 160),
         })
@@ -717,6 +719,7 @@ mod authoring;
 mod alpha_sessions;
 mod characters;
 mod identity;
+mod staging_sign_in;
 mod matches;
 mod revival;
 mod guard;

@@ -16,6 +16,7 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
   const available = useSocialStore(state => state.available);
   const status = useSocialStore(state => state.profileStatus);
   const registered = useSocialStore(state => state.registeredProfile);
+  const stagingSignIn = useSocialStore(state => state.stagingSignIn);
   const message = useSocialStore(state => state.message);
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -108,6 +109,8 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
       {!available && <p role="status">Connect to the game server to sign in.</p>}
       {error && <p role="alert">{error}</p>}
       <div className="main-menu-profile-options">
+        {stagingSignIn && <button type="button" className="menu-control menu-panel-frame"
+          onClick={() => window.location.assign("/__alpha/account")}>Account</button>}
         {PLAYER_ONBOARDING && !registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => useUIStore.getState().setScreen("welcome")}>Player options</button>}
         {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
