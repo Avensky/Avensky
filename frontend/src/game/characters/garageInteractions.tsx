@@ -250,13 +250,19 @@ export function chairSitClip(root: Object3D, seat: Object3D | undefined): Emote 
   const turn = Math.atan2(forward.x, forward.z);
   if (Math.abs(turn) > Math.PI / 2) return undefined;
   const sit = posePackEmote("pose-mh-poses01-callharvey3d_sittingdefault")?.keys[0][1];
+  const handsOverLap = root.userData.longGown === true ? {
+    left: [[.27, -.94, .2], [-.24, -.13, .96]],
+    right: [[-.27, -.94, .2], [.24, -.13, .96]],
+    leftPalm: [[-.17, -.08, .98], [-.1, -.98, -.08]],
+    rightPalm: [[.17, -.08, .98], [.1, -.98, -.08]],
+  } as const : undefined;
   return {
     id: SIT_IN_CHAIR, name: "Sit down", duration: 1.5,
     keys: [
       [0, {}],
       [.24, { torso: [.12, 0, 0], rise: shift.y * .12, travel: shift.z * .25, sway: shift.x * .25, turn: turn * .55 }],
-      [.7, { ...sit, rise: shift.y * .85, sway: shift.x, travel: shift.z * .9, turn }],
-      [1, { ...sit, rise: shift.y, sway: shift.x, travel: shift.z, turn }],
+      [.7, { ...sit, ...handsOverLap, rise: shift.y * .85, sway: shift.x, travel: shift.z * .9, turn }],
+      [1, { ...sit, ...handsOverLap, rise: shift.y, sway: shift.x, travel: shift.z, turn }],
     ],
   };
 }

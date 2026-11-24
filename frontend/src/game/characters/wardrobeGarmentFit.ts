@@ -23,7 +23,7 @@ import { highCollarSkirtWaistband } from "./wardrobeSkirt";
 import { prepareWardrobeCoverage, wardrobeCoverageSurface as bodySurface } from "./wardrobeCoverage";
 import { insideBraNeckline, insideBriefs, prepareWardrobeUnderwear, type BraStyle, type BriefsStyle } from "./wardrobeUnderwear";
 import { getWardrobeActorBody, isWardrobeBodyDonor, sharesWardrobeRig } from "./wardrobeBody";
-import { HOODED_GOWN, needsCloseDressFit, prepareCloseDressFit } from "./wardrobeDressFit";
+import { HOODED_GOWN, needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
 import { hoodedGownColors, prepareHoodedGown } from "./hoodedGown";
 
 export type WardrobeGarmentSource = { item: NonNullable<ReturnType<typeof getWardrobeGarment>>; scene: Object3D; authoredFit?: boolean };
@@ -507,7 +507,8 @@ export function prepareWardrobeGarments(
     const sockBody = item.slot === "socks" && restored.feet && full ? bodySurface(full) : undefined;
     const fitSocks = sockBody && prepareShoelessSockFit(sockBody);
     const fitDress = item.slot === "dress" && full && needsCloseDressFit(item.id)
-      ? prepareCloseDressFit(full, original.skeleton) : undefined;
+      ? prepareCloseDressFit(full, original.skeleton, item.id) : undefined;
+    if (fitDress && usesLongGownFit(item.id)) root.userData.longGown = true;
     for (const { geometry } of skirtSurfaces) geometry.dispose();
     for (const mesh of garmentMeshes) {
       const lining = mesh.userData.wardrobeRole === "shorts";
