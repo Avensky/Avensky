@@ -2,13 +2,16 @@ import { BufferGeometry, Float32BufferAttribute, MathUtils, Triangle, Uint16Buff
 import { MeshBVH, type HitPointInfo } from "three-mesh-bvh";
 
 export const HOODED_GOWN = "medieval-05";
+export const LINEN_NIGHTGOWN = "linen-nightgown";
+export const LINEN_NIGHTGOWN_BINDING = "CLOTH_LINEN_NIGHTGOWN_1_1";
+export const LINEN_NIGHTGOWN_FABRIC = "CLOTH_LINEN_NIGHTGOWN_2_0";
 
 export function usesLongGownFit(id: string) {
-  return id === "medieval-02" || id === "linen-nightgown";
+  return id === "medieval-02" || id === LINEN_NIGHTGOWN;
 }
 
 export function needsCloseDressFit(id: string) {
-  return id === "linen-nightgown" || /^(?:medieval-(?:kaftan-)?|sleepwear-)\d+$/.test(id);
+  return id === LINEN_NIGHTGOWN || /^(?:medieval-(?:kaftan-)?|sleepwear-)\d+$/.test(id);
 }
 
 function armSides(skeleton: Skeleton) {
@@ -63,7 +66,7 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
       if (!cloth || !source.hasAttribute("skinIndex") || !source.hasAttribute("skinWeight")) return;
       let fitted: BufferGeometry | undefined;
       let joints: Uint16BufferAttribute | undefined, weights: Float32BufferAttribute | undefined;
-      const nightgownBinding = id === "linen-nightgown" && meshName === "CLOTH_LINEN_NIGHTGOWN_1_1";
+      const nightgownBinding = id === LINEN_NIGHTGOWN && meshName === LINEN_NIGHTGOWN_BINDING;
       for (let vertex = 0; vertex < cloth.count; vertex++) {
         point.fromBufferAttribute(cloth, vertex);
         // The skirt needs enough ease for the hips to roll onto the seat
@@ -74,15 +77,12 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
         const kneeEase = id === "medieval-02" && point.z > .02
           ? MathUtils.smoothstep(point.y, .36, .50) * (1 - MathUtils.smoothstep(point.y, .57, .73))
             * MathUtils.smoothstep(point.z, .02, .115) : 0;
-        if (id === "linen-nightgown" && point.y < .24) {
+        if (id === LINEN_NIGHTGOWN && point.y < .24) {
           // Keep the layered hem above the bare heel across a full stride.
           const hem = 1 - MathUtils.smoothstep(point.y, .13, .24);
-          // The separate binding needs a little overlap with the fabric above
-          // it. The lighter mesh otherwise opens a seam as its hem flexes.
-          const overlap = nightgownBinding ? .032 * MathUtils.smoothstep(point.y, .135, .175) : 0;
           fitted ??= source.clone();
           fitted.getAttribute("position").setXYZ(vertex, point.x * (1 + .035 * hem),
-            point.y + .033 * hem + overlap, point.z - .017 * hem);
+            point.y + .033 * hem, point.z - .017 * hem);
         }
         if (seatEase || kneeEase) {
           fitted ??= source.clone();
@@ -91,7 +91,7 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
         }
         if (point.y <= (followsBody ? .77 : .90) || point.y >= 1.46) continue;
         const arm = vertexArm(source, arms, vertex);
-        const blend = arm ? (id === "linen-nightgown" ? 0 : .86 * MathUtils.smoothstep(point.y, .9, 1.04))
+        const blend = arm ? (id === LINEN_NIGHTGOWN ? 0 : .86 * MathUtils.smoothstep(point.y, .9, 1.04))
           : .91 * MathUtils.smoothstep(point.y, .91, 1.06) * (1 - MathUtils.smoothstep(point.y, 1.385, 1.46));
         const surface = surfaces[arm];
         const indices = surface?.geometry.getIndex();

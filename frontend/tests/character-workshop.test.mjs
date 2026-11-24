@@ -346,6 +346,63 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
   }
 });
 
+test("the linen hem and skirt share the same skinned seam and keep the upper binding", async () => {
+  const vite = await createServer({
+    configFile: false, appType: "custom", logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+  });
+  const strip = (heights, uvOrigin) => {
+    const geometry = new BufferGeometry().setIndex([0, 1, 2, 2, 1, 3])
+      .setAttribute("position", new Float32BufferAttribute([
+        -.25, heights[0], .17, .25, heights[0], .17, -.25, heights[1], .17, .25, heights[1], .17,
+      ], 3))
+      .setAttribute("uv", new Float32BufferAttribute([
+        uvOrigin, uvOrigin, uvOrigin + .2, uvOrigin, uvOrigin, uvOrigin + .2, uvOrigin + .2, uvOrigin + .2,
+      ], 2))
+      .setAttribute("skinIndex", new Uint16BufferAttribute([1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0], 4))
+      .setAttribute("skinWeight", new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4));
+    geometry.computeVertexNormals();
+    return geometry;
+  };
+  const fabric = strip([.16, .34], .1);
+  const lower = strip([.12, .195], .42), upper = strip([1.05, 1.15], .71);
+  const { mergeGeometries } = await import("three/addons/utils/BufferGeometryUtils.js");
+  const originalBinding = mergeGeometries([lower, upper]);
+  let fit;
+  try {
+    const { fitLinenNightgownHem } = await vite.ssrLoadModule("/src/game/characters/linenNightgownHem.ts");
+    fit = fitLinenNightgownHem(originalBinding, fabric);
+    assert(fit);
+    const seam = geometry => {
+      const { position, skinIndex, skinWeight } = geometry.attributes;
+      const vertices = new Map();
+      for (let i = 0; i < position.count; i++) {
+        if (Math.abs(position.getY(i) - .196) > .00001) continue;
+        const key = position.getX(i).toFixed(6);
+        const joints = Array.from(skinIndex.array.slice(i * 4, i * 4 + 4));
+        const weights = Array.from(skinWeight.array.slice(i * 4, i * 4 + 4));
+        vertices.set(key, { joints, weights });
+      }
+      return vertices;
+    };
+    assert.equal(seam(fit.skirt).size, 3);
+    assert.deepEqual(seam(fit.binding), seam(fit.skirt));
+    const { position, uv } = fit.binding.attributes;
+    for (let i = 0; i < position.count; i++) {
+      if (position.getY(i) < .25) assert(uv.getX(i) >= .419 && uv.getX(i) <= .621);
+      else assert(uv.getX(i) >= .709 && uv.getX(i) <= .911);
+    }
+    assert(fit.binding.boundingBox.min.y < .14);
+    assert(fit.binding.boundingBox.max.y > 1.14);
+  } finally {
+    fit?.binding.dispose();
+    fit?.skirt.dispose();
+    for (const geometry of [fabric, lower, upper, originalBinding]) geometry.dispose();
+    await vite.close();
+  }
+});
+
 test("medieval garments preserve their atlas and use distinct fabric, quilting and leather finishes", async () => {
   const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", logLevel: "error" });
   const atlas = new Texture();
