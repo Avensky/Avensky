@@ -105,8 +105,15 @@
   display: block;
   object-fit: cover;
   object-position: center;
+  background: #000;
+  opacity: 0;
+  transition: opacity 200ms ease;
 }
+.menu-flare-background video[data-playing] { opacity: 1; }
 .menu-flare-background video[hidden] { display: none; }
+@media (orientation: portrait) {
+  .menu-flare-background video { object-fit: contain; }
+}
 .menu-flare-background::after {
   content: "";
   background: linear-gradient(90deg, #060311c9, #0b031a45 48%, #060311c9);

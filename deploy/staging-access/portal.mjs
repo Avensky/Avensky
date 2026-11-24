@@ -20,16 +20,25 @@ const linkField = (name, label) => `<label>${label}<input id="link-code" name="$
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
-function page(title, contents, message = "") {
+function page(title, contents, message = "", showFlare = false) {
+  const background = showFlare ? `<div class="portal-flare" aria-hidden="true">
+<video muted playsinline loop preload="none" src="${base}/media/purple-sunflare-loop.mp4"></video>
+</div><script src="${base}/flare.js" defer></script>` : "";
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:#f5f1fd;background:#100b1c;font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
-main{width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-a{color:#e5d2fd}form,label,ul{display:grid;gap:.6rem}form{margin:.8rem 0}input,button{font:inherit;color:inherit;padding:.6rem .8rem;border:1px solid #927db0;border-radius:.3rem;background:#231933;min-height:44px;min-width:0}
+main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
+.portal-flare{position:fixed;inset:0;pointer-events:none;background:#060311 url(${base}/media/purple-sunflare.webp) center/cover no-repeat}
+.portal-flare video{width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s ease}
+.portal-flare video[data-playing]{opacity:1}
+.portal-flare::after{content:"";position:absolute;inset:0;background:#06031166}
+@media (orientation:portrait){.portal-flare video{object-fit:contain}}
+@media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
+a{color:#e5d2fd}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:inherit;padding:.6rem .8rem;border:1px solid #927db0;border-radius:.3rem;background:#231933;min-height:44px;min-width:0}
 button{color:#150c21;background:#dac2fb;font-weight:600;cursor:pointer}
 ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style><main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+</style>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
@@ -77,16 +86,12 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
   }
 
   function signInPage(message, invite = false) {
-    const gameFields = game ? `<label>Game account<select name="intent"><option value="existing">Link an existing account</option>
-<option value="device">Keep this browser’s guest profile</option><option value="new">Create an account</option></select></label>
-<input type="hidden" name="deviceToken">
-<label>Existing account name or email, if different<input name="login" maxlength="254" autocomplete="off"></label>
-<label>Display name for a new account<input name="name" maxlength="24" autocomplete="nickname"></label>` : "";
-    return invite ? page("Join the alpha", form("enroll", emailField + linkField("invite", "Invitation code") + gameFields
-      + passwordField(true), "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message)
+    return invite ? page("Join the alpha", form("enroll", emailField
+      + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
+      + passwordField(!game), game ? "Continue" : "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message, Boolean(game))
       : page("Log in", form("sign-in", emailField + passwordField() + codeField, "Log in")
         + (game ? "<p>Use your Avensky game password. An invitation is required for first-time access.</p>"
-          : `<a href="${base}/enroll">Sign up</a>`), message);
+          : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
   }
 
   function resetPage(message) {
@@ -98,8 +103,11 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
   function testerPage(viewer, message, extra = "") {
     if (!viewer?.admin) return page("Access denied", '<a href="/">Return to staging</a>');
     const { testers, invites } = accounts.list();
+    const fields = game
+      ? emailField + '<details><summary>Preserve a legacy username</summary><label>Existing game username<input name="gameLogin" maxlength="24"></label></details>'
+      : emailField;
     return page("Alpha testers", `<nav><a href="/">Enter staging</a><a href="${base}/account">Account</a></nav>
-${form("testers/invite", emailField, mailInvite ? "Send invite" : "Create invite")}${extra}
+${form("testers/invite", fields, mailInvite ? "Send invite" : "Create invite")}${extra}
 <h2>Testers</h2><ul>${testers.map(t => `<li>${escape(t.email)} · ${t.admin ? "Admin" : t.revoked ? "Revoked" : "Active"}${t.has_mfa ? " · 2FA" : ""}
 ${t.admin ? "" : form(t.revoked ? "testers/restore" : "testers/revoke", hideEmail(t.email), t.revoked ? "Grant access" : "Revoke access")}</li>`).join("")}</ul>
 <h2>Pending invitations</h2><ul>${invites.map(i => `<li>${escape(i.email)} · Expires ${new Date(i.expires * 1000).toISOString().slice(0, 10)}
@@ -112,7 +120,7 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       res.writeHead(status, {
         // A same-origin form submission needs its Origin header for the check below.
         "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "same-origin",
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff", ...headers,
       });
       res.end(body);
@@ -134,14 +142,12 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
           && req.headers.accept?.includes("text/html") ? redirect(base + "/sign-in") : send(401);
       }
       if (path === base + "/invite.js") {
-        let setup = 'const value = location.hash.slice(1); if (/^[0-9a-f]{64}$/.test(value)) { document.querySelector("#link-code").value=value; history.replaceState(null,"",location.pathname); }';
+        let setup = 'const value = location.hash.slice(1); const field = document.querySelector("#link-code"); if (field && /^[0-9a-f]{64}$/.test(value)) { field.value=value; field.closest("label").hidden=true; history.replaceState(null,"",location.pathname); }';
         if (game) {
           const serverId = await game.serverId().catch(() => "");
           if (serverId) setup += `const savedKey = "avenlab-social-profile-v1:" + ${JSON.stringify(serverId)};
             const deviceField = document.querySelector('[name="deviceToken"]');
-            const accountSelect = document.querySelector('[name="intent"]');
-            if (deviceField && accountSelect) accountSelect.form.addEventListener("submit", () => {
-              if (accountSelect.value !== "device") { deviceField.value = ""; return; }
+            if (deviceField) deviceField.form.addEventListener("submit", () => {
               try {
                 const saved = JSON.parse(sessionStorage.getItem(savedKey + ":tab") ?? localStorage.getItem(savedKey) ?? "null");
                 if (typeof saved?.token === "string" && /^[a-f0-9]{64}$/i.test(saved.token)) deviceField.value = saved.token;
@@ -150,6 +156,21 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         }
         return send(200, setup, { "Content-Type": "text/javascript; charset=utf-8" });
       }
+      if (path === base + "/flare.js" && game) return send(200, `
+        const video = document.querySelector(".portal-flare video");
+        if (video && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
+          video.defaultMuted = true;
+          video.muted = true;
+          const play = () => {
+            if (!document.hidden && video.paused) video.play().catch(() => {});
+          };
+          video.addEventListener("playing", () => { video.dataset.playing = ""; }, { once: true });
+          document.addEventListener("pointerup", play, { passive: true, capture: true });
+          document.addEventListener("touchend", play, { passive: true, capture: true });
+          document.addEventListener("visibilitychange", play);
+          document.addEventListener("keydown", play, true);
+          play();
+        }`, { "Content-Type": "text/javascript; charset=utf-8" });
       if (path === base + "/sign-in") return viewer ? redirect(base + "/account") : send(200, signInPage());
       if (path === base + "/enroll") return send(200, signInPage("", true));
       if (path === base + "/reset" && !game) return send(200, resetPage());
@@ -168,8 +189,7 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       const value = await readForm(req);
       if (path === base + "/sign-in") return redirect("/", await accounts.logIn(value("email"), value("password"), value("code").trim()));
       if (path === base + "/enroll") return redirect(game ? "/" : base + "/account",
-        await accounts.enroll(value("email"), value("invite").trim(), value("password"),
-          { intent: value("intent"), login: value("login"), name: value("name"), deviceToken: value("deviceToken") }));
+        await accounts.enroll(value("email"), value("invite").trim(), value("password"), value("deviceToken")));
       if (path === base + "/reset" && !game) {
         await accounts.resetPassword(value("email"), value("reset").trim(), value("password"), value("code").trim());
         return redirect(base + "/sign-in", "");
@@ -193,7 +213,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
       }
       if (!viewer.admin) return send(403);
       if (path === base + "/testers/invite") {
-        const { email, code } = accounts.issueInvite(value("email"));
+        const { email, code } = accounts.issueInvite(value("email"), false, value("gameLogin"));
         const url = origin + base + "/enroll#" + code;
         if (mailInvite) {
           try { await mailInvite(email, url); return send(200, testerPage(viewer, "Invitation sent.")); }
@@ -243,7 +263,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const game = AVENSKY_ALPHA_GAME_KEY ? gameBridge(AVENSKY_ALPHA_GAME_KEY) : undefined;
   const accounts = testerAccounts(join(AVENSKY_ALPHA_STATE, game ? "game-access.sqlite3" : "testers.sqlite3"),
     Buffer.from(AVENSKY_ALPHA_KEY, "hex"), game);
-  const [command, email, option, ...extra] = process.argv.slice(2);
+  const [command, email, option, optionValue, ...extra] = process.argv.slice(2);
   const configuredMail = () => AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
   if (command === undefined) {
     const mail = game ? undefined : configuredMail();
@@ -252,10 +272,11 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     if (game) gameSocketGate({ accounts, key: AVENSKY_ALPHA_GAME_KEY, origin }).listen(9062, "127.0.0.1");
   } else {
     try {
-      if (command === "invite-admin" && email && !option && !extra.length) {
-        const { code } = accounts.issueInvite(email, true);
+      if (command === "invite-admin" && email && !extra.length
+          && (!option || (option === "--game-login" && optionValue))) {
+        const { code } = accounts.issueInvite(email, true, optionValue);
         process.stdout.write(origin + base + "/enroll#" + code + "\n");
-      } else if (command === "reset-password" && email && (!option || option === "--email") && !extra.length) {
+      } else if (command === "reset-password" && email && (!option || option === "--email") && !optionValue && !extra.length) {
         const mail = option === "--email" ? configuredMail() : undefined;
         if (option === "--email" && !mail) throw Error("Configure the portal mail relay before using --email.");
         const reset = accounts.issuePasswordReset(email);
@@ -267,7 +288,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
           process.stdout.write(url + "\n");
         }
       } else {
-        throw Error("Use invite-admin EMAIL or reset-password EMAIL [--email], or start the portal without arguments.");
+        throw Error("Use invite-admin EMAIL [--game-login LOGIN] or reset-password EMAIL [--email], or start the portal without arguments.");
       }
     } finally {
       accounts.close();
