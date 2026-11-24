@@ -36,6 +36,7 @@ async function waitForProfile(owner: string) {
 export function WelcomeScreen() {
   const connected = useSocialStore(state => state.available);
   const accounts = useSocialStore(state => state.accountsAvailable);
+  const stagingSignIn = useSocialStore(state => state.stagingSignIn);
   const restoring = useSocialStore(state => state.profileStatus === "restoring");
   const restoreError = useSocialStore(state => state.profileStatus === "error" ? state.message : "");
   const profile = useSocialStore(state => state.view?.profile);
@@ -52,11 +53,12 @@ export function WelcomeScreen() {
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const rememberedPlayer = step === "welcome" && !showAccountEntry && profile?.characters?.length ? profile : undefined;
+  const rememberedPlayer = step === "welcome" && !showAccountEntry && (stagingSignIn || profile?.characters?.length) ? profile : undefined;
   const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const screen = rememberedPlayer ? "characters" : step === "characters" && slots?.length === 0 ? "create" : step;
+  const screen = rememberedPlayer ? (slots?.length === 0 ? "create" : "characters")
+    : step === "characters" && slots?.length === 0 ? "create" : step;
   const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
@@ -64,6 +66,10 @@ export function WelcomeScreen() {
 
   function back() {
     if (pending.current || restoring) return;
+    if (stagingSignIn && (step === "welcome" || screen === "characters" || !slots?.length)) {
+      window.location.assign("/__alpha/account");
+      return;
+    }
     setError("");
     if (step === "register" && newPlayer) { setStep("save"); return; }
     if (step === "save") { setStep("create"); return; }
@@ -269,7 +275,7 @@ export function WelcomeScreen() {
               <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{label}</button>
             </div>
           </form>
-        ) : <>
+        ) : stagingSignIn ? null : <>
           <div className="welcome-entry-options" data-controller-row>
             <button type="button" className="welcome-primary" disabled={busy || !accounts}
               onClick={() => { setError(""); setStep("login"); }}>Log in</button>

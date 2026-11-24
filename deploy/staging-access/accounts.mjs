@@ -12,6 +12,7 @@ const token = () => randomBytes(32).toString("hex");
 const now = () => Math.floor(Date.now() / 1000);
 const SESSION_AGE = 12 * 60 * 60;
 const INVITE_AGE = 3 * 24 * 60 * 60;
+const RESET_AGE = 30 * 60;
 
 export function emailAddress(value) {
   const email = value.trim().toLowerCase();
@@ -22,6 +23,13 @@ export function emailAddress(value) {
 
 function passwordHash(password, salt) {
   return derive(password, salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
+}
+
+async function newPasswordRecord(password) {
+  if (password.length < 15 || password.length > 128) throw Error("Choose a password with 15–128 characters.");
+  const salt = randomBytes(16);
+  const digest = await passwordHash(password, salt);
+  return [salt.toString("hex"), digest.toString("hex")];
 }
 
 const secretAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -52,7 +60,7 @@ function matchingStep(secret, code, lastStep) {
     step > lastStep && timingSafeEqual(Buffer.from(code), Buffer.from(totp(secret, step))));
 }
 
-export function testerAccounts(path, key) {
+export function testerAccounts(path, key, game) {
   if (!Buffer.isBuffer(key) || key.length !== 32) throw Error("Set a 32-byte alpha access encryption key.");
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path);
@@ -74,11 +82,18 @@ export function testerAccounts(path, key) {
     CREATE TABLE IF NOT EXISTS recovery (
       email TEXT NOT NULL REFERENCES testers(email), digest TEXT NOT NULL, PRIMARY KEY(email, digest)
     );
+    CREATE TABLE IF NOT EXISTS password_resets (
+      email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL, expires INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS game_profiles (
+      email TEXT PRIMARY KEY REFERENCES testers(email), profile_id TEXT NOT NULL UNIQUE, login TEXT NOT NULL
+    );
   `);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const all = sql => db.prepare(sql).all();
   const tester = email => get("SELECT * FROM testers WHERE email = ?", email);
+  const gameProfile = email => get("SELECT profile_id, login FROM game_profiles WHERE email = ?", email);
   function transaction(task) {
     db.exec("BEGIN IMMEDIATE");
     try { const result = task(); db.exec("COMMIT"); return result; }
@@ -104,6 +119,10 @@ export function testerAccounts(path, key) {
   }
   async function validPassword(record, password) {
     if (typeof password !== "string" || password.length > 256) return false;
+    if (game) {
+      const profile = record && gameProfile(record.email);
+      return Boolean(profile && !record.revoked && await game.authenticate(profile.login, password) === profile.profile_id);
+    }
     const result = await passwordHash(password, Buffer.from(record?.salt ?? "00".repeat(16), "hex"));
     const same = timingSafeEqual(result, Buffer.from(record?.password ?? "00".repeat(32), "hex"));
     return same && Boolean(record && !record.revoked);
@@ -121,9 +140,12 @@ export function testerAccounts(path, key) {
     close: () => db.close(),
     viewer(value) {
       if (!/^[0-9a-f]{64}$/.test(value)) return undefined;
-      return get(`SELECT t.email, t.admin, t.mfa IS NOT NULL AS has_mfa, s.digest
+      const viewer = get(`SELECT t.email, t.admin, t.mfa IS NOT NULL AS has_mfa, s.digest, s.expires,
+        g.profile_id AS game_profile
         FROM sessions s JOIN testers t ON t.email = s.email
+        LEFT JOIN game_profiles g ON g.email = t.email
         WHERE s.digest = ? AND s.expires > ? AND t.revoked = 0`, hash(value), now());
+      return game && !viewer?.game_profile ? undefined : viewer;
     },
     end(viewer) { run("DELETE FROM sessions WHERE digest = ?", viewer.digest); },
     issueInvite(raw, admin = false) {
@@ -138,19 +160,34 @@ export function testerAccounts(path, key) {
       });
       return { email, code };
     },
-    async enroll(raw, code, password) {
+    async enroll(raw, code, password, gameAccount = {}) {
       const email = emailAddress(raw);
       if (!/^[0-9a-f]{64}$/.test(code)) throw Error("Enter the invitation code from your email.");
-      if (password.length < 15 || password.length > 128) throw Error("Choose a password with 15–128 characters.");
       const digest = hash(code);
       const invitation = () => get("SELECT * FROM invitations WHERE digest = ? AND email = ? AND expires > ?", digest, email, now());
       if (!invitation()) throw Error("The invitation is invalid or expired.");
-      const salt = randomBytes(16);
-      const passwordDigest = await passwordHash(password, salt);
+      let link;
+      let salt = "", passwordDigest = "";
+      if (game) {
+        const existing = gameAccount.intent === "existing";
+        const device = gameAccount.intent === "device";
+        if (!existing && !device && gameAccount.intent !== "new") throw Error("Choose how to set up your game account.");
+        if (device && !/^[a-f0-9]{64}$/i.test(gameAccount.deviceToken ?? ""))
+          throw Error("Open the invitation in the original browser that holds your guest profile.");
+        const login = existing ? gameAccount.login?.trim() || email : email;
+        const profileId = await game.authenticate(login, password, existing ? undefined : device ? "Guest driver" : gameAccount.name,
+          device ? gameAccount.deviceToken : undefined);
+        link = { profileId, login };
+      } else {
+        [salt, passwordDigest] = await newPasswordRecord(password);
+      }
       return transaction(() => {
         const invite = invitation();
         if (!invite || tester(email)) throw Error("The invitation is invalid or expired.");
-        run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt.toString("hex"), passwordDigest.toString("hex"), invite.admin);
+        if (link && get("SELECT 1 FROM game_profiles WHERE profile_id = ?", link.profileId))
+          throw Error("This game account already has staging access.");
+        run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt, passwordDigest, invite.admin);
+        if (link) run("INSERT INTO game_profiles (email, profile_id, login) VALUES (?, ?, ?)", email, link.profileId, link.login);
         run("DELETE FROM invitations WHERE digest = ?", digest);
         return session(email);
       });
@@ -167,6 +204,36 @@ export function testerAccounts(path, key) {
         return session(email);
       });
     },
+    issuePasswordReset(raw) {
+      if (game) throw Error("This portal uses the game account password.");
+      const email = emailAddress(raw);
+      const code = token();
+      transaction(() => {
+        const record = tester(email);
+        if (!record || record.revoked) throw Error("There is no active alpha portal account for that email.");
+        run("DELETE FROM password_resets WHERE expires <= ?", now());
+        run("INSERT OR REPLACE INTO password_resets (email, digest, expires) VALUES (?, ?, ?)",
+          email, hash(code), now() + RESET_AGE);
+      });
+      return { email, code };
+    },
+    async resetPassword(raw, code, password, factor) {
+      if (game) throw Error("This portal uses the game account password.");
+      const email = emailAddress(raw);
+      const denied = () => Error("The reset link or authentication code is invalid or expired.");
+      if (!/^[0-9a-f]{64}$/.test(code)) throw denied();
+      const digest = hash(code);
+      const pending = () => get("SELECT 1 FROM password_resets WHERE email = ? AND digest = ? AND expires > ?", email, digest, now());
+      if (!pending()) throw denied();
+      const [salt, passwordDigest] = await newPasswordRecord(password);
+      transaction(() => {
+        const record = tester(email);
+        if (!pending() || !record || record.revoked || !verifySecondFactor(record, factor)) throw denied();
+        run("UPDATE testers SET salt = ?, password = ? WHERE email = ?", salt, passwordDigest, email);
+        run("DELETE FROM sessions WHERE email = ?", email);
+        run("DELETE FROM password_resets WHERE email = ?", email);
+      });
+    },
     list() {
       return {
         testers: all("SELECT email, admin, revoked, mfa IS NOT NULL AS has_mfa FROM testers ORDER BY email"),
@@ -178,9 +245,11 @@ export function testerAccounts(path, key) {
       transaction(() => {
         if (tester(email)?.admin) throw Error("Manage administrator access through the server operator.");
         run("DELETE FROM invitations WHERE email = ?", email);
+        run("DELETE FROM password_resets WHERE email = ?", email);
         run("DELETE FROM sessions WHERE email = ?", email);
         run("UPDATE testers SET revoked = 1 WHERE email = ?", email);
       });
+      return gameProfile(email)?.profile_id;
     },
     restore(raw) {
       const email = emailAddress(raw);

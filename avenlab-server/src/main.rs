@@ -60,7 +60,8 @@ async fn main() -> anyhow::Result<()> {
         "AvenLab: {} active world(s), {} total players maximum",
         server.max_active_worlds, server.max_players
     );
-    tokio::spawn(net::start_websocket_server(Arc::clone(&server)));
+    let staging_gate = net::StagingGate::load()?.map(Arc::new);
+    tokio::spawn(net::start_websocket_server(Arc::clone(&server), staging_gate));
     let admission = Arc::clone(&server);
     tokio::spawn(async move {
         let mut timer = interval(Duration::from_millis(500));

@@ -1,5 +1,7 @@
 # Staging tester access
 
+For the invite-only release that uses game credentials, use the [single sign-in rollout](STAGING_UNIFIED_SIGN_IN.md). This guide covers the earlier portal preview with separate credentials.
+
 The [alpha portal](../deploy/staging-access/portal.mjs) replaces the staging website's shared browser password dialog with individual tester access. It runs on Vultr at loopback port 9061 under its own account. Caddy asks the portal to authenticate both the staging site and its private model route. The Lightsail bucket, asset gateway on port 9060, and GitHub release connection keep their existing credentials. [Caddy forward-auth reference](https://caddyserver.com/docs/caddyfile/directives/forward_auth)
 
 ## Tester management
@@ -9,6 +11,21 @@ Sign in to the portal as the operator and open **Alpha testers**. Enter an appro
 Testers create a portal password and can add an authenticator under **Account**. The setup page supplies a key and confirms a six-digit code. Keep the one-use backup codes somewhere safe. The portal encrypts authenticator secrets with its server key. It stores password hashes, invitation digests, and session digests in its own SQLite database. [TOTP specification](https://www.rfc-editor.org/rfc/rfc6238)
 
 Portal access and game characters have separate accounts in this iteration. A portal invitation authorizes the staging website and asset route. The game signs in separately and preserves existing character accounts and outfits. The game supports email and legacy account names.
+
+## Reset a portal password
+
+Run the recovery command as the staging server operator. It issues a one-use link, expires it after 30 minutes, and binds it to the existing portal email. A successful reset preserves the account role and any enabled authenticator and ends old portal sessions. Enter an authenticator or recovery code at reset if the account uses two-factor authentication. The game account and password are separate.
+
+```sh
+read -r -p 'Alpha portal email: ' alpha_email
+systemd-run --wait --pipe --quiet --uid=avensky-alpha \
+  -p EnvironmentFile=/etc/avensky/staging-alpha.env \
+  --setenv=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha \
+  /usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs \
+  reset-password "$alpha_email"
+```
+
+Open the entire private link, including its fragment. To send it directly to the account's inbox, configure the mail relay as described below and append `--email` to the command. If using a relay, keep link rewriting and click tracking off for reset links. The email submits to the relay once. If delivery fails, run the command again without `--email` to open a fresh private link. Issuing a new link invalidates the previous one.
 
 ## Install on Vultr
 

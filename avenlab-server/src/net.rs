@@ -1,6 +1,10 @@
 //! Socket transport only. Server owns social authorization/room admission;
 //! WorldRuntime owns the room's physics. Inputs remain replaceable mailboxes.
 mod ingress;
+mod staging_gate;
+pub use staging_gate::StagingGate;
+pub(crate) use staging_gate::{PROOF_MAX_AGE_MS, staging_now_ms};
+use staging_gate::Admission;
 use crate::{
     server::{Connection, Server},
     spawn::Team,
@@ -18,8 +22,8 @@ use tokio::{
     sync::{Semaphore, watch},
 };
 use tokio_tungstenite::{
-    accept_async_with_config,
-    tungstenite::{Message, protocol::WebSocketConfig},
+    accept_hdr_async_with_config,
+    tungstenite::{Message, handshake::server::{Request, Response}, protocol::WebSocketConfig},
 };
 
 struct RateLimit {
@@ -52,7 +56,7 @@ impl RateLimit {
     }
 }
 
-pub async fn start_websocket_server(server: Arc<Server>) {
+pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<StagingGate>>) {
     let address = std::env::var("AVENLAB_BIND").unwrap_or_else(|_| "0.0.0.0:9001".into());
     let listener = TcpListener::bind(&address)
         .await
@@ -63,15 +67,29 @@ pub async fn start_websocket_server(server: Arc<Server>) {
         // This limit applies before register() can enforce the live-client cap.
         let Ok(permit) = handshakes.clone().try_acquire_owned() else { continue; };
         let server = Arc::clone(&server);
+        let gate = gate.clone();
         tokio::spawn(async move {
             let config = WebSocketConfig {
                 max_message_size: Some(1024 * 1024),
                 max_frame_size: Some(1024 * 1024),
                 ..Default::default()
             };
+            let mut admission = Admission::Legacy;
             let Ok(Ok(socket)) = tokio::time::timeout(Duration::from_secs(5),
-                accept_async_with_config(stream, Some(config))).await else {
+                accept_hdr_async_with_config(stream, |request: &Request, response: Response| {
+                    if let Some(gate) = &gate { admission = gate.admit(request); }
+                    Ok(response)
+                }, Some(config))).await else {
                 return;
+            };
+            let approved = match admission {
+                Admission::Legacy => None,
+                Admission::Denied => return, // The loopback deployment probe only checks the upgrade.
+                Admission::Bridge => {
+                    staging_gate::service_bridge(&server, socket).await;
+                    return;
+                }
+                Admission::Player { profile_id, seconds, issued } => Some((profile_id, seconds, issued)),
             };
             drop(permit);
             let (write, mut read) = socket.split();
@@ -168,7 +186,15 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                 return;
             }
             let server_id = server.data.lock().await.server_id.clone();
-            let _=tx.send(json!({"type":"welcome","player_id":player,"room_id":0,"team":"blue","spawned":false,"social_version":1,"packed_input_version":1,"compact_snapshot_version":crate::snapshot_wire::VERSION,"snapshot_hz":30,"server_id":server_id,"player_accounts":server.player_accounts_enabled(),"body_tattoos":true}).to_string());
+            let _=tx.send(json!({"type":"welcome","player_id":player,"room_id":0,"team":"blue","spawned":false,"social_version":1,"packed_input_version":1,"compact_snapshot_version":crate::snapshot_wire::VERSION,"snapshot_hz":30,"server_id":server_id,"player_accounts":server.player_accounts_enabled(),"body_tattoos":true,"staging_sign_in":approved.is_some()}).to_string());
+            if let Some((profile, _, issued)) = &approved {
+                if let Err(error) = server.attach_staging_profile(&player, profile, *issued).await {
+                    let _ = tx.send(json!({"type":"social_error","message":error}).to_string());
+                    server.disconnect(&player).await;
+                    return;
+                }
+                server.publish().await;
+            }
             let mut commands = RateLimit::new(12, 10);
             let mut passwords = RateLimit::new(4, 30);
             let mut pings = RateLimit::new(2, 1);
@@ -178,7 +204,9 @@ pub async fn start_websocket_server(server: Arc<Server>) {
             // Protocol pongs keep idle menus alive, but must not reserve an
             // unidentified connection forever. No per-packet registry lookup.
             let identify_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
-            let mut identified = false;
+            let mut identified = approved.is_some();
+            let session_deadline = tokio::time::Instant::now() + Duration::from_secs(
+                approved.as_ref().map(|(_, seconds, _)| *seconds).unwrap_or_default());
             loop {
                 if *overflow.borrow() { break; }
                 let next = tokio::select! {
@@ -186,6 +214,7 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                     _=overflow.changed()=>break,
                     _=&mut writer=>break,
                     _=tokio::time::sleep_until(identify_deadline), if !identified=>break,
+                    _=tokio::time::sleep_until(session_deadline), if approved.is_some()=>break,
                     next=tokio::time::timeout(Duration::from_secs(20),read.next())=>match next{Ok(value)=>value,Err(_)=>break},
                 };
                 let Some(Ok(message)) = next else { break; };
@@ -282,7 +311,10 @@ pub async fn start_websocket_server(server: Arc<Server>) {
                             value.get("action").and_then(Value::as_str),
                             Some("world_join" | "world_create")
                         );
-                        let result = if password_action && !passwords.allow() {
+                        let account_action = identifying || value.get("action").and_then(Value::as_str) == Some("account_logout");
+                        let result = if approved.is_some() && account_action {
+                            Err("Manage sign-in from the staging account page.".into())
+                        } else if password_action && !passwords.allow() {
                             Err("Too many world access attempts. Wait 30 seconds.".into())
                         } else {
                             server.handle(&player, value).await

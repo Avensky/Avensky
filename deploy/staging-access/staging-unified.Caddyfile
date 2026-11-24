@@ -1,0 +1,52 @@
+# Merge only into the existing staging site. Match its real frontend root.
+staging.avensky.com {
+	handle /__alpha/game-connection {
+		header Cache-Control "no-store"
+		header X-Avensky-Game-Connection "same-origin"
+		respond 204
+	}
+
+	handle /__alpha/* {
+		reverse_proxy 127.0.0.1:9061 {
+			header_up X-Alpha-Client {remote_host}
+			header_up -Authorization
+		}
+	}
+
+	handle /ws/ {
+		route {
+			request_header -X-Avensky-Alpha-Bridge
+			request_header -X-Avensky-Alpha-Profile
+			request_header -X-Avensky-Alpha-Expires
+			request_header -X-Avensky-Alpha-Issued
+			request_header -X-Avensky-Alpha-Proof
+			forward_auth 127.0.0.1:9062 {
+				uri /socket
+				copy_headers X-Avensky-Alpha-Profile X-Avensky-Alpha-Expires X-Avensky-Alpha-Issued X-Avensky-Alpha-Proof
+			}
+			reverse_proxy 127.0.0.1:9002 {
+				header_up -Cookie
+				header_up -Authorization
+			}
+		}
+	}
+
+	handle {
+		route {
+			forward_auth 127.0.0.1:9061 {
+				uri /__alpha/verify
+			}
+			handle /__staging-assets/* {
+				reverse_proxy 127.0.0.1:9060 {
+					header_up -Cookie
+					header_up -Authorization
+				}
+			}
+			handle {
+				root * /srv/avensky-staging/frontend/current
+				try_files {path} /index.html
+				file_server
+			}
+		}
+	}
+}

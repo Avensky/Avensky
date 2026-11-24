@@ -3,7 +3,7 @@ import { Keyboard } from "./controls/Keyboard";
 import { GameController } from "./controls/GameController";
 import { useMobilePortrait } from "./controls/useMobilePortrait";
 import { releaseWeaponSource } from "./combat/turretControls";
-import { connectRustServer } from "./net/rustSocket";
+import { startRustConnection } from "./net/rustSocket";
 import { startInputSender, stopInputSender } from "./net/inputSender";
 import { useInputStore } from "./store/input/inputStore";
 import "./App.css";
@@ -37,7 +37,9 @@ export default function App() {
 
   // Connect to Rust server on mount
   useEffect(() => {
-    connectRustServer();
+    const controller = new AbortController();
+    void startRustConnection(controller.signal);
+    return () => controller.abort();
   }, []);
 
   // Start input sender loop on mount, stop on unmount

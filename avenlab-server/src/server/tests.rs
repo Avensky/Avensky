@@ -5,6 +5,7 @@ fn server(active: usize, players: usize) -> Server {
         staff: Default::default(),
         operations: Mutex::new(()),
         accounts: None,
+        staging_disconnects: Mutex::new(HashMap::new()),
         chat: Mutex::new(Default::default()),
         matches: Mutex::new(Default::default()),
         revivals: Mutex::new(Default::default()),
@@ -113,6 +114,9 @@ async fn account_survives_a_restart_with_named_characters_and_separate_careers()
     let restarted = database::load_or_import(&s.path.with_extension("sqlite3"),&s.path).unwrap();
     assert_eq!(restarted.profiles[root].career_id(),second);
     assert_eq!(restarted.profiles[root].characters[root].inactive.as_ref().unwrap().career.summary.totals.kills,4);
+    let linked = s.staging_account(&json!({"action":"check","login":"restart_racer","password":"a stable multi character passphrase"})).await.unwrap();
+    assert_eq!(linked, json!({"profile_id":root}));
+    assert_eq!(s.data.lock().await.profiles[root].characters.len(), 2);
     cleanup(s).await;
 }
 
@@ -176,6 +180,39 @@ async fn account_survives_a_restart_and_restores_the_same_character_and_outfit()
     assert!(server.handle(&phone,json!({"action":"identify","token":phone_token})).await.is_err());
     assert_eq!(server.handle(&phone,json!({"action":"identify","token":desktop_token})).await.unwrap()["profile_id"],profile_id);
     assert!(server.handle(&phone,json!({"action":"account_register","login":"River_7","password":password,"name":"Unrelated"})).await.is_err());
+    assert_eq!(server.staging_account(&json!({"action":"check","login":"River_7","password":password})).await.unwrap(),
+        json!({"profile_id":profile_id}));
+    let mut staged = server.connections.lock().await[&phone].clone();
+    staged.profile_id = None;
+    server.disconnect(&phone).await;
+    server.register("staged".into(), staged).await.unwrap();
+    server.attach_staging_profile("staged", profile_id, crate::net::staging_now_ms()).await.unwrap();
+    assert_eq!(server.connections.lock().await["staged"].profile_id.as_deref(), Some(profile_id));
+    assert_eq!(server.data.lock().await.profiles[profile_id].progression.character.as_ref().unwrap().outfit, "race-crew");
+    let issued = crate::net::staging_now_ms();
+    server.staging_account(&json!({"action":"disconnect","profile_id":profile_id})).await.unwrap();
+    assert!(*server.connections.lock().await["staged"].tx.failure().borrow());
+    assert!(server.attach_staging_profile("staged", profile_id, issued).await.is_err());
+    cleanup(server).await;
+}
+
+#[tokio::test]
+async fn staging_invite_upgrades_a_guest_without_replacing_the_profile() {
+    let mut server = server(3, 8);
+    let (desktop, guest, _) = client(&server, "Guest racer").await;
+    let id = guest["profile_id"].as_str().unwrap();
+    server.handle(&desktop, json!({"action":"character_equip",
+        "character":{"id":"jules-okafor","outfit":"night-run","driver_id":"ae86-male"}})).await.unwrap();
+    server.accounts = Some(Default::default());
+    let response = server.staging_account(&json!({"action":"register","login":"driver@example.net",
+        "password":"a new device recovery passphrase","name":"Guest driver","device_token":guest["token"]})).await.unwrap();
+    assert_eq!(response["profile_id"], id);
+    let data = server.data.lock().await;
+    assert_eq!(data.profiles.len(), 1);
+    assert_eq!(data.profiles[id].progression.character.as_ref().unwrap().outfit, "night-run");
+    assert!(data.profiles[id].token_hash.is_empty());
+    assert!(data.profiles[id].account.is_some());
+    drop(data);
     cleanup(server).await;
 }
 

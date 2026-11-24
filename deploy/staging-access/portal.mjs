@@ -3,9 +3,9 @@ import { createServer } from "node:http";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { emailAddress, SESSION_AGE, testerAccounts } from "./accounts.mjs";
+import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-bridge.mjs";
 
 const base = "/__alpha";
-const cookieName = "__Host-avensky-alpha";
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -16,6 +16,8 @@ const emailField = '<label>Email<input type="email" name="email" autocomplete="u
 const passwordField = (newPassword = false) =>
   `<label>Password<input type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>`;
 const codeField = '<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" maxlength="32"></label>';
+const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
+const readLinkFragment = `<script src="${base}/invite.js"></script>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
 function page(title, contents, message = "") {
@@ -51,7 +53,7 @@ async function readForm(req) {
   return key => fields.get(key) ?? "";
 }
 
-export function createPortal({ origin, accounts, mailInvite }) {
+export function createPortal({ origin, accounts, mailInvite, game }) {
   if (new URL(origin).protocol !== "https:" || new URL(origin).origin !== origin)
     throw Error("Use the HTTPS origin of the staging site.");
   const attempts = new Map();
@@ -75,11 +77,22 @@ export function createPortal({ origin, accounts, mailInvite }) {
   }
 
   function signInPage(message, invite = false) {
-    return invite ? page("Sign up", form("enroll", emailField
-      + '<label>Invitation code<input id="invite-code" name="invite" minlength="64" maxlength="64" required></label>'
-      + passwordField(true), "Sign up") + `<a href="${base}/sign-in">Log in</a><script src="${base}/invite.js"></script>`, message)
+    const gameFields = game ? `<label>Game account<select name="intent"><option value="existing">Link an existing account</option>
+<option value="device">Keep this browser’s guest profile</option><option value="new">Create an account</option></select></label>
+<input type="hidden" name="deviceToken">
+<label>Existing account name or email, if different<input name="login" maxlength="254" autocomplete="off"></label>
+<label>Display name for a new account<input name="name" maxlength="24" autocomplete="nickname"></label>` : "";
+    return invite ? page("Join the alpha", form("enroll", emailField + linkField("invite", "Invitation code") + gameFields
+      + passwordField(true), "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message)
       : page("Log in", form("sign-in", emailField + passwordField() + codeField, "Log in")
-        + `<a href="${base}/enroll">Sign up</a>`, message);
+        + (game ? "<p>Use your Avensky game password. An invitation is required for first-time access.</p>"
+          : `<a href="${base}/enroll">Sign up</a>`), message);
+  }
+
+  function resetPage(message) {
+    return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
+      + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField, "Set new password")
+      + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message);
   }
 
   function testerPage(viewer, message, extra = "") {
@@ -95,10 +108,10 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
 
   return createServer({ requestTimeout: 12000, headersTimeout: 7000, maxHeaderSize: 8192 }, async (req, res) => {
     const path = req.url?.split("?")[0];
-    const cookie = req.headers.cookie?.split(";").map(row => row.trim()).find(row => row.startsWith(cookieName + "="));
     const send = (status, body = "", headers = {}) => {
       res.writeHead(status, {
-        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+        // A same-origin form submission needs its Origin header for the check below.
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "same-origin",
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff", ...headers,
       });
@@ -111,7 +124,7 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       }),
     });
     let viewer;
-    try { viewer = accounts.viewer(cookie?.slice(cookieName.length + 1) ?? ""); }
+    try { viewer = accounts.viewer(sessionCookie(req)); }
     catch { return send(503); }
     if (req.method === "GET") {
       if (path === base + "/verify") {
@@ -120,27 +133,53 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         return requested.startsWith("/") && !requested.startsWith("/__staging-assets/")
           && req.headers.accept?.includes("text/html") ? redirect(base + "/sign-in") : send(401);
       }
-      if (path === base + "/invite.js") return send(200,
-        'const value = location.hash.slice(1); if (/^[0-9a-f]{64}$/.test(value)) { document.querySelector("#invite-code").value=value; history.replaceState(null,"",location.pathname); }',
-        { "Content-Type": "text/javascript; charset=utf-8" });
+      if (path === base + "/invite.js") {
+        let setup = 'const value = location.hash.slice(1); if (/^[0-9a-f]{64}$/.test(value)) { document.querySelector("#link-code").value=value; history.replaceState(null,"",location.pathname); }';
+        if (game) {
+          const serverId = await game.serverId().catch(() => "");
+          if (serverId) setup += `const savedKey = "avenlab-social-profile-v1:" + ${JSON.stringify(serverId)};
+            const deviceField = document.querySelector('[name="deviceToken"]');
+            const accountSelect = document.querySelector('[name="intent"]');
+            if (deviceField && accountSelect) accountSelect.form.addEventListener("submit", () => {
+              if (accountSelect.value !== "device") { deviceField.value = ""; return; }
+              try {
+                const saved = JSON.parse(sessionStorage.getItem(savedKey + ":tab") ?? localStorage.getItem(savedKey) ?? "null");
+                if (typeof saved?.token === "string" && /^[a-f0-9]{64}$/i.test(saved.token)) deviceField.value = saved.token;
+              } catch {}
+            });`;
+        }
+        return send(200, setup, { "Content-Type": "text/javascript; charset=utf-8" });
+      }
       if (path === base + "/sign-in") return viewer ? redirect(base + "/account") : send(200, signInPage());
       if (path === base + "/enroll") return send(200, signInPage("", true));
+      if (path === base + "/reset" && !game) return send(200, resetPage());
       if (path === base + "/account") return viewer ? send(200, page("Account", securityPage(viewer))) : redirect(base + "/sign-in");
       if (path === base + "/testers") return send(viewer?.admin ? 200 : 403, testerPage(viewer));
       return send(404);
     }
     if (req.method !== "POST") return send(405);
-    if (req.headers.origin !== origin) return send(403);
+    if (req.headers.origin !== origin) return send(403, page("Form blocked",
+      `<a href="${base}/sign-in">Return to sign-in</a>`,
+      "Open the portal or your original invitation link directly in your browser and try again."));
     const client = req.headers["x-alpha-client"] ?? req.socket.remoteAddress;
     if (!admit(client)) return send(429, page("Try again shortly", `<a href="${base}/sign-in">Log in</a>`), { "Retry-After": "60" });
     active++;
     try {
       const value = await readForm(req);
       if (path === base + "/sign-in") return redirect("/", await accounts.logIn(value("email"), value("password"), value("code").trim()));
-      if (path === base + "/enroll") return redirect(base + "/account",
-        await accounts.enroll(value("email"), value("invite").trim(), value("password")));
+      if (path === base + "/enroll") return redirect(game ? "/" : base + "/account",
+        await accounts.enroll(value("email"), value("invite").trim(), value("password"),
+          { intent: value("intent"), login: value("login"), name: value("name"), deviceToken: value("deviceToken") }));
+      if (path === base + "/reset" && !game) {
+        await accounts.resetPassword(value("email"), value("reset").trim(), value("password"), value("code").trim());
+        return redirect(base + "/sign-in", "");
+      }
       if (!viewer) return send(403);
-      if (path === base + "/sign-out") { accounts.end(viewer); return redirect(base + "/sign-in", ""); }
+      if (path === base + "/sign-out") {
+        accounts.end(viewer);
+        if (game) await game.disconnect(viewer.game_profile);
+        return redirect(base + "/sign-in", "");
+      }
       if (path === base + "/mfa/start") {
         const seed = await accounts.beginMfa(viewer, value("password"));
         return send(200, page("Set up two-factor authentication",
@@ -163,7 +202,11 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
         return send(200, testerPage(viewer, mailInvite ? "Email delivery failed." : "Invitation created.",
           `<label>Invitation link<input value="${escape(url)}" readonly></label>`));
       }
-      if (path === base + "/testers/revoke") { accounts.revoke(value("email")); return redirect(base + "/testers"); }
+      if (path === base + "/testers/revoke") {
+        const profile = accounts.revoke(value("email"));
+        if (game && profile) await game.disconnect(profile);
+        return redirect(base + "/testers");
+      }
       if (path === base + "/testers/restore") { accounts.restore(value("email")); return redirect(base + "/testers"); }
       return send(404);
     } catch (error) {
@@ -171,6 +214,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
       if (path === base + "/sign-in" || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
+      if (path === base + "/reset") return send(400, resetPage(message));
       if (path?.startsWith(base + "/testers/")) return send(400, testerPage(viewer, message));
       return send(400, page("Account", viewer ? securityPage(viewer) : "", message));
     } finally { active--; }
@@ -180,28 +224,53 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
 function sendmail(program, sender) {
   if (!isAbsolute(program)) throw Error("Use an absolute sendmail executable path.");
   const from = emailAddress(sender);
-  return (recipient, url) => new Promise((resolveMail, reject) => {
+  return (recipient, subject, body) => new Promise((resolveMail, reject) => {
     const child = spawn(program, ["-t", "-i"], { stdio: ["pipe", "ignore", "ignore"], timeout: 8000 });
     child.once("error", reject);
     child.once("exit", code => code === 0 ? resolveMail() : reject(Error("Mail delivery failed.")));
     child.stdin.on("error", reject);
-    child.stdin.end(`From: ${from}\nTo: ${recipient}\nSubject: Avensky alpha invitation\nContent-Type: text/plain; charset=utf-8\n\n${url}\n\nThis invitation expires in three days.\n`);
+    child.stdin.end(`From: ${from}\nTo: ${recipient}\nSubject: ${subject}\nContent-Type: text/plain; charset=utf-8\n\n${body}\n`);
   });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const { AVENSKY_ALPHA_STATE, AVENSKY_ALPHA_KEY, AVENSKY_ALPHA_ORIGIN, AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER } = process.env;
+  const { AVENSKY_ALPHA_STATE, AVENSKY_ALPHA_KEY, AVENSKY_ALPHA_ORIGIN, AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER,
+    AVENSKY_ALPHA_GAME_KEY } = process.env;
   const origin = AVENSKY_ALPHA_ORIGIN || "https://staging.avensky.com";
   if (origin !== "https://staging.avensky.com" || !AVENSKY_ALPHA_STATE || !isAbsolute(AVENSKY_ALPHA_STATE)
     || !/^[0-9a-f]{64}$/i.test(AVENSKY_ALPHA_KEY ?? "")) throw Error("Configure the staging origin, state directory and encryption key.");
   process.umask(0o077);
-  const accounts = testerAccounts(join(AVENSKY_ALPHA_STATE, "testers.sqlite3"), Buffer.from(AVENSKY_ALPHA_KEY, "hex"));
-  if (process.argv[2] === "invite-admin") {
-    const { code } = accounts.issueInvite(process.argv[3] ?? "", true);
-    process.stdout.write(origin + base + "/enroll#" + code + "\n");
-    accounts.close();
-  } else if (process.argv.length === 2) {
-    const mailInvite = AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
-    createPortal({ origin, accounts, mailInvite }).listen(9061, "127.0.0.1");
-  } else throw Error("Use invite-admin with an email, or start the portal without arguments.");
+  const game = AVENSKY_ALPHA_GAME_KEY ? gameBridge(AVENSKY_ALPHA_GAME_KEY) : undefined;
+  const accounts = testerAccounts(join(AVENSKY_ALPHA_STATE, game ? "game-access.sqlite3" : "testers.sqlite3"),
+    Buffer.from(AVENSKY_ALPHA_KEY, "hex"), game);
+  const [command, email, option, ...extra] = process.argv.slice(2);
+  const configuredMail = () => AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
+  if (command === undefined) {
+    const mail = game ? undefined : configuredMail();
+    const mailInvite = mail && ((recipient, url) => mail(recipient, "Avensky alpha invitation", `${url}\n\nThis invitation expires in three days.`));
+    createPortal({ origin, accounts, mailInvite, game }).listen(9061, "127.0.0.1");
+    if (game) gameSocketGate({ accounts, key: AVENSKY_ALPHA_GAME_KEY, origin }).listen(9062, "127.0.0.1");
+  } else {
+    try {
+      if (command === "invite-admin" && email && !option && !extra.length) {
+        const { code } = accounts.issueInvite(email, true);
+        process.stdout.write(origin + base + "/enroll#" + code + "\n");
+      } else if (command === "reset-password" && email && (!option || option === "--email") && !extra.length) {
+        const mail = option === "--email" ? configuredMail() : undefined;
+        if (option === "--email" && !mail) throw Error("Configure the portal mail relay before using --email.");
+        const reset = accounts.issuePasswordReset(email);
+        const url = origin + base + "/reset#" + reset.code;
+        if (option === "--email") {
+          await mail(reset.email, "Reset your Avensky alpha password", `${url}\n\nThis one-use link expires in 30 minutes.`);
+          process.stdout.write("Password reset email submitted to the mail relay.\n");
+        } else {
+          process.stdout.write(url + "\n");
+        }
+      } else {
+        throw Error("Use invite-admin EMAIL or reset-password EMAIL [--email], or start the portal without arguments.");
+      }
+    } finally {
+      accounts.close();
+    }
+  }
 }

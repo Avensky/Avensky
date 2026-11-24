@@ -20,6 +20,8 @@ bitflags = "2"
 argon2 = "0.5.3"
 sha2 = "0.10"
 rusqlite = { version = "0.37.0", features = ["bundled"] }
+subtle = "2.6"
+hmac = "0.12"
 
 # A single release codegen unit avoids cross-unit serde linkage failures and
 # empty optimized physics objects observed with the current Rust toolchain.

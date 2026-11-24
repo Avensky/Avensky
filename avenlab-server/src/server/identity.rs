@@ -14,57 +14,17 @@ impl Server {
     ) -> Result<Value, String> {
         let text = |key: &str| value.get(key).and_then(Value::as_str).unwrap_or_default();
         let credential = if matches!(action, "account_register" | "account_login") {
-            let access = self
-                .accounts
-                .as_ref()
-                .ok_or("Player accounts are unavailable on this server.")?;
             let registering = action == "account_register";
-            let login = accounts::normalize_login(text("login")).map_err(|error| {
-                if registering {
-                    error
-                } else {
-                    accounts::LOGIN_FAILED.to_owned()
-                }
-            })?;
-            let password = text("password").to_owned();
             if registering {
                 valid_name(text("name"), 24)?;
-                accounts::validate_password(&password)?;
             }
-            let permit = access.admit(&login).await?;
-            let hash = if registering {
-                tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-                    accounts::hash_password(&password)
-                })
-                .await
-                .map_err(|_| "The password worker stopped.")??
-            } else {
-                let hash = self
-                    .data
-                    .lock()
-                    .await
-                    .profiles
-                    .values()
-                    .filter_map(|profile| profile.account.as_ref())
-                    .find(|account| account.login == login)
-                    .map(|account| account.password_hash.clone());
-                tokio::task::spawn_blocking(move || {
-                    let _permit = permit;
-                    if accounts::verify_password(&password, hash.as_deref()) {
-                        hash.ok_or(accounts::LOGIN_FAILED)
-                    } else {
-                        Err(accounts::LOGIN_FAILED)
-                    }
-                })
-                .await
-                .map_err(|_| "The password worker stopped.")??
-            };
-            Some((login, hash))
+            Some(
+                self.account_credentials(text("login"), text("password"), registering)
+                    .await?,
+            )
         } else {
             None
         };
-
         let _operation = self.operations.lock().await;
         let connection = self
             .connections
@@ -79,30 +39,14 @@ impl Server {
         let (profile_id, token) = match action {
             "account_register" => {
                 let (login, hash) = credential.expect("Registration passed the password check");
-                if next.profiles.values().any(|profile| {
-                    profile
-                        .account
-                        .as_ref()
-                        .is_some_and(|account| account.login == login)
-                }) {
-                    return Err("That account name is unavailable.".into());
-                }
-                let profile_id = match current {
-                    Some(existing) if next.profile(existing)?.account.is_none() => {
-                        existing.to_owned()
-                    }
-                    Some(_) => return Err("Sign out before registering another account.".into()),
-                    None => next.authenticate(None, text("name"))?.0,
-                };
-                let profile = next
+                let profile_id =
+                    Self::create_game_account(&mut next, current, text("name"), login, hash)?;
+                let token = next
                     .profiles
                     .get_mut(&profile_id)
-                    .ok_or("The player profile is unavailable.")?;
-                profile.name = valid_name(text("name"), 24)?;
-                profile.token_hash.clear();
-                let mut account = Account::new(login, hash);
-                let token = account.issue();
-                profile.account = Some(account);
+                    .and_then(|profile| profile.account.as_mut())
+                    .ok_or("The player account is unavailable.")?
+                    .issue();
                 (Some(profile_id), Some(token))
             }
             "account_login" => {
@@ -181,5 +125,85 @@ impl Server {
         }
         self.publish().await;
         Ok(json!({"profile_id":profile_id,"token":token,"name":name,"account":account}))
+    }
+
+    pub(super) async fn account_credentials(
+        &self,
+        login: &str,
+        password: &str,
+        registering: bool,
+    ) -> Result<(String, String), String> {
+        let access = self
+            .accounts
+            .as_ref()
+            .ok_or("Player accounts are unavailable on this server.")?;
+        let login = accounts::normalize_login(login).map_err(|error| {
+            if registering {
+                error
+            } else {
+                accounts::LOGIN_FAILED.to_owned()
+            }
+        })?;
+        if registering {
+            accounts::validate_password(password)?;
+        }
+        let permit = access.admit(&login).await?;
+        let hash = if registering {
+            None
+        } else {
+            self.data
+                .lock()
+                .await
+                .profiles
+                .values()
+                .filter_map(|profile| profile.account.as_ref())
+                .find(|account| account.login == login)
+                .map(|account| account.password_hash.clone())
+        };
+        let password = password.to_owned();
+        let hash = tokio::task::spawn_blocking(move || {
+            let _permit = permit;
+            if registering {
+                accounts::hash_password(&password)
+            } else if accounts::verify_password(&password, hash.as_deref()) {
+                hash.ok_or_else(|| accounts::LOGIN_FAILED.to_owned())
+            } else {
+                Err(accounts::LOGIN_FAILED.to_owned())
+            }
+        })
+        .await
+        .map_err(|_| "The password worker stopped.")??;
+        Ok((login, hash))
+    }
+
+    pub(super) fn create_game_account(
+        data: &mut SocialData,
+        current: Option<&str>,
+        name: &str,
+        login: String,
+        hash: String,
+    ) -> Result<String, String> {
+        if data.profiles.values().any(|profile| {
+            profile
+                .account
+                .as_ref()
+                .is_some_and(|account| account.login == login)
+        }) {
+            return Err("That account name is unavailable.".into());
+        }
+        let name = valid_name(name, 24)?;
+        let profile_id = match current {
+            Some(existing) if data.profile(existing)?.account.is_none() => existing.to_owned(),
+            Some(_) => return Err("Sign out before registering another account.".into()),
+            None => data.authenticate(None, &name)?.0,
+        };
+        let profile = data
+            .profiles
+            .get_mut(&profile_id)
+            .ok_or("The player profile is unavailable.")?;
+        profile.name = name;
+        profile.token_hash.clear();
+        profile.account = Some(Account::new(login, hash));
+        Ok(profile_id)
     }
 }

@@ -37,6 +37,7 @@ fn with_limits(messages: usize, max_bytes: usize) -> (Sender, Receiver) {
 
 impl Sender {
     pub fn failure(&self) -> watch::Receiver<bool> { self.failed.subscribe() }
+    pub fn close(&self) { self.failed.send_replace(true); }
     pub fn send(&self, text: String) -> Result<(), ()> {
         if *self.failed.borrow() { return Err(()); }
         let bytes = text.len();
