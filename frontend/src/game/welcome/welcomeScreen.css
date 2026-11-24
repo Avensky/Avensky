@@ -2,13 +2,12 @@
   position: fixed;
   inset: var(--welcome-top, 0px) 0 auto;
   height: var(--welcome-height, 100dvh);
+  z-index: 1;
   overflow: hidden;
   color: #f2f3f8;
-  background: #100b1c;
   isolation: isolate;
   touch-action: pan-y;
 }
-.welcome-screen .menu-flare-background { position: absolute; }
 .welcome-scroll {
   position: relative;
   z-index: 1;

@@ -88,6 +88,9 @@ export function testerAccounts(path, key, game) {
     CREATE TABLE IF NOT EXISTS game_profiles (
       email TEXT PRIMARY KEY REFERENCES testers(email), profile_id TEXT NOT NULL UNIQUE, login TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS invite_game_logins (
+      digest TEXT PRIMARY KEY REFERENCES invitations(digest) ON DELETE CASCADE, login TEXT NOT NULL
+    );
   `);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
@@ -148,35 +151,40 @@ export function testerAccounts(path, key, game) {
       return game && !viewer?.game_profile ? undefined : viewer;
     },
     end(viewer) { run("DELETE FROM sessions WHERE digest = ?", viewer.digest); },
-    issueInvite(raw, admin = false) {
+    issueInvite(raw, admin = false, gameLogin = "") {
       const email = emailAddress(raw);
+      const login = gameLogin.trim();
+      if (login && (!game || !/^[a-z0-9_.+@-]{3,254}$/i.test(login)))
+        throw Error("Enter a valid existing game login for this invitation.");
       if (tester(email)) throw Error("This email already has a tester account.");
       const code = token();
+      const digest = hash(code);
       transaction(() => {
         run("DELETE FROM invitations WHERE expires <= ? OR email = ?", now(), email);
         if (get("SELECT count(*) AS count FROM invitations").count >= 250)
           throw Error("The pending invitation limit has been reached.");
-        run("INSERT INTO invitations VALUES (?, ?, ?, ?)", hash(code), email, Number(admin), now() + INVITE_AGE);
+        run("INSERT INTO invitations VALUES (?, ?, ?, ?)", digest, email, Number(admin), now() + INVITE_AGE);
+        if (login) run("INSERT INTO invite_game_logins VALUES (?, ?)", digest, login);
       });
       return { email, code };
     },
-    async enroll(raw, code, password, gameAccount = {}) {
+    async enroll(raw, code, password, savedDevice) {
       const email = emailAddress(raw);
       if (!/^[0-9a-f]{64}$/.test(code)) throw Error("Enter the invitation code from your email.");
       const digest = hash(code);
-      const invitation = () => get("SELECT * FROM invitations WHERE digest = ? AND email = ? AND expires > ?", digest, email, now());
-      if (!invitation()) throw Error("The invitation is invalid or expired.");
+      const invitation = () => get(`SELECT i.*, g.login AS game_login
+        FROM invitations i LEFT JOIN invite_game_logins g ON g.digest = i.digest
+        WHERE i.digest = ? AND i.email = ? AND i.expires > ?`, digest, email, now());
+      const pending = invitation();
+      if (!pending) throw Error("The invitation is invalid or expired.");
       let link;
       let salt = "", passwordDigest = "";
       if (game) {
-        const existing = gameAccount.intent === "existing";
-        const device = gameAccount.intent === "device";
-        if (!existing && !device && gameAccount.intent !== "new") throw Error("Choose how to set up your game account.");
-        if (device && !/^[a-f0-9]{64}$/i.test(gameAccount.deviceToken ?? ""))
-          throw Error("Open the invitation in the original browser that holds your guest profile.");
-        const login = existing ? gameAccount.login?.trim() || email : email;
-        const profileId = await game.authenticate(login, password, existing ? undefined : device ? "Guest driver" : gameAccount.name,
-          device ? gameAccount.deviceToken : undefined);
+        const login = pending.game_login || email;
+        const deviceToken = /^[a-f0-9]{64}$/i.test(savedDevice ?? "") ? savedDevice : undefined;
+        const profileId = pending.game_login
+          ? await game.authenticate(login, password)
+          : await game.enroll(email, password, deviceToken);
         link = { profileId, login };
       } else {
         [salt, passwordDigest] = await newPasswordRecord(password);

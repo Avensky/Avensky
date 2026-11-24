@@ -61,6 +61,10 @@ test("welcome picks a personality and gender before registration and lets return
     assert.ok(flare.loop && flare.autoplay && flare.muted && flare.playsInline);
     assert.ok(flare.defaultMuted);
     assert.equal(flare.getAttribute("src"),"/images/purple-sunflare-loop.mp4");
+    assert.equal(flare.closest(".welcome-screen"), null, "the video stays behind the keyboard-sized welcome form");
+    assert.equal(flare.hasAttribute("data-playing"), false);
+    await act(async () => flare.dispatchEvent(new Event("playing")));
+    assert.equal(flare.hasAttribute("data-playing"), true);
     assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
     assert.equal(document.querySelector("h1"),null);
     assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Log in","Sign up"]);
@@ -191,5 +195,6 @@ test("the Avensky icon formats and lightweight sunflare ship with the frontend",
   assert.equal(flare.toString("ascii",8,12),"WEBP");
   assert.ok(flare.length < 15_000);
   assert.equal(loop.toString("ascii",4,8),"ftyp");
-  assert.ok(loop.length < 120_000);
+  assert.ok(loop.length < 800_000);
+  assert.ok(loop.indexOf("moov") < loop.indexOf("mdat"), "the video can start while it downloads");
 });

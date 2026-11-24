@@ -50,6 +50,7 @@ export function WelcomeScreen() {
   const [style, setStyle] = useState<string>();
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
+  const [connectionSlow, setConnectionSlow] = useState(false);
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
@@ -63,6 +64,8 @@ export function WelcomeScreen() {
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
+  const showStagingSignIn = connectionSlow && !connected && import.meta.env.MODE === "staging"
+    && window.location.hostname === "staging.avensky.com";
 
   function back() {
     if (pending.current || restoring) return;
@@ -84,8 +87,19 @@ export function WelcomeScreen() {
   }
 
   useEffect(() => {
-    if (!busy) root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
+    if (!busy && !window.matchMedia?.("(pointer: coarse)")?.matches
+        && !root.current?.contains(document.activeElement))
+      root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
   }, [screen, busy, connected]);
+
+  useEffect(() => {
+    if (connected) {
+      setConnectionSlow(false);
+      return;
+    }
+    const timeout = window.setTimeout(() => setConnectionSlow(true), 6000);
+    return () => window.clearTimeout(timeout);
+  }, [connected]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -178,7 +192,8 @@ export function WelcomeScreen() {
   };
   const label = labels[screen];
 
-  return (
+  return <>
+    <MenuFlareBackground animated />
     <main className="welcome-screen" ref={root} data-controller-rows onKeyDown={event => {
       if (event.key === "Escape") back();
       if (!isTypingTarget(event.target) && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) {
@@ -186,7 +201,6 @@ export function WelcomeScreen() {
         navigateFormRows(root.current!, event.target as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
-      <MenuFlareBackground animated />
       <div className="welcome-scroll">
       <div className="welcome-layout" data-step={screen}>
       <div className="welcome-art" aria-hidden="true">
@@ -288,7 +302,9 @@ export function WelcomeScreen() {
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
-        {(busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
+        {showStagingSignIn ? <p role="status" className="welcome-help">
+          Staging could not connect to the game. <a href="/__alpha/sign-in">Open staging sign-in</a>.
+        </p> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
           {working ? "Saving…" : restoring ? "Restoring your profile…" : "Connecting to the game server…"}
         </p>}
         {(error || restoreError) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
@@ -296,5 +312,5 @@ export function WelcomeScreen() {
       </div>
       </div>
     </main>
-  );
+  </>;
 }

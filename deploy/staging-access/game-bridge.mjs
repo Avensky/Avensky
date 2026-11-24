@@ -1,6 +1,11 @@
 import { createServer } from "node:http";
 import { createHmac } from "node:crypto";
 
+const LOGIN_FAILED = "The email, account name, or password is incorrect.";
+const ACCOUNT_EXISTS = "That account name is unavailable.";
+const REGISTERED_DEVICE = "Sign out before registering another account.";
+const LOST_DEVICE = "This profile is unavailable on this server. Create a new device profile.";
+
 export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
   if (!/^[a-f0-9]{64}$/i.test(key)) throw Error("Set the staging game sign-in key.");
   function request(action, fields = {}) {
@@ -21,6 +26,7 @@ export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
         try {
           const result = JSON.parse(data);
           if (result.ok === true) resolve(result.data ?? {});
+          else if (result.type === "welcome") reject(Error("The staging game has not enabled invite sign-in yet."));
           else reject(Error(result.message || "The game account did not accept the request."));
         } catch {
           reject(Error("The staging game returned an invalid sign-in reply."));
@@ -28,11 +34,33 @@ export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
       }, { once: true });
     });
   }
+  async function authenticate(login, password, name, device_token) {
+    const result = await request(name === undefined ? "check" : "register", { login, password, name, device_token });
+    if (!/^[a-f0-9]{32}$/i.test(result.profile_id ?? "")) throw Error("The game profile is unavailable.");
+    return result.profile_id;
+  }
+
+  async function registerEmail(email, password, deviceToken) {
+    try {
+      return await authenticate(email, password, "New player", deviceToken);
+    } catch (error) {
+      if (deviceToken && [REGISTERED_DEVICE, LOST_DEVICE].includes(error.message))
+        return registerEmail(email, password);
+      if (error.message === ACCOUNT_EXISTS)
+        throw Error("This email already has an Avensky account. Use its game password.");
+      throw error;
+    }
+  }
+
   return {
-    async authenticate(login, password, name, device_token) {
-      const result = await request(name === undefined ? "check" : "register", { login, password, name, device_token });
-      if (!/^[a-f0-9]{32}$/i.test(result.profile_id ?? "")) throw Error("The game profile is unavailable.");
-      return result.profile_id;
+    authenticate,
+    async enroll(email, password, deviceToken) {
+      try {
+        return await authenticate(email, password);
+      } catch (error) {
+        if (error.message !== LOGIN_FAILED) throw error;
+        return registerEmail(email, password, deviceToken);
+      }
     },
     async serverId() {
       const { server_id } = await request("metadata");

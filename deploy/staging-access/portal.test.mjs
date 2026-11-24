@@ -121,17 +121,24 @@ test("a reset link replaces the admin password once and invalidates old sessions
   assert.equal(viewer.admin, 1);
 });
 
-test("single sign-in links existing game identities and gates sockets and assets", async t => {
+test("one invitation form signs in by email and gates sockets and assets", async t => {
   const key = randomBytes(32).toString("hex");
   const adminId = "a".repeat(32);
   const testerId = "b".repeat(32);
   const calls = [];
   const game = {
-    async authenticate(login, attemptedPassword, name, deviceToken) {
-      calls.push([login, name, deviceToken]);
+    async authenticate(login, attemptedPassword) {
+      calls.push(["check", login]);
       if (attemptedPassword !== password) throw Error("Wrong game password.");
-      if (login === "old_racer") return adminId;
-      if (login === "tester@example.net" && deviceToken === "c".repeat(64)) return testerId;
+      if (login === "admin@example.net") return adminId;
+      if (login === "tester@example.net") return testerId;
+      throw Error("Unknown game account.");
+    },
+    async enroll(email, attemptedPassword, deviceToken) {
+      calls.push(["join", email, deviceToken]);
+      if (attemptedPassword !== password) throw Error("Wrong game password.");
+      if (email === "admin@example.net") return adminId;
+      if (email === "tester@example.net" && deviceToken === "c".repeat(64)) return testerId;
       throw Error("Unknown game account.");
     },
     async disconnect(profile) { calls.push(profile); },
@@ -155,11 +162,14 @@ test("single sign-in links existing game identities and gates sockets and assets
     body: new URLSearchParams(fields),
   });
   assert.equal((await fetch(socket, { headers: { origin } })).status, 401);
-  assert.equal((await post("enroll", { email: "unknown@example.net", intent: "new", invite: "1".repeat(64), password })).status, 400);
+  assert.equal((await post("enroll", { email: "unknown@example.net", invite: "1".repeat(64), password })).status, 400);
   assert.equal(calls.length, 0);
 
   const admin = accounts.issueInvite("admin@example.net", true);
-  const enrollment = { email: admin.email, intent: "existing", login: "old_racer", invite: admin.code };
+  const enrollment = { email: admin.email, invite: admin.code };
+  const enrollPage = await (await fetch(url + "enroll")).text();
+  assert.doesNotMatch(enrollPage, /name="intent"|name="login"|Link an existing account/);
+  assert.match(enrollPage, /purple-sunflare-loop\.mp4/);
   assert.equal((await post("enroll", { ...enrollment, password: "a wrong game password" })).status, 400);
   const linked = await post("enroll", { ...enrollment, password });
   assert.equal(linked.status, 303);
@@ -172,7 +182,7 @@ test("single sign-in links existing game identities and gates sockets and assets
   assert.equal(manual.status, 200);
   const [, invite] = (await manual.text()).match(/enroll#([a-f\d]{64})/);
   const tester = await post("enroll", {
-    email: "tester@example.net", invite, intent: "device", deviceToken: "c".repeat(64), password,
+    email: "tester@example.net", invite, deviceToken: "c".repeat(64), password,
   });
   assert.equal(tester.status, 303);
   const cookie = tester.headers.get("set-cookie").split(";")[0];
@@ -191,4 +201,22 @@ test("single sign-in links existing game identities and gates sockets and assets
   assert.equal(calls.at(-1), testerId);
   assert.equal((await fetch(socket, { headers: { origin, cookie } })).status, 401);
   assert.equal((await fetch(url + "verify", { headers: { cookie } })).status, 401);
+});
+
+test("a moderator can preserve a legacy profile without presenting a second login form", async t => {
+  const profile = "b".repeat(32);
+  const game = {
+    async authenticate(login, attemptedPassword) {
+      assert.equal(login, "legacy_racer");
+      assert.equal(attemptedPassword, password);
+      return profile;
+    },
+  };
+  const accounts = testerAccounts(":memory:", randomBytes(32), game);
+  t.after(() => accounts.close());
+  const invite = accounts.issueInvite("legacy@example.net", true, "legacy_racer");
+  const session = await accounts.enroll(invite.email, invite.code, password);
+  assert.equal(accounts.viewer(session).game_profile, profile);
+  const returning = await accounts.logIn(invite.email, password, "");
+  assert.equal(accounts.viewer(returning).game_profile, profile);
 });

@@ -4,6 +4,7 @@ import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 function MenuFlareLoop() {
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
   const ref = useRef<HTMLVideoElement>(null);
+  const [hasPlayed, setHasPlayed] = useState(false);
   const [systemReducedMotion, setSystemReducedMotion] = useState(
     () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false,
   );
@@ -29,17 +30,20 @@ function MenuFlareLoop() {
     video.addEventListener("loadeddata", play, { once: true });
     document.addEventListener("visibilitychange", play);
     document.addEventListener("pointerup", play, { capture: true, passive: true });
+    document.addEventListener("touchend", play, { capture: true, passive: true });
     document.addEventListener("keydown", play, { capture: true });
     play();
     return () => {
       video.removeEventListener("loadeddata", play);
       document.removeEventListener("visibilitychange", play);
       document.removeEventListener("pointerup", play, true);
+      document.removeEventListener("touchend", play, true);
       document.removeEventListener("keydown", play, true);
     };
   }, [reducedMotion, systemReducedMotion]);
   if (reducedMotion || systemReducedMotion) return null;
   return <video ref={ref} autoPlay loop muted playsInline preload="auto" poster="/images/purple-sunflare.webp"
+    data-playing={hasPlayed || undefined} onPlaying={() => setHasPlayed(true)}
     src="/images/purple-sunflare-loop.mp4" onError={event => { event.currentTarget.hidden = true; }} />;
 }
 
