@@ -30,6 +30,38 @@ import { restoreDressMaterial } from "./dressMaterials";
 
 export type WardrobeGarmentSource = { item: NonNullable<ReturnType<typeof getWardrobeGarment>>; scene: Object3D; authoredFit?: boolean };
 
+function fitJerkinShirt(meshes: readonly SkinnedMesh[]) {
+  const outer = meshes.find(mesh => mesh.name === "CLOTH_MEDIEVAL_08_0_0");
+  const shirt = meshes.find(mesh => mesh.name === "CLOTH_MEDIEVAL_08_1_1");
+  const index = shirt?.geometry.getIndex();
+  if (!outer || !shirt || !index) return;
+  const coat = bodySurface(outer.geometry);
+  if (!coat) return;
+  const position = shirt.geometry.getAttribute("position");
+  const hidden = prepareWardrobeCoverage([coat], -.012);
+  const a = new Vector3(), b = new Vector3(), c = new Vector3(), center = new Vector3();
+  const beneathJerkin = (point: Vector3) => point.y < 1.421 && point.y > 1.09 && Math.abs(point.x) < .34;
+  const coveredTorso = (point: Vector3) => point.y < 1.385 && Math.abs(point.x) < .151;
+  const visible: number[] = [];
+  // The original undershirt is exposed at the collar and below the short
+  // sleeve. Remove the hidden faces that break through the quilted outer layer.
+  for (let i = 0; i < index.count; i += 3) {
+    const ai = index.getX(i), bi = index.getX(i + 1), ci = index.getX(i + 2);
+    a.fromBufferAttribute(position, ai);
+    b.fromBufferAttribute(position, bi);
+    c.fromBufferAttribute(position, ci);
+    if (coveredTorso(a) && coveredTorso(b) && coveredTorso(c)) continue;
+    center.copy(a).add(b).add(c).multiplyScalar(1 / 3);
+    if (beneathJerkin(a) && beneathJerkin(b) && beneathJerkin(c) && hidden(center, a, b, c, true)) continue;
+    visible.push(ai, bi, ci);
+  }
+  coat.geometry.dispose();
+  if (visible.length === index.count) return;
+  const geometry = shirt.geometry.clone().setIndex(visible);
+  shirt.geometry = geometry;
+  return geometry;
+}
+
 export function replacesVillagerBody(slot: WardrobeGarmentSlot) {
   return slot === "top" || slot === "skirt" || slot === "dress";
 }
@@ -539,6 +571,10 @@ export function prepareWardrobeGarments(
       }
     }
     fitDress?.dispose();
+    if (item.id === "medieval-08") {
+      const shirt = fitJerkinShirt(garmentMeshes);
+      if (shirt) fittedGarments.push(shirt);
+    }
     if (isHoodedGown) {
       hoodedGown = prepareHoodedGown(garmentMeshes.filter(mesh => mesh.userData.wardrobeRole !== "shorts"), original.skeleton);
       restored.gownSleeves = Boolean(hoodedGown);
