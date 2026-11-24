@@ -1,7 +1,7 @@
 import { isMirrorMakeupEmote, MAKEUP_EMOTES } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
 import { FitReview } from "./FitReview";
-import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type Ref } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { readLocalCharacter, writeLocalCharacter } from "./localOutfits";
 import { ControllerAction } from "../../components/controller";
@@ -10,7 +10,7 @@ import { requestSocial } from "../../net/socialClient";
 import { selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, VILLAGER_ID, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
@@ -23,6 +23,7 @@ import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom } from "./DressingRoom";
 import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
+import { setWardrobeRemoval } from "./wardrobeGarments";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
@@ -119,7 +120,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const [trial, setTrial] = useState<CharacterChoice>();
   const [loadedOutfit, setLoadedOutfit] = useState(false);
   const activeTrial = trial?.id === choice.id ? trial : undefined;
-  const previewChoice = activeTrial ?? choice;
+  const wardrobeChoice = activeTrial ?? choice;
+  const previewChoice = useMemo(() => fittedHair && wardrobeChoice.id === VILLAGER_ID
+    ? setWardrobeRemoval(wardrobeChoice, "hat", true)
+    : wardrobeChoice, [fittedHair, wardrobeChoice]);
   const [locked, setLocked] = useState(Boolean(initialChoice));
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "local" | "error">("idle");
   const [message, setMessage] = useState("");
