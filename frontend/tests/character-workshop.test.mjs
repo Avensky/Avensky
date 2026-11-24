@@ -347,7 +347,11 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
 });
 
 test("the linen hem and skirt share the same skinned seam and keep the upper binding", async () => {
-  const vite = await createServer({ configFile: false, server: { middlewareMode: true, hmr: false, ws: false }, logLevel: "error" });
+  const vite = await createServer({
+    configFile: false, appType: "custom", logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+  });
   const strip = (heights, uvOrigin) => {
     const geometry = new BufferGeometry().setIndex([0, 1, 2, 2, 1, 3])
       .setAttribute("position", new Float32BufferAttribute([
