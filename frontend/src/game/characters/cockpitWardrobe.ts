@@ -100,8 +100,18 @@ export function cockpitWardrobe(driver: Object3D) {
   const inverse = new Matrix4();
   const leftElbow = driver.getObjectByName("lowerarm_l"), leftWrist = driver.getObjectByName("hand_l");
   const rightElbow = driver.getObjectByName("lowerarm_r"), rightWrist = driver.getObjectByName("hand_r");
+  const seatedDress: { mesh: Mesh; index: number }[] = [];
+  driver.getObjectByName("wardrobe-local-tennis-dress")?.traverse(part => {
+    if (!(part instanceof Mesh)) return;
+    const index = part.morphTargetDictionary?.Seated;
+    if (index !== undefined && part.morphTargetInfluences) seatedDress.push({ mesh: part, index });
+  });
+  const setSeatedDress = (amount: number) => {
+    for (const { mesh, index } of seatedDress) mesh.morphTargetInfluences![index] = amount;
+  };
   return {
     sample(car: Object3D, rim: Vector3, radius: number, amount: number) {
+      setSeatedDress(amount);
       car.updateWorldMatrix(true, false);
       inverse.copy(car.matrixWorld).invert();
       for (const { mesh, uniforms } of cloth) {
@@ -120,6 +130,7 @@ export function cockpitWardrobe(driver: Object3D) {
       }
     },
     stop() {
+      setSeatedDress(0);
       for (const { uniforms } of cloth) uniforms.garageLap.value = 0;
     },
   };

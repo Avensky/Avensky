@@ -192,7 +192,9 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     return wardrobe?.set === set && !garments ? wardrobe.waist : FITTED_PRESETS[set]?.waist ?? "tucked";
   }
   function wearOutfit(outfit: string, wardrobe?: WardrobeChoice) {
+    const newOutfit = outfit !== choice.outfit || wardrobe?.set !== choice.wardrobe?.set || Boolean(choice.garments?.dress);
     onPreviewOutfit({ ...choice, outfit, wardrobe, garments: undefined,
+      ...(newOutfit && { appearance: { ...appearance, color: "original", accent: undefined } }),
       wardrobeTrial: undefined, wardrobeEase: undefined, removedClothing: undefined, bra: undefined });
   }
   function tryCorset(set: string) {

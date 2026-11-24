@@ -12,6 +12,9 @@ import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type Charact
 import { StylizedDriver } from "./StylizedDriver";
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
 import { CharacterLoadingEffect } from "./CharacterLoadingEffect";
+import { SpaceBunsPreview } from "./fittedWardrobe/SpaceBunsPreview";
+import { DressContactMotion } from "./fittedWardrobe/DressContactMotion";
+import { WedgeSandalMotion } from "./fittedWardrobe/WedgeSandalMotion";
 import { applyVillagerLook, prepareVillager, villagerModelUrl } from "./villagerModel";
 import type { GarageLeanFit } from "./garageLean";
 import type { GarageCockpit } from "../preview/garageCockpit";
@@ -95,8 +98,13 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
     corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
   }), [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, corsetScene, corsetSet]);
   const model = useCommittedResource(createModel);
-  return model ? <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
-    leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} /> : null;
+  return model ? <>
+    <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
+    <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
+    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID} />
+    <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
+      leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} />
+  </> : null;
 }
 
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }:

@@ -18,6 +18,7 @@ export const clothingPieceLabel = (piece: ClothingPiece) => CLOTHING_PIECES.find
 export const isUnderwearPiece = (piece: ClothingPiece): piece is UnderwearPiece => piece === "bra" || piece === "briefs";
 export const skirtUsesUnderwear = (id?: string) => id === "gothic-skirt-02";
 export const DEFAULT_UNDERWEAR_COLORS = { color: "#826a9f", accent: "#d99eaf" };
+export const DRESS_UNDERWEAR_COLORS = { color: "#cc83a1", accent: "#f0b8ce" };
 
 export function clothingColorKey(choice: Pick<CharacterChoice, "outfit" | "wardrobe" | "wardrobeTrial" | "appearance" | "garments">, piece: ClothingPiece) {
   if (isUnderwearPiece(piece)) return `underwear:${piece}`;
@@ -37,6 +38,9 @@ export function clothingColors(look: CharacterLook, piece: ClothingPiece) {
 
 export function underwearColors(look: CharacterLook, piece: UnderwearPiece): Required<Pick<PieceColors, "color" | "accent">> {
   const dye = clothingColors(look, piece);
+  if (look.garments?.dress) {
+    return { color: dye?.color ?? DRESS_UNDERWEAR_COLORS.color, accent: dye?.accent ?? DRESS_UNDERWEAR_COLORS.accent };
+  }
   const skirtDye = piece === "briefs" && skirtUsesUnderwear(look.garments?.skirt) ? clothingColors(look, "skirt") : undefined;
   const outfitDye = look.appearance.color !== "original" ? look.fabric : undefined;
   return {
@@ -89,7 +93,7 @@ export function wornClothing(choice: CharacterChoice): ClothingPiece[] {
     const coveredBottom = shown.some(piece => piece === "skirt" || piece === "dress" || piece === "shorts");
     const autoBra = !corset && (removed.includes("top") || removed.includes("corset"));
     if (braFitsWith(shown, corset?.set) && (look?.bra ?? autoBra)) shown.push("bra");
-    if (!coveredBottom && (removed.includes("skirt") || removed.includes("village-skirt"))) shown.push("briefs");
+    if (shown.includes("dress") || (!coveredBottom && (removed.includes("skirt") || removed.includes("village-skirt")))) shown.push("briefs");
   }
   return shown;
 }

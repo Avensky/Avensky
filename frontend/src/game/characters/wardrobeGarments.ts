@@ -4,6 +4,7 @@ import type { Object3D, SkinnedMesh } from "three";
 import villageItems from "../../../../packages/wardrobe-catalog/character-village-pieces.json";
 import importedItems from "../../../../packages/wardrobe-catalog/character-garments.json";
 import discoveredManifest from "../../../../packages/wardrobe-catalog/discovered-wardrobe-garments.json";
+import { fittedTennisGarments } from "./fittedWardrobe/alphaAssets";
 
 export const wardrobeGarmentReplacements = {
   top: ["corset", "shirt", "sleeves", "bow"],
@@ -72,13 +73,16 @@ export type WardrobeGarment = {
   piece: ClothingPiece; url?: string; villageNode?: string; mobileUrl?: string; revisionUrl?: string; retired?: boolean;
   tucksHair?: boolean;
   scalpCap?: boolean;
+  preserveSkin?: boolean;
   detachableSleeves?: boolean;
   description?: string; hideLongHair?: boolean;
   outfit?: { description: string; barefoot?: boolean };
 };
 
 const discoveredItems = discoveredManifest as WardrobeGarment[];
-export const importedWardrobeItems = [...(importedItems as WardrobeGarment[]).filter(item => !item.retired), ...discoveredItems];
+export const importedWardrobeItems: WardrobeGarment[] = [
+  ...(importedItems as WardrobeGarment[]).filter(item => !item.retired), ...discoveredItems, ...fittedTennisGarments,
+];
 
 export const villageWardrobeItems = villageItems as WardrobeGarment[];
 const wardrobeItems = [...importedWardrobeItems, ...villageWardrobeItems];
@@ -134,6 +138,7 @@ export function setWardrobeGarment(choice: CharacterChoice, slot: WardrobeGarmen
     .map(layer => id && slot === "underskirt" && layer === "skirt" ? "outer-skirt" : layer))];
   return { ...choice, garments: Object.keys(garments).length ? garments : undefined,
     removedClothing: removed?.length ? removed : undefined, wardrobeTrial: replacesBodice ? undefined : choice.wardrobeTrial,
+    ...(id && slot === "dress" && id !== choice.garments?.dress && choice.appearance && { appearance: { ...choice.appearance, color: "original", accent: undefined } }),
     ...(id && (slot === "top" || slot === "dress") && { bra: undefined }),
     wardrobeEase: replacesBodice ? undefined : choice.wardrobeEase };
 }

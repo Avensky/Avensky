@@ -12,6 +12,7 @@ import { characterLod, findVillagerModel, hasCharacterModel, hasCompatibleWardro
 import { prepareBuild } from "./scripts/prepare-build.mjs";
 import { publicRoot, releaseOutput, stagingRelease, type StagingRelease } from "./scripts/staging-release.mjs";
 import { isStreamedAsset } from "./src/assets/assetPaths.ts";
+import { fittedHairCatalog, fittedTennisGarments } from "./src/game/characters/fittedWardrobe/alphaAssets.ts";
 import { resolveDeploymentEnvironment } from "./src/net/deploymentEnvironment.ts";
 
 const frontend = fileURLToPath(new URL(".", import.meta.url));
@@ -66,7 +67,9 @@ function assetDefines(release: StagingRelease | null) {
       id: release.id, paths: Object.fromEntries(Object.keys(release.assets).map(path => [path, true])),
     }),
     __HEROES_VEHICLE_PREVIEWS__: JSON.stringify(heroesVehiclePreviews),
-    __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(activeImports.filter(item => hasModel(garmentFile(item.url))).map(item => item.id)),
+    __FITTED_HAIR_URLS__: JSON.stringify(fittedHairCatalog.filter(item => hasModel(garmentFile(item.url))).map(item => item.url)),
+    __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify([...activeImports, ...fittedTennisGarments]
+      .filter(item => item.url && hasModel(garmentFile(item.url))).map(item => item.id)),
     __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(activeImports.filter(item => item.mobileUrl && hasModel(garmentFile(item.mobileUrl))).map(item => item.id)),
     __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(installedRevisions),
     __STANDALONE_CORSET_LODS__: JSON.stringify(standaloneCorsetLods),

@@ -45,6 +45,12 @@ cd frontend && node --test tests/game-boundary.test.mjs tests/menu-routing.test.
 
 Run `cargo test --locked --manifest-path avenlab-server/Cargo.toml` from the root to exercise the Rust game logic. Production hosting needs a WebSocket route at `/ws/` to the Rust server, or a `VITE_RUST_WS_URL` set at build time. This repository does not configure a domain.
 
+## Vesper’s alpha fitting room
+
+The fitting-room pass covers Space Buns & Loose Waves, the villager hairstyle with its hair piece, and Mia Braided Ponytail. The fitted space buns bind to the current actor rig and use a spring with clearance against the moving shoulders and dress. Device outfits keep the hairstyle ID and palette when the fitted assets are installed.
+
+The fitted GLBs are installed separately. The hair and wardrobe catalog entries resolve against the installed models in local development or the verified asset manifest in staging. See [asset clearance](docs/ASSET_CLEARANCE.md) and [private staging assets](docs/CLOUD_ASSETS.md) for the asset release procedure. The scoped shoulder check covered 318 walk poses and 244 steering and pedal poses in the private alpha. Headwear and physical-device performance remain to be verified.
+
 ## Credits
 
 Frontend inspiration from Domenicobrz’s R3F-in-practice. The upstream project identifies its code license as MIT. Bundled third-party assets retain their own notices.

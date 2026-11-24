@@ -97,7 +97,7 @@ export function resolveWardrobePreview({
 
   const compatibleBody = (source: Object3D | null | undefined) => skeleton ? getWardrobeBodyDonor(source, skeleton) : undefined;
   // Replacements can expose skin cut from the stock Village outfit.
-  const needsBody = Boolean(scene && (corsetUrl || requested.some(({ item, rejected }) => !rejected && replacesVillagerBody(item.slot))
+  const needsBody = Boolean(scene && (corsetUrl || requested.some(({ item, rejected }) => !rejected && (replacesVillagerBody(item.slot) || (item.slot === "shoes" && item.preserveSkin)))
     || look.removedClothing.some(removalNeedsVillagerBody)) && !compatibleBody(scene));
   const loadedCorset = corsetUrl ? sources[corsetUrl] : undefined;
   const bundledCorset = corsetUrl?.startsWith("/models/characters/wardrobe/");

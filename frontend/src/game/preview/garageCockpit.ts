@@ -271,7 +271,8 @@ export function prepareGarageCockpit(
     const ballOffsets = pedalRig ? legs.map(({ foot, ball }, index) => {
       if (!ball) return new Vector3(0, -.047, .125).applyQuaternion(seatedFeet[index].clone().invert());
       // The ball joint sits inside the shoe. Move the contact marker down to its sole.
-      const point = driver.worldToLocal(ball.getWorldPosition(new Vector3())).add(new Vector3(0, -.012, 0));
+      const wedgeSandals = Boolean(driver.getObjectByName("wardrobe-local-wave-wedges"));
+      const point = driver.worldToLocal(ball.getWorldPosition(new Vector3())).add(new Vector3(0, wedgeSandals ? -.034 : -.012, 0));
       return foot.worldToLocal(driver.localToWorld(point));
     }) : undefined;
     const camera = new Object3D();
@@ -476,7 +477,7 @@ export function prepareGarageCockpit(
             planted.y = standingAnkles[index].y;
           }
           const pitch = .13 * throttle + .12 * brake + .12 * clutch - .11 * lifted;
-          anklePitch.setFromAxisAngle(AXLE, pitch);
+          anklePitch.setFromAxisAngle(AXLE, pitch + (driver.getObjectByName("wardrobe-local-wave-wedges") ? .105 * step : 0));
           footRotation.copy(standingFeet[index]).premultiply(shoeTurn).slerp(seatedFeet[index], step).premultiply(anklePitch);
           if (throttlePlate && brakePlate && clutchPlate && ballOffsets) {
             ankle.copy(side > 0 ? clutchPlate : reach.copy(throttlePlate).lerp(brakePlate, id === null && drive ? brake : pose.brakeFoot));

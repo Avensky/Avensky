@@ -16,6 +16,7 @@ avenlab-server/runtime/
 /frontend/public/models/characters/villager/*.full.glb
 /frontend/public/models/characters/shop-bag.glb
 /frontend/src/game/characters/local-assets/
+/frontend/public/models/characters/female/wardrobe/alpha/*.glb
 
 # Safe, public build-time environment templates (never commit secrets)
 !.env.development
