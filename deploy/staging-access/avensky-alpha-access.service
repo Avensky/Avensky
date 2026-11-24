@@ -1,0 +1,22 @@
+[Unit]
+Description=Avensky staging tester access portal
+After=network.target
+
+[Service]
+Type=simple
+User=avensky-alpha
+Group=avensky-alpha
+StateDirectory=avensky-alpha
+StateDirectoryMode=0700
+Environment=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha
+EnvironmentFile=/etc/avensky/staging-alpha.env
+ExecStart=/usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs
+Restart=on-failure
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

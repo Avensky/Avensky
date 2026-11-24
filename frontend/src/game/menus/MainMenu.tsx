@@ -7,12 +7,9 @@ import { MenuIcon } from "../../components/menus/MenuIcon";
 import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { MainMenuProfile } from "./MainMenuProfile";
 
-import { useSocialStore } from "../../store/social/socialStore";
-import { mainMenuItems } from "./menuItems";
-import { openWorldForView } from "../social/openWorld";
+import { MAIN_MENU_ITEMS } from "./menuItems";
 
 export function MainMenu() {
-  const mainWorld = useSocialStore(s => openWorldForView(s.view));
   const selectedIndex = useUIStore((s) => s.selectedMenuIndexById.main);
   const setActiveMenuIndex = useUIStore((s) => s.setActiveMenuIndex);
   const activate = useUIStore((s) => s.activateActiveMenuSelection);
@@ -50,7 +47,7 @@ export function MainMenu() {
         </section>
         <section className="main-menu-actions" aria-label="Main menu">
           <div className="menu-action-list">
-            {mainMenuItems(mainWorld).map((item, index) => (
+            {MAIN_MENU_ITEMS.map((item, index) => (
               <GameButton
                 key={item.id}
                 ref={(el) => {

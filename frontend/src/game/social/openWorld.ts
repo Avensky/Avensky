@@ -18,3 +18,8 @@ export function openWorldForView(view?: SocialView | null) {
 export function findOpenWorld(worlds: SocialWorld[], id = OPEN_WORLD_ID) {
   return worlds.find(world => world.id === id && world.listed && !world.locked && world.mode == null);
 }
+
+export function currentOpenWorld(view?: SocialView | null) {
+  const id = openWorldForView(view);
+  return view && id != null ? findOpenWorld(view.worlds, id) : undefined;
+}

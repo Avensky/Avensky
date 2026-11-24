@@ -101,7 +101,12 @@
   width: 100%;
   height: 100%;
 }
-.menu-flare-background video { object-fit: cover; }
+.menu-flare-background video {
+  display: block;
+  object-fit: cover;
+  object-position: center;
+}
+.menu-flare-background video[hidden] { display: none; }
 .menu-flare-background::after {
   content: "";
   background: linear-gradient(90deg, #060311c9, #0b031a45 48%, #060311c9);

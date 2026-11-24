@@ -1,6 +1,6 @@
 # Staging Open World
 
-Start on the staging site, select a driver and a BRZ, and join **Open World**. Stop on clear, level ground before getting out. The same car stays in the room under its parking brake. Walk, run, or jump nearby, select the parked BRZ, and approach either side to get back in. Other players can see you on foot.
+Start on the staging site, select your character, and open **Play → Open World**. Join the hub and select the BRZ. Stop on clear, level ground before getting out. The same car stays in the room under its parking brake. Walk, run, or jump nearby, select the parked BRZ, and approach either side to get back in. Other players can see you on foot.
 
 | Input | Move | Run | Jump | Enter or exit your BRZ |
 | --- | --- | --- | --- | --- |
@@ -12,7 +12,16 @@ Drag the scene or use the controller's right stick to look around. Aim near a ca
 
 ## Scope and release
 
-The staging Rust service advertises on-foot support for listed, unlocked free-drive worlds. An optional server setting, `AVENLAB_HUB_WORLD_ID`, restricts support to one saved world. Use an assigned main world or point `STAGING_OPEN_WORLD_ID` at that same world for the main menu shortcut. In staging, the shortcut can also find an eligible listed world when no ID is assigned. Race, combat, private, locked, and production worlds continue to use their existing controls.
+The staging Rust service advertises on-foot support for listed, unlocked free-drive worlds. An optional server setting, `AVENLAB_HUB_WORLD_ID`, restricts support to one saved world. Assign a main world or point `STAGING_OPEN_WORLD_ID` at that same world for **Play → Open World**. In staging, Play can also find an eligible listed world when no ID is assigned. Race, combat, private, locked, and production worlds continue to use their existing controls.
+
+## Proposed social and duel rules
+
+- City hubs and repair shops are sanctuaries. Players can meet friends, equip, repair, and form groups there. Incoming duel invitations stay quiet inside sanctuaries, and combat damage stays disabled across the boundary.
+- Duel challenges default to off. Turning them on lets nearby players invite you to a duel in eligible outdoor areas. Both players accept and see the rules before a countdown. Spectators and passengers stay outside the duel.
+- Start with one-on-one, nonlethal sparring in a marked area. The first player to reach the practice limit loses the round. Surrender, disconnection, or leaving the area ends the duel safely. Restore players and keep their normal outfits, inventory, and Open World progress.
+- Keep races, time trials, rescue jobs, and repair meetups available regardless of duel preference. Friends can meet and take on shared challenges without turning on duels.
+
+These are proposed rules. Before staging duels, enforce consent, sanctuary bounds, and duel damage on the server, including both players changing preferences or disconnecting. Test boundary crossings, simultaneous challenges, and nearby nonparticipants.
 
 Publish with the game-enabled staging workflow. It builds the Rust image on Vultr, backs up the staging data volume before replacement, and checks the staging WebSocket before activating the frontend. See [frontend releases](FRONTEND_RELEASES.md#include-the-staging-game-server) and [the scaling architecture](SCALING_ARCHITECTURE.md).
 

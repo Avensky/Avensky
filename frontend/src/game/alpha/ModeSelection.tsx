@@ -31,6 +31,7 @@ import type { MenuAction } from "../../controls/inputRouting";
 import { joinSelectedMode } from "./sessionActions";
 import { SelectionFooter } from "./SelectionChrome";
 import { LobbyChat } from "./LobbyChat";
+import { currentOpenWorld } from "../social/openWorld";
 import "./heroSelection.css";
 
 /** Mode configuration never selects a hero. A real seat assignment opens the
@@ -40,6 +41,8 @@ export function ModeSelection() {
   const profileId=useSocialStore(s=>s.view?.profile.id);
   const profileStatus=useSocialStore(s=>s.profileStatus);
   const profileMessage=useSocialStore(s=>s.message);
+  const hub = useSocialStore(s => currentOpenWorld(s.view));
+  const joinedHub = useSocialStore(s => s.view?.current_world_id === hub?.id && Boolean(hub));
   const profileReady=Boolean(profileId)&&profileStatus!=="restoring";
   const needsProfileChoice=useSocialStore(s=>s.available && s.profileScope===null);
   const selectedWorld=useWorldSelection(s=>s.getSelectedMap());
@@ -53,6 +56,7 @@ export function ModeSelection() {
     [status, setStatus] = useState("");
   const planned = isPlannedMode(mode);
   const match = isMatchMode(mode);
+  const openWorld = mode === "open_world";
   const play = isPlayMenuMode(mode);
   const destinations = GAME_MODES.filter(entry => isPlayMenuMode(entry.id) === play);
   const item = GAME_MODES.find((m) => m.id === canonicalGameMode(mode))!;
@@ -82,7 +86,7 @@ export function ModeSelection() {
     useAlphaStore.getState().chooseTeamSize(next);setStatus("");
   }, []);
   const next = useCallback(async (requestedSize?: MatchTeamSize) => {
-    if (pending.current || planned) return;
+    if (pending.current || planned || (openWorld && !hub)) return;
     const focusedSize=Number((document.activeElement as HTMLElement|null)?.closest<HTMLElement>("[data-match-size]")?.dataset.matchSize);
     const size=requestedSize??focusedSize;
     // Activating a size is the primary action: commit it before the shared
@@ -107,7 +111,7 @@ export function ModeSelection() {
       pending.current = false;
       setBusy(false);
     }
-  }, [planned,profileReady,selectMatchSize]);
+  }, [planned, openWorld, hub, profileReady, selectMatchSize]);
   const recoverProfile=async(connect:()=>Promise<void>)=>{
     if(pending.current||profileStatus==="restoring")return;
     pending.current=true;setBusy(true);setStatus("");
@@ -167,7 +171,11 @@ export function ModeSelection() {
         idPrefix="mode-selection"
         panelId="mode-selection-panel"
         activeTab={item.id}
-        tabs={destinations.map(entry => ({ id: entry.id, label: entry.label, badge: isPlannedMode(entry.id) ? "PLANNED" : undefined }))}
+        tabs={destinations.map(entry => ({
+          id: entry.id, label: entry.label,
+          grow: entry.id === "open_world" ? 1.35 : entry.id === "solo" ? .7 : undefined,
+          badge: isPlannedMode(entry.id) ? "PLANNED" : undefined,
+        }))}
         onTabChange={selectMode}
       />
       <div className="hero-selection-stage" id="mode-selection-panel" role="tabpanel" aria-labelledby={"mode-selection-tab-" + item.id}>
@@ -177,6 +185,9 @@ export function ModeSelection() {
           <small>GAME MODE</small>
           <h2>{item.label}</h2>
           {match&&<p className="alpha-status" role="note">{teamSize===3?'3 VS 3 · One Tank, DPS and Support per team. ':'5 VS 5 · '}First to 3 captures · 15 minutes. Career records are live; {mode==='competitive'?'ranked MMR is pending.':'choose a match size to find a game.'}</p>}
+          {openWorld && <p className="alpha-status">{hub
+            ? `${hub.name} · ${hub.players}/${hub.max_players} players. ${item.description}`
+            : "The shared hub is unavailable."}</p>}
           {mode === "solo" && <p className="alpha-status" role="note">{item.description} City course in development.</p>}
           {!planned&&!profileReady&&<div className="profile-recovery" aria-label="Player profile recovery">
             <p role="status">{connected?profileMessage:"Connect to the game server to choose a player profile."}</p>
@@ -223,11 +234,11 @@ export function ModeSelection() {
         <ControllerAction button="A"
           type="button"
           className="menu-control  alpha-deploy"
-          disabled={busy || planned || ((!connected||!profileReady))}
+          disabled={busy || planned || !connected || !profileReady || (openWorld && !hub)}
           onClick={() => void next(isMatchMode(mode)?useAlphaStore.getState().teamSize:undefined)}
         >
 
-          {busy ? !profileReady?"PREPARING PLAYER…":"FINDING SERVER…" : planned ? "COMING LATER" : "CONTINUE"}
+          {busy ? "JOINING…" : planned ? "COMING LATER" : openWorld ? joinedHub ? "CONTINUE TO OPEN WORLD" : "JOIN OPEN WORLD" : "CONTINUE"}
         </ControllerAction>
       </SelectionFooter>
     </section>

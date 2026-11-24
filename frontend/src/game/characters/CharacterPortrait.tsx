@@ -49,11 +49,15 @@ function portraitMenuAllowsWork({ screen, overlay, isModeLoading }: ReturnType<t
   return screen === "main" && overlay === null && !isModeLoading;
 }
 
-function schedulePortraitWork(work: () => () => void) {
+function schedulePortraitWork(work: () => () => void, inWelcome: boolean) {
   let timer: number | undefined, idle: number | undefined;
   let cancelWork: (() => void) | undefined;
   let quietUntil = performance.now() + PORTRAIT_QUIET_MS;
-  const canRun = () => document.visibilityState !== "hidden" && portraitMenuAllowsWork(useUIStore.getState());
+  const canRun = () => {
+    const state = useUIStore.getState();
+    return document.visibilityState !== "hidden" && (portraitMenuAllowsWork(state)
+      || (inWelcome && state.screen === "welcome" && !state.isModeLoading));
+  };
   const cancel = () => {
     if (timer !== undefined) window.clearTimeout(timer);
     if (idle !== undefined) window.cancelIdleCallback(idle);
@@ -113,11 +117,12 @@ function PortraitImage({ src, label }: { src: string; label?: string }) {
 }
 
 /** Garage portraits use the selected GLB appearance, with art for unavailable models. */
-export function CharacterPortrait({ choice, compact = false, label, welcomePreview }: {
+export function CharacterPortrait({ choice, compact = false, label, welcomePreview, personal = false }: {
   choice: CharacterChoice | null | undefined;
   compact?: boolean;
   label?: string;
   welcomePreview?: "candidate" | "selected";
+  personal?: boolean;
 }) {
   const { id, outfit, appearance, wardrobe } = choice ?? {};
   const look = useMemo(() => characterLook(id && outfit ? { id, outfit, appearance, wardrobe } : null), [id, outfit, appearance, wardrobe]);
@@ -140,12 +145,12 @@ export function CharacterPortrait({ choice, compact = false, label, welcomePrevi
     return () => job.abort();
   });
   useEffect(() => {
-    if (needsBake) return schedulePortraitWork(() => startBake());
-  }, [needsBake, key]);
+    if (needsBake) return schedulePortraitWork(() => startBake(), welcomePreview === "selected");
+  }, [needsBake, key, welcomePreview]);
   if (cached) return <PortraitImage src={cached} label={label} />;
 
   const originalOnly = id === VILLAGER_ID;
-  const face = look && faces[look.character.id];
+  const face = look && (faces[look.character.id] ?? ((personal || welcomePreview) ? faces["niko-park"] : undefined));
   const alternate = look?.outfit.id === look?.character.outfits[1]?.id;
   const palette = look && {
     ...(look.appearance.skin !== "original" && {
@@ -153,7 +158,7 @@ export function CharacterPortrait({ choice, compact = false, label, welcomePrevi
     }),
     ...(look.appearance.hair_color !== "original" && { "--portrait-hair": look.hair }),
   } as CSSProperties;
-  const fallback = originalOnly && !welcomePreview
+  const fallback = originalOnly && !welcomePreview && !personal
     ? <span className="character-portrait character-portrait--unavailable" role={label ? "img" : undefined}
         aria-label={label} aria-hidden={label ? undefined : true} />
     : <svg className="character-portrait" style={palette ?? undefined} viewBox={compact ? "56 16 128 128" : "0 0 240 260"}
@@ -178,7 +183,7 @@ export function CharacterPortrait({ choice, compact = false, label, welcomePrevi
         </g>}
       </> : <path fill="var(--app-muted, #889aa9)" opacity=".64" d="M120 42a28 28 0 1 0 0 56 28 28 0 0 0 0-56Zm-54 83c10-16 32-22 54-22s44 6 54 22l14 57H52Z" />}
     </svg>;
-  return needsBake && url && !welcomePreview
+  return needsBake && url && !welcomePreview && !personal
     ? <span className="character-portrait character-portrait--loading" role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true} />
     : fallback;
 }

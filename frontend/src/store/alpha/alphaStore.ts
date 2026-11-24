@@ -8,8 +8,8 @@ import type { CharacterChoice } from "../../game/characters/characterCatalog";
 export type GameMode = "quickplay" | "competitive" | "skirmish" | "sandbox" | "editor";
 export type MatchTeamSize = 3 | 5;
 export type MatchCategory = "quickplay" | "competitive";
-/** Planned modes are garage destinations, never server mode_join IDs. */
-export type PlayMode = GameMode | "solo";
+/** Open World joins a saved room and Solo is a planned mode. */
+export type PlayMode = GameMode | "open_world" | "solo";
 export type HeroRole = "tank" | "dps" | "support";
 export type HeroFilter = HeroRole | "all" | "air" | "sea";
 export const HERO_FILTERS: HeroFilter[] = ["all", "tank", "dps", "support", "sea", "air"];
@@ -27,6 +27,11 @@ export const GAME_MODES: {
     id: "competitive",
     label: "COMPETITIVE",
     description: "CTF alpha · ranked MMR pending",
+  },
+  {
+    id: "open_world",
+    label: "OPEN WORLD",
+    description: "Meet other players, drive together, or explore on foot.",
   },
   {
     id: "solo",
@@ -257,7 +262,7 @@ export function isMatchMode(mode: string): mode is "quickplay" | "competitive" |
   return mode === "quickplay" || mode === "competitive" || mode === "skirmish";
 }
 export function isPlayMenuMode(mode: PlayMode) {
-  return mode === "solo" || isMatchMode(mode);
+  return mode === "open_world" || mode === "solo" || isMatchMode(mode);
 }
 export function isPlannedMode(mode: PlayMode) {
   return mode === "solo";
