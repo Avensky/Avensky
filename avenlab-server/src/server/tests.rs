@@ -213,6 +213,33 @@ async fn staging_invite_upgrades_a_guest_without_replacing_the_profile() {
     assert!(data.profiles[id].token_hash.is_empty());
     assert!(data.profiles[id].account.is_some());
     drop(data);
+    let lookup = server.staging_account(&json!({
+        "action": "recovery_profile", "login": "DRIVER@example.net"
+    })).await.unwrap();
+    assert_eq!(lookup["profile_id"], id);
+    let old_token = server.data.lock().await.profiles.get_mut(id).unwrap()
+        .account.as_mut().unwrap().issue();
+    let old_password = "a new device recovery passphrase";
+    let new_password = "a replacement staging passphrase";
+    let issued = crate::net::staging_now_ms();
+    server.staging_account(&json!({
+        "action": "reset_password", "profile_id": id, "login": "driver@example.net",
+        "password": new_password
+    })).await.unwrap();
+    assert!(*server.connections.lock().await[&desktop].tx.failure().borrow());
+    assert!(server.attach_staging_profile(&desktop, id, issued).await.is_err());
+    let denied = server.staging_account(&json!({
+        "action": "check", "login": "driver@example.net", "password": old_password
+    })).await.unwrap_err();
+    assert_eq!(denied, crate::social::accounts::LOGIN_FAILED);
+    let signed_in = server.staging_account(&json!({
+        "action": "check", "login": "driver@example.net", "password": new_password
+    })).await.unwrap();
+    assert_eq!(signed_in["profile_id"], id);
+    let stored = database::load_or_import(&server.path.with_extension("sqlite3"), &server.path).unwrap();
+    let profile = &stored.profiles[id];
+    assert_eq!(profile.progression.character.as_ref().unwrap().outfit, "night-run");
+    assert!(!profile.account.as_ref().unwrap().accepts(&crate::social::security::token_hash(&old_token)));
     cleanup(server).await;
 }
 
