@@ -1,14 +1,12 @@
 import { assetUrl } from "../../assets/runtimeAssets";
 import {
-  ACESFilmicToneMapping, Box3, DirectionalLight, HemisphereLight, LoadingManager, OrthographicCamera,
+  ACESFilmicToneMapping, DirectionalLight, HemisphereLight, LoadingManager, OrthographicCamera,
   Scene, Vector3, WebGLRenderer, type Object3D,
 } from "three";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { VILLAGER_ID } from "./characterCatalog";
 import type { CharacterPortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
-import { prepareStylizedDriver } from "./stylizedDriverModel";
 import { applyVillagerLook, prepareVillager } from "./villagerModel";
 import { getWardrobeActorBody, getWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
 
@@ -37,7 +35,7 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
   const manager = new LoadingManager();
   const decoder = new DRACOLoader(manager).setDecoderPath("/draco/").setWorkerLimit(1);
   const loader = new GLTFLoader(manager).setDRACOLoader(decoder).setMeshoptDecoder(MeshoptDecoder);
-  let model: ReturnType<typeof prepareVillager> | ReturnType<typeof prepareStylizedDriver> | undefined;
+  let model: ReturnType<typeof prepareVillager> | undefined;
   let renderer: WebGLRenderer | undefined;
   try {
     const loadScene = async (url: string) => {
@@ -49,26 +47,22 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
         return (await loader.loadAsync(assetUrl(original))).scene;
       }
     };
-    const source = modelUrl ? await loadScene(modelUrl).catch(() => undefined) : undefined;
-    if (!source && look.character.id === VILLAGER_ID) throw Error("The character model is unavailable.");
+    const source = await loadScene(modelUrl).catch(() => { throw Error("The character model is unavailable."); });
 
-    const outfit = source && dress ? await loadPortraitOutfit(source, dress, loadScene) : undefined;
-    const villager = source && prepareVillager(source, {
+    const outfit = dress ? await loadPortraitOutfit(source, dress, loadScene) : undefined;
+    model = prepareVillager(source, {
       female: look.female,
       garments: outfit && [outfit.garment],
       garmentBody: outfit?.body,
       removedClothing: outfit && look.removedClothing,
     });
-    model = villager ?? prepareStylizedDriver(look);
-    if (villager) {
-      applyVillagerLook(villager, look);
-      for (const name of ["CLOTH_BOTTOM_SKIRT", "CLOTH_FEET_SHOES", "CLOTH_UNDER_UNDERSKIRT", "CLOTH_BOTTOM_TROUSERS", "CLOTH_FEET_BOOTS"]) {
-        const part = villager.root.getObjectByName(name);
-        if (part) part.visible = false;
-      }
+    applyVillagerLook(model, look);
+    for (const name of ["CLOTH_BOTTOM_SKIRT", "CLOTH_FEET_SHOES", "CLOTH_UNDER_UNDERSKIRT", "CLOTH_BOTTOM_TROUSERS", "CLOTH_FEET_BOOTS"]) {
+      const part = model.root.getObjectByName(name);
+      if (part) part.visible = false;
     }
 
-    const head = "face" in model ? model.face : model.root.getObjectByName("head");
+    const head = model.root.getObjectByName("head");
     if (!head) throw Error("The character portrait needs a head anchor.");
     const scene = new Scene();
     const keyLight = new DirectionalLight(0xffefe1, 2);
@@ -76,9 +70,7 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
     scene.add(model.root, keyLight, new HemisphereLight(0xe5eeff, 0x73685e, 1.25));
 
     model.root.updateMatrixWorld(true);
-    const center = villager
-      ? head.getWorldPosition(new Vector3()).add(new Vector3(0, -.035, .018))
-      : new Box3().setFromObject(head).getCenter(new Vector3());
+    const center = head.getWorldPosition(new Vector3()).add(new Vector3(0, -.035, .018));
     const camera = new OrthographicCamera(-.245, .245, .245, -.245, .1, 10);
     camera.position.copy(center).add(new Vector3(.4, .08, 2));
     camera.lookAt(center);

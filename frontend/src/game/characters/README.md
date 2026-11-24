@@ -1,6 +1,7 @@
 # Garage characters
 
 Heroes and Garage use the portrait at the right of the header to open Character.
+The main menu shares the angled character header and uses it to open player options.
 The editor previews changes on the same turntable as the vehicle. New profiles
 confirm a character model before editing. Details, Body, Appearance, and Emotes share
 the Character header tab list, which opens on Appearance on the first visit.
@@ -16,15 +17,14 @@ build generates it from the installed asset and includes the source hash in
 its URL. It compresses vertex and index buffers, keeping triangle order,
 skinning inputs, and all 19 embedded WebP images. The packed model is 3.88 MB
 and the source is 5.50 MB. Actual transfer size depends on HTTP compression.
-The authored portrait is the fallback if the packed model is unavailable.
+The portrait worker tries the original authored GLB if the packed model is unavailable.
 
 Garment detail is selected independently of the base character. The selected
 car loads over a simple stage first. Once the car
 is on screen, the garage shell and driver can load. A circular reflective
 turntable accentuates the vehicle. The platform follows the display rotation,
 and Reduced Motion stops automatic rotation. If the character file is missing or unreadable,
-the portrait uses a neutral tile. Download the Git LFS object and restart Vite
-after restoring the file.
+the preview reports that the model is unavailable and the portrait area stays empty.
 
 At widths up to 960 CSS pixels the preview targets 30 fps, draws native
 emissive lighting, and updates a 256 px floor mirror at up to 15 Hz. Desktop

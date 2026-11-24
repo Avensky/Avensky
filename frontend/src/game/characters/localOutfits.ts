@@ -80,8 +80,12 @@ function subscribeLocalCharacter(listener: () => void) {
   };
 }
 
-export function usePlayerCharacter() {
+export function useSavedPlayerCharacter(allowLocal = true) {
   const equipped = useSocialStore(selectEquippedCharacter);
   const local = useSyncExternalStore(subscribeLocalCharacter, readLocalCharacter, () => undefined);
-  return equipped ?? local ?? DEFAULT_CHARACTER;
+  return equipped ?? (allowLocal ? local : undefined);
+}
+
+export function usePlayerCharacter() {
+  return useSavedPlayerCharacter() ?? DEFAULT_CHARACTER;
 }

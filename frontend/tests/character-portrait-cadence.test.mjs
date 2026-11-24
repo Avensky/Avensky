@@ -10,6 +10,7 @@ import { DefaultLoadingManager } from 'three';
 const serverOptions = {
   configFile: false,
   define: {
+    __STAGING_ASSET_RELEASE__: "null",
     __VILLAGER_PORTRAIT_URL__: JSON.stringify('/character-portrait-test/vega.glb'),
     __CHARACTER_MODEL_FALLBACKS__: JSON.stringify({ 'http://localhost/packed.gltf': 'http://localhost/cut-driver.gltf' }),
     __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['linen-nightgown']),
@@ -104,7 +105,7 @@ test('portraits create one background job for each quiet, visible main-menu requ
     const equivalent = { ...choice, appearance: { ...choice.appearance } };
     root = createRoot(document.getElementById('root'));
     const render = (...values) => act(async () => root.render(values.map((value, key) =>
-      h(CharacterPortrait, { choice: value, compact: true, key }))));
+      h(CharacterPortrait, { choice: value, key }))));
     const screen = (screen, overlay = null, isModeLoading = false) => act(async () => ui.setState({ screen, overlay, isModeLoading }));
     const step = ms => act(async () => { advance(ms); runIdle(); });
     const image = () => document.querySelector('img.character-portrait')?.getAttribute('src');
@@ -215,7 +216,7 @@ test('portraits create one background job for each quiet, visible main-menu requ
   }
 });
 
-test('portrait worker isolates GLTF loading and retains its model fallbacks', { timeout: 20000 }, async () => {
+test('portrait worker renders authored GLTF assets and skips missing character models', { timeout: 20000 }, async () => {
   const dom = new JSDOM();
   const NativeRequest = globalThis.Request;
   const nativeFetch = globalThis.fetch;
@@ -333,11 +334,11 @@ test('portrait worker isolates GLTF loading and retains its model fallbacks', { 
     const vega = characterLook({ id: 'mara-vega', outfit: 'linen-nightgown' });
 
     await handler({ data: { look: rook, modelUrl: 'http://localhost/missing.gltf' } });
-    assert.equal(response.image?.type, 'image/webp', response.error);
-    assert.equal(renderedModels.at(-1), 'garage-jules-stylized', 'a missing Rook GLTF falls back to the stylized driver');
+    assert.match(response.error, /character model is unavailable/);
 
     await handler({ data: { look: vega, modelUrl: 'http://localhost/missing.gltf' } });
-    assert.match(response.error, /character model is unavailable/, 'a missing Vega GLTF shows the neutral tile');
+    assert.match(response.error, /character model is unavailable/);
+    assert.deepEqual(renderedModels, [], 'missing GLTFs produce no character render');
 
     for (const [packedFile, expected] of [
       [cutBody, ['/packed.gltf']],

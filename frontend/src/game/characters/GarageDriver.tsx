@@ -3,13 +3,11 @@ import { CharacterTurntable } from "./CharacterTurntable";
 import { usesFittedAnimation } from "./animationFit";
 import { clothingColors } from "./clothingPieces";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
-import { Html } from "@react-three/drei";
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
 import type { Object3D } from "three";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterLook } from "./characterCatalog";
-import { StylizedDriver } from "./StylizedDriver";
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
 import { CharacterLoadingEffect } from "./CharacterLoadingEffect";
 import { SpaceBunsPreview } from "./fittedWardrobe/SpaceBunsPreview";
@@ -43,12 +41,12 @@ function MissingWardrobeAsset({ url, onReady }: { url: string; onReady: Wardrobe
   return null;
 }
 
-function MissingVillager({ cockpit }: { cockpit?: GarageCockpit }) {
+function MissingCharacterModel({ cockpit }: { cockpit?: GarageCockpit }) {
   const waiting = useCharacterPreviewStore(s => Boolean(cockpit && s.insideCar));
   useEffect(() => {
     if (waiting) failCockpitPreview("The character model is unavailable.");
   }, [waiting]);
-  return null;
+  return <PreviewLoadingStatus label="Character model unavailable" />;
 }
 
 function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, ...playback }: VillagerPlayback & {
@@ -134,10 +132,7 @@ export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory
   if (!look) return null;
   const bag = choice.prop === "shop-bag";
   const coatFitsLean = choice.id === ROOK_ID && (choice.outfit === "night-run" || choice.outfit === "race-crew");
-  const fallback = choice.id === VILLAGER_ID ? upright
-    ? <Html center><p className="menu-control">Character model unavailable. Install the character assets with Git LFS.</p></Html>
-    : <MissingVillager cockpit={cockpit} /> :
-    <group name="garage-driver" rotation={upright ? [0, 0, 0] : DRIVER_TILT}><StylizedDriver look={look} bag={bag} previewPacks={previewPacks} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} /></group>;
+  const fallback = <MissingCharacterModel cockpit={cockpit} />;
   const kind = compact ? "portrait" : "garage";
   // The portrait export has the original mesh and rig with smaller textures.
   const villageKind = victory ? kind : "portrait";
