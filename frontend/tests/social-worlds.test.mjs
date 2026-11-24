@@ -407,10 +407,16 @@ test("social requests, world transitions and assisted text have independent owne
           if(action==="world_join" && world_id===world.id)
             client.receiveSocialResult({request_id,ok:true,data:{world_id,map:world.map}});
         }});
-        social.setState({view:{...view,worlds:[world]},profileStatus:"ready"});
+        const profile = {
+          ...view.profile,
+          active_character_id: "saved-driver",
+          characters: [{ id: "saved-driver", name: "QA Violet" }],
+        };
+        social.setState({view:{...view,profile,worlds:[world]},profileStatus:"ready"});
         network.setState({connected:true});
       });
       await render(h(ModeSelection));
+      assert.equal(document.querySelector(".character-header-profile")?.getAttribute("aria-label"), "QA Violet");
       const openWorld = [...document.querySelectorAll('[role="tab"]')].find(tab=>tab.textContent==="OPEN WORLD");
       assert.ok(openWorld);
       await act(async()=>openWorld.click());
