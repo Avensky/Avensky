@@ -58,7 +58,7 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
   const triangle = new Triangle();
   const hit: HitPointInfo = { point: new Vector3(), faceIndex: 0, distance: 0 };
   return {
-    fit(source: BufferGeometry, meshName: string) {
+    fit(source: BufferGeometry, meshName: string, raisedDetail = false) {
       const cloth = source.getAttribute("position");
       if (!cloth || !source.hasAttribute("skinIndex") || !source.hasAttribute("skinWeight")) return;
       let fitted: BufferGeometry | undefined;
@@ -131,7 +131,8 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
         }
         // Pull the loose surface toward the skin without snapping folds or crossing the body.
         const bindingClearance = nightgownBinding && !arm ? .007 : 0;
-        const adjustment = MathUtils.clamp((followsBody ? .014 : .007) + bindingClearance - gap, -.058, .025) * blend;
+        const adjustment = MathUtils.clamp((followsBody ? .014 : .007) + bindingClearance - gap,
+          raisedDetail ? 0 : -.058, .025) * blend;
         if (Math.abs(adjustment) < .0007) continue;
         fitted ??= source.clone();
         point.addScaledVector(normal, adjustment);

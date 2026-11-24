@@ -47,11 +47,16 @@ also lifts its layered hem away from bare feet during a stride. These adjustment
 run when the outfit loads and use the character's existing skinning in motion.
 
 The Linen nightgown keeps the source's separate binding and UV islands. Its
-upper and lower sleeves taper around the rig, with clearance for the layered
-bands. The medieval gowns and kaftans use the same bind-space sleeve fit so
-their cuffs follow elbow and wrist motion. Authored normal atlases supply
-seams and folds. Linen weave, darker leather and metallic fasteners give the
-separate detail meshes distinct finishes.
+sleeves wrap around the character's open-arm bind pose. A profile sampled from
+the body donor limits the rear folds and leaves clearance over the skin. The
+medieval gowns and kaftans blend sleeve weights from shoulder through wrist
+while the bodice keeps its own rigging. This fit runs on garment load.
+
+The Laced linen dress keeps the gathered shirt at the neckline, the sleeve
+flares and the center skirt panel. Concealed inner faces are cut against the
+outer layer so the lining stays below the laced bodice. The original normal
+atlases supply seams and quilting. Small repeating textures and distinct
+roughness values differentiate linen, twill, satin, quilted cloth and leather.
 
 The Hooded gown keeps its existing cut and outfit ID. Its front laces are
 skinned to the cloth, and the selected hairstyle stays visible under the hood.

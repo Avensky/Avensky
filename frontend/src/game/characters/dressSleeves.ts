@@ -17,10 +17,57 @@ function sleeveArm(skeleton: Skeleton, side: "l" | "r") {
     upperLengthSquared, lowerLengthSquared };
 }
 
-/** Bind fabric and its separate bands to the same elbow and wrist transitions. */
-export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean) {
+type SleeveArm = NonNullable<ReturnType<typeof sleeveArm>>;
+const profileSteps = 16;
+
+function armCoordinates(arm: SleeveArm, point: Vector3, scratch: Vector3, center: Vector3) {
+  scratch.copy(point).sub(arm.elbow);
+  const bend = scratch.dot(arm.bendAxis);
+  const forearm = scratch.dot(arm.forearm) / arm.lowerLengthSquared;
+  const upper = scratch.copy(point).sub(arm.shoulder).dot(arm.upperAxis) / arm.upperLengthSquared;
+  // Blend the centerlines at the bend so the crease has no jump across the seam.
+  center.copy(arm.shoulder).addScaledVector(arm.upperAxis, MathUtils.clamp(upper, 0, 1));
+  scratch.copy(arm.elbow).addScaledVector(arm.forearm, MathUtils.clamp(forearm, 0, 1.1));
+  center.lerp(scratch, MathUtils.smoothstep(bend, -.04, .04));
+  const segment = bend < 0 ? MathUtils.clamp(upper, 0, .999) : 1 + MathUtils.clamp(forearm, 0, .999);
+  return { bend, forearm, upper, section: segment * profileSteps };
+}
+
+function armInfluence(arm: SleeveArm, geometry: BufferGeometry, vertex: number) {
+  const joints = geometry.getAttribute("skinIndex"), weights = geometry.getAttribute("skinWeight");
+  let influence = 0;
+  for (let channel = 0; channel < 4; channel++) {
+    if (arm.joints[joints.getComponent(vertex, channel)]) influence += weights.getComponent(vertex, channel);
+  }
+  return influence;
+}
+
+function rearProfile(arm: SleeveArm, skin: BufferGeometry) {
+  const position = skin.getAttribute("position");
+  const bins = new Float32Array(profileSteps * 2);
+  const point = new Vector3(), scratch = new Vector3(), center = new Vector3();
+  for (let vertex = 0; vertex < position.count; vertex++) {
+    if (armInfluence(arm, skin, vertex) < .72) continue;
+    point.fromBufferAttribute(position, vertex);
+    const { section } = armCoordinates(arm, point, scratch, center);
+    const bin = Math.floor(section);
+    bins[bin] = Math.max(bins[bin], center.z - point.z);
+  }
+  return bins.map((depth, i) => Math.max(.021, depth, bins[i - 1] ?? 0, bins[i + 1] ?? 0));
+}
+
+function profileAt(rear: Float32Array, section: number) {
+  const sample = MathUtils.clamp(section - .5, 0, rear.length - 1);
+  const lo = Math.floor(sample), hi = Math.min(lo + 1, rear.length - 1);
+  return MathUtils.lerp(rear[lo], rear[hi], sample - lo);
+}
+
+/** Fit to the actor's open arms in bind space, including the sleeve root at the shoulder. */
+export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean, body?: BufferGeometry) {
   const left = sleeveArm(skeleton, "l"), right = sleeveArm(skeleton, "r");
   if (!left || !right) return;
+  const rearLeft = fittedLinen && body && rearProfile(left, body);
+  const rearRight = fittedLinen && body && rearProfile(right, body);
   const point = new Vector3(), offset = new Vector3(), center = new Vector3();
 
   return (source: BufferGeometry, fitted?: BufferGeometry, sleeveBinding = false) => {
@@ -33,22 +80,27 @@ export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean) {
     let reshaped = false;
     for (let i = 0; i < position.count; i++) {
       point.fromBufferAttribute(position, i);
-      if (point.y < .84 || point.y > 1.44 || Math.abs(point.x) < .175) continue;
+      const across = Math.abs(point.x);
+      if (point.y < .84 || point.y > 1.44 || across < (fittedLinen ? .129 : .147)) continue;
       const arm = point.x > 0 ? left : right;
-      let armWeight = 0;
-      for (let channel = 0; channel < 4; channel++) {
-        if (arm.joints[joints.getComponent(i, channel)]) armWeight += weights.getComponent(i, channel);
-      }
+      const rear = point.x > 0 ? rearLeft : rearRight;
+      const { bend, forearm, upper, section } = armCoordinates(arm, point, offset, center);
+      const radius = offset.copy(point).sub(center).length();
       // Use the bind-space joint positions here. Wide corners can be far from
       // the skin and still belong below the elbow, even with old upper-arm weights.
-      const elbowDistance = offset.copy(point).sub(arm.elbow).dot(arm.bendAxis);
-      const forearm = offset.dot(arm.forearm) / arm.lowerLengthSquared;
-      const sleeve = MathUtils.smoothstep(armWeight, .42, .86);
-      const amount = sleeve * MathUtils.smoothstep(elbowDistance, -.12, -.015);
-      const upper = offset.copy(point).sub(arm.shoulder).dot(arm.upperAxis) / arm.upperLengthSquared;
-      const linenFit = fittedLinen ? sleeve * MathUtils.smoothstep(upper, .12, .57) : 0;
-      if (Math.max(amount, linenFit) < .001) continue;
-      const lower = MathUtils.smoothstep(elbowDistance, -.042, .062);
+      const shoulder = MathUtils.smoothstep(upper, .035, .42) * MathUtils.smoothstep(across, .147, .22);
+      const axisSupport = shoulder * (1 - MathUtils.smoothstep(radius, .042, .09));
+      const sleeve = Math.max(MathUtils.smoothstep(armInfluence(arm, source, i), .37, .85), .8 * axisSupport);
+      const amount = sleeve * Math.max(.88 * shoulder, MathUtils.smoothstep(bend, -.12, -.015));
+      const linenFit = fittedLinen ? sleeve * MathUtils.smoothstep(upper, .09, .42) : 0;
+      // The rear shoulder fold spans the sleeve and clavicle. Fit that seam
+      // even where the authored torso weights dilute its arm influence.
+      const rearShoulder = rear ? MathUtils.smoothstep(across, .129, .159) * MathUtils.smoothstep(point.y, 1.235, 1.303)
+        * (1 - MathUtils.smoothstep(point.y, 1.371, 1.414)) : 0;
+      const rearFit = rear ? Math.max(rearShoulder, sleeve * MathUtils.smoothstep(upper, .015, .25)
+        * MathUtils.smoothstep(across, .147, .202)) : 0;
+      if (Math.max(amount, linenFit, rearFit) < .001) continue;
+      const lower = MathUtils.smoothstep(bend, -.042, .062);
       const wrist = .48 * MathUtils.smoothstep(forearm, .67, 1.12);
       const blend = new Map<number, number>();
       for (let channel = 0; channel < 4; channel++) {
@@ -71,17 +123,19 @@ export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean) {
         indices.setComponent(i, channel, joint);
         influences.setComponent(i, channel, weight / total);
       }
-      if (linenFit < .001) continue;
-      if (elbowDistance < 0) center.copy(arm.shoulder).addScaledVector(arm.upperAxis, MathUtils.clamp(upper, 0, 1));
-      else center.copy(arm.elbow).addScaledVector(arm.forearm, MathUtils.clamp(forearm, 0, 1.10));
-      const radius = offset.copy(point).sub(center).length();
+      if (Math.max(linenFit, rearFit) < .001) continue;
       const clearance = MathUtils.lerp(.044, .034, MathUtils.clamp(forearm, 0, 1));
       // Narrow the ballooning cloth and keep the original band a separate,
       // slightly raised layer. Move its UVs with the cloth.
       const ease = Math.max(0, radius - clearance) * .65 * linenFit;
       const allowance = sleeveBinding ? .005 * linenFit : 0;
-      if (radius < .001 || Math.abs(allowance - ease) < .0001) continue;
+      if (radius < .001) continue;
       point.addScaledVector(offset, (allowance - ease) / radius);
+      if (rear) {
+        const depth = Math.max(profileAt(rear, section), .046 * rearShoulder);
+        const excess = center.z - point.z - depth - .007 - allowance;
+        point.z += Math.max(0, excess) * rearFit;
+      }
       result.getAttribute("position").setXYZ(i, point.x, point.y, point.z);
       reshaped = true;
     }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { Bone, Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial,
-  Quaternion, Skeleton, Uint16BufferAttribute, Vector3 } from "three";
+  Quaternion, Skeleton, Texture, Uint16BufferAttribute, Vector3 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createServer } from "vite";
 
@@ -305,12 +305,21 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
     .setAttribute("skinWeight", new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4))
     .setAttribute("uv", new Float32BufferAttribute([0, 1, 1, 1, 1, 0], 2));
   original.computeVertexNormals();
-  let sleeve, band;
+  const rearFold = original.clone(), body = original.clone();
+  rearFold.attributes.position.setXYZ(0, .211, 1.235, -.125);
+  body.attributes.position.setXYZ(0, .211, 1.235, -.052);
+  rearFold.attributes.position.setXYZ(1, -.16, 1.342, -.118);
+  body.attributes.position.setXYZ(1, -.16, 1.342, -.067);
+  let sleeve, band, fittedFold;
   try {
     const { prepareDressSleeves } = await vite.ssrLoadModule("/src/game/characters/dressSleeves.ts");
     const fit = prepareDressSleeves(skeleton, true);
     sleeve = fit(original);
     band = fit(original, undefined, true);
+    fittedFold = prepareDressSleeves(skeleton, true, body)(rearFold);
+    assert(fittedFold.attributes.position.getZ(0) > -.087, "the rear sleeve still wraps the measured upper arm");
+    assert(fittedFold.attributes.position.getZ(0) < -.053, "the rear sleeve leaves clearance for skin");
+    assert(fittedFold.attributes.position.getZ(1) > -.09, "the rear shoulder seam stays near the open-arm fit");
     assert.deepEqual(Array.from(sleeve.attributes.uv.array), Array.from(original.attributes.uv.array));
     assert.deepEqual(Array.from(sleeve.attributes.position.array.slice(6)), Array.from(original.attributes.position.array.slice(6)));
     for (const [vertex, lower] of [[0, 1], [1, 4]]) {
@@ -326,10 +335,43 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
     }
     assert.equal(original.attributes.skinIndex.getX(0), 0, "the shared source is immutable");
   } finally {
+    fittedFold?.dispose();
+    rearFold.dispose();
+    body.dispose();
     band?.dispose();
     sleeve?.dispose();
     original.dispose();
     skeleton.dispose();
+    await vite.close();
+  }
+});
+
+test("medieval garments preserve their atlas and use distinct fabric, quilting and leather finishes", async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", logLevel: "error" });
+  const atlas = new Texture();
+  const parts = [
+    ["medieval-01", "Shirt_FRONT_3102", "trim", "linen"],
+    ["medieval-02", "Sleeves-Front Part_FRONT_979937", "trim", "silk"],
+    ["medieval-04", "Dress_FRONT_6394288", "fabric", "silk"],
+    ["medieval-06", "Belt_FRONT_12468970", "trim", "leather"],
+    ["medieval-07", "Crop_FRONT_3765473", "trim", "quilt"],
+    ["medieval-08", "Jerkin_FRONT_38265049", "fabric", "quilt"],
+  ];
+  try {
+    const { restoreDressMaterial } = await vite.ssrLoadModule("/src/game/characters/dressMaterials.ts");
+    const finishes = new Map();
+    for (const [id, name, channel, finish] of parts) {
+      const material = new MeshStandardMaterial({ name, normalMap: atlas });
+      restoreDressMaterial(material, id, channel, true);
+      assert.equal(material.normalMap, atlas);
+      assert.equal(material.map.name, `Medieval ${finish}`);
+      if (finishes.has(finish)) assert.equal(material.map, finishes.get(finish));
+      finishes.set(finish, material.map);
+      material.dispose();
+    }
+    assert.equal(new Set(finishes.values()).size, 4);
+  } finally {
+    atlas.dispose();
     await vite.close();
   }
 });
