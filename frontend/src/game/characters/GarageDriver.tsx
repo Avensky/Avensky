@@ -22,6 +22,7 @@ import { failCockpitPreview, useCharacterPreviewStore } from "./characterPreview
 import { useCommittedResource } from "./useCommittedResource";
 import type { WardrobeRemoval } from "./wardrobeGarments";
 import { resolveWardrobePreview, type WardrobeAssetSources, type WardrobeAssetTier, type WardrobePreview } from "./wardrobePreviewAssets";
+import { HOODED_GOWN } from "./wardrobeDressFit";
 
 const DRIVER_TILT: [number, number, number] = [-.095, -.16, -.045];
 type WardrobeAssetListener = (url: string, scene: Object3D | null) => void;
@@ -99,7 +100,8 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
-    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID} />
+    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID
+      && !(look.garments?.dress === HOODED_GOWN && model.trialGarments?.tucksHair)} />
     <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
       leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} />
   </> : null;

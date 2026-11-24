@@ -153,7 +153,7 @@ test('the fitting camera orbits a close-up without changing its target or crossi
   } finally { await vite.close(); }
 });
 
-test('dressing room keeps fitted presets and lets imported garments be tried on independently', async () => {
+test('dressing room lists whole outfits and keeps corsets in their own category', async () => {
   const inventory = JSON.parse(await readFile(new URL('../../packages/wardrobe-catalog/character-garments.json', import.meta.url), 'utf8'));
   const imports = inventory.filter(item => !item.retired && !item.outfit);
   const missingImport = 'bowtie-13';
@@ -235,14 +235,14 @@ test('dressing room keeps fitted presets and lets imported garments be tried on 
     assert(toolbar.contains(find('.dressing-catalog-heading h3')), 'the current section stays with Back');
     assert(toolbar.contains(find('[aria-label="Search Outfits"]')), 'search shares the pinned toolbar');
     assert.equal(toolbar.nextElementSibling.querySelector('[data-remove-outfit]').textContent, 'Remove outfit');
-    assert.equal(find('[data-wardrobe-item=gothic-04]'), null, 'installed retired sets are hidden from outfits');
-    assert.deepEqual([...document.querySelectorAll('[data-wardrobe-item^=gothic-]')].map(button => button.dataset.wardrobeItem),
-      ['gothic-02', 'gothic-03', 'gothic-05'], 'only the selected Gothic presets are listed in Outfits');
+    assert.equal(find('[data-wardrobe-item=shop-crew]'), null);
+    assert.equal(find('[aria-label="Gothic collection"]'), null);
+    assert.equal(find('[data-wardrobe-item^=gothic-]'), null);
     for (const item of imports.filter(item => item.category !== 'outfits')) {
       assert(!find(`[data-wardrobe-item="${item.id}"]`), `${item.id} stays in its own category`);
     }
-    assert.match(find('[data-wardrobe-item=gothic-02]').textContent, /Pack not installed/);
-    await click('[data-wardrobe-item=gothic-02]');
+    assert.match(find('[data-wardrobe-item=medieval-08]').textContent, /Pack not installed/);
+    await click('[data-wardrobe-item=medieval-08]');
     assert.equal(find('.dressing-details').hidden, false, 'unavailable cards can still be inspected');
     assert.equal(find('.dressing-details dd').textContent, 'Not listed');
     assert.equal(find('.fit-review-toggle').getAttribute('aria-expanded'), 'false');
@@ -255,7 +255,7 @@ test('dressing room keeps fitted presets and lets imported garments be tried on 
       note.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => [...document.querySelectorAll('.fit-review-actions button')].find(button => button.textContent.includes('Copy ticket draft')).click());
-    assert.match(find('[aria-label="Ticket draft"]').value, /gothic-02[\s\S]+Verify strap in idle/);
+    assert.match(find('[aria-label="Ticket draft"]').value, /medieval-08[\s\S]+Verify strap in idle/);
     assert.equal(changes.length, 0, 'inspecting a missing pack never equips it');
     await click('[data-wardrobe-back]');
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'returning to categories releases the previous item list');
@@ -404,27 +404,6 @@ test('dressing room keeps fitted presets and lets imported garments be tried on 
 
     await open('outfits');
     assert.equal(document.activeElement.dataset.wardrobeItem, 'dockwear', 'keyboard activation moves into the catalog');
-    await click('[data-wardrobe-item=gothic-05]');
-    assert.equal(changes.at(-1).wardrobe.shirt, 'none');
-    assert.equal(changes.at(-1).wardrobe.waist, 'tucked');
-    assert.equal(changes.at(-1).garments, undefined, 'an outfit preset clears the trial pieces');
-    assertPiece('corset');
-    assert.equal(find('.dressing-details h2').textContent, 'High-collar corset');
-    assert.match(find('.dressing-item-description').textContent, /fitted upper back/);
-    assert.equal(find('.dressing-details dd').textContent, '0 credits');
-    assert.equal(find('[data-dressing-piece=shirt]'), null);
-    assert.equal(find('[data-dressing-piece=shorts]'), null);
-    assert.equal(find('[aria-label="Shirt layer"]'), null);
-    await open('footwear');
-    await click('[data-wearable-quick-select=skirt]');
-    assert.equal(find('[data-inspected]').dataset.wardrobeItem, 'gothic-05', 'a bundled skirt opens its parent outfit');
-    const changeCount = changes.length;
-    await click('[data-dressing-piece=skirt]');
-    assertPiece('skirt');
-    assert.equal(changes.length, changeCount, 'inspecting a piece does not equip a new outfit');
-    await open('outfits');
-    await click('[data-wardrobe-item=gothic-05]');
-    assertPiece('corset');
     const first = find('[aria-label="Complete outfits"] [data-wardrobe-item]');
     first.focus();
     const memory = new WeakMap();
@@ -432,20 +411,15 @@ test('dressing room keeps fitted presets and lets imported garments be tried on 
     navigateFormRows(find('#root'), first, 'right', memory);
     assert.equal(document.activeElement, first, 'right stays on the only item in the row');
     navigateFormRows(find('#root'), first, 'down', memory);
-    assert.equal(document.activeElement.dataset.wardrobeItem, 'shop-crew');
-    navigateFormRows(find('#root'), document.activeElement, 'down', memory);
-    assert.equal(document.activeElement.getAttribute('aria-label'), 'Clear Gothic collection', 'the next section starts at its clear control');
-    navigateFormRows(find('#root'), document.activeElement, 'down', memory);
-    assert.equal(document.activeElement.dataset.wardrobeItem, 'gothic-05', 'down enters the next section at its equipped item');
-    await click('[data-wardrobe-item=shop-crew]');
-    assert.equal(changes.at(-1).wardrobe, undefined, 'complete outfit replaces the corset set');
-    await click('[aria-label="Clear Complete outfits"]');
+    assert.equal(document.activeElement.closest('.dressing-section').getAttribute('aria-label'), 'Sleepwear');
+    await click('[data-wardrobe-item=medieval-05]');
+    assert.equal(changes.at(-1).outfit, 'medieval-05');
+    assert.equal(changes.at(-1).garments, undefined, 'a whole outfit clears try-on pieces');
+    assert.equal(preview.getState().camera, 'Full body');
+    await click('[aria-label="Clear Medieval outfits"]');
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit);
-    await click('[data-wardrobe-item=shop-crew]');
-    assertPiece('corset');
-
     await click('[data-wardrobe-item=medieval-08]');
-    assert.equal(changes.at(-1).outfit, 'shop-crew', 'missing complete outfit cannot be equipped');
+    assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit, 'missing outfits leave the current selection in place.');
     await click('[aria-label="Sleepwear"] [data-wardrobe-item=linen-nightgown]');
     const sleepwear = changes.at(-1);
     assert.equal(sleepwear.outfit, 'linen-nightgown');

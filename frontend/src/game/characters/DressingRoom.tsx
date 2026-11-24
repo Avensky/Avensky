@@ -3,7 +3,7 @@ import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterStyleField } from "./characterCatalog";
 import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
-import { UNDERBUST_WARDROBE_SET, WARDROBE_CORSETS, WARDROBE_SETS, WARDROBE_WAIST_OPTIONS, corsetModelUrl, hasSeparateWardrobeTop, hasTuckedUnderbust, hasUnderbustCut, resolveWardrobe, withWardrobeWaist, type WardrobeChoice } from "./wardrobe";
+import { UNDERBUST_WARDROBE_SET, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS, corsetModelUrl, hasSeparateWardrobeTop, hasTuckedUnderbust, hasUnderbustCut, resolveWardrobe, withWardrobeWaist, type WardrobeChoice } from "./wardrobe";
 import { ClothingColorToolbar } from "./ClothingColorToolbar";
 import { braFitsWith, CLOTHING_PIECES, clothingPieceLabel, UNDERWEAR_PIECES, underwearColors, wornClothing, type ClothingPiece, type UnderwearPiece } from "./clothingPieces";
 import { FittingCameraSelect, FittingWearableShortcuts } from "./FittingCameraSelect";
@@ -92,14 +92,12 @@ function alphaStatus(pieces: Item["pieces"]): AlphaStatus | undefined {
 
 const OUTFIT_DESCRIPTIONS: Record<string, string> = {
   dockwear: "A fitted bodice with a full skirt, petticoat and bonnet.",
-  "shop-crew": "Workshop clothes with pale trim and a matching bow.",
   "night-run": "Rook’s hill-run outfit pairs a dark coat and trousers with gloves and belt pouches.",
   "race-crew": "Rook’s race-crew outfit uses warm brown fabric and gold trim on his coat and accessories.",
 };
-const FITTED_PRESETS: Partial<Record<string, { waist: WardrobeChoice["waist"]; description: string }>> = {
-  "gothic-02": { waist: "tucked", description: "A sweetheart-neckline corset with a layered, scalloped skirt." },
-  "gothic-03": { waist: "over", description: "A ruffled corset with a matching skirt cut to clear its inner ruffles." },
-  "gothic-05": { waist: "tucked", description: "A high-collar corset with a fitted upper back and a matching skirt. It supports tucked and over-skirt fits." },
+const CORSET_PREVIEW_WAISTS: Partial<Record<string, WardrobeChoice["waist"]>> = {
+  "gothic-02": "tucked",
+  "gothic-05": "tucked",
 };
 function focusView(camera: "Face" | "Hands" | "Full body") {
   useCharacterPreviewStore.setState(s => ({ camera, zoom: 1, emote: null, focusRevision: s.focusRevision + 1 }));
@@ -188,12 +186,9 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   function edit(field: CharacterStyleField, value: string) {
     onChange({ ...choice, appearance: { ...appearance, [field]: value } });
   }
-  function waistForSet(set: string): WardrobeChoice["waist"] {
-    return wardrobe?.set === set && !garments ? wardrobe.waist : FITTED_PRESETS[set]?.waist ?? "tucked";
-  }
-  function wearOutfit(outfit: string, wardrobe?: WardrobeChoice) {
-    const newOutfit = outfit !== choice.outfit || wardrobe?.set !== choice.wardrobe?.set || Boolean(choice.garments?.dress);
-    onPreviewOutfit({ ...choice, outfit, wardrobe, garments: undefined,
+  function wearOutfit(outfit: string) {
+    const newOutfit = outfit !== choice.outfit || Boolean(choice.wardrobe || choice.garments?.dress);
+    onPreviewOutfit({ ...choice, outfit, wardrobe: undefined, garments: undefined,
       ...(newOutfit && { appearance: { ...appearance, color: "original", accent: undefined } }),
       wardrobeTrial: undefined, wardrobeEase: undefined, removedClothing: undefined, bra: undefined });
   }
@@ -202,7 +197,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     delete compatible.dress;
     delete compatible.top;
     const current = hasSeparateWardrobeTop(choice) ? undefined : choice.wardrobeTrial;
-    const waist = current?.set === set ? current.waist : FITTED_PRESETS[set]?.waist ?? "over";
+    const waist = current?.set === set ? current.waist : CORSET_PREVIEW_WAISTS[set] ?? "over";
     const cut = current?.set === set ? current.cut : undefined;
     onTryOn({ ...setWardrobeRemoval(setWardrobeRemoval(choice, "top", false), "corset", false), wardrobeTrial: resolveWardrobe({ set, shirt: "none", waist, cut }, { includeRetired: true }),
       wardrobeEase: current?.set === set ? choice.wardrobeEase : undefined,
@@ -234,20 +229,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
         ? next => ({ ...next, appearance: { ...(next.appearance ?? appearance), [field]: defaultOption } }) : undefined,
     }));
   }
-  const fittedSets = female ? WARDROBE_SETS.flatMap((set): Item[] => {
-    const preset = FITTED_PRESETS[set.id];
-    if (!preset) return [];
-    const installed = __WARDROBE_SET_IDS__.includes(set.id);
-    return [{
-      id: set.id, label: set.name, section: "Gothic collection", icon: "outfits", selected: !garments && !corset && !removedClothing.length && wardrobe?.set === set.id, set: set.id,
-      description: preset.description, pieces: "outfit",
-      detail: "Matched corset + skirt", unavailable: installed ? undefined : "Pack not installed",
-      choose: installed ? () => wearOutfit(outfit.id, resolveWardrobe({ set: set.id, shirt: "none", waist: waistForSet(set.id) })) : undefined,
-      clear: wardrobe?.set === set.id ? next => ({ ...next, wardrobe: undefined,
-        wardrobeEase: next.wardrobeTrial ? next.wardrobeEase : undefined }) : undefined,
-    }];
-  }) : [];
-  const completeOutfits = character.outfits.map((item): Item => {
+  const completeOutfits = character.outfits.filter(item => item.id !== "shop-crew").map((item): Item => {
     const garment = getWardrobeGarment(item.id);
     const preset = garment?.outfit ? garment : undefined;
     const installed = !preset || Boolean(wardrobeGarmentModelUrl(preset, "garage"));
@@ -273,7 +255,6 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   const allItems: Record<Category, Item[]> = {
     outfits: [
       ...completeOutfits.filter(item => item.section === "Complete outfits"),
-      ...fittedSets,
       ...completeOutfits.filter(item => item.section !== "Complete outfits"),
     ],
     saved: [], layers: [],
@@ -550,9 +531,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
                 <span className="dressing-item-copy">
                   <span className="dressing-item-name">{item.label}</span>
                   {item.alphaStatus && <span className="dressing-alpha-badge" data-alpha-status={item.alphaStatus}>{ALPHA_STATUSES[item.alphaStatus].label}</span>}
-                  {item.set && !item.unavailable && (!item.trial || item.selected) && <FitBadge choice={item.trial ? choice : {
-                    ...choice, wardrobe: resolveWardrobe({ set: item.set, shirt: "none", waist: waistForSet(item.set) }), garments: undefined, wardrobeTrial: undefined, wardrobeEase: undefined,
-                  }} piece="corset" itemId={item.id} />}
+                  {item.set && !item.unavailable && item.selected && <FitBadge choice={choice} piece="corset" itemId={item.id} />}
                   {item.icon !== "remove" && <small>{item.unavailable ?? (item.selected ? (item.trial || onDiscardPreview ? "Trying on" : "Wearing") : item.detail ?? "Available to try on")}</small>}
                 </span>
               </button>)}

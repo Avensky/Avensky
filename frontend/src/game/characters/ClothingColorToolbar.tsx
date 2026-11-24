@@ -3,6 +3,8 @@ import { ColorSwatch, ColorSwatchButton } from "../../components/menus/ColorSwat
 import { CHARACTER_APPEARANCE_OPTIONS, OUTFIT_THEMES, characterLook, type CharacterChoice } from "./characterCatalog";
 import { clothingColors, clothingPieceLabel, isUnderwearPiece, underwearColors, withClothingColors, type ClothingPiece, type PieceColors } from "./clothingPieces";
 import { getCorsetDyeProfile, resolveCorsetDye, type CorsetDyeGroup } from "./corsetDye";
+import { HOODED_GOWN_DYES, hoodedGownColors } from "./hoodedGown";
+import { HOODED_GOWN } from "./wardrobeDressFit";
 import "./clothingColorToolbar.css";
 
 const colorPresets = CHARACTER_APPEARANCE_OPTIONS.color.map(({ id, label, color }) => ({ label: id === "original" ? "White" : label, color }));
@@ -38,20 +40,34 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
   const toggle = useRef<HTMLButtonElement>(null);
   const focusPalette = useRef(false);
   const look = characterLook(choice)!;
+  const gown = piece === "dress" && look.garments?.dress === HOODED_GOWN;
+  const gownDyes = gown ? hoodedGownColors(look) : undefined;
   const colors = clothingColors(look, piece);
   const underwear = isUnderwearPiece(piece) ? underwearColors(look, piece) : undefined;
   const profile = piece === "corset" ? getCorsetDyeProfile(look) : undefined;
   const outfitFabric = look.appearance.color === "original" ? undefined : look.fabric;
   const rows: DyeRow[] = profile?.groups.map(group => ({
     ...group, value: resolveCorsetDye(group, colors, outfitFabric, look.appearance.accent) ?? group.original,
-  })) ?? [
+  })) ?? (gown ? HOODED_GOWN_DYES.map(group => ({
+    ...group, value: gownDyes?.[group.key] ?? (group.key === "color" ? outfitFabric
+      : group.key === "accent" ? look.appearance.accent : undefined) ?? group.original,
+  })) : [
     { key: "color", label: "Main", value: underwear?.color ?? colors?.color ?? look.fabric, theme: "color" },
     { key: "accent", label: "Accent", value: underwear?.accent ?? colors?.accent ?? colors?.color ?? look.trim, theme: "accent" },
-  ];
+  ]);
   const fabric = rows[0].value;
   const trim = rows.find(row => row.theme === "accent")?.value ?? fabric;
   const resetLabel = profile?.finishes ? "Reset piece appearance" : "Reset piece colors";
-  const dye = (value?: PieceColors) => onChange(withClothingColors(choice, piece, value));
+  function dye(value?: PieceColors) {
+    let next = choice;
+    if (gown) {
+      for (const { key, piece, field } of HOODED_GOWN_DYES) {
+        const color = value?.[key];
+        if (!value || color) next = withClothingColors(next, piece, color ? { [field]: color } : undefined, HOODED_GOWN);
+      }
+    } else next = withClothingColors(choice, piece, value);
+    onChange(next);
+  }
   const pieceName = clothingPieceLabel(piece);
 
   function applyTheme(theme: typeof OUTFIT_THEMES[number]) {
@@ -85,7 +101,8 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
           {OUTFIT_THEMES.map(theme => <ColorSwatchButton key={theme.name} className={presetClass} color={theme.color} accent={theme.accent}
             label={theme.name} pressed={rows.every(row => !row.theme || row.value === theme[row.theme])}
             onClick={() => applyTheme(theme)} />)}
-          <button type="button" className="menu-control menu-panel-frame dressing-color-reset" disabled={!colors}
+          <button type="button" className="menu-control menu-panel-frame dressing-color-reset"
+            disabled={gownDyes ? !Object.values(gownDyes).some(Boolean) : !colors}
             aria-label={resetLabel} title={resetLabel} onClick={() => dye()}>
             <svg className="menu-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
               <path d="M4 6v5h5M4.4 10a8 8 0 1 1 1.2 7" />
@@ -99,7 +116,7 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
             onClick={() => dye({ finish: id })}>{label}</button>)}
         </PaletteRow>}
         {rows.map(({ key, label, value }) => <ColorRow key={key} label={label} value={value}
-          onChange={color => dye(key === "color" && !profile && !underwear ? { color, accent: trim } : { [key]: color })} />)}
+          onChange={color => dye(key === "color" && !profile && !underwear && !gown ? { color, accent: trim } : { [key]: color })} />)}
       </>}
     </div>
     <div data-controller-row>

@@ -2,6 +2,7 @@
 
 Heroes and Garage use the portrait at the right of the header to open Character.
 The main menu shares the angled character header and uses it to open player options.
+Its profile tab follows the same desktop, phone and short-landscape sizes as the other menus.
 The editor previews changes on the same turntable as the vehicle. New profiles
 confirm a character model before editing. Details, Body, Appearance, and Emotes share
 the Character header tab list, which opens on Appearance on the first visit.
@@ -30,6 +31,18 @@ At widths up to 960 CSS pixels the preview targets 30 fps, draws native
 emissive lighting, and updates a 256 px floor mirror at up to 15 Hz. Desktop
 previews retain bloom and a larger mirror. Hero cards use factory art or a
 ready personalized image, and the Garage Portrait tab prepares custom art.
+
+Outfits lists complete looks. Corset components live under Corsets, and the saved
+outfit catalog still resolves previously equipped and saved presets by their IDs.
+Sleepwear, medieval dresses and kaftans use a bind-pose fit against the full body
+donor. The torso and sleeves move closer to the skin, with a transition at the
+hips to retain the authored skirt and hem. Review the tighter fits in motion
+before approving additional dresses for release.
+
+The Hooded gown keeps its existing fit and outfit ID. Its cuffs blend into the
+forearm and wrist weights. Its front laces are skinned to the cloth, and its hood
+tucks the selected hairstyle during wear. Gown fabric, inset panels, hood and
+cuffs, and laces use the existing saved per-piece dye fields.
 
 Source files under `frontend/src/public/models/characters/villager/` may use
 either the `village-` or `villager-` prefix. `npm run dev` and `npm run build`

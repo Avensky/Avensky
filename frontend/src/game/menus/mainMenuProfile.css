@@ -6,20 +6,17 @@
   flex-direction: column;
   align-items: flex-end;
   gap: .4rem;
-  width: 100%;
-  padding: .35rem .75rem;
-  border-block-end: 1px solid var(--app-line);
-  background: color-mix(in srgb, var(--app-background) 85%, transparent);
+  align-self: flex-end;
+  max-width: 100%;
+  padding: var(--menu-header-y) var(--menu-gutter);
   pointer-events: auto;
 }
-.main-menu-profile .character-header-profile { --angled-header-height: 44px; }
 .main-menu-profile .character-header-info {
   display: block;
   align-content: center;
   max-width: min(58vw, 220px);
   overflow: hidden;
   text-overflow: ellipsis;
-  font-size: .75rem;
 }
 .main-menu-profile-panel { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem .8rem; color: var(--app-text); }
 .main-menu-profile-panel[hidden] { display: none; }
