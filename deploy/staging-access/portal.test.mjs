@@ -7,6 +7,7 @@ import { createPortal } from "./portal.mjs";
 
 const origin = "https://staging.avensky.com";
 const password = "a separate staging passphrase for QA";
+const newPassword = "a new separate staging passphrase for QA";
 
 test("invites grant access once and revocation invalidates existing cookies", async t => {
   const accounts = testerAccounts(":memory:", randomBytes(32));
@@ -79,4 +80,42 @@ test("authenticator enrollment requires the password and recovery codes are one-
   await assert.rejects(accounts.logIn(invite.email, password, code));
   assert.equal(accounts.viewer(await accounts.logIn(invite.email, password, codes[0])).has_mfa, 1);
   await assert.rejects(accounts.logIn(invite.email, password, codes[0]));
+  const reset = accounts.issuePasswordReset(invite.email);
+  await assert.rejects(accounts.resetPassword(reset.email, reset.code, newPassword, ""));
+  await accounts.resetPassword(reset.email, reset.code, newPassword, codes[1]);
+  await assert.rejects(accounts.logIn(invite.email, newPassword, ""));
+  assert.equal(accounts.viewer(await accounts.logIn(invite.email, newPassword, codes[2])).has_mfa, 1);
+});
+
+test("a reset link replaces the admin password once and invalidates old sessions", async t => {
+  const accounts = testerAccounts(":memory:", randomBytes(32));
+  const server = createPortal({ origin, accounts });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); accounts.close(); });
+
+  const admin = accounts.issueInvite("operator@example.net", true);
+  const session = await accounts.enroll(admin.email, admin.code, password);
+  assert.throws(() => accounts.issuePasswordReset("unknown@example.net"));
+  const oldReset = accounts.issuePasswordReset(admin.email);
+  const reset = accounts.issuePasswordReset(admin.email);
+  const url = `http://127.0.0.1:${server.address().port}/__alpha/reset`;
+  const page = await fetch(url);
+  assert.equal(page.headers.get("referrer-policy"), "same-origin");
+  assert.match(await page.text(), /Set new password/);
+  const post = (email, code) => fetch(url, {
+    method: "POST", redirect: "manual", headers: { origin },
+    body: new URLSearchParams({ email, reset: code, password: newPassword }),
+  });
+  assert.equal((await post(admin.email, oldReset.code)).status, 400);
+  assert.equal((await post("unknown@example.net", reset.code)).status, 400);
+  const changed = await post(admin.email, reset.code);
+  assert.equal(changed.status, 303);
+  assert.equal(changed.headers.get("location"), "/__alpha/sign-in");
+  assert.equal((await post(admin.email, reset.code)).status, 400);
+  assert.equal(accounts.viewer(session), undefined);
+  await assert.rejects(accounts.logIn(admin.email, password, ""));
+  const viewer = accounts.viewer(await accounts.logIn(admin.email, newPassword, ""));
+  assert.equal(viewer.email, admin.email);
+  assert.equal(viewer.admin, 1);
 });

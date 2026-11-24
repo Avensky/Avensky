@@ -12,6 +12,7 @@ const token = () => randomBytes(32).toString("hex");
 const now = () => Math.floor(Date.now() / 1000);
 const SESSION_AGE = 12 * 60 * 60;
 const INVITE_AGE = 3 * 24 * 60 * 60;
+const RESET_AGE = 30 * 60;
 
 export function emailAddress(value) {
   const email = value.trim().toLowerCase();
@@ -22,6 +23,13 @@ export function emailAddress(value) {
 
 function passwordHash(password, salt) {
   return derive(password, salt, 32, { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 });
+}
+
+async function newPasswordRecord(password) {
+  if (password.length < 15 || password.length > 128) throw Error("Choose a password with 15–128 characters.");
+  const salt = randomBytes(16);
+  const digest = await passwordHash(password, salt);
+  return [salt.toString("hex"), digest.toString("hex")];
 }
 
 const secretAlphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -73,6 +81,9 @@ export function testerAccounts(path, key) {
     );
     CREATE TABLE IF NOT EXISTS recovery (
       email TEXT NOT NULL REFERENCES testers(email), digest TEXT NOT NULL, PRIMARY KEY(email, digest)
+    );
+    CREATE TABLE IF NOT EXISTS password_resets (
+      email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL, expires INTEGER NOT NULL
     );
   `);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
@@ -141,16 +152,14 @@ export function testerAccounts(path, key) {
     async enroll(raw, code, password) {
       const email = emailAddress(raw);
       if (!/^[0-9a-f]{64}$/.test(code)) throw Error("Enter the invitation code from your email.");
-      if (password.length < 15 || password.length > 128) throw Error("Choose a password with 15–128 characters.");
       const digest = hash(code);
       const invitation = () => get("SELECT * FROM invitations WHERE digest = ? AND email = ? AND expires > ?", digest, email, now());
       if (!invitation()) throw Error("The invitation is invalid or expired.");
-      const salt = randomBytes(16);
-      const passwordDigest = await passwordHash(password, salt);
+      const [salt, passwordDigest] = await newPasswordRecord(password);
       return transaction(() => {
         const invite = invitation();
         if (!invite || tester(email)) throw Error("The invitation is invalid or expired.");
-        run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt.toString("hex"), passwordDigest.toString("hex"), invite.admin);
+        run("INSERT INTO testers (email,salt,password,admin) VALUES (?,?,?,?)", email, salt, passwordDigest, invite.admin);
         run("DELETE FROM invitations WHERE digest = ?", digest);
         return session(email);
       });
@@ -167,6 +176,34 @@ export function testerAccounts(path, key) {
         return session(email);
       });
     },
+    issuePasswordReset(raw) {
+      const email = emailAddress(raw);
+      const code = token();
+      transaction(() => {
+        const record = tester(email);
+        if (!record || record.revoked) throw Error("There is no active alpha portal account for that email.");
+        run("DELETE FROM password_resets WHERE expires <= ?", now());
+        run("INSERT OR REPLACE INTO password_resets (email, digest, expires) VALUES (?, ?, ?)",
+          email, hash(code), now() + RESET_AGE);
+      });
+      return { email, code };
+    },
+    async resetPassword(raw, code, password, factor) {
+      const email = emailAddress(raw);
+      const denied = () => Error("The reset link or authentication code is invalid or expired.");
+      if (!/^[0-9a-f]{64}$/.test(code)) throw denied();
+      const digest = hash(code);
+      const pending = () => get("SELECT 1 FROM password_resets WHERE email = ? AND digest = ? AND expires > ?", email, digest, now());
+      if (!pending()) throw denied();
+      const [salt, passwordDigest] = await newPasswordRecord(password);
+      transaction(() => {
+        const record = tester(email);
+        if (!pending() || !record || record.revoked || !verifySecondFactor(record, factor)) throw denied();
+        run("UPDATE testers SET salt = ?, password = ? WHERE email = ?", salt, passwordDigest, email);
+        run("DELETE FROM sessions WHERE email = ?", email);
+        run("DELETE FROM password_resets WHERE email = ?", email);
+      });
+    },
     list() {
       return {
         testers: all("SELECT email, admin, revoked, mfa IS NOT NULL AS has_mfa FROM testers ORDER BY email"),
@@ -178,6 +215,7 @@ export function testerAccounts(path, key) {
       transaction(() => {
         if (tester(email)?.admin) throw Error("Manage administrator access through the server operator.");
         run("DELETE FROM invitations WHERE email = ?", email);
+        run("DELETE FROM password_resets WHERE email = ?", email);
         run("DELETE FROM sessions WHERE email = ?", email);
         run("UPDATE testers SET revoked = 1 WHERE email = ?", email);
       });

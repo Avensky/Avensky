@@ -16,6 +16,8 @@ const emailField = '<label>Email<input type="email" name="email" autocomplete="u
 const passwordField = (newPassword = false) =>
   `<label>Password<input type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>`;
 const codeField = '<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" maxlength="32"></label>';
+const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
+const readLinkFragment = `<script src="${base}/invite.js"></script>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
 function page(title, contents, message = "") {
@@ -75,11 +77,16 @@ export function createPortal({ origin, accounts, mailInvite }) {
   }
 
   function signInPage(message, invite = false) {
-    return invite ? page("Sign up", form("enroll", emailField
-      + '<label>Invitation code<input id="invite-code" name="invite" minlength="64" maxlength="64" required></label>'
-      + passwordField(true), "Sign up") + `<a href="${base}/sign-in">Log in</a><script src="${base}/invite.js"></script>`, message)
+    return invite ? page("Sign up", form("enroll", emailField + linkField("invite", "Invitation code")
+      + passwordField(true), "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message)
       : page("Log in", form("sign-in", emailField + passwordField() + codeField, "Log in")
         + `<a href="${base}/enroll">Sign up</a>`, message);
+  }
+
+  function resetPage(message) {
+    return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
+      + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField, "Set new password")
+      + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message);
   }
 
   function testerPage(viewer, message, extra = "") {
@@ -122,10 +129,11 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
           && req.headers.accept?.includes("text/html") ? redirect(base + "/sign-in") : send(401);
       }
       if (path === base + "/invite.js") return send(200,
-        'const value = location.hash.slice(1); if (/^[0-9a-f]{64}$/.test(value)) { document.querySelector("#invite-code").value=value; history.replaceState(null,"",location.pathname); }',
+        'const value = location.hash.slice(1); if (/^[0-9a-f]{64}$/.test(value)) { document.querySelector("#link-code").value=value; history.replaceState(null,"",location.pathname); }',
         { "Content-Type": "text/javascript; charset=utf-8" });
       if (path === base + "/sign-in") return viewer ? redirect(base + "/account") : send(200, signInPage());
       if (path === base + "/enroll") return send(200, signInPage("", true));
+      if (path === base + "/reset") return send(200, resetPage());
       if (path === base + "/account") return viewer ? send(200, page("Account", securityPage(viewer))) : redirect(base + "/sign-in");
       if (path === base + "/testers") return send(viewer?.admin ? 200 : 403, testerPage(viewer));
       return send(404);
@@ -142,6 +150,10 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       if (path === base + "/sign-in") return redirect("/", await accounts.logIn(value("email"), value("password"), value("code").trim()));
       if (path === base + "/enroll") return redirect(base + "/account",
         await accounts.enroll(value("email"), value("invite").trim(), value("password")));
+      if (path === base + "/reset") {
+        await accounts.resetPassword(value("email"), value("reset").trim(), value("password"), value("code").trim());
+        return redirect(base + "/sign-in", "");
+      }
       if (!viewer) return send(403);
       if (path === base + "/sign-out") { accounts.end(viewer); return redirect(base + "/sign-in", ""); }
       if (path === base + "/mfa/start") {
@@ -174,6 +186,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
       if (path === base + "/sign-in" || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
+      if (path === base + "/reset") return send(400, resetPage(message));
       if (path?.startsWith(base + "/testers/")) return send(400, testerPage(viewer, message));
       return send(400, page("Account", viewer ? securityPage(viewer) : "", message));
     } finally { active--; }
@@ -183,12 +196,12 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
 function sendmail(program, sender) {
   if (!isAbsolute(program)) throw Error("Use an absolute sendmail executable path.");
   const from = emailAddress(sender);
-  return (recipient, url) => new Promise((resolveMail, reject) => {
+  return (recipient, subject, body) => new Promise((resolveMail, reject) => {
     const child = spawn(program, ["-t", "-i"], { stdio: ["pipe", "ignore", "ignore"], timeout: 8000 });
     child.once("error", reject);
     child.once("exit", code => code === 0 ? resolveMail() : reject(Error("Mail delivery failed.")));
     child.stdin.on("error", reject);
-    child.stdin.end(`From: ${from}\nTo: ${recipient}\nSubject: Avensky alpha invitation\nContent-Type: text/plain; charset=utf-8\n\n${url}\n\nThis invitation expires in three days.\n`);
+    child.stdin.end(`From: ${from}\nTo: ${recipient}\nSubject: ${subject}\nContent-Type: text/plain; charset=utf-8\n\n${body}\n`);
   });
 }
 
@@ -199,12 +212,33 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     || !/^[0-9a-f]{64}$/i.test(AVENSKY_ALPHA_KEY ?? "")) throw Error("Configure the staging origin, state directory and encryption key.");
   process.umask(0o077);
   const accounts = testerAccounts(join(AVENSKY_ALPHA_STATE, "testers.sqlite3"), Buffer.from(AVENSKY_ALPHA_KEY, "hex"));
-  if (process.argv[2] === "invite-admin") {
-    const { code } = accounts.issueInvite(process.argv[3] ?? "", true);
-    process.stdout.write(origin + base + "/enroll#" + code + "\n");
-    accounts.close();
-  } else if (process.argv.length === 2) {
-    const mailInvite = AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
+  const [command, email, option, ...extra] = process.argv.slice(2);
+  const configuredMail = () => AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
+  if (command === undefined) {
+    const mail = configuredMail();
+    const mailInvite = mail && ((recipient, url) => mail(recipient, "Avensky alpha invitation", `${url}\n\nThis invitation expires in three days.`));
     createPortal({ origin, accounts, mailInvite }).listen(9061, "127.0.0.1");
-  } else throw Error("Use invite-admin with an email, or start the portal without arguments.");
+  } else {
+    try {
+      if (command === "invite-admin" && email && !option && !extra.length) {
+        const { code } = accounts.issueInvite(email, true);
+        process.stdout.write(origin + base + "/enroll#" + code + "\n");
+      } else if (command === "reset-password" && email && (!option || option === "--email") && !extra.length) {
+        const mail = option === "--email" ? configuredMail() : undefined;
+        if (option === "--email" && !mail) throw Error("Configure the portal mail relay before using --email.");
+        const reset = accounts.issuePasswordReset(email);
+        const url = origin + base + "/reset#" + reset.code;
+        if (option === "--email") {
+          await mail(reset.email, "Reset your Avensky alpha password", `${url}\n\nThis one-use link expires in 30 minutes.`);
+          process.stdout.write("Password reset email submitted to the mail relay.\n");
+        } else {
+          process.stdout.write(url + "\n");
+        }
+      } else {
+        throw Error("Use invite-admin EMAIL or reset-password EMAIL [--email], or start the portal without arguments.");
+      }
+    } finally {
+      accounts.close();
+    }
+  }
 }
