@@ -181,8 +181,6 @@
     "slot": "dress",
     "piece": "dress",
     "mobileUrl": "/models/characters/female/wardrobe/dress/medieval-05.mobile.glb",
-    "tucksHair": true,
-    "scalpCap": true,
     "outfit": {
       "description": "A hooded gown with a laced bodice, pointed cuffs and contrasting inset panels."
     }

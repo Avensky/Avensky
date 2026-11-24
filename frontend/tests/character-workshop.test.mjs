@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { Box3, BoxGeometry, BufferGeometry, Group, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from "three";
+import { Bone, Box3, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial,
+  Quaternion, Skeleton, Uint16BufferAttribute, Vector3 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { createServer } from "vite";
 
@@ -282,5 +283,53 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     await vite.close();
     if (before) Object.defineProperty(globalThis, "localStorage", before);
     else delete globalThis.localStorage;
+  }
+});
+
+test("gown cuff and binding follow the forearm without changing the skirt or authored UVs", async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", logLevel: "error" });
+  const skeleton = new Skeleton(["l", "r"].flatMap((side, index) => {
+    const sign = index === 0 ? 1 : -1;
+    return [["upperarm", .128, 1.355, -.026], ["lowerarm", .278, 1.162, -.026], ["hand", .399, 1.022, .097]]
+      .map(([name, x, y, z]) => {
+        const joint = new Bone();
+        joint.name = `${name}_${side}`;
+        joint.position.set(x * sign, y, z);
+        joint.updateMatrixWorld();
+        return joint;
+      });
+  }));
+  const original = new BufferGeometry().setIndex([0, 1, 2]).setAttribute("position",
+    new Float32BufferAttribute([.378, .998, .145, -.378, .998, .145, .12, .68, .075], 3))
+    .setAttribute("skinIndex", new Uint16BufferAttribute([0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0], 4))
+    .setAttribute("skinWeight", new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4))
+    .setAttribute("uv", new Float32BufferAttribute([0, 1, 1, 1, 1, 0], 2));
+  original.computeVertexNormals();
+  let sleeve, band;
+  try {
+    const { prepareDressSleeves } = await vite.ssrLoadModule("/src/game/characters/dressSleeves.ts");
+    const fit = prepareDressSleeves(skeleton, true);
+    sleeve = fit(original);
+    band = fit(original, undefined, true);
+    assert.deepEqual(Array.from(sleeve.attributes.uv.array), Array.from(original.attributes.uv.array));
+    assert.deepEqual(Array.from(sleeve.attributes.position.array.slice(6)), Array.from(original.attributes.position.array.slice(6)));
+    for (const [vertex, lower] of [[0, 1], [1, 4]]) {
+      assert.equal(sleeve.attributes.skinIndex.getX(vertex), lower);
+      assert(sleeve.attributes.skinWeight.getX(vertex) > .5);
+      assert.deepEqual(Array.from(band.attributes.skinWeight.array.slice(vertex * 4, vertex * 4 + 4)),
+        Array.from(sleeve.attributes.skinWeight.array.slice(vertex * 4, vertex * 4 + 4)));
+      const position = new Vector3().fromBufferAttribute(original.attributes.position, vertex);
+      const fitted = new Vector3().fromBufferAttribute(sleeve.attributes.position, vertex);
+      const edging = new Vector3().fromBufferAttribute(band.attributes.position, vertex);
+      assert(position.distanceTo(fitted) > .005, "the flared fabric narrows");
+      assert(edging.distanceTo(fitted) > .002, "the binding has clearance from the cloth");
+    }
+    assert.equal(original.attributes.skinIndex.getX(0), 0, "the shared source is immutable");
+  } finally {
+    band?.dispose();
+    sleeve?.dispose();
+    original.dispose();
+    skeleton.dispose();
+    await vite.close();
   }
 });

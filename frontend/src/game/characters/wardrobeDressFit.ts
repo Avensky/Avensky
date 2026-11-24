@@ -8,7 +8,7 @@ export function usesLongGownFit(id: string) {
 }
 
 export function needsCloseDressFit(id: string) {
-  return id !== HOODED_GOWN && (id === "linen-nightgown" || /^(?:medieval-(?:kaftan-)?|sleepwear-)\d+$/.test(id));
+  return id === "linen-nightgown" || /^(?:medieval-(?:kaftan-)?|sleepwear-)\d+$/.test(id);
 }
 
 function armSides(skeleton: Skeleton) {
@@ -79,7 +79,7 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
           const hem = 1 - MathUtils.smoothstep(point.y, .13, .24);
           // The separate binding needs a little overlap with the fabric above
           // it. The lighter mesh otherwise opens a seam as its hem flexes.
-          const overlap = nightgownBinding ? .023 * MathUtils.smoothstep(point.y, .135, .175) : 0;
+          const overlap = nightgownBinding ? .032 * MathUtils.smoothstep(point.y, .135, .175) : 0;
           fitted ??= source.clone();
           fitted.getAttribute("position").setXYZ(vertex, point.x * (1 + .035 * hem),
             point.y + .033 * hem + overlap, point.z - .017 * hem);
@@ -91,7 +91,7 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
         }
         if (point.y <= (followsBody ? .77 : .90) || point.y >= 1.46) continue;
         const arm = vertexArm(source, arms, vertex);
-        const blend = arm ? .86 * MathUtils.smoothstep(point.y, .9, 1.04)
+        const blend = arm ? (id === "linen-nightgown" ? 0 : .86 * MathUtils.smoothstep(point.y, .9, 1.04))
           : .91 * MathUtils.smoothstep(point.y, .91, 1.06) * (1 - MathUtils.smoothstep(point.y, 1.385, 1.46));
         const surface = surfaces[arm];
         const indices = surface?.geometry.getIndex();
@@ -130,7 +130,8 @@ export function prepareCloseDressFit(body: BufferGeometry, skeleton: Skeleton, i
           }
         }
         // Pull the loose surface toward the skin without snapping folds or crossing the body.
-        const adjustment = MathUtils.clamp((followsBody ? .014 : .007) - gap, -.058, .025) * blend;
+        const bindingClearance = nightgownBinding && !arm ? .007 : 0;
+        const adjustment = MathUtils.clamp((followsBody ? .014 : .007) + bindingClearance - gap, -.058, .025) * blend;
         if (Math.abs(adjustment) < .0007) continue;
         fitted ??= source.clone();
         point.addScaledVector(normal, adjustment);

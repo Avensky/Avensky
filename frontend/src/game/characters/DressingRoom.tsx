@@ -145,7 +145,8 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     {sleevesRemoved ? "Restore sleeves" : "Remove sleeves"}
   </button>;
   const canWearBra = braFitsWith(pieces, corset?.set);
-  const piece = pieces.includes(selectedPiece) ? selectedPiece : pieces[0];
+  const piece = camera !== "Selected item" && garments?.dress && pieces.includes("dress") ? "dress"
+    : pieces.includes(selectedPiece) ? selectedPiece : pieces[0];
   const female = choice.id === VILLAGER_ID;
   const categories = CATEGORIES.filter(item => female || !("femaleOnly" in item));
   const currentCategory = CATEGORIES.find(item => item.id === category)!;
