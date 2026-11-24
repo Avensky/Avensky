@@ -1,0 +1,14 @@
+{
+  "/models/characters/female/wardrobe/alpha/space-buns.glb": {
+    "sha256": "1765971a2add6f9221ac2aa11f2154cb2f11272aa374d86f34af5c350074ecf6",
+    "size": 24199444
+  },
+  "/models/characters/female/wardrobe/alpha/tennis-dress.glb": {
+    "sha256": "f2ac6dd0e92dfacd51079afc707a7adc8c1531648a170fd1874c4af0f646c61e",
+    "size": 9164880
+  },
+  "/models/characters/female/wardrobe/alpha/wave-wedge-sandals.glb": {
+    "sha256": "e3e6802aac6af856fcc86eb2b46d83414322eb68bd389aad9e9f02f03d062976",
+    "size": 1398620
+  }
+}
