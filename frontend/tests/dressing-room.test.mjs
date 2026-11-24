@@ -416,6 +416,21 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(changes.at(-1).outfit, 'medieval-05');
     assert.equal(changes.at(-1).garments, undefined, 'a whole outfit clears try-on pieces');
     assert.equal(preview.getState().camera, 'Full body');
+    const outfitColors = '.dressing-toolbar .dressing-color-toolbar';
+    const existingDyes = changes.at(-1).appearance.item_colors;
+    await click(`${outfitColors} .dressing-color-toggle`);
+    for (const label of ['Gown fabric', 'Inset panels', 'Hood and cuffs', 'Bodice laces']) {
+      await click(`${outfitColors} [aria-label="${label} color: White"]`);
+    }
+    assert.deepEqual(changes.at(-1).appearance.item_colors, {
+      ...existingDyes,
+      'medieval-05:dress': { color: '#ffffff', accent: '#ffffff' },
+      'medieval-05:skirt': { color: '#ffffff' },
+      'medieval-05:hat': { color: '#ffffff' },
+    }, 'the full-body color control targets the gown and keeps all four dyes');
+    await click(`${outfitColors} [aria-label="Reset piece colors"]`);
+    assert.deepEqual(changes.at(-1).appearance.item_colors, existingDyes);
+    await click(`${outfitColors} .dressing-color-toggle`);
     await click('[aria-label="Clear Medieval outfits"]');
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit);
     await click('[data-wardrobe-item=medieval-08]');

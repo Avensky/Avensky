@@ -40,40 +40,19 @@ function writeSkin(weights: JointWeights, indices: Uint16Array, influence: Float
   }
 }
 
-function armRig(skeleton: Skeleton, side: "l" | "r") {
-  const elbow = skeleton.bones.findIndex(bone => bone.name === `lowerarm_${side}`);
-  const wrist = skeleton.bones.findIndex(bone => bone.name === `hand_${side}`);
-  if (elbow < 0 || wrist < 0) return;
-  const origin = new Vector3().setFromMatrixPosition(skeleton.boneInverses[elbow].clone().invert());
-  const direction = new Vector3().setFromMatrixPosition(skeleton.boneInverses[wrist].clone().invert()).sub(origin);
-  return { elbow, wrist, origin, direction, lengthSquared: direction.lengthSq(),
-    joints: skeleton.bones.map(bone => /^(?:upperarm|lowerarm|hand)(?:_twist_\d+)?_/.test(bone.name) && bone.name.endsWith(`_${side}`)) };
-}
-
 function gownCloth(source: BufferGeometry, skeleton: Skeleton) {
   const prepared = source.clone(), position = source.getAttribute("position");
-  const joints = new Uint16Array(position.count * 4), influence = new Float32Array(joints.length);
+  const indices = source.getAttribute("skinIndex"), weights = source.getAttribute("skinWeight");
+  const armJoints = skeleton.bones.map(({ name }) => /^(?:upperarm|lowerarm|hand)(?:_twist_\d+)?_[lr]$/.test(name));
   const regions = new Float32Array(position.count * 2);
-  const point = new Vector3(), delta = new Vector3();
-  const left = armRig(skeleton, "l"), right = armRig(skeleton, "r");
+  const point = new Vector3();
   for (let vertex = 0; vertex < position.count; vertex++) {
     point.fromBufferAttribute(position, vertex);
-    const skin: JointWeights = new Map();
-    addSkin(skin, source, vertex, 1);
-    const arm = point.x > 0 ? left : right;
-    const followsArm = arm ? [...skin].reduce((sum, [joint, weight]) => sum + (arm.joints[joint] ? weight : 0), 0) : 0;
-    const cuff = MathUtils.smoothstep(Math.abs(point.x), .225, .333) * MathUtils.smoothstep(followsArm, .48, .88);
-    if (arm && cuff && arm.lengthSquared > 0) {
-      // The sleeve root keeps its original weights. Transition continuously into
-      // the animated forearm and wrist, including coincident UV seam vertices.
-      const along = delta.copy(point).sub(arm.origin).dot(arm.direction) / arm.lengthSquared;
-      const cuffWeight = cuff * MathUtils.smoothstep(along, .02, .78);
-      const wristShare = .65 * MathUtils.smoothstep(along, .47, 1.04);
-      for (const [joint, weight] of skin) skin.set(joint, weight * (1 - cuffWeight));
-      skin.set(arm.elbow, (skin.get(arm.elbow) ?? 0) + cuffWeight * (1 - wristShare));
-      skin.set(arm.wrist, (skin.get(arm.wrist) ?? 0) + cuffWeight * wristShare);
+    let followsArm = 0;
+    for (let channel = 0; channel < 4; channel++) {
+      if (armJoints[indices.getComponent(vertex, channel)]) followsArm += weights.getComponent(vertex, channel);
     }
-    writeSkin(skin, joints, influence, vertex);
+    const cuff = MathUtils.smoothstep(Math.abs(point.x), .225, .333) * MathUtils.smoothstep(followsArm, .48, .88);
     const front = MathUtils.smoothstep(point.z, .02, .09);
     const skirt = (1 - MathUtils.smoothstep(point.y, .93, 1.05)) * (1 - MathUtils.smoothstep(Math.abs(point.x), .08, .128));
     const bodice = MathUtils.smoothstep(point.y, 1.08, 1.13) * (1 - MathUtils.smoothstep(point.y, 1.295, 1.33))
@@ -81,8 +60,6 @@ function gownCloth(source: BufferGeometry, skeleton: Skeleton) {
     regions[vertex * 2] = Math.max(skirt, bodice) * front * (1 - cuff);
     regions[vertex * 2 + 1] = Math.max(cuff, MathUtils.smoothstep(point.y, 1.415, 1.493));
   }
-  prepared.setAttribute("skinIndex", new Uint16BufferAttribute(joints, 4));
-  prepared.setAttribute("skinWeight", new Float32BufferAttribute(influence, 4));
   const color = new Float32BufferAttribute(new Float32Array(position.count * 3), 3);
   prepared.setAttribute("color", color);
   return { prepared, color, regions };

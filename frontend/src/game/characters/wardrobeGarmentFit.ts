@@ -25,8 +25,42 @@ import { insideBraNeckline, insideBriefs, prepareWardrobeUnderwear, type BraStyl
 import { getWardrobeActorBody, isWardrobeBodyDonor, sharesWardrobeRig } from "./wardrobeBody";
 import { HOODED_GOWN, needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
 import { hoodedGownColors, prepareHoodedGown } from "./hoodedGown";
+import { prepareDressSleeves } from "./dressSleeves";
+import { restoreDressMaterial } from "./dressMaterials";
 
 export type WardrobeGarmentSource = { item: NonNullable<ReturnType<typeof getWardrobeGarment>>; scene: Object3D; authoredFit?: boolean };
+
+function fitJerkinShirt(meshes: readonly SkinnedMesh[]) {
+  const outer = meshes.find(mesh => mesh.name === "CLOTH_MEDIEVAL_08_0_0");
+  const shirt = meshes.find(mesh => mesh.name === "CLOTH_MEDIEVAL_08_1_1");
+  const index = shirt?.geometry.getIndex();
+  if (!outer || !shirt || !index) return;
+  const coat = bodySurface(outer.geometry);
+  if (!coat) return;
+  const position = shirt.geometry.getAttribute("position");
+  const hidden = prepareWardrobeCoverage([coat], -.012);
+  const a = new Vector3(), b = new Vector3(), c = new Vector3(), center = new Vector3();
+  const beneathJerkin = (point: Vector3) => point.y < 1.421 && point.y > 1.09 && Math.abs(point.x) < .34;
+  const coveredTorso = (point: Vector3) => point.y < 1.385 && Math.abs(point.x) < .151;
+  const visible: number[] = [];
+  // The original undershirt is exposed at the collar and below the short
+  // sleeve. Remove the hidden faces that break through the quilted outer layer.
+  for (let i = 0; i < index.count; i += 3) {
+    const ai = index.getX(i), bi = index.getX(i + 1), ci = index.getX(i + 2);
+    a.fromBufferAttribute(position, ai);
+    b.fromBufferAttribute(position, bi);
+    c.fromBufferAttribute(position, ci);
+    if (coveredTorso(a) && coveredTorso(b) && coveredTorso(c)) continue;
+    center.copy(a).add(b).add(c).multiplyScalar(1 / 3);
+    if (beneathJerkin(a) && beneathJerkin(b) && beneathJerkin(c) && hidden(center, a, b, c, true)) continue;
+    visible.push(ai, bi, ci);
+  }
+  coat.geometry.dispose();
+  if (visible.length === index.count) return;
+  const geometry = shirt.geometry.clone().setIndex(visible);
+  shirt.geometry = geometry;
+  return geometry;
+}
 
 export function replacesVillagerBody(slot: WardrobeGarmentSlot) {
   return slot === "top" || slot === "skirt" || slot === "dress";
@@ -225,7 +259,12 @@ function armVertices(body: SkinnedMesh, geometry: BufferGeometry) {
 
 function insideGownSleeve(point: Vector3) {
   const across = Math.abs(point.x);
-  return across > .181 && across < .353 && point.y > 1.018 && point.y < 1.324;
+  return (across > .181 && across < .353 && point.y > 1.018 && point.y < 1.324)
+    || (across > .118 && across < .247 && point.y >= 1.29 && point.y < 1.414);
+}
+
+function insideGownBodice(point: Vector3) {
+  return Math.abs(point.x) > .067 && point.y > 1.14 && point.y < 1.29;
 }
 
 // A zero byte means the outer clothing or original body cut already hides this triangle.
@@ -322,8 +361,10 @@ function fitBodyMask(
     sampleTriangle(ai, bi, ci);
     // The opaque gown sleeves cover the elbows through the full arm blend.
     // Keep the wrists and shoulder opening beyond the covered band.
-    if (restored.gownSleeves && arms?.[ai] && arms[bi] && arms[ci]
-      && insideGownSleeve(a) && insideGownSleeve(b) && insideGownSleeve(c)) continue;
+    if (restored.gownSleeves) {
+      if (arms?.[ai] && arms[bi] && arms[ci] && insideGownSleeve(a) && insideGownSleeve(b) && insideGownSleeve(c)) continue;
+      if (insideGownBodice(a) && insideGownBodice(b) && insideGownBodice(c)) continue;
+    }
     const upperBody = point.y > 1.10 || (point.y > .87 && Math.abs(point.x) > .17);
     // The long corset and high-waisted skirt overlap the usual upper/lower
     // split. Restore both sides of that seam and let the remaining cloth mask it.
@@ -453,6 +494,8 @@ export function prepareWardrobeGarments(
     const liningColors: Color[] = [];
     const garmentMeshes: SkinnedMesh[] = [];
     const isHoodedGown = item.id === HOODED_GOWN;
+    const isTailoredDress = item.slot === "dress" && needsCloseDressFit(item.id);
+    const fitSleeves = isTailoredDress && prepareDressSleeves(original.skeleton, item.id === "linen-nightgown");
     let fabricColor: Color | undefined;
     for (const { part, lining } of wardrobeMeshCandidates({ item, scene }, removeSleeves)) {
       const mesh = bindWardrobeGarmentMesh(part, original.skeleton);
@@ -462,6 +505,7 @@ export function prepareWardrobeGarments(
       const cloneMaterial = (source: Material) => {
         const material = source.clone();
         const channel = tintChannel(source, mesh);
+        if (isTailoredDress && !lining) restoreDressMaterial(material, channel, mesh.geometry.hasAttribute("uv"));
         if (item.id === "skirt-02" && channel === "fabric" && !lining && material instanceof MeshStandardMaterial && !material.map) {
           material.map = shortSkirtWeave();
         }
@@ -470,7 +514,7 @@ export function prepareWardrobeGarments(
           const base = material.color.clone();
           if (lining) liningColors.push(base);
           else if (channel === "fabric") fabricColor ??= base;
-          if (!isHoodedGown || lining) {
+          if ((!isHoodedGown || lining) && !(isTailoredDress && (channel === "hardware" || /(?:belt|bag)/i.test(source.name)))) {
             let palette = materials.get(item.piece);
             if (!palette) materials.set(item.piece, palette = []);
             palette.push({ base, color: material.color, accent: !lining && channel !== "fabric" });
@@ -491,14 +535,9 @@ export function prepareWardrobeGarments(
       if (item.slot === "hat") villageBonnet = prepareVillageBonnet(garment.getObjectByName(item.villageNode));
       if (item.slot === "shoes") disposeVillageShoes = prepareVillageShoes(garment);
     }
-    if (item.slot === "hat" || isHoodedGown) {
+    if (item.slot === "hat") {
       tucksHair ||= Boolean(item.tucksHair);
       scalpCap ||= Boolean(item.scalpCap);
-    }
-    if (isHoodedGown) {
-      hoodedGown = prepareHoodedGown(garmentMeshes.filter(mesh => mesh.userData.wardrobeRole !== "shorts"), original.skeleton);
-      restored.gownSleeves = Boolean(hoodedGown);
-      if (hoodedGown?.laces) garment.add(hoodedGown.laces);
     }
     if (item.id === "socks-04") tallSocks.push(...garmentMeshes);
     const skirtBody = full && item.slot === "skirt" && item.id.startsWith("gothic-skirt-") ? bodySurface(full) : undefined;
@@ -506,7 +545,7 @@ export function prepareWardrobeGarments(
     const fitSkirt = skirtBody && skirtSurfaces.length ? prepareGothicSkirtFit(skirtBody, skirtSurfaces, item.id, original.skeleton, authoredFit) : undefined;
     const sockBody = item.slot === "socks" && restored.feet && full ? bodySurface(full) : undefined;
     const fitSocks = sockBody && prepareShoelessSockFit(sockBody);
-    const fitDress = item.slot === "dress" && full && needsCloseDressFit(item.id)
+    const fitDress = isTailoredDress && full && !isHoodedGown
       ? prepareCloseDressFit(full, original.skeleton, item.id) : undefined;
     if (fitDress && usesLongGownFit(item.id)) root.userData.longGown = true;
     for (const { geometry } of skirtSurfaces) geometry.dispose();
@@ -514,7 +553,8 @@ export function prepareWardrobeGarments(
       const lining = mesh.userData.wardrobeRole === "shorts";
       const fit = fitTop ?? fitSkirt ?? fitSocks ?? (lining ? undefined : fitShortSkirt);
       const source = mesh.geometry;
-      const fitted = fit?.(source) ?? (lining ? undefined : fitDress?.fit(source, mesh.name));
+      let fitted = fit?.(source) ?? (lining ? undefined : fitDress?.fit(source, mesh.name));
+      if (!lining && fitSleeves) fitted = fitSleeves(source, fitted, mesh.name === "CLOTH_LINEN_NIGHTGOWN_1_1");
       if (fitted) {
         if (fitShortSkirt && mesh.userData.wardrobePart === "fabric") rebuildShortSkirtFabricNormals(mesh.geometry, fitted);
         mesh.geometry = fitted;
@@ -531,6 +571,15 @@ export function prepareWardrobeGarments(
       }
     }
     fitDress?.dispose();
+    if (item.id === "medieval-08") {
+      const shirt = fitJerkinShirt(garmentMeshes);
+      if (shirt) fittedGarments.push(shirt);
+    }
+    if (isHoodedGown) {
+      hoodedGown = prepareHoodedGown(garmentMeshes.filter(mesh => mesh.userData.wardrobeRole !== "shorts"), original.skeleton);
+      restored.gownSleeves = Boolean(hoodedGown);
+      if (hoodedGown?.laces) garment.add(hoodedGown.laces);
+    }
     if (skirtBody) {
       const lining = item.id === "gothic-skirt-01" ? seatHandkerchiefSkirtPanels(garmentMeshes, skirtBody)
         : item.id === "gothic-skirt-03" ? seatRuffledSkirtLining(garmentMeshes, skirtBody) : undefined;
