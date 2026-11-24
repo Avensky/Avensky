@@ -98,7 +98,7 @@ export function metadataRevision(assets) {
   return digest(JSON.stringify([sealRelease({ assets }).id, metadataInputs.map(textDigest)]));
 }
 
-export function stagingRelease(prebuiltFile) {
+function baseStagingRelease(prebuiltFile) {
   const assets = trackedAssets();
   if (!prebuiltFile) return sealRelease({ assets });
   const prebuilt = JSON.parse(readFileSync(prebuiltFile, "utf8"));
@@ -112,6 +112,18 @@ export function stagingRelease(prebuiltFile) {
     }
   }
   return release;
+}
+
+export function stagingRelease(prebuiltFile) {
+  const release = baseStagingRelease(prebuiltFile);
+  const fitted = JSON.parse(readFileSync(new URL("./staging-fitted-assets.json", import.meta.url), "utf8"));
+  for (const [path, entry] of Object.entries(fitted)) {
+    const existing = release.assets[path];
+    if (existing && (existing.sha256 !== entry.sha256 || existing.size !== entry.size)) {
+      throw new Error("Fitted staging metadata disagrees with the release for " + path);
+    }
+  }
+  return validateRelease(sealRelease({ ...release, assets: { ...release.assets, ...fitted } }));
 }
 
 export function localGlbEntry(path) {
