@@ -8,7 +8,7 @@ export type LocalHairOption = { id: string; label: string; url: string };
 
 export const hairOptions: LocalHairOption[] = fittedHairOptions;
 export const useLocalHairstyle = create<{id:string; choose:(id:string)=>void}>()(
-  persist(set => ({id:"Space_Buns",choose:id=>set({id})}),{name:"avensky-fitting-hairstyle-v1"}),
+  persist(set => ({id:"stock",choose:id=>set({id})}),{name:"avensky-fitting-hairstyle-v1"}),
 );
 
 export function LocalHairFeatures() {
