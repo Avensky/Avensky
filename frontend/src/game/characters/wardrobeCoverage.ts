@@ -25,12 +25,14 @@ export function wardrobeCoverageSurface(geometry: BufferGeometry, height?: reado
     .setIndex(new BufferAttribute(indices, 1)));
 }
 
-export function prepareWardrobeCoverage(surfaces: readonly MeshBVH[], minimumClearance = -.012, cornerSample = .8) {
+export function prepareWardrobeCoverage(
+  surfaces: readonly MeshBVH[], minimumClearance = -.012, cornerSample = .8, originInset = .012,
+) {
   if (!surfaces.length) return () => false;
   const ray = new Ray();
   const normal = new Vector3(), edge = new Vector3();
-  const near = .012 + minimumClearance;
-  const far = .052;
+  const near = originInset + minimumClearance;
+  const far = originInset + .04;
   const search = new Box3(), end = new Vector3();
   const bounded = surfaces.map(surface => ({ surface, bounds: surface.getBoundingBox(new Box3()).expandByScalar(1e-6) }));
   const hit = new Vector3();
@@ -47,7 +49,7 @@ export function prepareWardrobeCoverage(surfaces: readonly MeshBVH[], minimumCle
   function covered(center: Vector3, corner?: Vector3) {
     ray.origin.copy(center);
     if (corner) ray.origin.lerp(corner, cornerSample);
-    ray.origin.addScaledVector(normal, -.012);
+    ray.origin.addScaledVector(normal, -originInset);
     ray.at(far, end);
     search.min.copy(ray.origin).min(end);
     search.max.copy(ray.origin).max(end);
