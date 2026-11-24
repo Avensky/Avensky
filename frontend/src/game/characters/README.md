@@ -39,6 +39,13 @@ donor. The torso and sleeves move closer to the skin, with a transition at the
 hips to retain the authored skirt and hem. Review the tighter fits in motion
 before approving additional dresses for release.
 
+The Bell-sleeve gown and Linen nightgown keep their existing equip and save IDs.
+Their mobile and garage meshes inherit nearby body weights around the upper
+panels and leave room for the lining over the seat. The chair emote holds the
+hands above these gowns as the character lowers into the chair. The nightgown
+also lifts its layered hem away from bare feet during a stride. These adjustments
+run when the outfit loads and use the character's existing skinning in motion.
+
 The Hooded gown keeps its existing fit and outfit ID. Its cuffs blend into the
 forearm and wrist weights. Its front laces are skinned to the cloth, and its hood
 tucks the selected hairstyle during wear. Gown fabric, inset panels, hood and

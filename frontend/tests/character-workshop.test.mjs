@@ -58,6 +58,15 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
     assert.ok(Math.abs(goal.sway - .2) < .0001);
     assert.ok(Math.abs(goal.travel - (-.3)) < .0001);
     assert.ok(Math.abs(goal.turn - .25) < .0001);
+    actor.userData.longGown = true;
+    const gownSit = chairSitClip(actor, seat);
+    assert.deepEqual(gownSit.keys.slice(0, 2), sit.keys.slice(0, 2));
+    for (const pose of gownSit.keys.slice(2).map(([, pose]) => pose)) {
+      assert(pose.left[1][1] > goal.left[1][1]);
+      assert(pose.right[1][1] > goal.right[1][1]);
+      assert.deepEqual(pose.feet, goal.feet);
+    }
+    assert.equal(gownSit.keys.at(-1)[1].rise, goal.rise);
     seat.position.z = -3;
     assert.equal(chairSitClip(actor, seat), undefined);
     assert.equal(chairSitClip(actor, undefined), undefined);
