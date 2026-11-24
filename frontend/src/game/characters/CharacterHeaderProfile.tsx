@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { ProgressBadge } from "../alpha/ProgressBadge";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
+import { useSocialStore } from "../../store/social/socialStore";
 import { characterLook } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { usePlayerCharacter } from "./localOutfits";
@@ -17,7 +18,11 @@ export type CharacterHeaderProfileProps = {
 export function CharacterHeaderProfile({ onOpen, leadingAction, active, showProgress = false, readOnly = false, compact = false }: CharacterHeaderProfileProps) {
   const choice = usePlayerCharacter();
   const editingAllowed = useUIStore(canEditCharacter);
-  const name = characterLook(choice)?.character.name ?? "Choose character";
+  const activeName = useSocialStore(state => {
+    const profile = state.view?.profile;
+    return profile?.characters?.find(slot => slot.id === profile.active_character_id)?.name;
+  });
+  const name = activeName ?? characterLook(choice)?.character.name ?? "Choose character";
   const content = <>
     <span className="character-header-info">{showProgress ? <ProgressBadge compact /> : name}</span>
     <span className="character-header-portrait" aria-hidden="true"><CharacterPortrait choice={choice} compact /></span>
