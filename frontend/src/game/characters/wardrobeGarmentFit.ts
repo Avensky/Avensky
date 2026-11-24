@@ -23,7 +23,9 @@ import { highCollarSkirtWaistband } from "./wardrobeSkirt";
 import { prepareWardrobeCoverage, wardrobeCoverageSurface as bodySurface } from "./wardrobeCoverage";
 import { insideBraNeckline, insideBriefs, prepareWardrobeUnderwear, type BraStyle, type BriefsStyle } from "./wardrobeUnderwear";
 import { getWardrobeActorBody, isWardrobeBodyDonor, sharesWardrobeRig } from "./wardrobeBody";
-import { HOODED_GOWN, needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
+import { HOODED_GOWN, LINEN_NIGHTGOWN, LINEN_NIGHTGOWN_BINDING, LINEN_NIGHTGOWN_FABRIC,
+  needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
+import { fitLinenNightgownHem } from "./linenNightgownHem";
 import { hoodedGownColors, prepareHoodedGown } from "./hoodedGown";
 import { prepareDressSleeves } from "./dressSleeves";
 import { ORIGINAL_DRESS_BELT_COLORS, restoreDressMaterial } from "./dressMaterials";
@@ -132,7 +134,7 @@ const MAX_SHARED_FITTED_MASKS = 8;
 
 type RestoredSkin = {
   upper: boolean; arms: boolean; skirt: boolean; feet: boolean; shortSkirt: boolean; fittedSkirt: boolean; openFrontSkirt: boolean;
-  gownSleeves: boolean;
+  gownSleeves: boolean; linenNightgown: boolean;
 };
 type SkinCover = { surface: MeshBVH; piece: ClothingPiece; opening?: (point: Vector3) => boolean };
 type TriangleCoverage = (center: Vector3, a: Vector3, b: Vector3, c: Vector3) => boolean;
@@ -279,6 +281,10 @@ function insideGownSleeve(point: Vector3) {
     || (across > .118 && across < .247 && point.y >= 1.29 && point.y < 1.414);
 }
 
+function insideNightgownThigh(point: Vector3) {
+  return point.y > .61 && point.y < .82 && point.z > 0;
+}
+
 function insideGownBodice(point: Vector3) {
   return Math.abs(point.x) > .067 && point.y > 1.14 && point.y < 1.29;
 }
@@ -381,6 +387,8 @@ function fitBodyMask(
       if (arms?.[ai] && arms[bi] && arms[ci] && insideGownSleeve(a) && insideGownSleeve(b) && insideGownSleeve(c)) continue;
       if (insideGownBodice(a) && insideGownBodice(b) && insideGownBodice(c)) continue;
     }
+    // The opaque skirt covers the front of the thighs even when the knees bend.
+    if (restored.linenNightgown && insideNightgownThigh(a) && insideNightgownThigh(b) && insideNightgownThigh(c)) continue;
     const upperBody = point.y > 1.10 || (point.y > .87 && Math.abs(point.x) > .17);
     // The long corset and high-waisted skirt overlap the usual upper/lower
     // split. Restore both sides of that seam and let the remaining cloth mask it.
@@ -464,6 +472,7 @@ export function prepareWardrobeGarments(
     openFrontSkirt: sources.some(({ item, authoredFit }) => item.id === "gothic-skirt-02" && !authoredFit),
     feet: removals.includes("shoes") || sources.some(({ item }) => item.slot === "shoes" && item.preserveSkin),
     gownSleeves: false,
+    linenNightgown: false,
   };
   const restoresBody = restored.upper || restored.arms || restored.skirt || restored.feet || restored.openFrontSkirt;
   const replacements = new Set<ClothingPiece>(removals.flatMap(slot => wardrobeRemovalPieces[slot]));
@@ -513,7 +522,8 @@ export function prepareWardrobeGarments(
     const isHoodedGown = item.id === HOODED_GOWN;
     const isTailoredDress = item.slot === "dress" && needsCloseDressFit(item.id);
     const dyeableBelt = ORIGINAL_DRESS_BELT_COLORS.has(item.id);
-    const fitSleeves = isTailoredDress && prepareDressSleeves(original.skeleton, item.id === "linen-nightgown", full);
+    const linenNightgown = item.id === LINEN_NIGHTGOWN;
+    const fitSleeves = isTailoredDress && prepareDressSleeves(original.skeleton, linenNightgown, full);
     let fabricColor: Color | undefined;
     for (const { part, lining } of wardrobeMeshCandidates({ item, scene }, removeSleeves)) {
       const mesh = bindWardrobeGarmentMesh(part, original.skeleton);
@@ -578,7 +588,7 @@ export function prepareWardrobeGarments(
       // Fitting the fabric can take it closer to the body, while the fasteners
       // and belts need to retain the space given by the authored layers.
       let fitted = fit?.(source) ?? (lining ? undefined : fitDress?.fit(source, mesh.name, raisedDetail));
-      if (!lining && fitSleeves) fitted = fitSleeves(source, fitted, mesh.name === "CLOTH_LINEN_NIGHTGOWN_1_1");
+      if (!lining && fitSleeves) fitted = fitSleeves(source, fitted, mesh.name === LINEN_NIGHTGOWN_BINDING);
       if (fitted) {
         if (fitShortSkirt && mesh.userData.wardrobePart === "fabric") rebuildShortSkirtFabricNormals(mesh.geometry, fitted);
         mesh.geometry = fitted;
@@ -595,6 +605,19 @@ export function prepareWardrobeGarments(
       }
     }
     fitDress?.dispose();
+    if (linenNightgown) {
+      const fabric = garmentMeshes.find(mesh => mesh.name === LINEN_NIGHTGOWN_FABRIC);
+      const binding = garmentMeshes.find(mesh => mesh.name === LINEN_NIGHTGOWN_BINDING);
+      if (fabric && binding) {
+        restored.linenNightgown = true;
+        const fit = fitLinenNightgownHem(binding.geometry, fabric.geometry);
+        if (fit) {
+          fabric.geometry = fit.skirt;
+          binding.geometry = fit.binding;
+          fittedGarments.push(fit.skirt, fit.binding);
+        }
+      }
+    }
     if (Object.hasOwn(dressLayers, item.id)) {
       fittedGarments.push(...fitDressUnderlayers(garmentMeshes, item.id as keyof typeof dressLayers));
     }
