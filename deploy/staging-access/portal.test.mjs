@@ -32,8 +32,16 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.equal(redirect.headers.get("location"), "/__alpha/sign-in");
   assert.equal((await get("testers")).status, 403);
   const admin = accounts.issueInvite("operator@example.net", true);
-  const signed = await post("enroll", { email: admin.email, invite: admin.code, password });
+  const enrollment = { email: admin.email, invite: admin.code, password };
+  assert.equal((await get("enroll")).headers.get("referrer-policy"), "same-origin");
+  const blocked = await post("enroll", enrollment, undefined, "null");
+  assert.equal(blocked.status, 403);
+  assert.match(await blocked.text(), /Open the portal or your original invitation link/);
+  const signed = await post("enroll", enrollment);
+  assert.equal(signed.status, 303);
+  assert.equal(signed.headers.get("location"), "/__alpha/account");
   const adminCookie = getCookie(signed);
+  assert.match(await (await get("account", { cookie: adminCookie })).text(), /Alpha testers/);
   assert.equal((await post("testers/invite", { email: "player@example.net" }, adminCookie, "https://example.org")).status, 403);
   assert.equal((await post("testers/invite", { email: "PLAYER@example.net" }, adminCookie)).status, 200);
   assert.equal(delivered[0][0], "player@example.net");

@@ -98,7 +98,8 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
     const cookie = req.headers.cookie?.split(";").map(row => row.trim()).find(row => row.startsWith(cookieName + "="));
     const send = (status, body = "", headers = {}) => {
       res.writeHead(status, {
-        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "no-referrer",
+        // A same-origin form submission needs its Origin header for the check below.
+        "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "same-origin",
         "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff", ...headers,
       });
@@ -130,7 +131,9 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       return send(404);
     }
     if (req.method !== "POST") return send(405);
-    if (req.headers.origin !== origin) return send(403);
+    if (req.headers.origin !== origin) return send(403, page("Form blocked",
+      `<a href="${base}/sign-in">Return to sign-in</a>`,
+      "Open the portal or your original invitation link directly in your browser and try again."));
     const client = req.headers["x-alpha-client"] ?? req.socket.remoteAddress;
     if (!admit(client)) return send(429, page("Try again shortly", `<a href="${base}/sign-in">Log in</a>`), { "Retry-After": "60" });
     active++;
