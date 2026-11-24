@@ -1,5 +1,5 @@
 /* One density/surface contract for menus and translucent selection chrome. */
-:is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel){
+:is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel,.main-menu){
  --menu-gutter:clamp(16px,3vw,44px);
  --menu-header-y:6px;--menu-action-height:32px;--menu-action-y:4px;
  --menu-angled-header-height:41px;
@@ -115,7 +115,7 @@ html[data-ui-theme] .menu-frame .menu-row:is(:hover,:focus-visible,[data-selecte
 html[data-ui-theme] .menu-frame .menu-row-label{font-weight:700;font-size:calc(13px * var(--menu-text-scale,1))}
 html[data-ui-theme] .menu-frame .menu-row-description{color:var(--app-muted);font-size:calc(10px * var(--menu-text-scale,1))}
 @media(max-width:760px){
- :is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel){--menu-gutter:16px;--menu-header-y:4px;--menu-angled-header-height:39px;--menu-tab-height:32px;--menu-tab-y:4px}
+ :is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel,.main-menu){--menu-gutter:16px;--menu-header-y:4px;--menu-angled-header-height:39px;--menu-tab-height:32px;--menu-tab-y:4px}
  .menu-frame-header{gap:10px}
  .menu-frame-header small{font-size:7px}.menu-frame-header .alpha-progress{display:none}
  .menu-frame .menu-frame-tabs,html[data-ui-theme] .menu-frame .menu-frame-tabs{padding:0 6px}
@@ -127,7 +127,7 @@ html[data-ui-theme] .menu-frame .menu-row-description{color:var(--app-muted);fon
  html[data-ui-theme] .menu-frame .menu-row{min-height:48px;padding:12px 10px}
 }
 @media(max-height:480px) and (min-width:560px){
- :is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel){--menu-gutter:15px;--menu-header-y:3px;--menu-angled-header-height:35px;--menu-action-height:28px;--menu-action-y:3px;--menu-tab-height:28px;--menu-tab-y:3px}
+ :is(.menu-frame,.hero-selection,.hero-ability-guide,.cockpit-panel,.main-menu){--menu-gutter:15px;--menu-header-y:3px;--menu-angled-header-height:35px;--menu-action-height:28px;--menu-action-y:3px;--menu-tab-height:28px;--menu-tab-y:3px}
  .menu-frame-header h1{font-size:20px}.menu-frame-header small,.menu-frame-header .alpha-progress{display:none}
  .menu-frame .menu-frame-tabs .menu-control{padding-inline:10px}
 }

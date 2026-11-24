@@ -37,7 +37,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   const { close } = characterTestDom();
   let vite, root;
   try {
-    vite = await createServer({ define: { __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01']) },
+    vite = await createServer({ define: { __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01', 'medieval-05']) },
       server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error',
       plugins: [{
         name: 'count-fit-review-keys',
@@ -658,12 +658,25 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(drafts.at(-1).appearance.animation_fit, 'fitted');
     await click('#character-editor-tab-appearance');
     await browseWardrobe('outfits');
-    await click('[data-wardrobe-item="shop-crew"]');
+    assert.equal(find('[data-wardrobe-item="shop-crew"]'), null);
+    await click('[data-wardrobe-item="medieval-05"]');
     assert.equal(drafts.at(-1).garments, undefined);
     assert.deepEqual(drafts.at(-1).appearance?.item_colors, { 'underwear:briefs': { color: '#101015', accent: '#ff2d95' } },
       'underwear dye persists across outfits while the trial top dye stays in its preview');
+    await click('[data-wearable-quick-select=dress]');
+    await click('[aria-label="Open clothing colors"]');
+    await click('[aria-label="Gown fabric color: Ink"]');
+    await click('[aria-label="Inset panels color: Crimson"]');
+    await click('[aria-label="Hood and cuffs color: Navy"]');
+    await click('[aria-label="Bodice laces color: White"]');
     await click('[data-equip-outfit]');
-    assert.equal(requests[4].character.outfit, 'shop-crew');
+    assert.equal(requests[4].character.outfit, 'medieval-05');
+    assert.deepEqual(requests[4].character.appearance.item_colors, {
+      'underwear:briefs': { color: '#101015', accent: '#ff2d95' },
+      'medieval-05:dress': { color: '#262630', accent: '#ffffff' },
+      'medieval-05:skirt': { color: '#ad444d' },
+      'medieval-05:hat': { color: '#4b79a4' },
+    });
     assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
     assert.equal(requests[4].character.appearance.hair, 'cropped');
     await acknowledge(requests[4], requests[4].character);
@@ -682,7 +695,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(requests[5].character.outfit, 'race-crew');
     assert.equal(requests[5].character.appearance.hair_color, 'copper');
     await acknowledge(requests[5], requests[5].character);
-    assert.equal(social.getState().view.profile.progression.character_presets['mara-vega'].outfit, 'shop-crew');
+    assert.equal(social.getState().view.profile.progression.character_presets['mara-vega'].outfit, 'medieval-05');
 
     const customization = find('[aria-label="Customization"]');
     assert(customization.querySelector('[data-open-character][aria-current="page"]'));

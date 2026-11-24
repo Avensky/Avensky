@@ -49,9 +49,9 @@ export function underwearColors(look: CharacterLook, piece: UnderwearPiece): Req
   };
 }
 
-export function withClothingColors(choice: CharacterChoice, piece: ClothingPiece, colors?: PieceColors): CharacterChoice {
+export function withClothingColors(choice: CharacterChoice, piece: ClothingPiece, colors?: PieceColors, variant?: string): CharacterChoice {
   const item_colors = { ...choice.appearance?.item_colors };
-  const key = clothingColorKey(choice, piece);
+  const key = variant ? `${variant}:${piece}` : clothingColorKey(choice, piece);
   if (colors) item_colors[key] = { ...item_colors[key], ...colors };
   else delete item_colors[key];
   return { ...choice, appearance: { ...characterAppearance(choice), item_colors: Object.keys(item_colors).length ? item_colors : undefined } };

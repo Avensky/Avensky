@@ -67,9 +67,10 @@
 .character-header-action { display: flex; flex: none; }
 .character-header-profile {
   --profile-cut: var(--angled-tab-cut, 11px);
+  --profile-height: var(--angled-header-height, var(--menu-angled-header-height, 39px));
   display: flex;
   align-items: flex-start;
-  height: var(--angled-header-height, 39px);
+  height: var(--profile-height);
   padding: 0;
   border: 0;
   color: var(--app-text);
@@ -100,7 +101,7 @@ button.character-header-profile { cursor: pointer; }
 }
 .character-header-portrait {
   height: 100%;
-  width: calc(var(--angled-header-height, 39px) + var(--profile-cut));
+  width: calc(var(--profile-height) + var(--profile-cut));
   margin-inline-start: calc(-.6 * var(--profile-cut));
   padding: 0 0 0 calc(.45 * var(--profile-cut));
   background: var(--app-panel);
@@ -134,11 +135,11 @@ button.character-header-profile { cursor: pointer; }
   padding-inline: calc(var(--profile-cut) + 5px) 6px;
 }
 .character-header-profile:is([data-joined], [data-angled]) .character-header-portrait {
-  width: var(--angled-header-height, 39px);
+  width: var(--profile-height);
   padding: 0;
 }
 :is(.angled-tab-header .character-header-profile[data-joined], .character-header-profile[data-angled]) {
-  --profile-edge-height: var(--angled-tabs-height, 32px);
+  --profile-edge-height: var(--angled-tabs-height, calc(var(--profile-height) / 1.2));
   clip-path: polygon(var(--profile-cut) 0, 100% 0, 100% 100%, 0 100%, 0 var(--profile-edge-height));
 }
 :is(.angled-tab-header .character-header-profile[data-joined], .character-header-profile[data-angled])::before {
