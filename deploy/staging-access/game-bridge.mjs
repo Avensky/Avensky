@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import { createHmac } from "node:crypto";
 
-const LOGIN_FAILED = "The email, account name, or password is incorrect.";
+export const LOGIN_FAILED = "The email, account name, or password is incorrect.";
 const ACCOUNT_EXISTS = "That account name is unavailable.";
 const REGISTERED_DEVICE = "Sign out before registering another account.";
 const LOST_DEVICE = "This profile is unavailable on this server. Create a new device profile.";

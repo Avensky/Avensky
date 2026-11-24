@@ -5,6 +5,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
+import { LOGIN_FAILED } from "./game-bridge.mjs";
 
 const derive = promisify(scrypt);
 const hash = value => createHash("sha256").update(value).digest("hex");
@@ -13,6 +14,8 @@ const now = () => Math.floor(Date.now() / 1000);
 const SESSION_AGE = 12 * 60 * 60;
 const INVITE_AGE = 3 * 24 * 60 * 60;
 const RESET_AGE = 30 * 60;
+const SIGN_IN_AGE = 5 * 60;
+const SIGN_IN_ATTEMPTS = 5;
 
 export function emailAddress(value) {
   const email = value.trim().toLowerCase();
@@ -82,6 +85,10 @@ export function testerAccounts(path, key, game) {
     CREATE TABLE IF NOT EXISTS recovery (
       email TEXT NOT NULL REFERENCES testers(email), digest TEXT NOT NULL, PRIMARY KEY(email, digest)
     );
+    CREATE TABLE IF NOT EXISTS sign_in_challenges (
+      email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL UNIQUE,
+      expires INTEGER NOT NULL, attempts INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS password_resets (
       email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL, expires INTEGER NOT NULL
     );
@@ -124,7 +131,12 @@ export function testerAccounts(path, key, game) {
     if (typeof password !== "string" || password.length > 256) return false;
     if (game) {
       const profile = record && gameProfile(record.email);
-      return Boolean(profile && !record.revoked && await game.authenticate(profile.login, password) === profile.profile_id);
+      if (!profile || record.revoked) return false;
+      try { return await game.authenticate(profile.login, password) === profile.profile_id; }
+      catch (error) {
+        if (error.message !== LOGIN_FAILED) throw error;
+        return false;
+      }
     }
     const result = await passwordHash(password, Buffer.from(record?.salt ?? "00".repeat(16), "hex"));
     const same = timingSafeEqual(result, Buffer.from(record?.password ?? "00".repeat(32), "hex"));
@@ -200,16 +212,41 @@ export function testerAccounts(path, key, game) {
         return session(email);
       });
     },
-    async logIn(raw, password, code) {
+    async beginSignIn(raw, password) {
       const email = emailAddress(raw);
       const record = tester(email);
-      const denied = () => Error("The email, password, or authentication code is incorrect.");
+      const denied = () => Error("The email or password is incorrect, or your staging invitation has not been accepted.");
       if (!await validPassword(record, password)) throw denied();
       return transaction(() => {
         const current = tester(email);
-        if (!current || current.revoked || current.password !== record.password
-          || !verifySecondFactor(current, code)) throw denied();
-        return session(email);
+        if (!current || current.revoked || current.password !== record.password) throw denied();
+        if (!current.mfa) return { session: session(email) };
+        const challenge = token();
+        run("DELETE FROM sign_in_challenges WHERE expires <= ?", now());
+        const pending = get(`INSERT INTO sign_in_challenges (email, digest, expires, attempts) VALUES (?, ?, ?, ?)
+          ON CONFLICT(email) DO UPDATE SET digest = excluded.digest RETURNING attempts`,
+          email, hash(challenge), now() + SIGN_IN_AGE, SIGN_IN_ATTEMPTS);
+        return pending.attempts ? { challenge } : { locked: true };
+      });
+    },
+    completeSignIn(challenge, code) {
+      if (!/^[0-9a-f]{64}$/.test(challenge)) return {};
+      const digest = hash(challenge);
+      return transaction(() => {
+        const pending = get("SELECT email, attempts FROM sign_in_challenges WHERE digest = ? AND expires > ?", digest, now());
+        if (!pending) return {};
+        if (!pending.attempts) return { locked: true };
+        const record = tester(pending.email);
+        if (record?.mfa && !record.revoked) {
+          if (verifySecondFactor(record, code)) {
+            run("DELETE FROM sign_in_challenges WHERE digest = ?", digest);
+            return { session: session(record.email) };
+          }
+          run("UPDATE sign_in_challenges SET attempts = attempts - 1 WHERE digest = ?", digest);
+          return pending.attempts > 1 ? { challenge } : { locked: true };
+        }
+        run("DELETE FROM sign_in_challenges WHERE digest = ?", digest);
+        return {};
       });
     },
     issuePasswordReset(raw) {
@@ -239,6 +276,7 @@ export function testerAccounts(path, key, game) {
         if (!pending() || !record || record.revoked || !verifySecondFactor(record, factor)) throw denied();
         run("UPDATE testers SET salt = ?, password = ? WHERE email = ?", salt, passwordDigest, email);
         run("DELETE FROM sessions WHERE email = ?", email);
+        run("DELETE FROM sign_in_challenges WHERE email = ?", email);
         run("DELETE FROM password_resets WHERE email = ?", email);
       });
     },
@@ -255,6 +293,7 @@ export function testerAccounts(path, key, game) {
         run("DELETE FROM invitations WHERE email = ?", email);
         run("DELETE FROM password_resets WHERE email = ?", email);
         run("DELETE FROM sessions WHERE email = ?", email);
+        run("DELETE FROM sign_in_challenges WHERE email = ?", email);
         run("UPDATE testers SET revoked = 1 WHERE email = ?", email);
       });
       return gameProfile(email)?.profile_id;

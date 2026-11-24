@@ -28,6 +28,7 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 
 - A manager issues an expiring, single-use invite. Send its link privately or use an optional email relay. The invite approves the intended account for staging.
 - Each player accepts the invite using their email and one password. A new email creates a game account. Use the existing game password if the email already has an account to keep its profile and saves. Returning players go straight to character selection.
+- Sign-in starts with email and password. A password visibility button lets players check their typing on mobile. Accounts with two-factor authentication enabled receive a separate authenticator or recovery-code prompt after their password is verified. The prompt expires after five minutes. Staging currently uses authenticator apps and one-use recovery codes for 2FA.
 - Open the invite in the original browser to retain a saved guest profile. The invite can upgrade an available guest profile to the invited email.
 - An operator can preserve a legacy username by specifying it in **Alpha testers** when creating the invite or by passing `--game-login EXISTING_USERNAME` to `invite-admin`. The tester still enters only their email and game password.
 - The staging signup path requires an invite. Revoking alpha access blocks new sessions and private model requests and disconnects the active game session. The player profile and saves are retained.

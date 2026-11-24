@@ -14,8 +14,10 @@ const form = (action, contents, label) =>
   `<form method="post" action="${base}/${action}">${contents}<button>${label}</button></form>`;
 const emailField = '<label>Email<input type="email" name="email" autocomplete="username" maxlength="254" required></label>';
 const passwordField = (newPassword = false) =>
-  `<label>Password<input type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>`;
-const codeField = '<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" maxlength="32"></label>';
+  `<div class="password-control"><label>Password<input id="alpha-password" type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>
+  <button type="button" class="password-toggle" aria-controls="alpha-password" hidden>Show password</button></div>
+  <script src="${base}/password.js" defer></script>`;
+const codeField = (required = false) => `<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="32"${required ? " required" : ""}></label>`;
 const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
@@ -36,6 +38,8 @@ main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{fo
 @media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
 a{color:#e5d2fd}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:inherit;padding:.6rem .8rem;border:1px solid #927db0;border-radius:.3rem;background:#231933;min-height:44px;min-width:0}
 button{color:#150c21;background:#dac2fb;font-weight:600;cursor:pointer}
+.password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
+.password-toggle{background:#231933;color:inherit;font-size:.875rem}
 ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
 </style>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
@@ -89,14 +93,20 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
     return invite ? page("Join the alpha", form("enroll", emailField
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
       + passwordField(!game), game ? "Continue" : "Sign up") + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message, Boolean(game))
-      : page("Log in", form("sign-in", emailField + passwordField() + codeField, "Log in")
-        + (game ? "<p>Use your Avensky game password. An invitation is required for first-time access.</p>"
+      : page("Log in", form("sign-in", emailField + passwordField(), "Log in")
+        + (game ? "<p>Use the email from your staging invitation and your Avensky game password. Open the invite first if you haven’t accepted it yet.</p>"
           : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
+  }
+
+  function factorPage(challenge, message) {
+    return page("Verify your sign-in", form("sign-in/code",
+      `<input type="hidden" name="challenge" value="${escape(challenge)}">` + codeField(true), "Verify")
+      + `<a href="${base}/sign-in">Back to log in</a>`, message, Boolean(game));
   }
 
   function resetPage(message) {
     return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
-      + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField, "Set new password")
+      + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField(), "Set new password")
       + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message);
   }
 
@@ -131,6 +141,8 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         "Set-Cookie": `${cookieName}=${value}; Max-Age=${value ? SESSION_AGE : 0}; ${cookieFlags}`,
       }),
     });
+    const factorRateLimited = () => send(429, signInPage("Too many incorrect codes. Wait five minutes, then log in again."),
+      { "Retry-After": "300" });
     let viewer;
     try { viewer = accounts.viewer(sessionCookie(req)); }
     catch { return send(503); }
@@ -156,6 +168,18 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         }
         return send(200, setup, { "Content-Type": "text/javascript; charset=utf-8" });
       }
+      if (path === base + "/password.js") return send(200, `
+        const toggle = document.querySelector(".password-toggle");
+        const password = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
+        if (password) {
+          toggle.hidden = false;
+          const setVisible = visible => {
+            password.type = visible ? "text" : "password";
+            toggle.textContent = visible ? "Hide password" : "Show password";
+          };
+          toggle.addEventListener("click", () => setVisible(password.type === "password"));
+          window.addEventListener("pageshow", () => setVisible(false));
+        }`, { "Content-Type": "text/javascript; charset=utf-8" });
       if (path === base + "/flare.js" && game) return send(200, `
         const video = document.querySelector(".portal-flare video");
         if (video && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -187,7 +211,18 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
     active++;
     try {
       const value = await readForm(req);
-      if (path === base + "/sign-in") return redirect("/", await accounts.logIn(value("email"), value("password"), value("code").trim()));
+      if (path === base + "/sign-in") {
+        const result = await accounts.beginSignIn(value("email"), value("password"));
+        if (result.locked) return factorRateLimited();
+        return result.challenge ? send(200, factorPage(result.challenge)) : redirect("/", result.session);
+      }
+      if (path === base + "/sign-in/code") {
+        const result = accounts.completeSignIn(value("challenge"), value("code").trim());
+        if (result.session) return redirect("/", result.session);
+        if (result.locked) return factorRateLimited();
+        if (result.challenge) return send(400, factorPage(result.challenge, "The authentication code is incorrect."));
+        return send(400, signInPage("The verification step ended. Enter your email and password to try again."));
+      }
       if (path === base + "/enroll") return redirect(game ? "/" : base + "/account",
         await accounts.enroll(value("email"), value("invite").trim(), value("password"), value("deviceToken")));
       if (path === base + "/reset" && !game) {
