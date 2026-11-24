@@ -5,7 +5,7 @@ import { clothingColors, clothingPieceLabel, isUnderwearPiece, underwearColors, 
 import { getCorsetDyeProfile, resolveCorsetDye, type CorsetDyeGroup } from "./corsetDye";
 import { HOODED_GOWN_DYES, hoodedGownColors } from "./hoodedGown";
 import { HOODED_GOWN } from "./wardrobeDressFit";
-import { BELTED_TUNIC, BELTED_TUNIC_BELT_COLOR } from "./dressMaterials";
+import { ORIGINAL_DRESS_BELT_COLORS } from "./dressMaterials";
 import "./clothingColorToolbar.css";
 
 const colorPresets = CHARACTER_APPEARANCE_OPTIONS.color.map(({ id, label, color }) => ({ label: id === "original" ? "White" : label, color }));
@@ -46,8 +46,9 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
   const focusPalette = useRef(false);
   const look = characterLook(choice)!;
   const gown = piece === "dress" && look.garments?.dress === HOODED_GOWN;
-  const utilityBelt = piece === "dress" && look.garments?.dress === BELTED_TUNIC;
-  const beltColor = utilityBelt ? look.appearance.item_colors?.[`${BELTED_TUNIC}:belt`]?.color : undefined;
+  const dress = look.garments?.dress;
+  const originalBeltColor = piece === "dress" && dress ? ORIGINAL_DRESS_BELT_COLORS.get(dress) : undefined;
+  const beltColor = originalBeltColor ? look.appearance.item_colors?.[`${dress}:belt`]?.color : undefined;
   const gownDyes = gown ? hoodedGownColors(look) : undefined;
   const colors = clothingColors(look, piece);
   const underwear = isUnderwearPiece(piece) ? underwearColors(look, piece) : undefined;
@@ -122,9 +123,9 @@ export function ClothingColorToolbar({ choice, piece, onChange }: {
             aria-pressed={(colors?.finish ?? "original") === id}
             onClick={() => dye({ finish: id })}>{label}</button>)}
         </PaletteRow>}
-        {utilityBelt && <ColorRow label="Utility belt" value={beltColor ?? BELTED_TUNIC_BELT_COLOR}
-          onChange={color => onChange(withClothingColors(choice, "belt", { color }, BELTED_TUNIC))}
-          onReset={beltColor ? () => onChange(withClothingColors(choice, "belt", undefined, BELTED_TUNIC)) : undefined} />}
+        {dress && originalBeltColor && <ColorRow label="Utility belt" value={beltColor ?? originalBeltColor}
+          onChange={color => onChange(withClothingColors(choice, "belt", { color }, dress))}
+          onReset={beltColor ? () => onChange(withClothingColors(choice, "belt", undefined, dress)) : undefined} />}
         {rows.map(({ key, label, value }) => <ColorRow key={key} label={label} value={value}
           onChange={color => dye(key === "color" && !profile && !underwear && !gown ? { color, accent: trim } : { [key]: color })} />)}
       </>}
