@@ -12,14 +12,23 @@ export function isAssetPath(path: string) {
   );
 }
 
+type AssetRelease = { id: string; paths: Record<string, unknown> };
+
+/** Check optional model candidates before mounting a loader. */
+export function hasAssetUrl(url: string, release: AssetRelease | null): boolean {
+  if (!release) return true;
+  const path = url.split(/[?#]/, 1)[0];
+  return !isStreamedAsset(path) || (isAssetPath(path) && Object.hasOwn(release.paths, path));
+}
+
 export function resolveAssetUrl(
   url: string,
-  release: { id: string; paths: Record<string, unknown> } | null,
+  release: AssetRelease | null,
 ): string {
   if (!release) return url;
   const path = url.split(/[?#]/, 1)[0];
   if (!isStreamedAsset(path)) return url;
-  if (!isAssetPath(path) || !Object.hasOwn(release.paths, path)) {
+  if (!hasAssetUrl(path, release)) {
     throw new Error(`Staging asset is missing from release ${release.id}: ${path}`);
   }
   // The release ID already versions caches. Discard legacy per-model query stamps.
