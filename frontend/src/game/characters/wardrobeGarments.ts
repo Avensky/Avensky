@@ -76,7 +76,7 @@ export type WardrobeGarment = {
   preserveSkin?: boolean;
   detachableSleeves?: boolean;
   description?: string; hideLongHair?: boolean;
-  outfit?: { description: string; barefoot?: boolean };
+  outfit?: { description: string; barefoot?: boolean; alphaStatus?: "provisional" };
 };
 
 const discoveredItems = discoveredManifest as WardrobeGarment[];

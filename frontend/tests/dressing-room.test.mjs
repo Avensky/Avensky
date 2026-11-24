@@ -431,6 +431,18 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     await click(`${outfitColors} [aria-label="Reset piece colors"]`);
     assert.deepEqual(changes.at(-1).appearance.item_colors, existingDyes);
     await click(`${outfitColors} .dressing-color-toggle`);
+    assert.equal(find('[data-wardrobe-item=medieval-06]').dataset.alphaStatus, 'provisional');
+    assert.match(find('[data-wardrobe-item=medieval-06]').textContent, /Provisional pass/);
+    await click('[data-wardrobe-item=medieval-06]');
+    await click(`${outfitColors} .dressing-color-toggle`);
+    assert.equal(find('[aria-label="Custom utility belt color"]').value, '#8b735a');
+    await click(`${outfitColors} [aria-label="Utility belt color: White"]`);
+    assert.deepEqual(changes.at(-1).appearance.item_colors, {
+      ...existingDyes, 'medieval-06:belt': { color: '#ffffff' },
+    });
+    await click(`${outfitColors} [aria-label="Reset utility belt color"]`);
+    assert.deepEqual(changes.at(-1).appearance.item_colors, existingDyes);
+    await click(`${outfitColors} .dressing-color-toggle`);
     await click('[aria-label="Clear Medieval outfits"]');
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit);
     await click('[data-wardrobe-item=medieval-08]');
