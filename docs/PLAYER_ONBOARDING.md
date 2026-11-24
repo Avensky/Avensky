@@ -1,6 +1,6 @@
 # Player accounts and onboarding
 
-On the staging welcome screen, new players pick a gender and personality and name their character before registering or playing as a guest. Returning players log in or resume their device profile and select a saved character. Registered accounts have four slots. Guests have one and can register the same profile to add slots. Choose a vehicle later in Play or Open World. The selected character stays with the player through vehicle changes. Match vehicle and role rules still apply.
+New players select **Sign up**, pick a gender and personality, and name their character before registering by email or playing as a guest. Returning players can use their email or existing account name. Tap a saved character portrait to enter the main menu. Registered accounts have four slots. Guests have one and can register the same profile to add slots. Choose a vehicle later in Play or Open World. The selected character stays with the player through vehicle changes. Match vehicle and role rules still apply.
 
 Street, Workshop, and Night Shift use the existing female and male rigs and approved wardrobe IDs. Styles set the starting outfit palette and emote personality. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) is shared by the browser preview and server. Previously equipped roster looks remain available under **Keep current look** when creating the first character. Players can return to the character picker from the main menu after leaving any active world or queue.
 

@@ -89,6 +89,8 @@ AWS_PROFILE=avensky-asset-operator node deploy/staging-assets/audit-access.mjs \
 
 ## Serve only to authorized testers
 
+The [staging tester portal](STAGING_TESTER_ACCESS.md) provides email sign-in, invitations, and optional two-factor authentication. Preview and verify that gate before swapping the existing staging access guard.
+
 Start the gateway under a dedicated service account with Node 24, AWS CLI v2, the private bucket name, reader credentials and the verified release file. The process binds `127.0.0.1:9060`. Use the existing service manager to keep it running. For a rolling release, pass the previous verified file as an extra argument so already-open clients can finish loading.
 
 ```sh

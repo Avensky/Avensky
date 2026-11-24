@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { JSDOM } from "jsdom";
 import { createServer } from "vite";
 import { act, createElement as h, Fragment, useState, Profiler } from "react";
@@ -373,10 +374,10 @@ test("social requests, world transitions and assisted text have independent owne
       assert.deepEqual(calls.pop(), ["roster_save",{driver}]);
     });
 
-    await t.test("Open World joins the configured listed hub while Play still opens matchmaking", async () => {
+    await t.test("Play lists Open World and joins the configured hub through world admission", async () => {
       const { MAIN_MENU_ITEMS } = await load("game/menus/menuItems.ts");
       const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");
-      const { WorldsPage } = await load("game/social/WorldsPage.tsx");
+      const { ModeSelection } = await load("game/alpha/ModeSelection.tsx");
       const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
       const { useAlphaStore: alpha } = await load("store/alpha/alphaStore.ts");
       assert.equal(OPEN_WORLD_ID, 7);
@@ -395,26 +396,32 @@ test("social requests, world transitions and assisted text have independent owne
       };
       select("play");
       assert.equal(ui.getState().screen, "mode_select");
-      select("open_world");
-      assert.equal(ui.getState().screen, "social");
+      assert.equal(MAIN_MENU_ITEMS.some(item=>item.id==="open_world"),false);
 
       const calls = [];
-      await act(async () => social.setState({ view: {
-        ...view, worlds: [world], alpha: { active: { mode: "quickplay" } },
-      } }));
-      await render(h(WorldsPage, {
-        view: { ...view, worlds: [world] },
-        command: async (...args) => {
-          calls.push(args);
-          return { world_id: world.id, map: world.map };
-        },
-        onStatus: () => {},
-      }));
       await act(async () => useWorldCatalog.setState({ maps: mapCatalog }));
-      const join = document.querySelector('[aria-label="Open World"] button');
+      await act(async()=>{
+        client.setSocialConnection({readyState:WebSocket.OPEN,send:body=>{
+          const {action,world_id,request_id}=JSON.parse(body);
+          calls.push(action);
+          if(action==="world_join" && world_id===world.id)
+            client.receiveSocialResult({request_id,ok:true,data:{world_id,map:world.map}});
+        }});
+        social.setState({view:{...view,worlds:[world]},profileStatus:"ready"});
+        network.setState({connected:true});
+      });
+      await render(h(ModeSelection));
+      const openWorld = [...document.querySelectorAll('[role="tab"]')].find(tab=>tab.textContent==="OPEN WORLD");
+      assert.ok(openWorld);
+      await act(async()=>openWorld.click());
+      const join = document.querySelector(".alpha-deploy");
       assert.ok(join);
-      await act(async () => join.click());
-      assert.deepEqual(calls[0].slice(0, 2), ["world_join", { world_id: 7, password: "" }]);
+      const catalog = await readFile(new URL("../public/world-builder/catalog.json", import.meta.url), "utf8");
+      const originalFetch = globalThis.fetch;
+      globalThis.fetch = async () => new Response(catalog);
+      try { await act(async () => join.click()); }
+      finally { globalThis.fetch = originalFetch; }
+      assert.deepEqual(calls,["world_join"]);
       assert.equal(ui.getState().screen, "hero_select");
       assert.equal(alpha.getState().mode, "sandbox", "a late lobby update cannot carry the previous match into the hub");
     });

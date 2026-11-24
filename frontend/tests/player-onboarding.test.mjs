@@ -7,6 +7,11 @@ import { createServer } from "vite";
 
 test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true });
+  let playbackAttempts = 0;
+  dom.window.HTMLMediaElement.prototype.play = () => {
+    playbackAttempts++;
+    return Promise.reject(new Error("Autoplay needs a gesture"));
+  };
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis,key));
@@ -54,12 +59,18 @@ test("welcome picks a personality and gender before registration and lets return
     });
     const flare=document.querySelector(".menu-flare-background video");
     assert.ok(flare.loop && flare.autoplay && flare.muted && flare.playsInline);
+    assert.ok(flare.defaultMuted);
     assert.equal(flare.getAttribute("src"),"/images/purple-sunflare-loop.mp4");
     assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
+    assert.equal(document.querySelector("h1"),null);
+    assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Log in","Sign up"]);
+    const autoplay = playbackAttempts;
+    document.dispatchEvent(new Event("pointerup"));
+    assert.ok(playbackAttempts > autoplay,"a touch release offers another chance to play");
     await act(async()=>preferences.setState({reducedMotion:true}));
     assert.equal(document.querySelector(".menu-flare-background video"),null);
     await act(async()=>preferences.setState({reducedMotion:false}));
-    await act(async()=>button("Create a character").click());
+    await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
     assert.equal(button("Continue").disabled,true);
     await act(async()=>button("Male").click());
@@ -72,12 +83,12 @@ test("welcome picks a personality and gender before registration and lets return
     assert.ok(button("Play as guest"));
     await act(async()=>button("Create an account").click());
     const form=document.querySelector("form");
-    form.elements.login.value="lightfoot";
+    form.elements.login.value="lightfoot@example.net";
     form.elements.password.value="a staging passphrase for test";
     await act(async()=>submit());
     const register=sent.at(-1);
     assert.equal(register.action,"account_register");
-    assert.equal(register.login,"lightfoot");
+    assert.equal(register.login,"lightfoot@example.net");
     assert.equal(ui.getState().screen,"welcome");
     await act(async()=>{
       reply(register,{profile_id:"registered-player",name:"Lightfoot",token,account:true});
@@ -110,11 +121,12 @@ test("welcome picks a personality and gender before registration and lets return
 
     await act(async()=>{
       ui.setState({screen:"welcome"});
+      social.setState({view:null,profileStatus:"idle"});
       root.render(createElement(WelcomeScreen,{key:"returning"}));
     });
     await act(async()=>button("Log in").click());
     const loginForm=document.querySelector("form");
-    loginForm.elements.login.value="lightfoot";
+    loginForm.elements.login.value="lightfoot@example.net";
     loginForm.elements.password.value="a staging passphrase for test";
     await act(async()=>submit());
     const login=sent.at(-1);
@@ -124,9 +136,10 @@ test("welcome picks a personality and gender before registration and lets return
       client.receiveSocialState({...view,profile:saved});
     });
     assert.equal(document.querySelector('[name="characterName"]'),null);
-    assert.match(document.querySelector('.welcome-character[aria-pressed="true"]').textContent,/Track Fox/);
+    assert.match(document.querySelector('.welcome-character').textContent,/Track Fox/);
     assert.ok(button("New character"));
-    await act(async()=>button("Enter main menu").click());
+    assert.equal(button("Enter main menu"),undefined);
+    await act(async()=>document.querySelector('.welcome-character').click());
     const select=sent.at(-1);
     assert.equal(select.action,"character_select");
     assert.equal(select.character_id,"registered-player");

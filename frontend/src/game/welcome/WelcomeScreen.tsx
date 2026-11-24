@@ -43,7 +43,7 @@ export function WelcomeScreen() {
   const [step, setStep] = useState<Step>("welcome");
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
   const [newPlayer, setNewPlayer] = useState(false);
-  const [selected, setSelected] = useState<string>();
+  const [showAccountEntry, setShowAccountEntry] = useState(false);
   const [name, setName] = useState("");
   const [body, setBody] = useState<CharacterBody>("female");
   const [style, setStyle] = useState<string>();
@@ -52,11 +52,11 @@ export function WelcomeScreen() {
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const player = profile && profile.id === confirmedProfile ? profile : undefined;
+  const rememberedPlayer = step === "welcome" && !showAccountEntry && profile?.characters?.length ? profile : undefined;
+  const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const screen = step === "characters" && slots?.length === 0 ? "create" : step;
-  const active = selected ?? player?.active_character_id;
+  const screen = rememberedPlayer ? "characters" : step === "characters" && slots?.length === 0 ? "create" : step;
   const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
@@ -70,8 +70,8 @@ export function WelcomeScreen() {
     if (screen === "create" && slots?.length) { setStep("characters"); return; }
     setConfirmedProfile(undefined);
     setStep("welcome");
+    setShowAccountEntry(true);
     setNewPlayer(false);
-    setSelected(undefined);
     setBody("female");
     setStyle(undefined);
     setName("");
@@ -80,6 +80,25 @@ export function WelcomeScreen() {
   useEffect(() => {
     if (!busy) root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
   }, [screen, busy, connected]);
+
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const container = root.current;
+    if (!viewport || !container) return;
+    const resize = () => {
+      if (viewport.scale === 1) {
+        container.style.setProperty("--welcome-height", `${viewport.height}px`);
+        container.style.setProperty("--welcome-top", `${viewport.offsetTop}px`);
+      }
+    };
+    resize();
+    viewport.addEventListener("resize", resize);
+    viewport.addEventListener("scroll", resize);
+    return () => {
+      viewport.removeEventListener("resize", resize);
+      viewport.removeEventListener("scroll", resize);
+    };
+  }, []);
 
   useEffect(() => {
     function navigate(event: Event) {
@@ -116,7 +135,8 @@ export function WelcomeScreen() {
     const login = String(form.get("login") ?? "");
     const password = String(form.get("password") ?? "");
     void run(async () => {
-      const owner = await selectAccount({ login, password }, step === "register" ? login.trim() : undefined);
+      const accountName = draft?.name ?? profile?.name ?? login.trim().split("@")[0].slice(0, 24);
+      const owner = await selectAccount({ login, password }, step === "register" ? accountName : undefined);
       if (step === "register" && newPlayer && draft) {
         await finishDraft(owner, draft);
       } else {
@@ -147,7 +167,7 @@ export function WelcomeScreen() {
   }
 
   const labels: Record<Step, string> = {
-    welcome: "Welcome to Avensky", create: "Create your character", save: "Save your character",
+    welcome: "Account access", create: "Create your character", save: "Save your character",
     register: "Create an account", login: "Log in", characters: "Choose your character",
   };
   const label = labels[screen];
@@ -161,11 +181,13 @@ export function WelcomeScreen() {
       }
     }}>
       <MenuFlareBackground animated />
+      <div className="welcome-scroll">
+      <div className="welcome-layout" data-step={screen}>
       <div className="welcome-art" aria-hidden="true">
         <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
       </div>
       <section className="welcome-panel" aria-label={label}>
-        <h1>{label}</h1>
+        {screen !== "welcome" && <h1>{label}</h1>}
         {screen === "create" ? <form key="new-character" onSubmit={event => {
             event.preventDefault();
             if (!draft || !connected || !accounts) return;
@@ -204,20 +226,21 @@ export function WelcomeScreen() {
           </form> : screen === "characters" ? <>
             {player && !slots && <p role="status" className="welcome-help">Character selection needs the updated game server.</p>}
             {slots && <div className="welcome-characters" role="group" aria-label="Saved characters" data-controller-row>
-              {slots.map(slot => <button type="button" key={slot.id} className="welcome-character" disabled={busy}
-                aria-pressed={active === slot.id} onClick={() => { setSelected(slot.id); setError(""); }}>
-                <CharacterPortrait choice={slot.appearance ?? undefined} compact />
+              {slots.map(slot => <button type="button" key={slot.id} className="welcome-character"
+                disabled={busy || !connected || !slot.appearance}
+                onClick={() => { if (player) void run(() => enter(player.id, "character_select", { character_id: slot.id })); }}>
+                <CharacterPortrait choice={slot.appearance ?? undefined}
+                  welcomePreview={player?.active_character_id === slot.id ? "selected" : "candidate"} />
                 <strong>{slot.name}</strong><span>{styleName(slot.style)} · Level {slot.level}</span>
               </button>)}
             </div>}
             <div className="welcome-actions" data-controller-row>
               <button type="button" onClick={back} disabled={busy}>Back</button>
               {registered && slots && slots.length < 4 &&
-                <button type="button" onClick={() => { setStep("create"); setName(""); setStyle(undefined); setError(""); }} disabled={busy}>New character</button>}
-              <button type="button" className="welcome-primary" disabled={!active || !slots || busy || !connected}
-                onClick={() => {
-                  if (player && active) void run(() => enter(player.id, "character_select", { character_id: active }));
-                }}>Enter main menu</button>
+                <button type="button" onClick={() => {
+                  if (player) setConfirmedProfile(player.id);
+                  setStep("create"); setName(""); setStyle(undefined); setError("");
+                }} disabled={busy}>New character</button>}
             </div>
           </> : screen === "save" ? <>
             <p className="welcome-help">Create an account to keep {draft?.name} across devices.</p>
@@ -231,9 +254,10 @@ export function WelcomeScreen() {
             </div>
         </> : screen === "login" || screen === "register" ? (
           <form key={screen} method="post" onSubmit={authenticate}>
-              <label data-controller-row>Account name
-                <input name="login" autoComplete="username" autoCapitalize="none" spellCheck={false}
-                  minLength={3} maxLength={24} pattern={"[A-Za-z0-9_\\-]{3,24}"} required />
+              <label data-controller-row>{screen === "register" ? "Email" : "Email or account name"}
+                <input name="login" type={screen === "register" ? "email" : "text"}
+                  inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
+                  minLength={3} maxLength={254} required />
               </label>
               <label data-controller-row>Password
                 <input name="password" type="password" autoComplete={screen === "register" ? "new-password" : "current-password"}
@@ -247,15 +271,14 @@ export function WelcomeScreen() {
           </form>
         ) : <>
           <div className="welcome-entry-options" data-controller-row>
-            {profile ? <button type="button" className="welcome-primary" disabled={busy || !accounts} onClick={() => {
-              setError(""); setConfirmedProfile(profile.id); setStep("characters");
-            }}>Continue as {profile.name}</button> :
-              <button type="button" className="welcome-primary" disabled={busy || !accounts} onClick={() => {
-                setError(""); setNewPlayer(true); setStep("create");
-              }}>Create a character</button>}
-            <button type="button" disabled={busy || !accounts} onClick={() => { setError(""); setStep("login"); }}>Log in</button>
-            {profile && !registered && <button type="button" disabled={busy || !accounts}
-              onClick={() => { setError(""); setStep("register"); }}>Register this profile</button>}
+            <button type="button" className="welcome-primary" disabled={busy || !accounts}
+              onClick={() => { setError(""); setStep("login"); }}>Log in</button>
+            <button type="button" disabled={busy || !accounts} onClick={() => {
+              setError("");
+              if (profile && !registered && profile.characters?.length) setStep("register");
+              else if (profile && registered) { setConfirmedProfile(profile.id); setStep("characters"); }
+              else { setNewPlayer(true); setStep("create"); }
+            }}>Sign up</button>
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
@@ -264,6 +287,8 @@ export function WelcomeScreen() {
         </p>}
         {(error || restoreError) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
       </section>
+      </div>
+      </div>
     </main>
   );
 }

@@ -17,7 +17,7 @@ use tokio::sync::{Mutex, OwnedSemaphorePermit, Semaphore};
 const SESSION_SECONDS: u64 = 30 * 24 * 60 * 60;
 const SESSION_LIMIT: usize = 8;
 const DUMMY_HASH: &str = "$argon2id$v=19$m=19456,t=2,p=1$YXZlbnNreS1kdW1teS1zYWx0$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
-pub const LOGIN_FAILED: &str = "The account name or password is incorrect.";
+pub const LOGIN_FAILED: &str = "The email, account name, or password is incorrect.";
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Account {
@@ -66,6 +66,30 @@ impl Account {
 
 pub fn normalize_login(value: &str) -> Result<String, String> {
     let value = value.trim();
+    if let Some((local, domain)) = value.split_once('@') {
+        let valid_local = !local.is_empty()
+            && local.len() <= 64
+            && !local.starts_with('.')
+            && !local.ends_with('.')
+            && !local.contains("..")
+            && local
+                .bytes()
+                .all(|c| c.is_ascii_alphanumeric() || b"._+-".contains(&c));
+        let valid_domain = domain.contains('.')
+            && domain.split('.').all(|label| {
+                !label.is_empty()
+                    && label.len() <= 63
+                    && !label.starts_with('-')
+                    && !label.ends_with('-')
+                    && label
+                        .bytes()
+                        .all(|c| c.is_ascii_alphanumeric() || c == b'-')
+            });
+        if value.len() <= 254 && valid_local && valid_domain {
+            return Ok(value.to_ascii_lowercase());
+        }
+        return Err("Enter a valid email address.".into());
+    }
     if !(3..=24).contains(&value.len())
         || !value
             .bytes()
@@ -76,6 +100,22 @@ pub fn normalize_login(value: &str) -> Result<String, String> {
         );
     }
     Ok(value.to_ascii_lowercase())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_login;
+
+    #[test]
+    fn normalizes_email_and_existing_account_names() {
+        assert_eq!(
+            normalize_login(" Test+Alpha@Example.COM ").unwrap(),
+            "test+alpha@example.com"
+        );
+        assert_eq!(normalize_login(" Legacy_Player ").unwrap(), "legacy_player");
+        assert!(normalize_login("test@-example.com").is_err());
+        assert!(normalize_login("test@example.com@other.com").is_err());
+    }
 }
 
 pub fn validate_password(password: &str) -> Result<(), String> {

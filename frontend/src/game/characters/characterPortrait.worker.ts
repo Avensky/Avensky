@@ -77,9 +77,9 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
 
     model.root.updateMatrixWorld(true);
     const center = villager
-      ? head.getWorldPosition(new Vector3()).add(new Vector3(0, .075, .018))
+      ? head.getWorldPosition(new Vector3()).add(new Vector3(0, -.035, .018))
       : new Box3().setFromObject(head).getCenter(new Vector3());
-    const camera = new OrthographicCamera(-.20, .20, .20, -.20, .1, 10);
+    const camera = new OrthographicCamera(-.245, .245, .245, -.245, .1, 10);
     camera.position.copy(center).add(new Vector3(.4, .08, 2));
     camera.lookAt(center);
 

@@ -8,6 +8,8 @@ import { useNetworkStore } from "../../store/session/networkStore";
 import { useUIStore } from "../../store/menus/uiStore";
 import { useGameStore } from "../../store/presentation/gameStore";
 import { useRenderSettingsStore } from "../../store/presentation/renderSettingsStore";
+import { currentOpenWorld } from "../social/openWorld";
+import { enterWorld } from "../social/navigation";
 
 export async function joinSelectedMode() {
   const state = useAlphaStore.getState();
@@ -19,6 +21,18 @@ export async function joinSelectedMode() {
   // player's installed-world selection. Fetch here too: match screens do not
   // render MapSelector, so relying on its mount hook breaks first-time joins.
   await refreshInstalledWorlds();
+  if (state.mode === "open_world") {
+    const view = useSocialStore.getState().view;
+    const world = currentOpenWorld(view);
+    if (!world) throw Error("No Open World hub is available.");
+    if (!useWorldCatalog.getState().maps.some(map => map.id === world.map))
+      throw Error("The Open World map is unavailable in this client.");
+    const joined = view?.current_world_id === world.id
+      ? { world_id: world.id, map: world.map }
+      : await requestSocial("world_join", { world_id: world.id });
+    enterWorld(joined);
+    return;
+  }
   const selectedMap=useSelectionStore.getState().getSelectedMap();
   if(!useWorldCatalog.getState().maps.length)
     throw Error("No installed environments found. Check the world catalog or server files.");

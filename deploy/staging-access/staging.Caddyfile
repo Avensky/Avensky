@@ -1,0 +1,29 @@
+# Staging-only example. Merge these handlers into the existing staging site.
+staging.avensky.com {
+	handle /__alpha/* {
+		reverse_proxy 127.0.0.1:9061 {
+			header_up X-Alpha-Client {remote_host}
+		}
+	}
+
+	handle {
+		route {
+			forward_auth 127.0.0.1:9061 {
+				uri /__alpha/verify
+			}
+
+			handle /__staging-assets/* {
+				reverse_proxy 127.0.0.1:9060 {
+					header_up -Cookie
+					header_up -Authorization
+				}
+			}
+
+			handle {
+				root * /srv/avensky-staging/frontend/current
+				try_files {path} /index.html
+				file_server
+			}
+		}
+	}
+}

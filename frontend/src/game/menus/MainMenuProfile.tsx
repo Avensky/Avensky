@@ -100,12 +100,10 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
     <button ref={trigger} type="button" className="main-menu-profile-trigger menu-control menu-panel-frame"
       data-main-profile-toggle aria-label="Player profile" aria-expanded={open} aria-controls={panelId}
       title={`Player profile · ${caption}`} onClick={open ? close : () => setOpen(true)}>
+      <span className="main-menu-profile-portrait" aria-hidden="true"><CharacterPortrait choice={choice} personal /></span>
       <span className="main-menu-profile-caption" aria-hidden="true">{caption}</span>
-      <span className="main-menu-profile-portrait" aria-hidden="true"><CharacterPortrait choice={choice} compact /></span>
     </button>
     <section ref={panel} id={panelId} className="main-menu-profile-panel menu-panel-frame" aria-label="Player profile options" hidden={!open}>
-      <h2>{signedIn ? name : guest ? "Guest session" : "Player profile"}</h2>
-      <p>{registered ? "Your progress and outfits follow your Avensky account." : signedIn ? "Your progress and outfits are saved on this device." : guest ? "Your progress and outfits stay in this tab." : "Sign in to keep your progress and outfits for later visits."}</p>
       {(status === "restoring" || status === "error") && <p role="status">{message}</p>}
       {!available && <p role="status">Connect to the game server to sign in.</p>}
       {error && <p role="alert">{error}</p>}
