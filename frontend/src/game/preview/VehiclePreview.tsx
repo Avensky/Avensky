@@ -317,7 +317,9 @@ export function VehiclePreview({
     const orbiting = fittingOrbitEnabled && (rotation.yaw !== 0 || rotation.pitch !== 0);
     if (orbiting) rotation.pitch = orbitFittingCamera(position, target, rotation.yaw, rotation.pitch, rotation.sphere);
     let boundedCamera = false;
-    if (emotesInGarage || !aim.held && (garageView !== "Showroom" || insideCar || orbiting)) {
+    // A newly selected outfit resets the orbit. Its default framing and the
+    // transition from the previous shot still need to stay inside the room.
+    if (emotesInGarage || !aim.held && (garageView !== "Showroom" || insideCar || fittingOrbitEnabled)) {
       const bounds = findPreviewAnchor(aim.anchors, scene, "garage-camera-envelope")?.userData.bounds;
       if (bounds && !bounds.isEmpty()) {
         aim.cameraMin.copy(bounds.min).addScalar(.30);

@@ -5,10 +5,10 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createServer } from "vite";
 
-function wardrobePreviewServer(modelFallbacks = {}) {
+function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
-      __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01"]),
+      __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),
       __STANDALONE_CORSET_LODS__: JSON.stringify({
@@ -22,6 +22,7 @@ function wardrobePreviewServer(modelFallbacks = {}) {
       __VILLAGER_MODEL_URL__: JSON.stringify("village-full"),
       __VILLAGER_PORTRAIT_URL__: JSON.stringify("village"),
       __CHARACTER_MODEL_FALLBACKS__: JSON.stringify(modelFallbacks),
+      __STAGING_ASSET_RELEASE__: JSON.stringify(assetRelease),
     },
     server: { middlewareMode: true, hmr: false, ws: false },
     appType: "custom",
@@ -295,6 +296,34 @@ test("the wardrobe resolver requests donors and authored tiers in order", async 
       assert.equal(recovered.preview.garmentBody, legacy.getObjectByName("BODY_WARDROBE"));
       assert.deepEqual(recovered.pendingUrls, []);
     }
+  } finally {
+    await vite.close();
+  }
+});
+
+test("staging opens a dress with the shipped body donor on the first selection", async () => {
+  const dressUrl = "/models/characters/female/wardrobe/dress/medieval-04.garage.glb";
+  const donorUrl = "/models/characters/wardrobe/gothic-02.mobile.glb";
+  const vite = await wardrobePreviewServer({}, { id: "wardrobe-release", paths: { [dressUrl]: true, [donorUrl]: true } });
+  try {
+    const { resolveWardrobePreview } = await vite.ssrLoadModule("/src/game/characters/wardrobePreviewAssets.ts");
+    const { characterLook, DEFAULT_CHARACTER } = await vite.ssrLoadModule("/src/game/characters/characterCatalog.ts");
+    const { makeAssetAvailable, makeVillageAvailable, makeGarmentAvailable } = await vite.ssrLoadModule("virtual:wardrobe-preview");
+    const village = makeVillageAvailable("village", "cut");
+    const frame = { preferredUrl: "village", villageKind: "portrait", kind: "garage" };
+    const previous = resolveWardrobePreview({ ...frame, look: characterLook(DEFAULT_CHARACTER), sources: { village } }).preview;
+    const select = sources => resolveWardrobePreview({
+      ...frame, look: characterLook({ ...DEFAULT_CHARACTER, outfit: "medieval-04" }), previous, sources,
+    });
+    const loading = select({ village });
+    assert.deepEqual(loading.pendingUrls, [dressUrl, donorUrl], "request the dress and shipped donor together");
+    assert.equal(loading.preview, previous, "keep the last rendered outfit while the new dress loads");
+    const dress = makeGarmentAvailable(dressUrl), donor = makeAssetAvailable(donorUrl);
+    const loaded = select({ village, [dressUrl]: dress, [donorUrl]: donor });
+    assert.deepEqual(loaded.pendingUrls, []);
+    assert.equal(loaded.unavailable, false);
+    assert.equal(loaded.preview.garments[0].scene, dress);
+    assert.equal(loaded.preview.garmentBody, donor.getObjectByName("BODY_WARDROBE"));
   } finally {
     await vite.close();
   }
