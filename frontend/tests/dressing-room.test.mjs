@@ -157,7 +157,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
   const inventory = JSON.parse(await readFile(new URL('../../packages/wardrobe-catalog/character-garments.json', import.meta.url), 'utf8'));
   const imports = inventory.filter(item => !item.retired && !item.outfit);
   const missingImport = 'bowtie-13';
-  const missingOutfit = 'medieval-08';
+  const missingOutfit = 'medieval-03';
   const installed = inventory.filter(item => item.id !== missingImport && item.id !== missingOutfit);
   const revisedImport = 'gothic-skirt-02';
   const dom = new JSDOM('<div id="root" data-controller-rows></div>', { url: 'http://localhost/', pretendToBeVisual: true });
@@ -241,8 +241,8 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     for (const item of imports.filter(item => item.category !== 'outfits')) {
       assert(!find(`[data-wardrobe-item="${item.id}"]`), `${item.id} stays in its own category`);
     }
-    assert.match(find('[data-wardrobe-item=medieval-08]').textContent, /Pack not installed/);
-    await click('[data-wardrobe-item=medieval-08]');
+    assert.match(find(`[data-wardrobe-item=${missingOutfit}]`).textContent, /Pack not installed/);
+    await click(`[data-wardrobe-item=${missingOutfit}]`);
     assert.equal(find('.dressing-details').hidden, false, 'unavailable cards can still be inspected');
     assert.equal(find('.dressing-details dd').textContent, 'Not listed');
     assert.equal(find('.fit-review-toggle').getAttribute('aria-expanded'), 'false');
@@ -255,7 +255,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
       note.dispatchEvent(new Event('input', { bubbles: true }));
     });
     await act(async () => [...document.querySelectorAll('.fit-review-actions button')].find(button => button.textContent.includes('Copy ticket draft')).click());
-    assert.match(find('[aria-label="Ticket draft"]').value, /medieval-08[\s\S]+Verify strap in idle/);
+    assert.match(find('[aria-label="Ticket draft"]').value, new RegExp(`${missingOutfit}[\\s\\S]+Verify strap in idle`));
     assert.equal(changes.length, 0, 'inspecting a missing pack never equips it');
     await click('[data-wardrobe-back]');
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'returning to categories releases the previous item list');
@@ -433,19 +433,35 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     await click(`${outfitColors} .dressing-color-toggle`);
     assert.equal(find('[data-wardrobe-item=medieval-06]').dataset.alphaStatus, 'provisional');
     assert.match(find('[data-wardrobe-item=medieval-06]').textContent, /Provisional pass/);
-    await click('[data-wardrobe-item=medieval-06]');
-    await click(`${outfitColors} .dressing-color-toggle`);
-    assert.equal(find('[aria-label="Custom utility belt color"]').value, '#8b735a');
-    await click(`${outfitColors} [aria-label="Utility belt color: White"]`);
-    assert.deepEqual(changes.at(-1).appearance.item_colors, {
-      ...existingDyes, 'medieval-06:belt': { color: '#ffffff' },
-    });
-    await click(`${outfitColors} [aria-label="Reset utility belt color"]`);
-    assert.deepEqual(changes.at(-1).appearance.item_colors, existingDyes);
-    await click(`${outfitColors} .dressing-color-toggle`);
+    const beltDefaults = [
+      ['medieval-06', '#8b735a'],
+      ['medieval-04', '#84707b'],
+      ['medieval-07', '#846b62'],
+      ['medieval-08', '#887364'],
+    ];
+    const selectedDyes = { ...existingDyes };
+    for (const [outfit, original] of beltDefaults) {
+      await click(`[data-wardrobe-item=${outfit}]`);
+      await click(`${outfitColors} .dressing-color-toggle`);
+      assert.equal(find('[aria-label="Custom utility belt color"]').value, original);
+      await click(`${outfitColors} [aria-label="Utility belt color: White"]`);
+      selectedDyes[`${outfit}:belt`] = { color: '#ffffff' };
+      assert.deepEqual(changes.at(-1).appearance.item_colors, selectedDyes);
+      await click(`${outfitColors} .dressing-color-toggle`);
+    }
+    for (const [outfit, original] of beltDefaults) {
+      await click(`[data-wardrobe-item=${outfit}]`);
+      await click(`${outfitColors} .dressing-color-toggle`);
+      assert.equal(find('[aria-label="Custom utility belt color"]').value, '#ffffff');
+      await click(`${outfitColors} [aria-label="Reset utility belt color"]`);
+      delete selectedDyes[`${outfit}:belt`];
+      assert.deepEqual(changes.at(-1).appearance.item_colors, selectedDyes);
+      assert.equal(find('[aria-label="Custom utility belt color"]').value, original);
+      await click(`${outfitColors} .dressing-color-toggle`);
+    }
     await click('[aria-label="Clear Medieval outfits"]');
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit);
-    await click('[data-wardrobe-item=medieval-08]');
+    await click(`[data-wardrobe-item=${missingOutfit}]`);
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit, 'missing outfits leave the current selection in place.');
     await click('[aria-label="Sleepwear"] [data-wardrobe-item=linen-nightgown]');
     const sleepwear = changes.at(-1);
