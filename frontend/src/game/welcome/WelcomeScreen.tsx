@@ -227,12 +227,13 @@ export function WelcomeScreen() {
             </div>
             <div className="welcome-characters" role="group" aria-label="Personality" data-controller-row>
               {original && <button type="button" className="welcome-character" aria-pressed={selectedStyle === "original"}
-                disabled={busy} onClick={() => setStyle("original")}><CharacterPortrait choice={original} compact /><strong>Keep current look</strong></button>}
+                disabled={busy} onClick={() => setStyle("original")}><CharacterPortrait choice={original}
+                  welcomePreview={selectedStyle === "original" ? "selected" : "candidate"} /><strong>Keep current look</strong></button>}
               {CHARACTER_STYLES.map(item => {
                 const choice = styleLook(item, body);
                 return <button type="button" key={item.id} className="welcome-character" aria-pressed={selectedStyle === item.id}
                   disabled={busy} onClick={() => { setStyle(item.id); setError(""); }}>
-                  <CharacterPortrait choice={choice} compact />
+                  <CharacterPortrait choice={choice} welcomePreview={selectedStyle === item.id ? "selected" : "candidate"} />
                   <strong>{attitudeName(item.attitude)}</strong><span>{item.name}</span>
                 </button>;
               })}

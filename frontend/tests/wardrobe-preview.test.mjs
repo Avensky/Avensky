@@ -30,8 +30,11 @@ function wardrobePreviewServer(modelFallbacks = {}) {
       name: "wardrobe-preview-test",
       enforce: "pre",
       transform(source, id) {
+        if (/\/(?:DressContactMotion|WedgeSandalMotion)\.tsx$/.test(id)) {
+          return source.replace('from "@react-three/fiber"', 'from "virtual:wardrobe-preview"');
+        }
         if (id.endsWith("/GarageDriver.tsx")) return source
-          .replace(/from "(?:@react-three\/(?:fiber|drei)|\.\/(?:CharacterTurntable|CharacterLoadingEffect|GarageEmotePlayer|StylizedDriver|villagerModel)|\.\.\/preview\/PreviewLoadingSeal)"/g, 'from "virtual:wardrobe-preview"')
+          .replace(/from "(?:@react-three\/fiber|\.\/(?:CharacterTurntable|CharacterLoadingEffect|GarageEmotePlayer|villagerModel)|\.\.\/preview\/PreviewLoadingSeal|\.\.\/\.\.\/assets\/useAssetGLTF)"/g, 'from "virtual:wardrobe-preview"')
           .replaceAll("<group ", "<div ").replaceAll("</group>", "</div>");
       },
       resolveId(id) { if (id === "virtual:wardrobe-preview") return "\0wardrobe-preview-test"; },
@@ -45,11 +48,10 @@ function wardrobePreviewServer(modelFallbacks = {}) {
           export const prepared = [], committed = [], appliedLooks = [], loadedGarments = [], loadedBodies = [];
           export const assetReads = [];
           export const useThree = selector => selector({ size: { width: 1200 }, invalidate });
-          export const Html = ({ children }) => children;
+          export const useFrame = () => {};
           export const CharacterTurntable = ({ children }) => children;
           export const CharacterLoadingEffect = () => createElement("span", { "data-victory-loading": true });
           export const PreviewLoadingStatus = ({ label }) => createElement("span", { role: "status" }, label);
-          export const StylizedDriver = () => null;
           export const villagerModelUrl = (look, kind, villageKind = kind) => look.wardrobe?.set ?? (villageKind === "portrait" ? "village" : "village-full");
           export const applyVillagerLook = (model, look) => { appliedLooks.push(look); };
 
@@ -115,7 +117,7 @@ function wardrobePreviewServer(modelFallbacks = {}) {
               resolve();
             };
           }
-          export function useGLTF(url) {
+          export function useAssetGLTF(url) {
             assetReads.push(url);
             const asset = assets.get(url);
             if (!asset) throw new Error("Unexpected " + url);

@@ -396,7 +396,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
           ? progression.character : progression?.character_presets?.[next.id]);
         update({ ...(preset && characterLook(preset) ? preset : next), identity: choice.identity });
       }}>
-      {!locked && <CharacterPortrait choice={next} compact />}
+      {!locked && <CharacterPortrait choice={next} />}
       <span>{locked ? name : gender === "female" ? "Female" : "Male"}</span>
     </button>)}
   </div>;

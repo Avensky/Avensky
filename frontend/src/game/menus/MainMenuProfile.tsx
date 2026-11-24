@@ -4,19 +4,19 @@ import { createGuestProfile, signInDeviceProfile, signOutPlayerProfile } from ".
 import { connectRustServer, disconnectRustServer } from "../../net/rustSocket";
 import { useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
-import { CharacterPortrait } from "../characters/CharacterPortrait";
-import { usePlayerCharacter } from "../characters/localOutfits";
+import { CharacterHeaderButton } from "../characters/CharacterHeaderProfile";
+import { useSavedPlayerCharacter } from "../characters/localOutfits";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import "./mainMenuProfile.css";
 
 export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
-  const choice = usePlayerCharacter();
   const name = useSocialStore(state => state.view?.profile.name);
   const scope = useSocialStore(state => state.profileScope);
   const available = useSocialStore(state => state.available);
   const status = useSocialStore(state => state.profileStatus);
   const registered = useSocialStore(state => state.registeredProfile);
   const stagingSignIn = useSocialStore(state => state.stagingSignIn);
+  const choice = useSavedPlayerCharacter(!registered && !stagingSignIn);
   const message = useSocialStore(state => state.message);
   const [open, setOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -28,7 +28,7 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
   const guest = Boolean(name) && scope === "tab";
   const signedIn = Boolean(name) && !guest;
   const busy = status === "restoring" || signingOut;
-  const caption = guest ? "Guest" : name ?? "Sign in";
+  const caption = name ?? "Sign in";
 
   const close = useCallback(() => {
     setOpen(false);
@@ -98,12 +98,9 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
   return <header ref={root} className="main-menu-profile" onKeyDown={event => {
     if (open && event.key === "Escape") { event.preventDefault(); close(); }
   }}>
-    <button ref={trigger} type="button" className="main-menu-profile-trigger menu-control menu-panel-frame"
-      data-main-profile-toggle aria-label="Player profile" aria-expanded={open} aria-controls={panelId}
-      title={`Player profile · ${caption}`} onClick={open ? close : () => setOpen(true)}>
-      <span className="main-menu-profile-portrait" aria-hidden="true"><CharacterPortrait choice={choice} personal /></span>
-      <span className="main-menu-profile-caption" aria-hidden="true">{caption}</span>
-    </button>
+    <CharacterHeaderButton ref={trigger} angled choice={choice} name={caption}
+      data-main-profile-toggle aria-label={`Player profile · ${caption}`} aria-expanded={open} aria-controls={panelId}
+      onClick={open ? close : () => setOpen(true)} />
     <section ref={panel} id={panelId} className="main-menu-profile-panel menu-panel-frame" aria-label="Player profile options" hidden={!open}>
       {(status === "restoring" || status === "error") && <p role="status">{message}</p>}
       {!available && <p role="status">Connect to the game server to sign in.</p>}

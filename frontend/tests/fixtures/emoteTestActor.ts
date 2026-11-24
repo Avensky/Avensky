@@ -1,17 +1,17 @@
-import { clothingColors, type ClothingPiece } from "./clothingPieces";
-import { usesFittedAnimation } from "./animationFit";
+import { clothingColors, type ClothingPiece } from "../../src/game/characters/clothingPieces";
+import { usesFittedAnimation } from "../../src/game/characters/animationFit";
 import { CapsuleGeometry, CylinderGeometry, Group, Mesh, MeshStandardMaterial, SphereGeometry, Vector3, type BufferGeometry } from "three";
-import type { CharacterLook } from "./characterCatalog";
+import type { CharacterLook } from "../../src/game/characters/characterCatalog";
 
 type Point = [number, number, number];
 
-export function prepareStylizedDriver(look: CharacterLook) {
+export function createEmoteTestActor(look: CharacterLook) {
   const { female, fabric, trim, skin, hair, appearance, outfit } = look;
   const shoulders = female ? .155 : .205;
   const crop = appearance.hair === "cropped";
   const hat = appearance.headwear === "hat";
   const root = new Group();
-  root.name = female ? "garage-mara-stylized" : "garage-jules-stylized";
+  root.name = "emote-test-actor";
   root.userData.fittedClothing = usesFittedAnimation(look);
   if (female) root.userData.skirtHandRoom = 0;
   const top: ClothingPiece = female ? "corset" : "coat";

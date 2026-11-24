@@ -134,8 +134,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('.hero-roster'), null);
     assert.equal(find('[role=tab]'), null);
     assert.equal(find('[data-character-preview]').dataset.characterPreview, 'mara-vega');
-    const vesperPortrait = find('[data-character-option="mara-vega"] .character-portrait');
-    assert(vesperPortrait?.matches('span.character-portrait--unavailable'), 'Vesper keeps a neutral portrait when WebGL is unavailable');
+    assert.equal(find('[data-character-option="mara-vega"] .character-portrait'), null,
+      'the character option uses its text label when a render is unavailable');
     assert.equal(find('.character-emote-toggle').getAttribute('aria-expanded'), 'false');
     assert.equal(find('.character-emotes'), null);
     await openEmotes();
@@ -872,8 +872,8 @@ test('all emote batches return to rest and keep planted and lifted feet distinct
     const { sampleCockpitMotion } = await vite.ssrLoadModule('/src/game/preview/garageCockpit.ts');
     const { sampleDriveOut, DRIVE_OUT_DURATION } = await vite.ssrLoadModule('/src/game/preview/garageDriveMotion.ts');
     const { characterLook } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
-    const { prepareStylizedDriver } = await vite.ssrLoadModule('/src/game/characters/stylizedDriverModel.ts');
-    const model = prepareStylizedDriver(characterLook({ id: 'jules-okafor', outfit: 'night-run' }));
+    const { createEmoteTestActor } = await vite.ssrLoadModule('/tests/fixtures/emoteTestActor.ts');
+    const model = createEmoteTestActor(characterLook({ id: 'jules-okafor', outfit: 'night-run' }));
     const turntable = new Object3D();
     turntable.rotation.y = 1;
     turntable.add(model.root);

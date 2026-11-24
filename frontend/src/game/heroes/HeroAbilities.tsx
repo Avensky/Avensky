@@ -44,7 +44,7 @@ export function HeroAbilityDetails({heroId}:{heroId:string}){
         <div className="hero-guide-showcase" aria-label={`${hero.name} overview`}>
           <div className="hero-guide-portraits">
             <HeroPortrait hero={hero.id} cacheOnly showStyleStatus={false}/>
-            <CharacterPortrait choice={driver} compact label={driverName}/>
+            <CharacterPortrait choice={driver} label={driverName}/>
           </div>
           <p>{guide.description}</p>
         </div>

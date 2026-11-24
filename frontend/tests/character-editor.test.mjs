@@ -55,7 +55,10 @@ test('portraits stay available outside Heroes without character editing controls
     };
 
     await show('main', h(MainMenuProfile, { focusMenu: () => {} }));
-    assert(find('.main-menu-profile-portrait'));
+    assert(find('header.main-menu-profile > button.character-header-profile[data-angled]'));
+    assert(find('.main-menu-profile .character-header-portrait'));
+    assert.match(find('.main-menu-profile .character-header-info').textContent, /Driver/);
+    assert.equal(find('.main-menu-profile .character-portrait'), null);
     await act(async () => find('[data-main-profile-toggle]').click());
     assert.match(find('.main-menu-profile-panel').textContent, /Continue as guest/);
     assert.doesNotMatch(find('.main-menu-profile-panel').textContent, /Edit character/i);

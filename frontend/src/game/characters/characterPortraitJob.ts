@@ -3,7 +3,7 @@ import type { WardrobeGarment } from "./wardrobeGarments";
 
 export type CharacterPortraitJob = {
   look: CharacterLook;
-  modelUrl: string | null;
+  modelUrl: string;
   dress?: { item: WardrobeGarment; url: string };
 };
 
