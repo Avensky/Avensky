@@ -22,6 +22,7 @@ import { CHARACTER_PERSONALITIES, type AnimationFit, type CharacterPersonality }
 import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom } from "./DressingRoom";
+import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
@@ -80,6 +81,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   beforeClose: Ref<() => Promise<boolean>>;
 }) {
   const page = useRef<HTMLDivElement>(null);
+  const fittedHair = useLocalHairstyle(state => hairOptions.some(style => style.id === state.id));
   const owner = useSocialStore(state => state.view?.profile.id ?? state.profileOwner);
   const connectedOwner = useSocialStore(state => state.view?.profile.id);
   const characterSlot = useSocialStore(state => state.view?.profile.active_character_id ? state.view.profile : undefined);
@@ -309,7 +311,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       setTrial(undefined);
       return;
     }
-    setTrial(activeTrial && !equipPreview ? { ...choice, outfit: next.outfit, wardrobe: next.wardrobe } : next);
+    setTrial(activeTrial && !equipPreview ? { ...choice, outfit: next.outfit, wardrobe: next.wardrobe,
+      appearance: { ...characterAppearance(choice), color: next.appearance?.color ?? "original", accent: next.appearance?.accent },
+    } : next);
   }
 
   function loadOutfit(next: CharacterChoice) {
@@ -653,7 +657,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         <h2>Body</h2>
         {BODY_STYLE.map(([section, fields]) => <fieldset key={section}>
           <legend>{section}</legend>
-          {fields.map(([field, label]) => field === "hair" && choice.id === ROOK_ID && __ROOK_MODEL_URL__ ? null
+          {section === "Hair" && choice.id === "mara-vega" && hairOptions.length > 0 && <LocalHairFeatures />}
+          {fields.map(([field, label]) => (field === "hair" && choice.id === ROOK_ID && __ROOK_MODEL_URL__) ||
+            (section === "Hair" && choice.id === "mara-vega" && fittedHair) ? null
             : <label className="character-setting" key={field} data-controller-row>{label}
               <select className="menu-control" aria-label={label} value={appearance[field] ?? (field === "hair" ? "natural" : field === "tattoo" ? "none" : "original")}
                 disabled={field === "tattoo" && saveToProfile && !bodyTattoosAvailable}

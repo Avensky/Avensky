@@ -7,6 +7,7 @@ import { clothingPieceLabel, wornClothing } from "./clothingPieces";
 import { resolveCharacterWardrobe, wardrobeOverEase, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS } from "./wardrobe";
 import { getWardrobeGarment, visibleWardrobeGarments } from "./wardrobeGarments";
 import { LOCAL_OUTFITS_KEY, OUTFIT_NAME_CONFLICT, readLocalOutfits, writeLocalOutfit } from "./localOutfits";
+import { captureLocalOutfit, restoreLocalOutfitHair, localOutfitHairLabel } from "./fittedWardrobe/localOutfitHair";
 import "./savedOutfits.css";
 
 const MAX_OUTFITS = 24;
@@ -97,7 +98,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
     if (!canEditCharacter()) return;
     if (source === "device") {
       try {
-        setLocalOutfits(writeLocalOutfit(name, character));
+        setLocalOutfits(writeLocalOutfit(name, character && captureLocalOutfit(character)));
         if (!character) setName(current => current.trim() === name ? "" : current);
         setMessage(character ? `Saved ${name} on this device.` : `Deleted ${name} from this device.`);
       } catch (error) {
@@ -174,10 +175,11 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
     {notice && <p className="saved-outfit-message" role="status">{notice}</p>}
     {looks.length > 0 ? <ul className="saved-outfit-list" aria-label="Saved outfits">
       {looks.map(([outfitName, outfit]) => {
-        const details = outfitDetails(outfit);
+        const details = [outfitDetails(outfit), source === "device" && localOutfitHairLabel(outfit)].filter(Boolean).join(" · ");
         return <li key={outfitName} data-controller-row data-controller-columns="2">
           <button type="button" className="menu-control saved-outfit-preview" aria-label={`Try on ${outfitName}`} disabled={!editingAllowed} onClick={() => {
             if (!canEditCharacter()) return;
+            if (source === "device") restoreLocalOutfitHair(outfit);
             onTryOn(outfit);
             setName(outfitName);
             setMessage(`Previewing ${outfitName}.`);
