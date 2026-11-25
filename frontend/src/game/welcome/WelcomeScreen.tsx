@@ -1,3 +1,5 @@
+import { GarageCredentialFields } from "./GarageCredentialFields";
+import { GameButton } from "../../components/GameButton";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
@@ -10,13 +12,12 @@ import { CharacterPortrait, ProfilePortrait } from "../characters/CharacterPortr
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
-import { garageBrandHeader, garageCredentials } from "../../theme/garageEntry";
+import { garageBrandHeader } from "../../theme/garageEntry";
 import { STAGING_SIGN_IN_PATH } from "../../net/deploymentEnvironment";
 import { entryAssets, stagingAccountPortal } from "./config";
 import "./welcomeScreen.css";
 
 const chrome = { __html: garageBrandHeader(entryAssets) };
-const credentialFields = { __html: garageCredentials(false) };
 
 type Step = "welcome" | "create" | "register" | "characters";
 type Draft = { name: string; body: CharacterBody; style: string };
@@ -42,6 +43,7 @@ async function waitForProfile(owner: string) {
 }
 
 export function WelcomeScreen() {
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const connected = useSocialStore(state => state.available);
   const accounts = useSocialStore(state => state.accountsAvailable);
   const stagingSignIn = useSocialStore(state => state.stagingSignIn);
@@ -103,6 +105,7 @@ export function WelcomeScreen() {
   }
 
   useEffect(() => {
+    if (screen === "welcome") return;
     if (!busy && !window.matchMedia?.("(pointer: coarse)")?.matches
         && !root.current?.contains(document.activeElement))
       root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
@@ -140,11 +143,12 @@ export function WelcomeScreen() {
     function navigate(event: Event) {
       if (!root.current || busy) return;
       const action = (event as CustomEvent<MenuAction>).detail;
-      const active = document.activeElement;
+      const active = root.current.contains(document.activeElement) ? document.activeElement :
+        root.current.querySelector(".garage-field[data-selected=true] input") ?? document.activeElement;
       if (!(active instanceof HTMLElement)) return;
       if (action === "back") back();
       else if (action === "activate" && root.current.contains(active)) {
-        if (active.matches("button:enabled, summary, a[href]")) active.click();
+        if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), summary, a[href]")) active.click();
         else if (active instanceof HTMLInputElement && active.closest(".garage-credentials")) openFieldKeyboard(active);
         else if (isTypingTarget(active)) active.focus();
       } else if (["up","down","left","right"].includes(action)) {
@@ -224,10 +228,11 @@ export function WelcomeScreen() {
 
   return <>
     <main className="welcome-screen garage-entry" ref={root} data-controller-rows onKeyDown={event => {
+      if (event.key === "Tab") { event.preventDefault(); return; }
       if (event.key === "Escape") back();
-      if (!isTypingTarget(event.target) && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) {
+      if ((["ArrowUp","ArrowDown"].includes(event.key) || !isTypingTarget(event.target) && ["ArrowLeft","ArrowRight"].includes(event.key))) {
         event.preventDefault();
-        navigateFormRows(root.current!, event.target as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
+        navigateFormRows(root.current!, (root.current!.contains(document.activeElement) ? document.activeElement : root.current!.querySelector(".garage-field[data-selected=true] input")) as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
       <div className="welcome-chrome" dangerouslySetInnerHTML={chrome} />
@@ -312,25 +317,19 @@ export function WelcomeScreen() {
             </div>
           </form>
         ) : sessionPending || signedIn ? null : <>
-          <form className="garage-credentials" method="post" onSubmit={authenticate}
-            onClick={event => {
-              const toggle = (event.target as HTMLElement).closest<HTMLButtonElement>(".garage-eye");
-              const field = event.currentTarget.elements.namedItem("password") as HTMLInputElement | null;
-              if (toggle && field) {
-                const show = field.type === "password";
-                field.type = show ? "text" : "password";
-                toggle.textContent = show ? "Hide password" : "Show password";
-              }
-            }}>
-            <fieldset disabled={busy || !accounts} dangerouslySetInnerHTML={credentialFields} />
+          <form className="garage-credentials" method="post" onSubmit={authenticate}>
+            <GarageCredentialFields disabled={busy || !accounts} />
           </form>
           <div className="garage-recovery" data-controller-row>
-            <details><summary>Forgot password?</summary><p>Contact your game server operator to recover this account.</p></details>
-            {accounts && <button type="button" disabled={busy} onClick={() => {
+            <GameButton variant="menu" aria-expanded={recoveryOpen} onPress={() => setRecoveryOpen(value => !value)}>
+              Forgot password?
+            </GameButton>
+            {recoveryOpen && <p>Contact your game server operator to recover this account.</p>}
+            {accounts && <GameButton variant="menu" disabled={busy} onPress={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
               else { setNewPlayer(true); setStep("create"); }
-            }}>Sign up</button>}
+            }}>Sign up</GameButton>}
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}

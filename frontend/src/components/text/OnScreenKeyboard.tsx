@@ -1,7 +1,7 @@
+import { GameButton } from "../GameButton";
 import { useEffect, useRef, useState } from "react";
 import { ControlGlyph, MenuShortcuts } from "../controller";
 import { useMenuInputDevice } from "../controller/useMenuInputDevice";
-import { trapMenuFocus } from "../menus/menuFocus";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import type { MenuAction } from "../../controls/inputRouting";
 import "./textKeyboard.css";
@@ -98,7 +98,7 @@ function KeyboardDialog() {
         aria-label={`Keyboard: ${session.label}`}
         className="text-keyboard"
         onKeyDown={(event) => {
-          trapMenuFocus(event);
+          if (event.key === "Tab") { event.preventDefault(); return; }
           const direction = (
             {
               ArrowUp: "up",
@@ -117,13 +117,13 @@ function KeyboardDialog() {
       >
         <header>
           <strong>{session.label}</strong>
-          <button
-            type="button"
+          <GameButton
+            variant="menu"
             className="menu-control"
-            onClick={() => useTextKeyboardStore.getState().close(true)}
+            onPress={() => useTextKeyboardStore.getState().close(true)}
           >
             <ControlGlyph controller="B" /> CANCEL
-          </button>
+          </GameButton>
         </header>
         <output
           className="text-keyboard-preview"
@@ -143,12 +143,12 @@ function KeyboardDialog() {
               }}
             >
               {row.map((key, c) => (
-                <button
-                  type="button"
+                <GameButton
+                  variant="menu"
                   key={key}
                   className="menu-control"
                   data-key={`${r}-${c}`}
-                  data-selected={position[0] === r && position[1] === c}
+                  selected={position[0] === r && position[1] === c}
                   aria-label={
                     key.length === 1
                       ? `Type ${upper ? key : key.toLowerCase()}`
@@ -158,10 +158,10 @@ function KeyboardDialog() {
                     if (position[0] !== r || position[1] !== c)
                       setPosition([r, c]);
                   }}
-                  onClick={() => press(key)}
+                  onPress={() => press(key)}
                 >
                   {key.length === 1 && !upper ? key.toLowerCase() : key}
-                </button>
+                </GameButton>
               ))}
             </div>
           ))}

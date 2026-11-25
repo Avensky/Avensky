@@ -33,7 +33,7 @@ test("welcome picks a personality and gender before registration and lets return
       progression:{character:null,cosmetics_revision:0}},
       limits:{max_active_worlds:2},players:[],teammates:[],requests:[],groups:[],worlds:[],world_invites:[],maps:[],current_world_id:null};
     const reply=(request,data,ok=true,message)=>client.receiveSocialResult({request_id:request.request_id,ok,data,message});
-    const button=label=>[...document.querySelectorAll("button")].find(button=>button.textContent.trim() === label);
+    const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>button.textContent.trim() === label);
     const submit=()=>document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
     const typeName=name=>{
       const input=document.querySelector('[name="characterName"]');

@@ -119,10 +119,11 @@ export function prepareGarageDisplay(scene: Object3D) {
         object.material instanceof MeshStandardMaterial && object.material.name.trim() === "LIGHT") {
       if (!rackLight) {
         rackLight = object.material.clone();
-        rackLight.userData.garageAccent = false;
+        rackLight.userData.garageAccent = true;
+        rackLight.userData.garageAccentIntensity = .7;
         rackLight.color.set("#39332b");
         rackLight.emissive.set("#ffead5");
-        rackLight.emissiveIntensity = 2.2;
+        rackLight.emissiveIntensity = .7;
       }
       object.material = rackLight;
     }
@@ -131,9 +132,10 @@ export function prepareGarageDisplay(scene: Object3D) {
     if (isGarageWorkLight(object)) {
       if (!workLight) {
         workLight = object.material.clone();
-        workLight.userData.garageAccent = false;
+        workLight.userData.garageAccent = true;
+        workLight.userData.garageAccentIntensity = .55;
         workLight.emissive.set("#ffead5");
-        workLight.emissiveIntensity = 2.2;
+        workLight.emissiveIntensity = .55;
       }
       object.material = workLight;
     }

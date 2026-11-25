@@ -21,6 +21,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
       selected = false,
       variant = "primary",
       className = "",
+      onClick,
       ...rest
     },
     ref
@@ -70,6 +71,17 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
             // also select another row or treat Space as braking.
             e.stopPropagation();
             if (!e.repeat) onPress?.();
+          }
+        }}
+        onClick={(event) => {
+          onClick?.(event);
+          if (event.defaultPrevented) return;
+          // Keyboard and assistive activation use click with no pointer detail.
+          // Pointer activation is already handled by onPointerUp.
+          if (event.detail === 0 && !disabled) {
+            event.preventDefault();
+            event.stopPropagation();
+            onPress?.();
           }
         }}
         onContextMenu={(e) => e.preventDefault()}

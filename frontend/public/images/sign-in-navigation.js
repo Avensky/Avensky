@@ -29,7 +29,7 @@
         document.querySelector("main.garage-entry-body").replaceWith(main);
         history.replaceState(null, "", next.pathname + next.search + url.hash);
         document.title = page.title;
-        for (const path of ["/__alpha/password.js", "/__alpha/invite.js"]) {
+        for (const path of ["/__alpha/invite.js"]) {
           if (path.endsWith("invite.js") && !main.querySelector("#link-code, input[name=deviceToken]")) continue;
           const script = document.createElement("script");
           script.src = path;
@@ -42,9 +42,13 @@
         throw Error();
       const modules = [...page.querySelectorAll('script[type=module][src]')].map(el => new URL(el.getAttribute("src"), next));
       if (!modules.length || modules.some(src => src.origin !== next.origin || !src.pathname.startsWith("/assets/")))
-        return location.replace("/");
+        throw Error("The game entry is unavailable.");
+      const previousMain = document.querySelector("main.garage-entry-body").cloneNode(true);
+      previousMain.querySelector(".garage-gamepad-controls")?.remove();
+      previousMain.querySelector(".garage-entry-card")?.removeAttribute("data-controls-ready");
+      const previousHeader = document.querySelector(".garage-entry-header");
+      const previousUrl = location.href;
       window.dispatchEvent(new Event("avensky:leave-portal-form"));
-      scope.abort();
       const room = document.querySelector("[data-live-garage]");
       document.querySelector("main.garage-entry-body").remove();
       document.querySelector(".garage-entry-header")?.remove();
@@ -63,12 +67,29 @@
       document.body.append(startup, root);
       // These are the same module URLs as the public entry, so React and the
       // renderer retain their identity as the protected bundle starts.
-      try { for (const module of modules) await import(module.href); }
-      catch { location.replace("/"); }
+      try {
+        for (const module of modules) await import(module.href);
+        scope.abort();
+      } catch {
+        // A failed bundle request leaves the room and a usable sign-in form in place.
+        document.body.append(room);
+        document.getElementById("startup-screen")?.remove();
+        document.getElementById("root")?.remove();
+        document.body.classList.add("garage-entry");
+        if (previousHeader) document.body.append(previousHeader);
+        document.body.append(previousMain);
+        history.replaceState(null, "", previousUrl);
+        window.dispatchEvent(new Event("avensky:portal-form"));
+        throw Error("The game could not start.");
+      }
     } catch {
       showError("Couldn’t open the next screen. Check your connection and try again.");
     } finally { pending = false; }
   }
+  window.addEventListener("avensky:portal-navigate", event => {
+    const url = new URL(event.detail, location.href);
+    if (portalPath(url) || url.href === location.origin + "/") void navigate(url);
+  }, { signal: scope.signal });
   document.addEventListener("submit", event => {
     const form = event.target;
     if (!(form instanceof HTMLFormElement) || form.method !== "post") return;
