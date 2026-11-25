@@ -1,7 +1,7 @@
 import { isMirrorMakeupEmote, MAKEUP_EMOTES } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
 import { FitReview } from "./FitReview";
-import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type Ref } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { readLocalCharacter, writeLocalCharacter } from "./localOutfits";
 import { ControllerAction } from "../../components/controller";
@@ -23,7 +23,6 @@ import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom } from "./DressingRoom";
 import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
-import { setWardrobeRemoval } from "./wardrobeGarments";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
@@ -121,9 +120,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const [loadedOutfit, setLoadedOutfit] = useState(false);
   const activeTrial = trial?.id === choice.id ? trial : undefined;
   const wardrobeChoice = activeTrial ?? choice;
-  const previewChoice = useMemo(() => fittedHair && wardrobeChoice.id === VILLAGER_ID
-    ? setWardrobeRemoval(wardrobeChoice, "hat", true)
-    : wardrobeChoice, [fittedHair, wardrobeChoice]);
+  // Preview hair must not change garment removal arrays, which forces the
+  // entire skinned actor to rebuild and produces black frames in the garage.
+  // Bonnet visibility is preview-only and updated on the existing model.
+  const previewChoice = wardrobeChoice;
   const [locked, setLocked] = useState(Boolean(initialChoice));
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "local" | "error">("idle");
   const [message, setMessage] = useState("");

@@ -11,6 +11,7 @@ import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type Charact
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
 import { CharacterLoadingEffect } from "./CharacterLoadingEffect";
 import { SpaceBunsPreview } from "./fittedWardrobe/SpaceBunsPreview";
+import { previewStockBonnet, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
 import { DressContactMotion } from "./fittedWardrobe/DressContactMotion";
 import { WedgeSandalMotion } from "./fittedWardrobe/WedgeSandalMotion";
 import { applyVillagerLook, prepareVillager, villagerModelUrl } from "./villagerModel";
@@ -108,10 +109,18 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
+  const previewHair = useLocalHairstyle(s => s.id);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
+    if (previewPacks && look.character.id === VILLAGER_ID && model.hat) {
+      // Stock means braid + bonnet; a fitted preview must always remove it.
+      // Do not mutate outfit selection or recreate the entire character rig.
+      const visible = previewStockBonnet(true, true, previewHair);
+      model.hat.visible = visible;
+      if (visible) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
+    }
     invalidate();
-  }, [model, look, invalidate]);
+  }, [model, look, previewHair, previewPacks, invalidate]);
   useLayoutEffect(() => {
     if (model.trialGarments && useCharacterPreviewStore.getState().camera === "Selected item") {
       useCharacterPreviewStore.setState(state => ({ focusRevision: state.focusRevision + 1 }));
