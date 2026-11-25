@@ -17,14 +17,18 @@
 | Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original CURLY 01.FBX supplied and analyzed; correct FBX node axis transforms identified, but Blender import unit conversion and original Curls opacity/materials remain unverified |
 | Establish reusable Vesper head coordinates | **Not finalized** | Neutral actor + real source BaseColor + rig/bone/unit frame + reference cameras need a saved, approved private scene |
 | Automatically find/assign source hair roots | **Not implemented** | Need explicit or confirmed root zones per imported mesh/card; output confidence and manual fallback |
-| Coarse source→Vesper alignment | **Math + guarded Blender pilot implemented; real donor untested** | `fit_math.py` uses reflection-free Kabsch/Umeyama similarity; `pilot_curly_mane.py` requires five paired source/target markers and real Face BaseColor |
-| Controlled root-only conformance | **Initial prototype scripted; real donor untested** | Connected-clump displacement respects root weight fade and zero-weight tips; projects only onto author-approved Face4 scalp faces and rejects excessive shifts. Needs actual root groups, Blender run and visual QA |
+| Coarse source→Vesper alignment | **Real-source offline candidate; Blender approval pending** | `coarse_scalp_alignment.py` + `auto_align_curly_mane.py` produce a bounded global scale/translation using upper UV roots and approved original scalp; the real source candidate improves measured clearance but is NOT final. |
+| Controlled root-only conformance | **Temporarily blocked for safety** | The old nearest-skin UV-end experiment may have selected tips. Its old conform command now refuses execution until post-global roots are identified and reviewed. |
 | Genuine density/volume correction | **Not implemented** | Need detected uncovered non-part areas and limited inner clump/wisp authoring; do not blindly duplicate cards |
 | Automated six-view/pose QA | **Not implemented** | Need reproducible front/back/left/right/top/three-quarter captures, cap isolation, head turns/collar/bonnet checks |
 | Mobile optimization and GLB export | **Not implemented for V2** | LOD generator, deterministic export, reimport, mesh/material validation and physical-phone GPU QA |
 | In-game discovery/integration | **Existing runtime catalog mechanism; V2 unintegrated** | Add approved private manifest entry to existing catalog only after real fit, not a new manual UI list |
 
 **The Vesper pilot isn't finished.** No success is claimed for a new fitted Curly Mane GLB, an authored original-texture root overlay, or a validated phone LOD.
+
+## Global geometric alignment solved provisionally (2026-11-25)
+
+The actual Curly Mane UV ribbons show 234/253 upper ends at high V. The earlier 39-section nearest-head experiment risked pulling lower/tip ends while the entire hairstyle hovered too high. A NEW bounded global scale/translation solver now uses the higher longitudinal ends of 209 eligible curl sections and the original Face4 scalp-colored vertices: median candidate distance 19.62 to 1.40 SOURCE-coordinate units, 0/209 to 166/209 within 2 source units. The candidate is unapproved and optimizer scale hit its 0.92 lower bound; Blender physical units still need verification. Original Curls diffuse/opacity was later provided and used in a software UV render. Crown/back remain sparse; face-crossing cards need adjustment. The old `pilot_curly_mane.py --mode conform` command has been disabled. Read [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) first.
 
 ## Curly Mane actual-source update (2026-11-25)
 
