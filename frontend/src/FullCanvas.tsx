@@ -85,7 +85,7 @@ export function FullCanvas({
     >
       <Canvas
         className={preview ? "garage-canvas" : undefined}
-        frameloop={covered ? "never" : demand ? "demand" : "always"}
+        frameloop={covered && preview ? "never" : demand ? "demand" : "always"}
         camera={{ position: [0, 10, 20], fov: 50, far: 2000 }}
         dpr={compact ? Math.min(dpr, 1) : dpr}
         shadows={shadows && !compact}

@@ -2,7 +2,7 @@
 @import "./ui/drivingHud.css";
 
 .game-viewport { width: 100%; height: 100%; }
-.game-viewport[inert] { visibility: hidden; }
+.game-viewport[inert] > :not(.garage-menu-backdrop) { visibility: hidden; }
 .mobile-rotate-screen {
   position: fixed;
   z-index: 10000;
@@ -12,7 +12,7 @@
   justify-items: center;
   gap: 9px;
   padding: 24px;
-  background: radial-gradient(ellipse at center, var(--app-panel), var(--app-background) 72%);
+  background: color-mix(in srgb, var(--app-background) 72%, transparent);
   color: var(--app-text);
   text-align: center;
 }
@@ -42,8 +42,8 @@ canvas {
   min-height: 100svh;
   background: radial-gradient(
     ellipse at 55% 42%,
-    var(--app-raised, #142b46),
-    var(--app-background, #050c18) 75%
+    var(--app-raised),
+    var(--app-background) 75%
   );
 }
 .garage-canvas canvas {
@@ -68,3 +68,12 @@ html[data-reduce-motion="true"] .garage-canvas canvas {
 .GameOverlay {
   z-index: 100;
 }
+
+/* The world keeps warming underneath. Driving HUD elements appear when the player enters it. */
+.game-wrapper[data-world-cover] > :not(.garage-mode-loading, .team-lineup) { visibility: hidden; }
+.garage-mode-loading { color: var(--app-text); }
+.garage-loading-panel { background: color-mix(in srgb, var(--app-panel) 94%, transparent); border-color: var(--app-line); }
+.garage-loading-brand { color: var(--app-accent); }
+.garage-loading-muted { color: var(--app-muted); }
+.garage-loading-track { background: var(--app-raised); border-color: var(--app-line); }
+.garage-loading-fill { background: var(--app-accent); }

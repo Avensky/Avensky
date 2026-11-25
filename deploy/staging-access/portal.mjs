@@ -16,7 +16,7 @@ const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.
 const themes = JSON.parse(readFileSync(existsSync(sourcePalettes) ? sourcePalettes : new URL("./palettes.json", import.meta.url), "utf8"));
 const sourceEntry = new URL("../../frontend/src/theme/garageEntry.ts", import.meta.url);
 const { garageBackdrop, garageBrandHeader, garageCredentials, DEFAULT_GARAGE_THEME, GARAGE_ENTRY_PORTRAIT, GARAGE_ENTRY_MASK, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
-const defaultColors = Object.entries(themes.navy)
+const defaultColors = Object.entries(themes[DEFAULT_GARAGE_THEME])
   .filter(([key]) => key !== "label" && key !== "scheme")
   .map(([key, color]) => `--app-${key}:${key.startsWith("garage-") ? themes[DEFAULT_GARAGE_THEME][key] : color}`).join(";");
 
@@ -34,7 +34,7 @@ const entryAssets = new Map([
 function paletteScript() {
   return `(() => {
     const themes = ${JSON.stringify(themes)};
-    let chosen = "navy", garage = ${JSON.stringify(DEFAULT_GARAGE_THEME)};
+    let chosen = ${JSON.stringify(DEFAULT_GARAGE_THEME)}, garage = chosen;
     try {
       const saved = JSON.parse(localStorage.getItem("avenlab-preferences-v1") || "{}");
       if (Object.hasOwn(themes, saved?.state?.theme)) chosen = saved.state.theme;
@@ -71,29 +71,16 @@ const backToSignIn = `<a class="portal-back" href="${signInPath}" aria-label="Ba
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
 function page(title, contents, message = "", garage = false) {
-  if (garage) {
-    const signIn = garage === "login";
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>${escape(title)} · Avensky</title><style>html{color-scheme:${themes.navy.scheme};${defaultColors}}</style>
+  const signIn = garage === "login";
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${escape(title)} · Avensky</title><style>html{color-scheme:${themes[DEFAULT_GARAGE_THEME].scheme};${defaultColors}}</style>
 <script type="module" src="${base}/entry/garage-room.js"></script>
 <script src="${base}/theme.js"></script><link rel="stylesheet" href="${base}/entry/garage-entry.css">
 <script src="${base}/password.js" defer></script>
 <script src="${base}/entry/sign-in-input.js" defer></script></head><body class="garage-entry">
-${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card" data-controller-rows aria-label="${escape(title)}">
+${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card${garage ? "" : " garage-entry-account"}" data-controller-rows aria-label="${escape(title)}">
 ${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}
 </section></main></body></html>`;
-  }
-  return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
-<style>
-*{box-sizing:border-box}html{color-scheme:${themes.navy.scheme};${defaultColors}}body{margin:0;color:var(--app-text);background:var(--app-background);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
-main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-a{color:var(--app-accent);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text);padding:.6rem .8rem;border:1px solid var(--app-line);border-radius:0;background:var(--app-panel);min-height:44px;min-width:0}
-button{color:var(--app-text);background:var(--app-raised);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent);outline-color:var(--app-accent)}
-.password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
-.password-toggle{background:var(--app-panel);color:inherit;font-size:.875rem}
-ul{padding:0;list-style:none}li{border-top:1px solid var(--app-line);padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
-.portal-back{display:inline-grid;place-items:center;width:44px;height:44px;color:var(--app-text);border:1px solid var(--app-line);background:var(--app-panel);font-size:1.6rem}.portal-back:focus-visible{outline:2px solid var(--app-accent)}code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style><script src="${base}/theme.js"></script><script src="${base}/password.js" defer></script><main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {

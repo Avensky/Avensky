@@ -10,6 +10,8 @@ import { createHmac, randomBytes } from "node:crypto";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { testerAccounts, totp } from "./accounts.mjs";
+import palettes from "../../frontend/src/theme/palettes.json" with { type: "json" };
+import { DEFAULT_GARAGE_THEME } from "../../frontend/src/theme/garageEntry.ts";
 import { createPortal } from "./portal.mjs";
 import { gameSocketGate, LOGIN_FAILED } from "./game-bridge.mjs";
 
@@ -133,7 +135,8 @@ test("invites grant access once and revocation invalidates existing cookies", as
   const root = { dataset: {}, style: { setProperty: (key, value) => set.set(key, value) } };
   const paletteSource = await theme.text();
   runInNewContext(paletteSource, { localStorage: { getItem: () => null }, document: { documentElement: root } });
-  assert.equal(set.get("--app-garage-panel"), "#716a60");
+  assert.equal(root.dataset.uiTheme, DEFAULT_GARAGE_THEME);
+  assert.equal(set.get("--app-garage-panel"), palettes[DEFAULT_GARAGE_THEME]["garage-panel"]);
   runInNewContext(paletteSource, {
     localStorage: { getItem: key => key === "avenlab-preferences-v1" ? JSON.stringify({ state: { theme: "deep-purple", garageEffects: { theme: "forest" } } }) : null },
     document: { documentElement: root },

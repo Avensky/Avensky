@@ -22,17 +22,22 @@ export function entryRoomGeometry() {
     quad([[l, t, f], [r, t, f], [r, t, k], [l, t, k]], material);
     quad([[l, b, k], [r, b, k], [r, b, f], [l, b, f]], material);
   }
-  function strip(x: number, y: number, z: number, w: number, h: number, vertical = false) {
+  function strip(x: number, y: number, z: number, w: number, h: number, vertical = false, sideWall = false) {
     const hw = (vertical ? h : w) / 2, hh = (vertical ? w : h) / 2;
-    quad([[x - hw, y - hh, z], [x + hw, y - hh, z], [x + hw, y + hh, z], [x - hw, y + hh, z]], 6);
-    const bloom = 2.7;
-    quad([[x - hw - bloom, y - hh - bloom, z + .04], [x + hw + bloom, y - hh - bloom, z + .04],
-    [x + hw + bloom, y + hh + bloom, z + .04], [x - hw - bloom, y + hh + bloom, z + .04]], vertical ? 9 : 8, faceUV, glow);
+    const point = (u: number, v: number, depth: number): Point =>
+      sideWall ? [x + depth, y + v, z - u] : [x + u, y + v, z + depth];
+    const rectangle = (width: number, height: number, depth: number) =>
+      [point(-width, -height, depth), point(width, -height, depth), point(width, height, depth), point(-width, height, depth)];
+    quad(rectangle(hw, hh, 0), 6);
+    quad(rectangle(hw + 2.7, hh + 2.7, .04), vertical ? 9 : 8, faceUV, glow);
   }
   for (const { group, x, z, endX, endZ, bottom, top, span, bottomY, topY } of wallPanels()) {
+    const backWall = z === -98 && endZ === z;
+    const leftWall = x === -108 && endX === x;
+    if (!backWall && !leftWall) continue;
     quad([[x, bottomY, z], [endX, bottomY, endZ], [endX, topY, endZ], [x, topY, z]], group, [[0, bottom], [span, bottom], [span, top], [0, top]]);
   }
-  quad([[-108, wallFloor, 103], [108, wallFloor, 103], [108, wallFloor, -98], [-108, wallFloor, -98]], 3);
+  quad([[-108, wallFloor, 350], [350, wallFloor, 350], [350, wallFloor, -98], [-108, wallFloor, -98]], 3);
   quad([[-108, 82, -98], [108, 82, -98], [108, 82, 103], [-108, 82, 103]], 5);
   // Structural bays and the upper steel truss frame the original concrete wall profile.
   for (const x of [-106, -54, 0, 54, 106]) {
@@ -41,7 +46,7 @@ export function entryRoomGeometry() {
     box(x, 2.4, -95.8, 3.4, 3.1, 1.8, 5);
   }
   for (const z of [-95, -48, 0, 48, 99]) {
-    for (const x of [-107, 107]) box(x, 41, z, 2.2, 81, 2.4, 4);
+    box(-107, 41, z, 2.2, 81, 2.4, 4);
     box(0, 79, z, 215, 2.1, 2, 4);
   }
   box(0, 68, -96.7, 215, 1.2, 2.2, 4);
@@ -54,15 +59,20 @@ export function entryRoomGeometry() {
     box(x, 66.8, -96.3, 32, 1.9, 2.5, 4);
     strip(x, 66.5, -94.95, 29, .56);
   }
+  box(-106.7, 68, 2, 2.2, 1.2, 199, 4);
+  for (const z of [-73, -23, 27, 77]) {
+    box(-106, 66.8, z, 2.5, 1.9, 27, 4);
+    strip(-104.7, 66.5, z, 24, .56, false, true);
+  }
   // Wall-mounted segmented numerals. The inactive lower-left segment distinguishes each nine.
   const segments = [[0, 8, 0], [4.3, 4, 1], [4.3, -4, 1], [0, -8, 0], [-4.3, -4, 1], [-4.3, 4, 1], [0, 0, 0]];
   [0, 9, 9, 9].forEach((digit, index) => {
-    const x = -46 + index * 12.1;
+    const x = -86 + index * 12.1;
     for (let i = 0; i < segments.length; i++) {
       if ((digit === 0 && i === 6) || (digit === 9 && i === 4)) continue;
       const [dx, dy, vert] = segments[i], cx = x + dx, cy = 50 + dy;
-      box(cx, cy, -96.8, vert ? 1.95 : 7.95, vert ? 7.3 : 1.95, 1.6, 4);
-      strip(cx, cy, -95.92, vert ? 6.75 : 7.4, 1.2, Boolean(vert));
+      box(cx, cy, -95.8, vert ? 1.95 : 7.95, vert ? 7.3 : 1.95, 1.6, 4);
+      strip(cx, cy, -94.92, vert ? 6.75 : 7.4, 1.2, Boolean(vert));
     }
   });
   return { vertices: new Float32Array([...solid, ...glow]), solidCount: solid.length / 9, glowCount: glow.length / 9 };

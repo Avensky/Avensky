@@ -3,7 +3,6 @@ import { AttackIcon } from "../../combat/AttackIcon";
 import { ControllerAction } from "../../components/controller";
 import { MenuFooter, MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { trapMenuFocus } from "../../components/menus/menuFocus";
 import { canDrive, type MenuAction } from "../../controls/inputRouting";
 import { HEROES, matchModeLabel, modeTeamSize } from "../../store/alpha/alphaStore";
@@ -72,7 +71,6 @@ export function TeamLineup() {
   return (
     <section className="team-lineup game-ui menu-surface" role="dialog" aria-modal="true" aria-labelledby={title}
       onKeyDown={trapMenuFocus}>
-      <MenuFlareBackground />
       <header className="team-lineup-heading">
         <p>{matchModeLabel(active.mode, active.team_size)} <span data-team={active.team}>{active.team} team</span></p>
         <div className="menu-title-with-logo">

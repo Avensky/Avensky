@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
-import { HalfFloatType, Vector2, WebGLRenderTarget } from "three";
+import { CustomBlending, OneFactor, ZeroFactor, HalfFloatType, Vector2, WebGLRenderTarget } from "three";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
@@ -27,6 +27,11 @@ export function GarageGlow() {
     const render = new RenderPass(scene, camera);
     // Give bright fixture cores a soft halo while preserving the dark room.
     const bloom = new UnrealBloomPass(new Vector2(1, 1), 0.24, 0.15, 1.6);
+    // Bloom adds radiance. Preserve the actor pass's coverage so empty pixels reveal the garage.
+    Object.assign(bloom.blendMaterial, {
+      blending: CustomBlending, blendSrc: OneFactor, blendDst: OneFactor,
+      blendSrcAlpha: ZeroFactor, blendDstAlpha: OneFactor,
+    });
     const output = new OutputPass();
     composer.addPass(render);
     composer.addPass(bloom);

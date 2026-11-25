@@ -173,9 +173,6 @@ export function VehiclePreview({
     requestFrame();
   };
   const [turntable, setTurntable] = useState<Group | null>(null);
-  const [platform, setPlatform] = useState<[number, number]>(
-    DEFAULT_PREVIEW_PLATFORM,
-  );
   const [currentDriverFit, setCurrentDriverFit] = useState<VehiclePreviewDriverFit>();
   const [parkedDriverFit, setParkedDriverFit] = useState<VehiclePreviewDriverFit>();
   const reportDriverFit = useCallback((fit: VehiclePreviewDriverFit) => {
@@ -393,7 +390,7 @@ export function VehiclePreview({
   const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={vehicleMissing} cockpit={insideCar} visible={!characterOnly} />;
   return (
     <>
-      <GarageEnvironment turntable={turntable} onPlatformReady={setPlatform} selectionLighting={staging}
+      <GarageEnvironment turntable={turntable} selectionLighting={staging}
         showPlatform={showPlatform} onSettled={roomSettled} floorCaptureRate={fittingRoom ? 12 : undefined} />
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
@@ -423,7 +420,7 @@ export function VehiclePreview({
             >
               <Suspense fallback={null}>
                 <StagedVehiclePreviewModel browse={workshop && !garageOpen && !vehicleEmotes} unavailable={unavailable}
-                  platform={platform} model={vehicleId} driver={vehicleEmotes ? driver : garageDriver} previewPacks={vehicleEmotes}
+                  platform={DEFAULT_PREVIEW_PLATFORM} model={vehicleId} driver={vehicleEmotes ? driver : garageDriver} previewPacks={vehicleEmotes}
                   motion={motion} onDriverFit={reportDriverFit} onSettled={vehicleReady} allowDriver={roomReady}
                   garageOpen={garageOpen} garageCameraAnchors={workshop} reducedMotion={reducedMotion} active={!characterOnly} diagnostics={!wardrobeOpen}
                   summon={Boolean(settledVehicle && waitingForCar && !stationary && !reducedMotion)} />

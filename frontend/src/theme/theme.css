@@ -3,15 +3,15 @@
 :root {
   --app-radius: 16px;
   --app-radius-sm: 10px;
-  --app-scene-tint: #4484ff;
-  --app-background: #050c18;
-  --app-panel: #0b1729;
-  --app-raised: #142b46;
-  --app-line: #54749a;
-  --app-text: #e6efff;
-  --app-muted: #a6b9d3;
-  --app-accent: #82b7ff;
-  --app-physical: #58e0b0;
+  --app-scene-tint: #efb265;
+  --app-background: #201a16;
+  --app-panel: #2c241e;
+  --app-raised: #3b3027;
+  --app-line: #89735d;
+  --app-text: #f5ede1;
+  --app-muted: #c9b8a5;
+  --app-accent: #efb265;
+  --app-physical: #78e5b4;
 }
 html[data-ui-theme] :is(.menu-surface, .cockpit-overlay, .cockpit-panel) {
   color: var(--app-text);

@@ -68,9 +68,8 @@
   padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
     max(5dvh, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   overflow: auto;
-  background: var(--app-background);
+  background: color-mix(in srgb, var(--app-background) 40%, transparent);
 }
-.team-lineup > .menu-flare-background { z-index: -1; }
 .team-lineup-heading {
   text-align: center;
   color: #f4f6ff;
