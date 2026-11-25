@@ -97,3 +97,6 @@
 .welcome-character-details small{font-size:clamp(11px,1vw,14px);color:var(--app-muted)}
 .welcome-layout[data-step="characters"] .welcome-actions{justify-content:flex-end}
 @media(max-height:500px) and (orientation:landscape){.welcome-layout[data-step="characters"] .welcome-character{min-height:100px;grid-template-columns:minmax(85px,28%) 1fr}.welcome-character-details strong{font-size:18px}}
+
+.welcome-layout[data-authenticated="true"][data-step="welcome"]{grid-template-columns:minmax(0,1fr);align-content:center}
+.welcome-layout[data-authenticated="true"][data-step="welcome"] .welcome-art{display:none}

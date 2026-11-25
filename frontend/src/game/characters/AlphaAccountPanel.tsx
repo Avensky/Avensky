@@ -104,7 +104,10 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
       </section>}
       {session && <button type="button" className="menu-control" disabled={busy} onClick={() => void logout()}>Log out</button>}
     </>}
-    {unavailable && <p role="status" className="alpha-account-hint">{unavailable} <a href="/__alpha/account">Open account portal</a></p>}
+    {unavailable && <p role="status" className="alpha-account-hint">{unavailable}
+      {" "}<a href="/__alpha/account">Open account portal</a>
+      {tab === "profile" && <><br />Alpha tester invites: <a href="/__alpha/testers">Manage tester invitations</a></>}
+    </p>}
     {!session && !unavailable && isStaging && <p role="status">Loading account…</p>}
     {!isStaging && <p className="alpha-account-hint">Account tools are available to signed-in alpha testers.</p>}
     {message && <p role="status" className="alpha-account-response">{message}</p>}

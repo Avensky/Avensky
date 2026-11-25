@@ -207,7 +207,7 @@ export function WelcomeScreen() {
       }
     }}>
       <div className="welcome-scroll">
-      <div className="welcome-layout" data-step={screen}>
+      <div className="welcome-layout" data-step={screen} data-authenticated={stagingSignIn || undefined}>
       <div className="welcome-art" aria-hidden="true">
         <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
       </div>
