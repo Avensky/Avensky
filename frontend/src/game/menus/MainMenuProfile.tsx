@@ -106,7 +106,7 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
       {!available && <p role="status">Connect to the game server to sign in.</p>}
       {error && <p role="alert">{error}</p>}
       <div className="main-menu-profile-options">
-        {stagingSignIn && <button type="button" className="menu-control menu-panel-frame"
+        {stagingSignIn && signedIn && <button type="button" className="menu-control menu-panel-frame"
           onClick={() => window.location.assign("/__alpha/account")}>Account</button>}
         {PLAYER_ONBOARDING && !registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => useUIStore.getState().setScreen("welcome")}>Player options</button>}

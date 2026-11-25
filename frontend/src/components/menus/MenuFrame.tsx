@@ -35,7 +35,7 @@ export function MenuFrameHeader({
  backAction:BackShortcutAction;
 }){
  return <header className={`menu-frame-header alpha-header ${compact?'menu-frame-header--compact':''} ${className}`} data-menu-chrome={variant} data-team-heading={team?true:undefined}>
-  <div className="menu-frame-title" data-title-team={titleTeam}><MenuHeaderBack {...backAction}/>{eyebrow&&<small>{eyebrow}</small>}<h1 id={titleId}>{title}</h1></div>
+  <div className="menu-frame-title" data-title-team={titleTeam}><MenuHeaderBack {...backAction}/>{eyebrow&&<small>{eyebrow}</small>}{title && <h1 id={titleId}>{title}</h1>}</div>
   {children}
   {team&&<div className="menu-header-team" data-team={team}><strong>{team.toUpperCase()}</strong><span>TEAM</span></div>}
   <div className="menu-header-actions">
