@@ -10,7 +10,7 @@ import { requestSocial } from "../../net/socialClient";
 import { selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, VILLAGER_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
