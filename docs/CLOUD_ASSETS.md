@@ -59,6 +59,10 @@ The twelve standalone Espresso GLBs are distributed to the staging operator in a
 3. Configure the gateway to serve the newly verified manifest alongside the previous release. Point the staging receiver's verified-manifest configuration at the new file. Set the GitHub repository Actions variable `STAGING_FITTED_HAIR` to the same selection, then run **Deploy to staging** on `main`. The existing receiver checks the manifest ID before switching the frontend. The game server build must include the updated wardrobe catalog to save the new IDs.
 4. Select Vesper, open **Character → Body → Hair**, equip a style, turn her head and reload the saved profile. Check hat clearance and color on the target phone. Her glasses, harnesses and bracer are under **Appearance → Accessories → All items**.
 
+## Automatic private asset uploads
+
+New fitted hair, garments and donor meshes can use the tested [Windows watcher and manifest-driven uploader](../scripts/assets/README.md). It validates Blender exports against public hash metadata and uploads only approved matching files through the existing `avensky-lightsail` profile. Uploads do not by themselves activate a staging release; the separate server-side verified manifest and matching frontend release remain mandatory.
+
 ## Verify the private bucket
 
 The staging build includes metadata for Vesper's fitted space buns, tennis dress and wedge sandals in `frontend/scripts/staging-fitted-assets.json`. The model files are installed separately in private storage for the login-protected alpha. Before changing this metadata on main, verify the new release on the staging gateway and retain the previous manifest for open sessions.

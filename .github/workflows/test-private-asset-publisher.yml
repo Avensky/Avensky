@@ -1,0 +1,27 @@
+name: Validate private staging asset uploader
+on:
+  pull_request:
+    paths:
+      - "scripts/assets/**"
+      - ".github/workflows/test-private-asset-publisher.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/assets/**"
+      - ".github/workflows/test-private-asset-publisher.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test-publisher:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest discover -s scripts/assets -p 'test_*.py' -v
