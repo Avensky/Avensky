@@ -51,6 +51,20 @@ class StagingGameTest(unittest.TestCase):
             copy.assert_not_called()
             self.assertFalse((Path(temp) / "pending.json").exists())
 
+    def test_rollback_quiesces_the_portal_before_restoring_the_shared_database(self):
+        events = []
+        with tempfile.TemporaryDirectory() as temp, ExitStack() as patches:
+            patches.enter_context(patch.object(game, "STATE", Path(temp)))
+            patches.enter_context(patch.object(game, "volume_path", return_value=Path(temp)))
+            patches.enter_context(patch.object(game.subprocess, "run", side_effect=lambda cmd, **kw: events.append(cmd[1])))
+            patches.enter_context(patch.object(game, "compose", side_effect=lambda *args: events.append("stop game")))
+            patches.enter_context(patch.object(game, "sync_volume", side_effect=lambda *args: events.append("restore data")))
+            patches.enter_context(patch.object(game, "activate", side_effect=lambda *args: events.append("start game")))
+            (Path(temp) / "snapshot").mkdir()
+            game.record({"snapshot_complete": True, "portal_active": True})
+            game.recover()
+        self.assertEqual(events, ["stop", "stop game", "restore data", "start game", "start"])
+
     @unittest.skipUnless(os.getenv("AVENSKY_TEST_DOCKER") == "1", "Docker integration runs on the Ubuntu runner")
     def test_changed_image_restarts_ui_only_skips_and_failed_image_restores_data(self):
         with tempfile.TemporaryDirectory() as temp, ExitStack() as cleanup:

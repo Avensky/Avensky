@@ -10,6 +10,7 @@ import { CharacterPortrait, ProfilePortrait } from "../characters/CharacterPortr
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { garageBrandHeader, garageCredentials } from "../../theme/garageEntry";
+import { STAGING_SIGN_IN_PATH } from "../../net/deploymentEnvironment";
 import { entryAssets, stagingAccountPortal } from "./config";
 import "./welcomeScreen.css";
 
@@ -62,8 +63,8 @@ export function WelcomeScreen() {
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const signedIn = Boolean(profile && (stagingSignIn || registered));
-  const rememberedPlayer = step === "welcome" && (signedIn || (!showAccountEntry && profile?.characters?.length)) ? profile : undefined;
+  const signedIn = Boolean(profile && (stagingSignIn || (!stagingAccountPortal && registered)));
+  const rememberedPlayer = step === "welcome" && (signedIn || (!stagingAccountPortal && !showAccountEntry && profile?.characters?.length)) ? profile : undefined;
   const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
@@ -73,10 +74,10 @@ export function WelcomeScreen() {
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
-  const sessionPending = screen === "welcome" && (!connected || restoring || stagingSignIn);
+  const sessionPending = screen === "welcome" && (!connected || restoring || stagingSignIn || stagingAccountPortal);
   const accountRoot = signedIn && (screen === "characters" || (screen === "create" && !slots?.length));
   const accountOpen = accountRoot && stagingSignIn && (showSettings || openedFromMenu);
-  const showStagingSignIn = connectionSlow && !connected && stagingAccountPortal;
+  const showStagingSignIn = stagingAccountPortal && ((connectionSlow && !connected) || (connected && !stagingSignIn));
 
   function back() {
     if (pending.current || restoring) return;
@@ -322,9 +323,8 @@ export function WelcomeScreen() {
             <fieldset disabled={busy || !accounts} dangerouslySetInnerHTML={credentialFields} />
           </form>
           <div className="garage-recovery" data-controller-row>
-            {stagingAccountPortal ? <a href="/__alpha/forgot-password">Forgot password?</a>
-              : <details><summary>Forgot password?</summary><p>Contact your game server operator to recover this account.</p></details>}
-            {!stagingAccountPortal && accounts && <button type="button" disabled={busy} onClick={() => {
+            <details><summary>Forgot password?</summary><p>Contact your game server operator to recover this account.</p></details>
+            {accounts && <button type="button" disabled={busy} onClick={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
               else { setNewPlayer(true); setStep("create"); }
@@ -333,7 +333,7 @@ export function WelcomeScreen() {
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
         {showStagingSignIn ? <p role="status" className="welcome-help">
-          Staging could not connect to the game. <a href="/__alpha/sign-in">Open staging sign-in</a>.
+          The game could not restore your session. <a href={STAGING_SIGN_IN_PATH}>Return to sign-in</a>.
         </p> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
           {working ? "Saving…" : restoring ? "Restoring your profile…" : "Connecting to the game server…"}
         </p>}

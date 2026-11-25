@@ -1,13 +1,16 @@
+import { checkSharedDatabase, consolidateAccess } from "./shared-database.mjs";
 import { spawn } from "node:child_process";
 import { readFile, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
-import { isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { emailAddress, SESSION_AGE, testerAccounts } from "./accounts.mjs";
 import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-bridge.mjs";
 
 const base = "/__alpha";
+const signInPath = "/sign-in";
+const oldSignInPath = base + signInPath;
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
 const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.meta.url);
 const themes = JSON.parse(readFileSync(existsSync(sourcePalettes) ? sourcePalettes : new URL("./palettes.json", import.meta.url), "utf8"));
@@ -54,7 +57,7 @@ const passwordField = (newPassword = false, id = "alpha-password") =>
 const codeField = (required = false) => `<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="32"${required ? " required" : ""}></label>`;
 const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
-const backToSignIn = `<a class="portal-back" href="${base}/sign-in" aria-label="Back to sign in" title="Back to sign in"><span aria-hidden="true">‹</span></a>`;
+const backToSignIn = `<a class="portal-back" href="${signInPath}" aria-label="Back to sign in" title="Back to sign in"><span aria-hidden="true">‹</span></a>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
 function page(title, contents, message = "", garage = false) {
@@ -135,14 +138,14 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
       + passwordField(!game), game ? "Continue" : "Sign up") + `<nav>${backToSignIn}
       <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, true)
-      : page("Sign in", `<form method="post" action="${base}/sign-in" class="garage-credentials">${garageCredentials(true)}</form>
+      : page("Sign in", `<form method="post" action="${signInPath}" class="garage-credentials">${garageCredentials(true)}</form>
         <div class="garage-recovery"><a href="${base}/forgot-password">Forgot password?</a></div>`, message, "login");
   }
 
   function factorPage(challenge, message) {
-    return page("Verify your sign-in", form("sign-in/code",
-      `<input type="hidden" name="challenge" value="${escape(challenge)}">` + codeField(true), "Verify")
-      + `${backToSignIn}`, message, true);
+    return page("Verify your sign-in", `<form method="post" action="${signInPath}">
+      <input type="hidden" name="challenge" value="${escape(challenge)}">${codeField(true)}<button>Verify</button></form>
+      ${backToSignIn}`, message, true);
   }
 
   function forgotPasswordPage(message) {
@@ -184,7 +187,9 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
   }
 
   return createServer({ requestTimeout: 12000, headersTimeout: 7000, maxHeaderSize: 8192 }, async (req, res) => {
-    const path = req.url?.split("?")[0];
+    const requestedPath = req.url?.split("?")[0];
+    // Accept an already-open legacy form. Redirect bookmarks using GET only.
+    const path = req.method === "POST" && requestedPath === oldSignInPath ? signInPath : requestedPath;
     const send = (status, body = "", headers = {}) => {
       res.writeHead(status, {
         // A same-origin form submission needs its Origin header for the check below.
@@ -212,7 +217,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         if (viewer) return send(204);
         const requested = req.headers["x-forwarded-uri"] ?? "";
         return requested.startsWith("/") && !requested.startsWith("/__staging-assets/")
-          && req.headers.accept?.includes("text/html") ? redirect(base + "/sign-in") : send(401);
+          && req.headers.accept?.includes("text/html") ? redirect(signInPath) : send(401);
       }
       if (path === base + "/invite.js") {
         let setup = 'const value = location.hash.slice(1); const field = document.querySelector("#link-code"); if (field && /^[0-9a-f]{64}$/.test(value)) { field.value=value; field.closest("label").hidden=true; history.replaceState(null,"",location.pathname); }';
@@ -258,20 +263,21 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         try { return send(200, paletteScript(), { "Content-Type": "text/javascript; charset=utf-8" }); }
         catch { return send(503); }
       }
-      if (path === base + "/sign-in") return viewer ? redirect("/") : send(200, signInPage());
+      if (path === oldSignInPath) return redirect(viewer ? "/" : signInPath);
+      if (path === signInPath) return viewer ? redirect("/") : send(200, signInPage());
       if (path === base + "/session") return viewer
         ? json(200, { email: viewer.email, admin: Boolean(viewer.admin), hasMfa: Boolean(viewer.has_mfa) })
         : json(401, { error: "Sign in required." });
       if (path === base + "/enroll") return send(200, signInPage("", true));
       if (path === base + "/forgot-password") return send(200, forgotPasswordPage());
       if (path === base + "/reset") return send(200, resetPage());
-      if (path === base + "/account") return viewer ? send(200, page("Account", securityPage(viewer))) : redirect(base + "/sign-in");
+      if (path === base + "/account") return viewer ? send(200, page("Account", securityPage(viewer))) : redirect(signInPath);
       if (path === base + "/testers") return send(viewer?.admin ? 200 : 403, testerPage(viewer));
       return send(404);
     }
     if (req.method !== "POST") return send(405);
     if (req.headers.origin !== origin) return send(403, page("Form blocked",
-      `<a href="${base}/sign-in">Return to sign-in</a>`,
+      `<a href="${signInPath}">Return to sign-in</a>`,
       "Open the portal or your original invitation link directly in your browser and try again."));
     const client = req.headers["x-alpha-client"] ?? req.socket.remoteAddress;
     if (!admit(client)) return send(429, page("Try again shortly", `${backToSignIn}`), { "Retry-After": "60" });
@@ -279,12 +285,12 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
     let resetInput;
     try {
       const value = await readForm(req);
-      if (path === base + "/sign-in") {
+      if (path === signInPath && !value("challenge")) {
         const result = await accounts.beginSignIn(value("email"), value("password"));
         if (result.locked) return factorRateLimited();
         return result.challenge ? send(200, factorPage(result.challenge)) : redirect("/", result.session);
       }
-      if (path === base + "/sign-in/code") {
+      if (path === signInPath || path === base + "/sign-in/code") {
         const result = accounts.completeSignIn(value("challenge"), value("code").trim());
         if (result.session) return redirect("/", result.session);
         if (result.locked) return factorRateLimited();
@@ -308,7 +314,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         return game ? send(200, page("Password updated", "<p>Use your new password to sign in. If you still have an invitation to accept, open the invite first.</p>"
           + `${backToSignIn}`, "", true), {
           "Set-Cookie": `${cookieName}=; Max-Age=0; ${cookieFlags}`,
-        }) : redirect(base + "/sign-in", "");
+        }) : redirect(signInPath, "");
       }
       if (!viewer) return wantsJson ? json(401, { error: "Sign in required." }) : send(403);
       if (path === base + "/account/email-request") {
@@ -322,7 +328,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       if (path === base + "/sign-out") {
         accounts.end(viewer);
         if (game) await game.disconnect(viewer.game_profile);
-        return redirect(base + "/sign-in", "");
+        return redirect(signInPath, "");
       }
       if (path === base + "/mfa/start") {
         const seed = await accounts.beginMfa(viewer, value("password"));
@@ -359,7 +365,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
     } catch (error) {
       // Database, filesystem and mail failures are private to the operator.
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
-      if (path === base + "/sign-in" || path === base + "/enroll")
+      if (path === signInPath || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
       if (path === base + "/forgot-password") return send(400, forgotPasswordPage(message));
       if (path === base + "/reset" || path === base + "/reset/verify") {
@@ -391,22 +397,26 @@ function sendmail(program, sender) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const { AVENSKY_ALPHA_STATE, AVENSKY_ALPHA_KEY, AVENSKY_ALPHA_ORIGIN, AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER,
+  const { AVENSKY_GAME_DATABASE, AVENSKY_ALPHA_KEY, AVENSKY_ALPHA_ORIGIN, AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER,
     AVENSKY_ALPHA_GAME_KEY } = process.env;
   const origin = AVENSKY_ALPHA_ORIGIN || "https://staging.avensky.com";
-  if (origin !== "https://staging.avensky.com" || !AVENSKY_ALPHA_STATE || !isAbsolute(AVENSKY_ALPHA_STATE)
-    || !/^[0-9a-f]{64}$/i.test(AVENSKY_ALPHA_KEY ?? "")) throw Error("Configure the staging origin, state directory and encryption key.");
+  if (origin !== "https://staging.avensky.com"
+    || !/^[0-9a-f]{64}$/i.test(AVENSKY_ALPHA_KEY ?? "")) throw Error("Configure the staging origin and encryption key.");
   process.umask(0o077);
-  const game = AVENSKY_ALPHA_GAME_KEY ? gameBridge(AVENSKY_ALPHA_GAME_KEY) : undefined;
-  const accounts = testerAccounts(join(AVENSKY_ALPHA_STATE, game ? "game-access.sqlite3" : "testers.sqlite3"),
-    Buffer.from(AVENSKY_ALPHA_KEY, "hex"), game);
+  // Hosted staging always authenticates against the game account database.
+  const game = gameBridge(AVENSKY_ALPHA_GAME_KEY);
   const [command, email, option, optionValue, ...extra] = process.argv.slice(2);
+  if (command === "consolidate-access") {
+    if (!email || option) throw Error("Supply the previous game-access.sqlite3 path or --fresh.");
+    console.log(consolidateAccess(AVENSKY_GAME_DATABASE, email));
+    process.exit(0);
+  }
+  checkSharedDatabase(AVENSKY_GAME_DATABASE);
+  const accounts = testerAccounts(AVENSKY_GAME_DATABASE, Buffer.from(AVENSKY_ALPHA_KEY, "hex"), game);
   const configuredMail = () => AVENSKY_ALPHA_SENDMAIL ? sendmail(AVENSKY_ALPHA_SENDMAIL, AVENSKY_ALPHA_SENDER ?? "") : undefined;
   if (command === undefined) {
-    const mail = game ? undefined : configuredMail();
-    const mailInvite = mail && ((recipient, url) => mail(recipient, "Avensky alpha invitation", `${url}\n\nThis invitation expires in three days.`));
-    createPortal({ origin, accounts, mailInvite, game }).listen(9061, "127.0.0.1");
-    if (game) gameSocketGate({ accounts, key: AVENSKY_ALPHA_GAME_KEY, origin }).listen(9062, "127.0.0.1");
+    createPortal({ origin, accounts, game }).listen(9061, "127.0.0.1");
+    gameSocketGate({ accounts, key: AVENSKY_ALPHA_GAME_KEY, origin }).listen(9062, "127.0.0.1");
   } else {
     try {
       if (command === "invite-admin" && email && !extra.length

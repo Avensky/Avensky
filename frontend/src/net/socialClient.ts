@@ -1,3 +1,4 @@
+import { STAGING_SIGN_IN_PATH } from "./deploymentEnvironment";
 import { usePresenceStore } from "../store/chat/presenceStore";
 import { useSocialStore } from "../store/social/socialStore";
 import { useChatStore } from "../store/chat/chatStore";
@@ -178,7 +179,7 @@ export async function signOutPlayerProfile() {
     const response = await fetch("/__alpha/sign-out", { method: "POST", body: new URLSearchParams(), redirect: "manual" });
     if (response.type !== "opaqueredirect" && response.status !== 303 && response.status !== 403)
       throw new Error("The staging account could not sign out. Try again.");
-    window.location.assign("/__alpha/sign-in");
+    window.location.assign(STAGING_SIGN_IN_PATH);
     return;
   }
   const generation = connectionGeneration;
