@@ -9,7 +9,7 @@ import { createRoot } from "react-dom/client";
 import { createServer } from "vite";
 
 test("catalog hair styles appear in the preview menu with their GLB mesh names", async () => {
-  const server = wardrobePreviewServer();
+  const server = await wardrobePreviewServer();
   try {
     const module = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/alphaAssets.ts");
     for (const entry of expectedHairStyles) {
@@ -27,7 +27,7 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
 });
 
 test("emote tab keeps the stable fitting stage unless a garage interaction needs a car", async () => {
-  const server = wardrobePreviewServer();
+  const server = await wardrobePreviewServer();
   try {
     const { characterEmoteNeedsGarage } = await server.ssrLoadModule("/src/game/characters/characterPreviewStage.ts");
     assert.equal(characterEmoteNeedsGarage("emotes", "Full body", undefined, false), false);
@@ -44,7 +44,7 @@ test("emote tab keeps the stable fitting stage unless a garage interaction needs
 });
 
 test("fitting camera stays on the safe stage-facing side during character rotation", async () => {
-  const server = wardrobePreviewServer();
+  const server = await wardrobePreviewServer();
   try {
     const { orientFittingCameraOffset, cutToFittingView } = await server.ssrLoadModule("/src/game/characters/clothingFraming.ts");
     const { Quaternion, Vector3 } = await import("three");
