@@ -34,7 +34,7 @@ def unpack(stream, destination, staging):
             name = PurePosixPath(member.name)
             if (count > MAX_ENTRIES or size > limit or name.is_absolute()
                     or ".." in name.parts or "\\" in member.name or not name.parts
-                    or (name.parts[0] != "web" and name.as_posix() != "bundle.json")):
+                    or (name.parts[0] != "web" and name.as_posix() not in ({"bundle.json", "asset-release.json"} if staging else {"bundle.json"}))):
                 raise ValueError("Archive path or size is outside the release limits")
             if staging and (name.suffix.lower() == ".glb" or ".asset-release" in name.parts):
                 raise ValueError("Unexpected model payload in the staging archive")
@@ -111,6 +111,15 @@ def publish(args, commit, *, deploy_game=False):
             if metadata["commit"] != commit or metadata["environment"] != args.environment:
                 raise ValueError("The bundle does not match the requested commit and environment")
             if staging:
+                approved_release = candidate / "asset-release.json"
+                if approved_release.is_file():
+                    release_bytes = approved_release.read_bytes()
+                    if json.loads(release_bytes)["id"] != metadata.get("assetRelease"):
+                        raise ValueError("The private asset manifest disagrees with the staging bundle")
+                    # Root-owned, sudo-restricted helper verifies only new digest-keyed
+                    # S3 objects and activates the gateway; unchanged releases are no-ops.
+                    subprocess.run(["sudo", "-n", "--", "/usr/local/lib/avensky/auto_activate.py"],
+                                   input=release_bytes, check=True)
                 check_staging_assets(args.verified_manifest, metadata.get("assetRelease"))
             elif not isinstance(metadata.get("licenseReview"), str) or not metadata["licenseReview"].strip():
                 raise ValueError("Production requires a recorded asset license review")

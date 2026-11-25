@@ -109,6 +109,45 @@ class ReleaseTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "different verified"):
                     publish.check_staging_assets(legacy, new_id)
 
+    def test_staging_archive_triggers_automatic_private_asset_activation(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)
+            data = tar_bytes({
+                "bundle.json": bundle("staging", assetRelease=ASSETS),
+                "web/index.html": b"staging",
+                "asset-release.json": json.dumps({"id": ASSETS, "assets": {}}).encode(),
+            })
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "check_staging_assets"),
+                patch.object(publish.subprocess, "run") as action,
+            ):
+                publish.publish(SimpleNamespace(environment="staging", root=path,
+                                verified_manifest=path / "verified"), COMMIT)
+            self.assertEqual(action.call_args.args[0],
+                             ["sudo", "-n", "--", "/usr/local/lib/avensky/auto_activate.py"])
+            self.assertEqual(json.loads(action.call_args.kwargs["input"])["id"], ASSETS)
+            self.assertEqual((path / "current/index.html").read_bytes(), b"staging")
+
+    def test_asset_release_manifest_mismatch_never_installs_or_switches(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp)
+            data = tar_bytes({
+                "bundle.json": bundle("staging", assetRelease=ASSETS),
+                "web/index.html": b"staging",
+                "asset-release.json": json.dumps({"id": "c" * 64}).encode(),
+            })
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "check_staging_assets"),
+                patch.object(publish.subprocess, "run") as action,
+            ):
+                with self.assertRaisesRegex(ValueError, "disagrees"):
+                    publish.publish(SimpleNamespace(environment="staging", root=path,
+                                    verified_manifest=path / "verified"), COMMIT)
+            action.assert_not_called()
+            self.assertFalse((path / "current").exists())
+
     def test_game_failure_keeps_previous_frontend_and_no_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
