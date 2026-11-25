@@ -112,12 +112,16 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
   const previewHair = useLocalHairstyle(s => s.id);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
-    if (previewPacks && look.character.id === VILLAGER_ID && model.hat) {
-      // Stock means braid + bonnet; a fitted preview must always remove it.
-      // Do not mutate outfit selection or recreate the entire character rig.
-      const visible = previewStockBonnet(true, true, previewHair);
-      model.hat.visible = visible;
-      if (visible) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
+    if (previewPacks && look.character.id === VILLAGER_ID) {
+      // Stock is the authored long braid with bonnet, even if a saved appearance
+      // previously chose cropped/fitted hair. Imported previews take its place.
+      // Change only visibility, never the outfit's removal array or actor rig.
+      const stock = previewStockBonnet(true, true, previewHair);
+      if (model.hat) model.hat.visible = stock;
+      if (model.longHair) model.longHair.visible = stock;
+      if (model.fittedHair) model.fittedHair.visible = false;
+      if (model.crop) model.crop.visible = false;
+      if (stock) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
     }
     invalidate();
   }, [model, look, previewHair, previewPacks, invalidate]);
