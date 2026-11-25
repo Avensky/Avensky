@@ -76,8 +76,10 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const actorBody = getWardrobeActorBody(root);
   const fittedHair = female && actorBody ? bindFittedHair(hairSource, actorBody.skeleton) : undefined;
   if (fittedHair) root.add(fittedHair);
-  const fullBody = actorBody && (getWardrobeBodyDonor(scene, actorBody.skeleton)
-    ?? (isWardrobeBodyDonor(garmentBody, actorBody.skeleton) ? garmentBody : undefined));
+  const suppliedBody = actorBody && isWardrobeBodyDonor(garmentBody, actorBody.skeleton) ? garmentBody : undefined;
+  const tennisBody = suppliedBody?.morphTargetDictionary?.TennisUnderarmFit !== undefined
+    && garments.some(({ item }) => item.id === "local-wave-wedges" || item.id === "local-tennis-dress") ? suppliedBody : undefined;
+  const fullBody = actorBody && (tennisBody ?? getWardrobeBodyDonor(scene, actorBody.skeleton) ?? suppliedBody);
   const detachedCorset = female && corsetSource && actorBody
     ? prepareStandaloneCorset(corsetSource, actorBody.skeleton, fullBody) : undefined;
   const replaced = new Set<ClothingPiece>([
