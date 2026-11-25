@@ -108,7 +108,7 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.deepEqual(await (await get("session", { cookie: player })).json(),
     { email: "player@example.net", admin: false, hasMfa: false });
   const inviteJson = (cookie, email) => fetch(url + "testers/invite", {
-    method: "POST", headers: { origin, accept: "application/json", ...(cookie ? { cookie } : {}) },
+    method: "POST", headers: { origin, accept: "application/json", "x-alpha-client": "alpha-account-tests", ...(cookie ? { cookie } : {}) },
     body: new URLSearchParams({ email }),
   });
   assert.equal((await inviteJson(undefined, "anon@example.net")).status, 401);
@@ -116,7 +116,7 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.deepEqual(await (await inviteJson(adminCookie, "jsoninvite@example.net")).json(),
     { email: "jsoninvite@example.net", sent: true });
   const request = (endpoint, fields, cookie = player) => fetch(url + endpoint, {
-    method: "POST", headers: { origin, cookie, accept: "application/json" },
+    method: "POST", headers: { origin, cookie, accept: "application/json", "x-alpha-client": "alpha-account-tests" },
     body: new URLSearchParams(fields),
   });
   assert.equal((await request("account/delete-request", {
