@@ -76,6 +76,8 @@ const hideEmail = email => `<input type="hidden" name="email" value="${escape(em
 function page(title, contents, message = "", garage = false) {
   const signIn = garage === "login";
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="theme-color" content="#080808">
 <title>${escape(title)} · Avensky</title><style>html{color-scheme:${themes[DEFAULT_GARAGE_THEME].scheme};${defaultColors}}</style>
 <script type="module" src="${base}/entry/garage-room.js"></script>
 <script src="${base}/theme.js"></script><link rel="stylesheet" href="${base}/entry/garage-entry.css">
