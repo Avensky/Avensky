@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,6 +8,25 @@ import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-br
 
 const base = "/__alpha";
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
+function paletteScript() {
+  const themes = JSON.parse(readFileSync(new URL("../../frontend/src/theme/palettes.json", import.meta.url), "utf8"));
+  return `(() => {
+    const themes = ${JSON.stringify(themes)};
+    let chosen = "navy";
+    try {
+      const saved = JSON.parse(localStorage.getItem("avenlab-preferences-v1") || "{}");
+      if (Object.hasOwn(themes, saved?.state?.theme)) chosen = saved.state.theme;
+    } catch {}
+    const palette = themes[chosen];
+    const root = document.documentElement;
+    root.dataset.uiTheme = chosen;
+    root.dataset.uiScheme = palette.scheme;
+    root.style.colorScheme = palette.scheme;
+    for (const [key, color] of Object.entries(palette)) {
+      if (key !== "label" && key !== "scheme") root.style.setProperty("--app-" + key, color);
+    }
+  })();`;
+}
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
@@ -28,21 +48,21 @@ function page(title, contents, message = "", showFlare = false) {
 </div><script src="${base}/flare.js" defer></script>` : "";
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
 <style>
-*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:#f5f1fd;background:#100b1c;font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
+*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:var(--app-text,#e6efff);background:var(--app-background,#050c18);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
 main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-.portal-flare{position:fixed;inset:0;pointer-events:none;background:#060311 url(${base}/media/purple-sunflare.webp) center/cover no-repeat}
+.portal-flare{position:fixed;inset:0;pointer-events:none;background:var(--app-background,#050c18) url(${base}/media/purple-sunflare.webp) center/cover no-repeat;opacity:.55}
 .portal-flare video{width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s ease}
 .portal-flare video[data-playing]{opacity:1}
-.portal-flare::after{content:"";position:absolute;inset:0;background:#06031166}
+.portal-flare::after{content:"";position:absolute;inset:0;background:var(--app-background,#050c18);opacity:.35}
 @media (orientation:portrait){.portal-flare video{object-fit:contain}}
 @media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
-a{color:#e5d2fd}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:inherit;padding:.6rem .8rem;border:1px solid #927db0;border-radius:.3rem;background:#231933;min-height:44px;min-width:0}
-button{color:#150c21;background:#dac2fb;font-weight:600;cursor:pointer}
+a{color:var(--app-accent,#82b7ff);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text,#e6efff);padding:.6rem .8rem;border:1px solid var(--app-line,#54749a);border-radius:0;background:var(--app-panel,#0b1729);min-height:44px;min-width:0}
+button{color:var(--app-text,#e6efff);background:var(--app-raised,#142b46);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent,#82b7ff);outline-color:var(--app-accent,#82b7ff)}
 .password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
-.password-toggle{background:#231933;color:inherit;font-size:.875rem}
+.password-toggle{background:var(--app-panel,#0b1729);color:inherit;font-size:.875rem}
 ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+</style><script src="${base}/theme.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
@@ -94,7 +114,7 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
       + passwordField(!game), game ? "Continue" : "Sign up") + `<nav><a href="${base}/sign-in">Log in</a>
       <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, Boolean(game))
-      : page("Log in", form("sign-in", emailField + passwordField(), "Log in")
+      : page("Sign in", form("sign-in", emailField + passwordField(), "Sign in")
         + `<a href="${base}/forgot-password">Forgot password?</a>`
         + (game ? "<p>Use the email from your staging invitation and your Avensky game password. Open the invite first if you haven’t accepted it yet.</p>"
           : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
