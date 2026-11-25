@@ -103,6 +103,12 @@ export function testerAccounts(path, key, game) {
     CREATE TABLE IF NOT EXISTS game_profiles (
       email TEXT PRIMARY KEY REFERENCES testers(email), profile_id TEXT NOT NULL UNIQUE, login TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS account_email_requests (
+      email TEXT PRIMARY KEY REFERENCES testers(email), new_email TEXT NOT NULL, requested_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS profile_deletion_requests (
+      email TEXT PRIMARY KEY REFERENCES testers(email), requested_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS invite_game_logins (
       digest TEXT PRIMARY KEY REFERENCES invitations(digest) ON DELETE CASCADE, login TEXT NOT NULL
     );
@@ -197,6 +203,26 @@ export function testerAccounts(path, key, game) {
       return game && !viewer?.game_profile ? undefined : viewer;
     },
     end(viewer) { run("DELETE FROM sessions WHERE digest = ?", viewer.digest); },
+    async requestEmailChange(viewer, raw, password) {
+      const newEmail = emailAddress(raw);
+      return withCredentials(viewer.email, async () => {
+        if (newEmail === viewer.email) throw Error("Choose a different email address.");
+        if (tester(newEmail)) throw Error("That email is already registered.");
+        if (!await validPassword(tester(viewer.email), password)) throw Error("Verify your current password.");
+        run("INSERT INTO account_email_requests(email,new_email,requested_at) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET new_email=excluded.new_email,requested_at=excluded.requested_at",
+          viewer.email, newEmail, now());
+        return { message: "Email change requested. Your current email remains active until the operator verifies the change." };
+      });
+    },
+    async requestDeletion(viewer, confirmation, password) {
+      return withCredentials(viewer.email, async () => {
+        if (confirmation !== viewer.email) throw Error("Enter your account email to confirm the request.");
+        if (!await validPassword(tester(viewer.email), password)) throw Error("Verify your current password.");
+        run("INSERT INTO profile_deletion_requests(email,requested_at) VALUES(?,?) ON CONFLICT(email) DO UPDATE SET requested_at=excluded.requested_at",
+          viewer.email, now());
+        return { message: "Profile deletion requested for operator review. Nothing has been deleted." };
+      });
+    },
     issueInvite(raw, admin = false, gameLogin = "") {
       const email = emailAddress(raw);
       const login = gameLogin.trim();
@@ -370,6 +396,8 @@ export function testerAccounts(path, key, game) {
         testers: all("SELECT email, admin, revoked, mfa IS NOT NULL AS has_mfa FROM testers ORDER BY email"),
         invites: db.prepare("SELECT email, expires FROM invitations WHERE expires > ? ORDER BY email").all(now()),
         resetRequests: db.prepare("SELECT email FROM password_reset_requests WHERE requested_at > ? ORDER BY requested_at DESC").all(now() - INVITE_AGE),
+        emailChanges: all("SELECT email,new_email,requested_at FROM account_email_requests ORDER BY requested_at DESC"),
+        deletionRequests: all("SELECT email,requested_at FROM profile_deletion_requests ORDER BY requested_at DESC"),
       };
     },
     revoke(raw) {
