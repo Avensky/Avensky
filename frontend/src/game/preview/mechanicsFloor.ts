@@ -1,4 +1,4 @@
-import { Color, DoubleSide, Mesh, MeshStandardMaterial, type Object3D } from "three";
+import { DoubleSide, Mesh, MeshStandardMaterial, type Object3D } from "three";
 
 export function setFloorFinish(material: MeshStandardMaterial, metal: boolean, reflectivity: number) {
   material.color.set(metal ? "#868685" : "#646363");
@@ -33,15 +33,11 @@ export function fitMechanicsFloor(room: Object3D) {
     name: "Workshop slab", side: DoubleSide,
   });
   setFloorFinish(concrete, false, 1);
-  const stripe = new Color();
-  concrete.userData.bayStripe = stripe;
   concrete.onBeforeCompile = shader => {
-    shader.uniforms.bayStripe = { value: stripe };
     shader.vertexShader = "varying vec2 shopFloor;\n" + shader.vertexShader.replace(
       "#include <project_vertex>", "shopFloor = (modelMatrix * vec4(transformed, 1.)).xz;\n#include <project_vertex>",
     );
-    shader.fragmentShader = `uniform vec3 bayStripe;
-      varying vec2 shopFloor;
+    shader.fragmentShader = `varying vec2 shopFloor;
       float shopNoise(vec2 p) {
         vec2 grid = floor(p), f = fract(p);
         f = f*f*(3.-2.*f);
@@ -60,10 +56,7 @@ export function fitMechanicsFloor(room: Object3D) {
         float brushed = step(.04, metalness);
         float grain = mix(aggregate, shopNoise(p*vec2(.75,85.))-.5, brushed);
         float mottling = .68 + .32*shopNoise(p*.67) + .25*wear + .30*grain;
-        float marking = abs(abs(p.x)-3.25);
-        float fringe = max(.001,fwidth(marking));
-        float paint = (1.-smoothstep(.032-fringe,.032+fringe,marking)) * (.55+.26*wear);
-        diffuseColor.rgb = mix(diffuseColor.rgb, bayStripe, paint) * mottling * (1.-.22*sawCut);
+        diffuseColor.rgb *= mottling * (1.-.22*sawCut);
       `).replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
         roughnessFactor = clamp(roughnessFactor + (.12*wear + .09*grain - .06 + .17*sawCut), .18, 1.);
       `);
