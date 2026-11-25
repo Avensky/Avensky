@@ -4,6 +4,6 @@ export interface StagingRelease {
   previews: Record<string, string>;
   wardrobeRevisions: string[];
 }
-export function stagingRelease(file?: string): StagingRelease;
+export function stagingRelease(file?: string, fittedHair?: string): StagingRelease;
 export const publicRoot: URL;
 export const releaseOutput: URL;

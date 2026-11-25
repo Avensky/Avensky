@@ -6,6 +6,7 @@ import {
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { installedHairStyles } from "./characterCatalog";
 import type { CharacterPortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
 import { applyVillagerLook, prepareVillager } from "./villagerModel";
 import { getWardrobeActorBody, getWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
@@ -49,9 +50,14 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
     };
     const source = await loadScene(modelUrl).catch(() => { throw Error("The character model is unavailable."); });
 
-    const outfit = dress ? await loadPortraitOutfit(source, dress, loadScene) : undefined;
+    const selectedHair = installedHairStyles(look.character.id).find(style => style.id === look.appearance.hair);
+    const [outfit, hairSource] = await Promise.all([
+      dress ? loadPortraitOutfit(source, dress, loadScene) : undefined,
+      selectedHair ? loadScene(selectedHair.url).then(scene => scene.getObjectByName(selectedHair.mesh), () => undefined) : undefined,
+    ]);
     model = prepareVillager(source, {
       female: look.female,
+      hairSource,
       garments: outfit && [outfit.garment],
       garmentBody: outfit?.body,
       removedClothing: outfit && look.removedClothing,

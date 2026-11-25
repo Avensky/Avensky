@@ -10,9 +10,9 @@ Avensky is the canonical public game repository. This directory tracks source-sa
 
 ## Implementation gap on Avensky `main` (checked 2026-11-19)
 
-The production hair choices in `packages/wardrobe-catalog/character-appearance.json` are currently `natural` and `cropped`. The repaired 12-style pack has a **provisional visual pass** from offline fitting only; the detailed curly pack is still an **intake candidate**. Neither of these statuses means the styles are installed or alpha-ready in Avensky.
+The base hair choices are Natural and Close crop. Private staging can additionally load twelve fitted Vesper styles from its verified release. Open **Heroes → Character → Body → Hair**. The curly intake candidates are separate assets.
 
-The next focused PR should implement one testable hairstyle in the actual Identity/Appearance UI, initially Style 12, with a safe fallback when its independently installed model or textures are absent. Preserve existing profile IDs, appearance serialization, and both initial hair options. Color validation must inspect brunette, ash and caramel highlights under game lighting, with save/reload and mobile checks.
+The private Espresso GLBs use embedded strand textures. The public fitted-hair catalog records their digests and lengths. Each selected model binds to the existing Vesper skeleton. In-game color, headwear clearance, save/reload and physical-phone performance still need visual testing. See the [staging installation procedure](../CLOUD_ASSETS.md#fitted-vesper-hairstyles).
 
 Source files `CURLY HAIR SET.zip`, the 12-style commercial pack, character BLEND files and their extracted textures must remain outside this public repository until redistribution permissions are documented. The texture preview/contact sheet is deliberately not checked in.
 

@@ -3,6 +3,7 @@ import type { BriefsStyle } from "./wardrobeUnderwear";
 import type { AnimationFit, CharacterPersonality } from "./characterPersonality";
 import catalog from "../../../../packages/wardrobe-catalog/characters.json";
 import appearanceOptions from "../../../../packages/wardrobe-catalog/character-appearance.json";
+import fittedHair from "../../../../packages/wardrobe-catalog/fitted-hair.json";
 import { hasSeparateWardrobeTop, resolveWardrobe, wardrobeOverEase, type WardrobeChoice } from "./wardrobe";
 import type { OverSkirtEase } from "./overSkirtEase";
 import { getWardrobeGarment, removedWardrobeLayers, visibleWardrobeGarments, wardrobeGarmentModelUrl, type WardrobeGarmentChoice, type WardrobeRemoval } from "./wardrobeGarments";
@@ -55,6 +56,11 @@ export type CharacterChoice = {
 export const VILLAGER_ID = "mara-vega";
 export const ROOK_ID = "jules-okafor";
 export const DEFAULT_CHARACTER: CharacterChoice = { id: VILLAGER_ID, outfit: CHARACTERS[0].outfits[0].id };
+
+export function installedHairStyles(characterId: string) {
+  return characterId === VILLAGER_ID && typeof __FITTED_HAIR_IDS__ !== "undefined"
+    ? fittedHair.filter(style => __FITTED_HAIR_IDS__.includes(style.id)) : [];
+}
 
 export function isEquippableOutfit(choice: CharacterChoice) {
   if (choice.garments || choice.wardrobeTrial || choice.wardrobeEase || choice.removedClothing || choice.bra !== undefined) return false;

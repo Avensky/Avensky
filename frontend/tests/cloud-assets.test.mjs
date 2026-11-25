@@ -10,6 +10,20 @@ import { checkDependencies, verifyObject, verifyStoredObject } from "../../deplo
 import { signedObjectReader, storageKey } from "../../deploy/staging-assets/object-store.mjs";
 
 const path = "/models/city/a, b.glb";
+
+test("staging includes only the requested privately installed hair and preserves the accessory catalog", () => {
+  const baseline = stagingRelease(undefined, "");
+  const pilot = stagingRelease(undefined, "hair-12");
+  const all = stagingRelease(undefined, "all");
+  const paths = release => Object.keys(release.assets).filter(url => url.startsWith("/models/characters/female/hair/"));
+  assert.equal(paths(baseline).length, 0);
+  assert.deepEqual(paths(pilot), ["/models/characters/female/hair/Hair_12_espresso.glb"]);
+  assert.equal(paths(all).length, 12);
+  assert.notEqual(pilot.id, baseline.id);
+  assert.deepEqual(all.assets["/models/characters/female/wardrobe/bracers/bracer-01.garage.glb"],
+    baseline.assets["/models/characters/female/wardrobe/bracers/bracer-01.garage.glb"]);
+  assert.throws(() => stagingRelease(undefined, "unlisted"), /Unknown fitted hairstyle/);
+});
 const nextLod = "/models/city/a-low.glb";
 const texture = "/textures/a.webp";
 const etag = '"' + "a".repeat(32) + '"';

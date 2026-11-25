@@ -1,0 +1,98 @@
+[
+  {
+    "id": "hair-01",
+    "label": "Side-swept short",
+    "mesh": "Hair_01",
+    "url": "/models/characters/female/hair/Hair_01_espresso.glb",
+    "sha256": "af8be08bdb40cfab52e6fab47766142298d17accf5be7fedff4fa1a75fae1aca",
+    "size": 1002712
+  },
+  {
+    "id": "hair-02",
+    "label": "Curved bob",
+    "mesh": "Hair_02",
+    "url": "/models/characters/female/hair/Hair_02_espresso.glb",
+    "sha256": "89266bd91b66570be90679e52ad87c4bf264930df4190586c3d2b2be1e2c6d38",
+    "size": 1082852
+  },
+  {
+    "id": "hair-03",
+    "label": "Two braids",
+    "mesh": "Hair_03",
+    "url": "/models/characters/female/hair/Hair_03_espresso.glb",
+    "sha256": "8e6adc43be44cc565f772d28461b0b516b978d0dffc86b00aa2a01cf230a43cc",
+    "size": 1152072
+  },
+  {
+    "id": "hair-04",
+    "label": "Short with bangs",
+    "mesh": "Hair_04",
+    "url": "/models/characters/female/hair/Hair_04_espresso.glb",
+    "sha256": "e90ac5450bf9db13f3a26b4a39348afd5dd9bd3da101ad0b7bfd25507a8c9793",
+    "size": 1003508
+  },
+  {
+    "id": "hair-05",
+    "label": "Rounded bob",
+    "mesh": "Hair_05",
+    "url": "/models/characters/female/hair/Hair_05_espresso.glb",
+    "sha256": "bb8a5193430fab1cab7413924ba659771ccb19edc5779f823415028e33969b97",
+    "size": 1085628
+  },
+  {
+    "id": "hair-06",
+    "label": "Straight with bangs",
+    "mesh": "Hair_06",
+    "url": "/models/characters/female/hair/Hair_06_espresso.glb",
+    "sha256": "da34571e38519d86629a06ce9d918021b8c504e88f62edeba5fe29c421f295b8",
+    "size": 1141768
+  },
+  {
+    "id": "hair-07",
+    "label": "Long waves",
+    "mesh": "Hair_07",
+    "url": "/models/characters/female/hair/Hair_07_espresso.glb",
+    "sha256": "dd2d57ec1899520cb00420ed05e8dc52f7a018ff3cf158cbc3c6ee068bc79b93",
+    "size": 1247404
+  },
+  {
+    "id": "hair-08",
+    "label": "Bob with long back",
+    "mesh": "Hair_08",
+    "url": "/models/characters/female/hair/Hair_08_espresso.glb",
+    "sha256": "6afa4c75166f71dd9669413fbc3f33289e2060214f056176f0de15f57c284c17",
+    "size": 1178968
+  },
+  {
+    "id": "hair-09",
+    "label": "Swept short",
+    "mesh": "Hair_09",
+    "url": "/models/characters/female/hair/Hair_09_espresso.glb",
+    "sha256": "18b209ec4ed60de1357c30a64d4bdee6ed99f847ff22ed04c327163251bb616b",
+    "size": 1238876
+  },
+  {
+    "id": "hair-10",
+    "label": "Asymmetric bob",
+    "mesh": "Hair_10",
+    "url": "/models/characters/female/hair/Hair_10_espresso.glb",
+    "sha256": "b878a465c6ff9cb097094a84e607b1c938775d0e107ed2cfa049053e3a656cf5",
+    "size": 1001864
+  },
+  {
+    "id": "hair-11",
+    "label": "Flipped curls",
+    "mesh": "Hair_11",
+    "url": "/models/characters/female/hair/Hair_11_espresso.glb",
+    "sha256": "53e1e19a93631426ed418f04fe6c2eccaea2bf4526503863395a4776b92191a4",
+    "size": 1809216
+  },
+  {
+    "id": "hair-12",
+    "label": "Long with bangs",
+    "mesh": "Hair_12",
+    "url": "/models/characters/female/hair/Hair_12_espresso.glb",
+    "sha256": "923194cf9a12649b37a9523731d8d10616aae7fc0e1ec97be71739c4ee0a78d4",
+    "size": 1418972
+  }
+]

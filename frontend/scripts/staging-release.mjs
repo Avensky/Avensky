@@ -114,7 +114,7 @@ function baseStagingRelease(prebuiltFile) {
   return release;
 }
 
-export function stagingRelease(prebuiltFile) {
+export function stagingRelease(prebuiltFile, fittedHair = process.env.AVENSKY_STAGING_FITTED_HAIR) {
   const release = baseStagingRelease(prebuiltFile);
   const fitted = JSON.parse(readFileSync(new URL("./staging-fitted-assets.json", import.meta.url), "utf8"));
   for (const [path, entry] of Object.entries(fitted)) {
@@ -123,7 +123,21 @@ export function stagingRelease(prebuiltFile) {
       throw new Error("Fitted staging metadata disagrees with the release for " + path);
     }
   }
-  return validateRelease(sealRelease({ ...release, assets: { ...release.assets, ...fitted } }));
+  const assets = { ...release.assets, ...fitted };
+  if (fittedHair?.trim()) {
+    const styles = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
+    const ids = fittedHair.trim() === "all" ? styles.map(style => style.id) : fittedHair.split(",").map(id => id.trim());
+    for (const id of new Set(ids)) {
+      const style = styles.find(style => style.id === id);
+      if (!style) throw new Error("Unknown fitted hairstyle: " + id);
+      const existing = assets[style.url];
+      if (existing && (existing.sha256 !== style.sha256 || existing.size !== style.size)) {
+        throw new Error("Hair staging metadata disagrees with the release for " + style.url);
+      }
+      assets[style.url] = { sha256: style.sha256, size: style.size };
+    }
+  }
+  return validateRelease(sealRelease({ ...release, assets }));
 }
 
 export function localGlbEntry(path) {
