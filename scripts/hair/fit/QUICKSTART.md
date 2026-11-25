@@ -12,6 +12,22 @@ The runtime `villager-scalp-cap` is a bonnet/hood fallback constructed from hard
 - `test_cap_geometry.py`: non-Blender unit tests for topology, winding, orientation and invalid geometry.
 - `RUNTIME_COMPARISON.md`: previously added optional development/staging comparison for old cap vs imported hair backing.
 
+## Windows shortcut: no Blender PATH configuration required
+
+If PowerShell says `blender` is not recognized, use the included launcher instead. It searches the normal Blender installation directories and permits an explicit `-BlenderExe` path. All example names/units below still must be verified.
+
+```powershell
+.\scripts\hair\fit\run-scalp.ps1 -Mode inspect -CharacterGlb "C:\AvenskyPrivate\villager-female.garage.glb" -Report "C:\AvenskyPrivate\fit\vesper-head.json"
+```
+
+After authoring the `AV_HairlineLoop` and `AV_Crown` reference objects in the private .blend, dry-run the builder:
+
+```powershell
+.\scripts\hair\fit\run-scalp.ps1 -Mode cap-dry-run -SceneBlend "C:\AvenskyPrivate\vesper_head_guides.blend" -Armature "Armature" -HeadBone "head" -UpVector "0,0,1" -MetersPerUnit 1.0 -Report "C:\AvenskyPrivate\fit\cap-preflight.json"
+```
+
+To save a distinct new output after inspecting the dry-run report, change `-Mode` to `cap-build` and provide `-OutputBlend "C:\AvenskyPrivate\vesper_scalp_foundation_v2.blend"`. The launcher rejects an output path that already exists.
+
 ## Step 1 — inspect the original avatar, not the bonnet geometry
 
 Use **the true current female character GLB**, e.g. the private original or
