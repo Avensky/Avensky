@@ -1,7 +1,8 @@
 import { APP_BRANDING } from "./branding.ts";
 
 export const GARAGE_ENTRY_STORAGE_KEY = "avensky-portal-backdrop";
-export const GARAGE_ENTRY_POSTER = "garage-entry.87218bf4bd50.webp";
+export const GARAGE_ENTRY_MASK = "garage-wall-mask.4688e14d5cc9.webp";
+export const GARAGE_ENTRY_POSTER = "garage-entry.37a6f46c5f6b.webp";
 
 // This markup is also rendered by the standalone Node portal before React loads.
 // All interpolation here is from app configuration. Form values stay in native inputs.
@@ -11,7 +12,8 @@ function escapeText(text: string) {
 
 export function garageBackdrop(assets: "/images" | "/__alpha/entry") {
   return `<div class="garage-entry-scene" aria-hidden="true">
-    <div class="garage-entry-plate"><img class="garage-entry-photo" src="${assets}/${GARAGE_ENTRY_POSTER}" width="1680" height="775" alt="" decoding="async" fetchpriority="low"><span class="garage-entry-sign">${escapeText(APP_BRANDING.garageSign)}</span></div>
+    <div class="garage-entry-plate"><img class="garage-entry-photo" src="${assets}/${GARAGE_ENTRY_POSTER}" width="1680" height="775" alt="" decoding="async">
+      <span class="garage-entry-finish garage-entry-walls"></span><span class="garage-entry-finish garage-entry-panels"></span><span class="garage-entry-finish garage-entry-stripe"></span></div>
   </div>`;
 }
 

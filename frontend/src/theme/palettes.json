@@ -13,7 +13,10 @@
     "grid": "#1b3652",
     "axis": "#547cac",
     "floor": "#10213a",
-    "scene-tint": "#4484ff"
+    "scene-tint": "#4484ff",
+    "garage-wall": "#d8e2eb",
+    "garage-panel": "#637f97",
+    "garage-stripe": "#8fb8df"
   },
   "hacker-blue": {
     "label": "Hacker blue",
@@ -29,7 +32,10 @@
     "grid": "#19485a",
     "axis": "#38a8ba",
     "floor": "#0d3040",
-    "scene-tint": "#30d5ff"
+    "scene-tint": "#30d5ff",
+    "garage-wall": "#d6e8e8",
+    "garage-panel": "#538287",
+    "garage-stripe": "#77dbda"
   },
   "forest": {
     "label": "Forest",
@@ -45,7 +51,10 @@
     "grid": "#304c39",
     "axis": "#8ba879",
     "floor": "#23382b",
-    "scene-tint": "#82b887"
+    "scene-tint": "#82b887",
+    "garage-wall": "#e2e4d0",
+    "garage-panel": "#6e886f",
+    "garage-stripe": "#a3b787"
   },
   "hacker": {
     "label": "Hacker green",
@@ -61,7 +70,10 @@
     "grid": "#193a27",
     "axis": "#54a66f",
     "floor": "#10271a",
-    "scene-tint": "#5bff35"
+    "scene-tint": "#5bff35",
+    "garage-wall": "#e3e7d9",
+    "garage-panel": "#5e7561",
+    "garage-stripe": "#a6d574"
   },
   "black": {
     "label": "Bat black",
@@ -77,7 +89,10 @@
     "grid": "#29292d",
     "axis": "#6c6c77",
     "floor": "#19191f",
-    "scene-tint": "#e5cb70"
+    "scene-tint": "#e5cb70",
+    "garage-wall": "#d7d6d0",
+    "garage-panel": "#555758",
+    "garage-stripe": "#c1a16a"
   },
   "pit-wall": {
     "label": "Pit Wall",
@@ -93,7 +108,10 @@
     "grid": "#3b3623",
     "axis": "#ad9142",
     "floor": "#22211b",
-    "scene-tint": "#ffdc42"
+    "scene-tint": "#ffdc42",
+    "garage-wall": "#ecddc6",
+    "garage-panel": "#716a60",
+    "garage-stripe": "#e3a146"
   },
   "deep-purple": {
     "label": "Deep purple",
@@ -109,7 +127,10 @@
     "grid": "#252e50",
     "axis": "#8395cc",
     "floor": "#1a2342",
-    "scene-tint": "#7185ff"
+    "scene-tint": "#7185ff",
+    "garage-wall": "#d8d6ea",
+    "garage-panel": "#716c8d",
+    "garage-stripe": "#a09bd3"
   },
   "pastel-purple": {
     "label": "Pastel purple",
@@ -125,7 +146,10 @@
     "grid": "#b1a0c8",
     "axis": "#9f7db9",
     "floor": "#bbadd1",
-    "scene-tint": "#a789d4"
+    "scene-tint": "#a789d4",
+    "garage-wall": "#e8dfea",
+    "garage-panel": "#988aa4",
+    "garage-stripe": "#bf9ec8"
   },
   "scarlet": {
     "label": "Scarlet crimson",
@@ -141,7 +165,10 @@
     "grid": "#3b1924",
     "axis": "#ae344b",
     "floor": "#25151b",
-    "scene-tint": "#ef122c"
+    "scene-tint": "#ef122c",
+    "garage-wall": "#eadbd6",
+    "garage-panel": "#816264",
+    "garage-stripe": "#c46865"
   },
   "strawberry": {
     "label": "Strawberry",
@@ -157,7 +184,10 @@
     "grid": "#e7a3ce",
     "axis": "#d153a7",
     "floor": "#efb8dc",
-    "scene-tint": "#ff3caf"
+    "scene-tint": "#ff3caf",
+    "garage-wall": "#efddd9",
+    "garage-panel": "#9e7483",
+    "garage-stripe": "#d498a6"
   },
   "white": {
     "label": "White",
@@ -173,6 +203,9 @@
     "grid": "#c9d3e0",
     "axis": "#6d88a7",
     "floor": "#e1e8f1",
-    "scene-tint": "#b9d4ff"
+    "scene-tint": "#b9d4ff",
+    "garage-wall": "#edece6",
+    "garage-panel": "#9ba4a5",
+    "garage-stripe": "#b9c6c0"
   }
 }

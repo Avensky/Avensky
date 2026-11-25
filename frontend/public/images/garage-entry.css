@@ -19,13 +19,14 @@
   content: ""; position: absolute; inset: 0;
   background: linear-gradient(90deg, transparent 30%, rgb(3 8 13 / .16) 70%, rgb(3 8 13 / .40));
 }
-.garage-entry-sign {
-  position: absolute; top: 31%; left: 45%; transform: skewY(-3deg);
-  max-width: 27%; padding: .15em .55em .27em; overflow: hidden; white-space: nowrap;
-  color: #d2c4af; background: #26282a; border-bottom: .15em solid #b65e25;
-  box-shadow: 0 .06em .13em #090a0c; text-transform: uppercase;
-  font: italic 750 clamp(16px, 2.3vw, 45px)/1.1 system-ui,sans-serif; letter-spacing: .075em;
+.garage-entry-plate { isolation: isolate; }
+.garage-entry-finish {
+  position: absolute; inset: 0; mix-blend-mode: multiply;
+  mask: url("./garage-wall-mask.4688e14d5cc9.webp") left / 300% 100% no-repeat;
 }
+.garage-entry-panels { background-color: var(--app-garage-panel); }
+.garage-entry-stripe { mask-position: center; background-color: var(--app-garage-stripe); }
+.garage-entry-walls { mask-position: right; background-color: var(--app-garage-wall); }
 .garage-entry-header {
   position: relative; z-index: 1; display: flex; align-items: center;
   padding-left: env(safe-area-inset-left); min-height: 44px;
@@ -88,9 +89,9 @@
 .garage-entry-card p { margin:.4rem 0; }
 .garage-entry-card [role="alert"] { border-inline-start:2px solid var(--app-accent); padding-inline-start:.7rem; }
 @media (max-width:600px) and (orientation:portrait) {
+  .garage-entry-plate { transform: translate(-40%, -50%); }
   .garage-entry-body { align-items:end; justify-items:center; padding:1rem 1rem max(2rem,env(safe-area-inset-bottom)); }
   .garage-entry-card { width:min(100%,390px); }
-  .garage-entry-sign { font-size:clamp(24px,4svh,40px); }
 }
 .garage-entry-card h1 { font-size:1.35rem; margin:0 0 .8rem; line-height:1.15; }
 .garage-entry-card form:not(.garage-credentials),

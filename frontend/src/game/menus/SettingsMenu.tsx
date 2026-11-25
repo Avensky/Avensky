@@ -686,7 +686,7 @@ export function SettingsMenu() {
             label: "Garage",
             icon: "garage",
             description:
-              "Lighting, glow and reflections for the selection garage. Colors follow your interface theme.",
+              "Wall finishes, lighting and reflections.",
             rows: garageSettingsRows(
               prefs.garageEffects,
               prefs.highContrast,

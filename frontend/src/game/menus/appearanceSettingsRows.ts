@@ -9,7 +9,7 @@ export function appearanceSettingsRows(prefs: Preferences, update: (patch: Prefe
   const mobile = isMobileBrowser();
   return [
     {id:"theme",label:"Global app theme",value:UI_THEMES[prefs.theme].label,
-      description:"One palette for every menu, HUD, world editor and garage. Always available.",
+      description:"Applies to menus, HUD and world editor. The garage follows this palette by default.",
       action:dir=>update({theme:cycle(Object.keys(UI_THEMES) as UITheme[],prefs.theme,dir)})},
     {id:"menu-header-style",label:"Menu header style",value:mobile ? "Angled · mobile" : prefs.menuHeaderStyle === "classic" ? "Classic" : "Angled",
       description:"Choose the layout for tabbed menus on desktop. Mobile uses the compact angled header.",

@@ -1,5 +1,4 @@
 import { useUIStore, type MenuScreen } from "../../store/menus/uiStore";
-import {SELECTION_CRIMSON} from "../../theme/garageLighting";
 import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MathUtils, Matrix4, Quaternion, Spherical, Vector2, Vector3, type Group, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
 import { useFrame, useThree } from "@react-three/fiber";
@@ -91,14 +90,10 @@ export function VehiclePreview({
   stationary = false,
 }: { previewScreen?: MenuScreen; heroLayout?: boolean; awaitingHero?: boolean; characterDraft?: CharacterChoice | null; wardrobeOpen?: boolean; characterOnly?: boolean; fittingRoom?: boolean; stationary?: boolean } = {}) {
   const screen = useUIStore(s => previewScreen ?? s.screen);
-  const theme=usePreferencesStore(s=>s.theme);
   const preferenceReducedMotion = usePreferencesStore(s => s.reducedMotion);
   const systemMotion = useSyncExternalStore(subscribeMotion, systemReducedMotion, () => false);
   const reducedMotion = preferenceReducedMotion || systemMotion;
   const staging=screen==="hero_select"||screen==="heroes"||screen==="queue";
-  // Team identity belongs in the selection UI; fixtures and reflections keep
-  // the saved theme, including its softer crimson selection lighting.
-  const selectionAccent=staging && theme==="scarlet" ? SELECTION_CRIMSON : null;
   const picked = useAlphaStore(s => screen === "heroes" ? s.previewHero : s.hero);
   const mode = useAlphaStore(s => s.mode);
   const favorite = useSelectionStore(s => s.getSelectedVehicle().id);
@@ -187,7 +182,7 @@ export function VehiclePreview({
   const panelPose = panel ? vehicleFit?.panels?.[panel] : undefined;
   const panelTarget = useMemo(() => panelPose ? { hinge: panelPose.hinge, clearance: vehicleFit?.clearance, actor: characterActor } : undefined,
     [panelPose, vehicleFit?.clearance]);
-  const staticPanelPose = panelTarget?.clearance ? undefined : panelPose;
+  const staticPanelPose = vehicleFit?.clearance ? undefined : panelPose;
   const aspect = width / Math.max(1, height);
   const verticalFov = (horizontal: number) => (2 * Math.atan(Math.tan((horizontal * Math.PI) / 360) / aspect) * 180) / Math.PI;
   // Look into the authored corner from inside the room. The tighter horizontal
@@ -389,7 +384,7 @@ export function VehiclePreview({
   const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={setSettledVehicle} cockpit={insideCar} visible={!characterOnly} />;
   return (
     <>
-      <GarageEnvironment turntable={turntable} onPlatformReady={setPlatform} accentOverride={selectionAccent}
+      <GarageEnvironment turntable={turntable} onPlatformReady={setPlatform} selectionLighting={staging}
         allowLoad={characterOnly || !waitingForCar} onSettled={roomSettled} floorCaptureRate={fittingRoom ? 12 : undefined} />
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
