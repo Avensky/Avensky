@@ -1,5 +1,4 @@
 import { useEffect, useLayoutEffect, useMemo } from "react";
-import { Environment, Lightformer } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
 import { selectedGarageTheme } from "../../theme/catalog";
@@ -8,7 +7,6 @@ import { applyGarageLighting, SELECTION_CRIMSON, tagGarageAccent } from "../../t
 import { GarageFloorReflection } from "./GarageFloorReflection";
 import { GarageGlow } from "./GarageGlow";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
-import { isCompactPreview } from "./previewBudget";
 const origin = new Vector3();
 
 function createDisplayPlatform(center: Vector3, floorY: number, radius: number) {
@@ -122,19 +120,6 @@ export function VehiclePlatform({ turntable, selectionLighting, floorCaptureRate
 }
 
 export function GarageEnvironment({ onSettled }: { onSettled: () => void }) {
-  const compact = useThree(state => isCompactPreview(state.size.width));
-  const reflections = usePreferencesStore(state => state.garageEffects.environmentReflections);
   useLayoutEffect(onSettled, [onSettled]);
-  // Capture softboxes once. Opening another menu never loads a second room model or HDR image.
-  const softboxes = useMemo(() => reflections && (
-    <Environment resolution={compact ? 32 : 64} frames={1} background={false}>
-      <Lightformer color="#fff1dd" intensity={1.2} position={[0, 6, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[4, 8, 1]} />
-      <Lightformer color="#fff7eb" intensity={.8} position={[-6, 3, 0]} rotation={[0, Math.PI / 2, 0]} scale={[8, .6, 1]} />
-      <Lightformer color="#f0c79a" intensity={.5} position={[0, 3, -6]} scale={[8, .5, 1]} />
-    </Environment>
-  ), [compact, reflections]);
-  return <>
-    <GarageGlow />
-    {softboxes}
-  </>;
+  return <GarageGlow />;
 }

@@ -179,12 +179,13 @@ html[data-ui-theme] .main-menu .menu-home-content { text-shadow: 0 1px 4px #000;
 html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-brand-title,.menu-action) { color: var(--scene-ink); }
 html[data-ui-theme] .main-menu :is(.menu-brand-tagline,.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }
 html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action {
-  background: #060a147d;
-  border-color: #d7e5ff30;
+  background: var(--garage-menu-row);
+  color: var(--garage-menu-ink);
+  border-color: var(--garage-menu-line);
 }
 html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action:is(:hover,:focus-visible,[data-selected="true"]) {
   color: var(--scene-ink);
-  background: color-mix(in srgb,var(--app-scene-tint) 25%,#060a14c9);
+  background: color-mix(in srgb,var(--garage-menu-row) 86%,var(--garage-menu-accent));
   border-color: color-mix(in srgb,var(--app-scene-tint) 65%,#fff);
 }
 html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu {

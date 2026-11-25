@@ -55,6 +55,8 @@ export function applyGarageLighting(
       : [node.material]) {
       if (!(material instanceof MeshStandardMaterial) || visited.has(material)) continue;
       visited.add(material);
+      const stripe = material.userData.bayStripe;
+      if (stripe instanceof Color) stripe.set(UI_THEMES[theme]["garage-stripe"]);
       const surface: unknown = material.userData.garageSurface;
       if (surface === "garage-wall" || surface === "garage-panel" || surface === "garage-stripe") {
         material.color.set(UI_THEMES[theme][surface]);

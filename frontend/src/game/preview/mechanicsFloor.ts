@@ -1,4 +1,11 @@
-import { DoubleSide, Mesh, MeshStandardMaterial, type Object3D } from "three";
+import { Color, DoubleSide, Mesh, MeshStandardMaterial, type Object3D } from "three";
+
+export function setFloorFinish(material: MeshStandardMaterial, metal: boolean, reflectivity: number) {
+  material.color.set(metal ? "#868685" : "#646363");
+  material.roughness = 1 - reflectivity * (metal ? .69 : .60);
+  material.metalness = metal ? .75 * reflectivity : .025;
+  material.envMapIntensity = reflectivity;
+}
 
 // BASE_Full contains the original two walls and the continuous slab underneath the black tile overlay.
 export function fitMechanicsFloor(room: Object3D) {
@@ -23,13 +30,18 @@ export function fitMechanicsFloor(room: Object3D) {
   if (!floorFaces) { geometry.dispose(); return; }
 
   const concrete = new MeshStandardMaterial({
-    name: "Sealed workshop concrete", color: "#978f82", roughness: .88, metalness: .025, side: DoubleSide,
+    name: "Workshop slab", side: DoubleSide,
   });
+  setFloorFinish(concrete, false, 1);
+  const stripe = new Color();
+  concrete.userData.bayStripe = stripe;
   concrete.onBeforeCompile = shader => {
+    shader.uniforms.bayStripe = { value: stripe };
     shader.vertexShader = "varying vec2 shopFloor;\n" + shader.vertexShader.replace(
       "#include <project_vertex>", "shopFloor = (modelMatrix * vec4(transformed, 1.)).xz;\n#include <project_vertex>",
     );
-    shader.fragmentShader = `varying vec2 shopFloor;
+    shader.fragmentShader = `uniform vec3 bayStripe;
+      varying vec2 shopFloor;
       float shopNoise(vec2 p) {
         vec2 grid = floor(p), f = fract(p);
         f = f*f*(3.-2.*f);
@@ -45,7 +57,15 @@ export function fitMechanicsFloor(room: Object3D) {
         float joint = min(edge.x,edge.y);
         float aa = max(.001, fwidth(joint));
         float sawCut = 1.-smoothstep(.004-aa,.009+aa,joint);
-        diffuseColor.rgb *= (.89 + .12*shopNoise(p*.67) + .07*wear + .15*aggregate) * (1.-.28*sawCut);
+        float brushed = step(.04, metalness);
+        float grain = mix(aggregate, shopNoise(p*vec2(.75,85.))-.5, brushed);
+        float mottling = .68 + .32*shopNoise(p*.67) + .25*wear + .30*grain;
+        float marking = abs(abs(p.x)-3.25);
+        float fringe = max(.001,fwidth(marking));
+        float paint = (1.-smoothstep(.032-fringe,.032+fringe,marking)) * (.55+.26*wear);
+        diffuseColor.rgb = mix(diffuseColor.rgb, bayStripe, paint) * mottling * (1.-.22*sawCut);
+      `).replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
+        roughnessFactor = clamp(roughnessFactor + (.12*wear + .09*grain - .06 + .17*sawCut), .18, 1.);
       `);
   };
   shell.geometry = geometry;
