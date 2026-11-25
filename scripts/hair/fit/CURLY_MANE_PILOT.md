@@ -1,6 +1,6 @@
 # Curly Mane → Vesper: first real root-fitting pilot
 
-**Status (2026-11-25): actual CURLY 01.FBX inspected; private geometry-only four-view overlay and offline conservative root-contact test created. No Blender-verified, textured, rigged, approved, or game-ready Curly Mane exists.** See [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md).
+**Status (2026-11-25): actual CURLY 01.FBX inspected; real Curls diffuse/opacity atlas used in a software preview; new global alignment candidate now surrounds Vesper's original textured head. Large crown/back gaps remain; no Blender/engine-approved, rigged, or game-ready result exists.** See [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md).
 
 **Scope:** Female Vesper only. No male hair/clothing, no production deploy or PR merge.
 
@@ -17,7 +17,9 @@ The Curly Mane model from the donor source (`CURLY 01.FBX`, object name `Curly_M
 | `fit_math.py` | Proper-rotation similarity alignment and per-connected-curl root-only translation; zero-weight tips don't move |
 | `test_fit_math.py` | Eight unit tests pass locally on synthetic meshes/landmarks |
 | `prepare_curly_mane_workbench.py` | Import original Face4 + actual Face BaseColor + original Curly Mane into a *new private .blend*. No fitting. |
-| `pilot_curly_mane.py` | Inspect markers/groups; align landmark pairs; optionally conform approved root zones to marked source scalp faces. No GLB export. |
+| `pilot_curly_mane.py` | Legacy manual-marker inspection/align only; old conform mode is DISABLED due potential mistaken tip selection. |
+| `coarse_scalp_alignment.py` | Use upper UV ends as candidates; solve bounded global scale/translation against approved original Face4 scalp points. |
+| `auto_align_curly_mane.py` | New dry-run Blender global fit; saves only a NEW private review .blend when explicitly requested; no individual root changes. |
 
 ## Run procedure (Windows, from Avensky repo root)
 
@@ -50,15 +52,15 @@ On Face4, paint vertex group `AV_ScalpRegion` to **1** only over acceptable hair
 
 **1 meter per world unit above is an example, not yet verified**. If imported coordinates retained centimeters, replace this with the true conversion. The original face TGA must be mapped to the original Face4 material.
 
-### Step 4: safe alignment and fit
+### Step 4: global alignment FIRST (corrected workflow)
 
-Use the same annotated INPUT for both modes. First run `--mode align --write --output-blend ...` and compare silhouette against vendor source. Then run `--mode conform --write --output-blend ...` on the original annotated INPUT, not the already aligned output; conform includes coarse alignment.
+The earlier nearest-scalp UV-end method could mistake the LOWER end of a floating curl card for its actual root. The old pilot_curly_mane.py --mode conform path is now deliberately DISABLED. Do not run the old command.
 
-```powershell
-& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" -b "C:\AvenskyPrivate\curly\vesper-curly-annotated.blend" --python scripts/hair/fit/pilot_curly_mane.py -- --mode conform --meters-per-world-unit 1 --face-basecolor "C:\AvenskyPrivate\T_Villager_Lady_Face_BaseColor.tga" --max-root-move-m 0.035 --root-offset-mm 1 --write --output-blend "C:\AvenskyPrivate\curly\curly-roots-prototype.blend" --report "C:\AvenskyPrivate\curly\curly-fit.json"
-```
+Use the new auto_align_curly_mane.py with original Face4 + actual Face BaseColor and a HUMAN-APPROVED AV_ScalpRegion. It is dry-run by default, emitting a fit report. Confirm Blender's UP vector and meters per world unit. Only if the report is valid, use --write with a NEW --output-blend path; it duplicates and globally aligns the donor without per-curl deformation or GLB export.
 
-When no marked roots or safe scalp targets exist, or shifts exceed guarded limits, the script refuses to save. It preserves original head, original Face4 UV/color, original Curly Mane FBX, unmarked tips and matching donor UVs.
+Read [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) for measured source-coordinate results, source-vs-Blender unit warnings, and exact acceptance tests. The offline candidate uses scale approximately 0.92 with a downward shift of about 22 SOURCE-COORDINATE units; these numbers are not approved Blender settings. The actual Curls alpha test still shows scalp gaps and some face overlap.
+
+Individual root conformance remains BLOCKED until global placement, root identities, and the actual hairline are visually approved.
 
 ### Step 5: visual acceptance before any GLB export
 
@@ -72,6 +74,6 @@ When no marked roots or safe scalp targets exist, or shifts exceed guarded limit
 
 ## What has NOT been automated yet
 
-An additional private offline test adjusted 39 high-confidence near-scalp curl roots (819 vertices, max 2 cm) using real FBX geometry and an approximate original Face BaseColor scalp mask. That is **not** a completed Blender fit, and 214 components require human classification. The scripts implement deterministic coarse alignment and protected per-curl root motion, but donor roots/target scalp must still be annotated; automatic gap correction, full rig attachment, six-camera rendering, GLB LOD export, engine import and phone QA are not implemented. The fact that the math passes synthetic tests does **not** prove a real Curly Mane fit.
+The earlier private offline trial moved 39 near-scalp sections (819 vertices, max 2 source-coordinate units), but preceded the corrected global placement and may have mistaken lower/tip ends for roots. Keep this as a regression case, not an accepted fit. That is **not** a completed Blender fit, and 214 components require human classification. The scripts implement deterministic coarse alignment and protected per-curl root motion, but donor roots/target scalp must still be annotated; automatic gap correction, full rig attachment, six-camera rendering, GLB LOD export, engine import and phone QA are not implemented. The fact that the math passes synthetic tests does **not** prove a real Curly Mane fit.
 
 **Privacy:** commercial source ZIP/FBX/TGA, extracted vendor geometry and new private .blend files must NOT be committed to public GitHub until licensing is independently confirmed. PR #67 remains draft.
