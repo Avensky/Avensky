@@ -29,8 +29,9 @@ pub enum Admission {
     Bridge,
     Player {
         profile_id: String,
-        seconds: u64,
+        expires: u64,
         issued: u64,
+        session: Option<String>,
     },
 }
 
@@ -76,7 +77,18 @@ impl StagingGate {
         let issued = header("x-avensky-alpha-issued")
             .parse::<u64>()
             .unwrap_or_default();
-        let proof = header("x-avensky-alpha-proof");
+        // The digest is an identifier signed by the trusted verifier, never a bearer cookie.
+        // Unversioned MACs remain valid during the staged verifier rollout.
+        let value = header("x-avensky-alpha-proof");
+        let (session, proof) = match value.split_once('.') {
+            Some((digest, mac))
+                if digest.len() == 64 && digest.bytes().all(|b| b.is_ascii_hexdigit()) =>
+            {
+                (Some(digest), mac)
+            }
+            Some(_) => return Admission::Denied,
+            None => (None, value),
+        };
         let now_ms = staging_now_ms();
         if request.uri().path() != "/ws/"
             || header("origin") != STAGING_ORIGIN
@@ -97,13 +109,18 @@ impl StagingGate {
         let mut hmac =
             Hmac::<Sha256>::new_from_slice(self.0.as_bytes()).expect("HMAC accepts any key size");
         hmac.update(format!("avensky-staging-ws:{profile_id}:{issued}:{expires}").as_bytes());
+        if let Some(digest) = session {
+            hmac.update(b":");
+            hmac.update(digest.as_bytes());
+        }
         if hmac.verify_slice(&bytes).is_err() {
             return Admission::Denied;
         }
         Admission::Player {
             profile_id: profile_id.to_owned(),
-            seconds,
+            expires,
             issued,
+            session: session.map(str::to_owned),
         }
     }
 }
@@ -168,6 +185,24 @@ mod tests {
             gate.admit(&request(&"b".repeat(32), now, &signed(now))),
             Admission::Denied
         ));
+        let digest = "d".repeat(64);
+        let mut mac = Hmac::<Sha256>::new_from_slice(key.as_bytes()).unwrap();
+        mac.update(format!("avensky-staging-ws:{profile}:{now}:{expires}:{digest}").as_bytes());
+        let tag = format!("{:x}", mac.finalize().into_bytes());
+        assert!(
+            matches!(gate.admit(&request(&profile, now, &format!("{digest}.{tag}"))),
+            Admission::Player { session: Some(value), .. } if value == digest)
+        );
+        for proof in [
+            format!("{}.{tag}", "e".repeat(64)),
+            format!("{digest}.{}", signed(now)),
+            tag,
+        ] {
+            assert!(matches!(
+                gate.admit(&request(&profile, now, &proof)),
+                Admission::Denied
+            ));
+        }
         let stale = now - PROOF_MAX_AGE_MS - 1;
         assert!(matches!(
             gate.admit(&request(&profile, stale, &signed(stale))),

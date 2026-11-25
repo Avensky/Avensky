@@ -19,6 +19,7 @@ pub struct Connection {
     pub input: watch::Receiver<Option<InputPacket>>,
     pub input_tx: watch::Sender<Option<InputPacket>>,
     pub profile_id: Option<String>,
+    pub staging_session: Option<String>,
     pub world_id: Option<usize>,
     pub team: Team,
 }
@@ -211,6 +212,10 @@ impl Server {
     }
     pub async fn disconnect(&self, player: &str) {
         let _operation = self.operations.lock().await;
+        self.disconnect_locked(player).await;
+    }
+    // Replacements must checkpoint/remove the old socket and restore its lease atomically.
+    async fn disconnect_locked(&self, player: &str) {
         {
             let mut clients = self.connections.lock().await;
             let Some(client) = clients.get(player) else { return; };
@@ -426,7 +431,8 @@ impl Server {
             .lock()
             .await
             .get(player)
-            .and_then(|client| client.world_id);
+            .ok_or("The connection closed.")?
+            .world_id;
         if let Some(world_id) = current {
             let data=self.data.lock().await;
             let matches=data.worlds.get(&world_id).is_some_and(|world|world.map==map ||
@@ -532,6 +538,9 @@ impl Server {
             return self.handle_identity(player, action, &value).await;
         }
         let _operation = self.operations.lock().await;
+        if !self.connections.lock().await.contains_key(player) {
+            return Err("The connection closed.".into());
+        }
         // Chat does not serialize profiles, republish social views or touch physics.
         if matches!(action, "chat_send" | "chat_history") {
             return self.handle_chat(player, &value).await;

@@ -72,7 +72,11 @@ export function gameBridge(key, url = "ws://127.0.0.1:9002/__alpha_bridge") {
       if (!/^[a-f0-9]{32}$/i.test(server_id ?? "")) throw Error("The staging game server is unavailable.");
       return server_id;
     },
-    disconnect: profile_id => request("disconnect", { profile_id }),
+    async supportsSessionTakeover() {
+      return (await request("metadata")).session_takeover_version === 2;
+    },
+    sessionChanged: (profile_id, session_digest) => request("session_changed", { profile_id, session_digest }),
+    disconnect: (profile_id, session_digest) => request("disconnect", { profile_id, session_digest }),
   };
 }
 
@@ -91,12 +95,12 @@ export function gameSocketGate({ accounts, key, origin }) {
     if (!viewer?.game_profile) { res.writeHead(401).end(); return; }
     const issued = Date.now();
     const proof = createHmac("sha256", key)
-      .update(`avensky-staging-ws:${viewer.game_profile}:${issued}:${viewer.expires}`).digest("hex");
+      .update(`avensky-staging-ws:${viewer.game_profile}:${issued}:${viewer.expires}:${viewer.digest}`).digest("hex");
     res.writeHead(204, {
       "X-Avensky-Alpha-Profile": viewer.game_profile,
       "X-Avensky-Alpha-Expires": String(viewer.expires),
       "X-Avensky-Alpha-Issued": String(issued),
-      "X-Avensky-Alpha-Proof": proof,
+      "X-Avensky-Alpha-Proof": `${viewer.digest}.${proof}`,
       "Cache-Control": "no-store",
     }).end();
   });

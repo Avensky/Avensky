@@ -45,13 +45,15 @@
   }
   // The protected game can also be opened directly with an existing cookie.
   // In either direction only the interface changes ownership. Keep the room.
-  async function showSignIn(signOut) {
+  async function showSignIn(signOut, notice) {
     const request = (path, options) => fetch(path, {
       credentials: "same-origin", mode: "same-origin", cache: "no-store", ...options,
     });
     let response = signOut
       ? await request("/__alpha/sign-out", { method: "POST", body: new URLSearchParams() })
-      : await request("/sign-in");
+      // A replacement notification belongs to this socket. A newer tab may
+      // already own the shared cookie; fetch only the public form markup.
+      : await request("/sign-in", notice ? { credentials: "omit" } : {});
     // An expired session may already have been disconnected by another tab.
     if (signOut && response.status === 403) response = await request("/sign-in");
     const next = new URL(response.url);
@@ -63,9 +65,19 @@
     const room = document.querySelector("[data-live-garage]");
     if (!room || !header || !main?.querySelector('form.garage-credentials[action="/sign-in"]'))
       throw Error("The sign-in page is unavailable. Try again.");
+    if (notice) {
+      const notices = page.createElement("aside");
+      notices.className = "garage-notices";
+      notices.setAttribute("aria-label", "Announcements and issues");
+      const message = page.createElement("p");
+      message.setAttribute("role", "status");
+      message.textContent = notice;
+      notices.append(message);
+      main.prepend(notices);
+    }
     // A socket expiry and an explicit logout can both finish at this form.
     if (document.body.classList.contains("garage-entry") && document.querySelector("main.garage-entry-body")) {
-      if (location.pathname !== next.pathname) showPortalForm(page, next.pathname, main);
+      if (location.pathname !== next.pathname || notice) showPortalForm(page, next.pathname, main);
       return;
     }
     if (document.body.classList.contains("garage-entry")) {

@@ -36,7 +36,27 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 
 The portal unit binds the named game volume’s staging directory into its private mount namespace. Its `/run/avensky-player/social.sqlite3` and the Rust game’s `/data/staging/social.sqlite3` are the same file. An old `/__alpha/sign-in` bookmark redirects to `/sign-in`. Returning signed-in players continue to character selection. A portal session created when the player accepts an invite also authenticates their game connection. The portal serves the lightweight 3D room, its wall finish, cached first frames, login styling and optional Xbox input module from the published frontend. The room renders when its size or colors change. Heroes can use the GPU as soon as it needs its larger scene. The app, models, and multiplayer endpoint use the same invite gate.
 
-## Vultr cutover
+## Refresh the installed staging portal
+
+Wait for the main-branch staging publisher to finish. It builds and activates the Rust game when its inputs change, checks the game, then publishes the frontend. During rollout the updated game accepts the older portal’s admission proofs. Session takeover becomes available after the operator updates the portal and its socket verifier together.
+
+From a root shell on the staging host, refresh the portal from the same commit as the published frontend.
+
+```bash
+(
+  set -eu
+  web=$(readlink -e /srv/avensky-staging/frontend/current)
+  revision=$(basename "$(dirname "$web")")
+  script=$(mktemp)
+  trap 'rm -f "$script"' EXIT
+  git --git-dir=/var/lib/avensky-staging-deploy/source.git show "$revision:deploy/staging-access/install-sign-in.sh" > "$script"
+  bash "$script" --portal-only
+)
+```
+
+The installer checks the running game’s authenticated metadata for admission version 2 before changing any live files. It backs up the installed modules, installs the matching portal, account, verifier, and theme files, then restarts the portal. It checks sign-in HTML, controller assets, the signed-out verifier response, and the public garage model. A failed check restores the previous portal files. The refresh uses the existing game database and leaves Caddy and the game service in place. On first startup the new portal keeps the newest valid legacy session per account. Existing players, characters, invitations, and account settings are preserved. The earlier `--ui-only` flag is an alias for this version-matched refresh.
+
+## First Vultr cutover
 
 For the existing staging installation, run this as root on Vultr after the frontend publisher reports success for the change. The installer reads the revision the staging frontend actually serves. It backs up the database, imports the previous unified access records, updates the portal and Caddy, and verifies the public garage page. The game can stay online. The host must already have its staging bridge key, the managed `avensky-alpha-access` unit, and the local `avensky-staging_avensky_staging_data` volume.
 
@@ -48,8 +68,6 @@ git --git-dir=/var/lib/avensky-staging-deploy/source.git show "$revision:deploy/
 bash "$script"
 rm -f "$script"
 ```
-
-For a sign-in UI update after cutover, run the same commands with `bash "$script" --ui-only`. This refreshes the portal and its theme files from the active release, restarts the portal, and checks its sign-in page and controller assets.
 
 If the journal reports `217/USER` for UID 10001, retry the normal installer from the published release. Before stopping the old portal, it provisions the host login-disabled service account `avensky-staging` with UID and GID 10001 on hosts that need it. It checks for identity conflicts and verifies that systemd can open the game database as the service user. Hosts already configured to run the portal as the game database owner retain their existing identity. A failure at systemd's USER step happens before the access migration runs.
 

@@ -61,7 +61,13 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async () => social.setState({ profileStatus: "restoring" }));
     assert.equal(button("Sign in"), undefined);
     assert.equal(button("Sign up"), undefined);
-    assert.match(document.querySelector('[role="status"]').textContent, /Restoring/);
+    assert.match(document.querySelector('.garage-notices [role="status"]').textContent, /Loading your characters/);
+    assert.equal(document.querySelector(".garage-entry-card"), null, "pending character data needs no empty menu panel");
+    assert.equal(button("Reconnect"), undefined, "a normal handoff has no recovery action");
+    await act(async () => social.setState({ entryIssue: { kind: "other-tab" } }));
+    assert.match(document.querySelector(".garage-notices").textContent, /another tab/);
+    assert.equal(document.activeElement, button("Reconnect"), "controller can retry without leaving the garage");
+    await act(async () => social.setState({ entryIssue: null }));
     await act(async () => social.setState({ profileStatus: "idle" }));
     assert.equal(document.querySelector(".garage-entry-header"), header);
     await act(async()=>button("Sign up").click());

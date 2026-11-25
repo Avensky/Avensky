@@ -14,7 +14,8 @@ import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { garageBrandHeader } from "../../theme/garageEntry";
-import { STAGING_SIGN_IN_PATH } from "../../net/deploymentEnvironment";
+import { retryEntryConnection } from "../../net/rustSocket";
+import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
 import { entryAssets, stagingAccountPortal } from "./config";
 import "./welcomeScreen.css";
 
@@ -50,6 +51,7 @@ export function WelcomeScreen() {
   const stagingSignIn = useSocialStore(state => state.stagingSignIn);
   const restoring = useSocialStore(state => state.profileStatus === "restoring");
   const restoreError = useSocialStore(state => state.profileStatus === "error" ? state.message : "");
+  const entryIssue = useSocialStore(state => state.entryIssue);
   const profile = useSocialStore(state => state.view?.profile);
   const registered = useSocialStore(state => state.registeredProfile);
   const [step, setStep] = useState<Step>("welcome");
@@ -64,6 +66,7 @@ export function WelcomeScreen() {
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [connectionSlow, setConnectionSlow] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
@@ -72,16 +75,40 @@ export function WelcomeScreen() {
   const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const screen = rememberedPlayer ? (slots?.length === 0 ? "create" : "characters")
+  const screen = entryIssue || (stagingAccountPortal && !profile) ? "welcome"
+    : rememberedPlayer ? (slots?.length === 0 ? "create" : "characters")
     : step === "characters" && slots?.length === 0 ? "create" : step;
   const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
-  const sessionPending = screen === "welcome" && (!connected || restoring || stagingSignIn || stagingAccountPortal);
+  const sessionPending = screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
   const accountRoot = signedIn && (screen === "characters" || (screen === "create" && !slots?.length));
   const accountOpen = accountRoot && stagingSignIn && (showSettings || openedFromMenu);
-  const showStagingSignIn = stagingAccountPortal && ((connectionSlow && !connected) || (connected && !stagingSignIn));
+  const unconfirmedSignIn = stagingAccountPortal && connected && !stagingSignIn;
+  const signInReason = entryIssue?.kind === "session-replaced" || entryIssue?.kind === "session-expired" ? entryIssue.kind : undefined;
+  const showRecovery = sessionPending && Boolean(entryIssue || connectionSlow || unconfirmedSignIn || restoreError);
+
+  function entryNotice() {
+    if (signInReason) return sessionEndNotices[signInReason];
+    if (entryIssue?.kind === "other-tab") return "This game is open in another tab. Close that tab to play here.";
+    if (entryIssue?.kind === "server") return entryIssue.message;
+    if (unconfirmedSignIn) return "The game server could not verify this sign-in.";
+    if (restoreError) return restoreError;
+    if (connected) return connectionSlow ? "Your characters are taking longer to load." : "Loading your characters…";
+    if (connectionSlow) return "The game server is taking longer to respond.";
+    return stagingAccountPortal ? "Signed in. Contacting the game server…" : "Contacting the game server…";
+  }
+
+  function recoverEntry() {
+    setError("");
+    if (signInReason) {
+      void returnToStagingSignIn(false, signInReason).catch(() => setError("Couldn’t open sign-in. Check your connection and try again."));
+      return;
+    }
+    setAttempt(previous => previous + 1);
+    retryEntryConnection();
+  }
 
   function back() {
     if (pending.current || restoring) return;
@@ -113,13 +140,15 @@ export function WelcomeScreen() {
   }, [screen, busy, connected, accountOpen]);
 
   useEffect(() => {
-    if (connected) {
-      setConnectionSlow(false);
-      return;
-    }
+    setConnectionSlow(false);
+    if (!sessionPending) return;
     const timeout = window.setTimeout(() => setConnectionSlow(true), 6000);
     return () => window.clearTimeout(timeout);
-  }, [connected]);
+  }, [sessionPending, attempt]);
+
+  useEffect(() => {
+    if (showRecovery) root.current?.querySelector<HTMLElement>(".garage-notices [role=button]")?.focus({ preventScroll:true });
+  }, [showRecovery]);
 
   useEffect(() => {
     const viewport = window.visualViewport;
@@ -142,7 +171,7 @@ export function WelcomeScreen() {
 
   useEffect(() => {
     function navigate(event: Event) {
-      if (!root.current || busy) return;
+      if (!root.current || (busy && !sessionPending)) return;
       const action = (event as CustomEvent<MenuAction>).detail;
       const active = root.current.contains(document.activeElement) ? document.activeElement :
         root.current.querySelector(".garage-field[data-selected=true] input") ?? document.activeElement;
@@ -239,8 +268,8 @@ export function WelcomeScreen() {
       <div className="welcome-chrome" dangerouslySetInnerHTML={chrome} />
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
-      {!accountOpen && (screen === "create" || screen === "characters") && <GarageOrbitSurface />}
-      <section className={screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Account" : label}>
+      {!accountOpen && (sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
+      {!sessionPending && <section className={screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Account" : label}>
         {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
         {accountOpen ? <>
           <div data-controller-row><MenuBackButton label="Back" onClick={back} /></div>
@@ -318,7 +347,7 @@ export function WelcomeScreen() {
               <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{label}</button>
             </div>
           </form>
-        ) : sessionPending || signedIn ? null : <>
+        ) : <>
           <form className="garage-credentials" method="post" onSubmit={authenticate}>
             <GarageCredentialFields disabled={busy || !accounts} />
           </form>
@@ -335,14 +364,17 @@ export function WelcomeScreen() {
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
-      </section>
+      </section>}
       <aside className={screen === "welcome" ? "garage-notices" : "welcome-notices"} aria-label="Announcements and issues">
-        {showStagingSignIn ? <p role="status" className="welcome-help">
-          The game could not restore your session. <a href={STAGING_SIGN_IN_PATH}>Return to sign-in</a>.
-        </p> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
-          {working ? "Saving…" : restoring ? "Restoring your profile…" : "Connecting to the game server…"}
+        {sessionPending ? <>
+          <p role="status">{entryNotice()}</p>
+          {showRecovery && <div data-controller-row className="welcome-connection-actions">
+            <GameButton variant="menu" onPress={recoverEntry}>{signInReason ? "Return to sign-in" : "Reconnect"}</GameButton>
+          </div>}
+        </> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
+          {working ? "Saving…" : restoring ? "Loading your characters…" : "Waiting for the game server…"}
         </p>}
-        {(error || restoreError) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
+        {(error || (restoreError && !sessionPending)) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
       </aside>
       </div>
       </div>

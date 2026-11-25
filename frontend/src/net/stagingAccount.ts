@@ -30,11 +30,16 @@ export async function alphaAction(endpoint: "testers/invite" | "account/email-re
   return value;
 }
 
-type PortalNavigation = { showSignIn(signOut: boolean): Promise<void> };
+export const sessionEndNotices = {
+  "session-replaced": "You signed in on another device. Sign in again to play here. If this wasn’t you, use Forgot password.",
+  "session-expired": "Your session ended. Sign in again to play.",
+};
+export type SessionEndReason = keyof typeof sessionEndNotices;
+type PortalNavigation = { showSignIn(signOut: boolean, notice?: string): Promise<void> };
 let returning: { signOut: boolean; done: Promise<void> } | undefined;
 
 /** The server may close the game socket while its sign-out POST is in flight. */
-export function returnToStagingSignIn(signOut = false): Promise<void> {
+export function returnToStagingSignIn(signOut = false, reason?: SessionEndReason): Promise<void> {
   if (returning) {
     if (!signOut || returning.signOut) return returning.done;
     // A passive session check must never consume a player's explicit revocation.
@@ -48,7 +53,7 @@ export function returnToStagingSignIn(signOut = false): Promise<void> {
     }
     const navigation = portal.avenskyPortalNavigation;
     if (!navigation) throw new Error("The staging sign-in page is unavailable. Try again.");
-    await navigation.showSignIn(signOut);
+    await navigation.showSignIn(signOut, reason && sessionEndNotices[reason]);
   })().finally(() => { returning = undefined; });
   returning = { signOut, done };
   return done;
