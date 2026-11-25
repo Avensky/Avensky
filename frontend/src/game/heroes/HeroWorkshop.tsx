@@ -66,6 +66,8 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const overlay=useUIStore(s=>s.overlay);
  const owner=useSocialStore(s=>s.view?.profile.id??s.profileOwner);
  const connected=useSocialStore(s=>Boolean(s.view));
+ const stagingSignedIn=useSocialStore(s=>s.stagingSignIn);
+ const visibleCharacterTabs=stagingSignedIn?CHARACTER_TABS:CHARACTER_TABS.filter(item=>item.id!=="profile"&&item.id!=="account");
  const main=useHeroLoadouts(s=>s.ownerId===owner?s.defaultHero:null);
  const mainDefinition=HEROES.find(item=>item.id===main);
  const skins=useSocialStore(s=>s.view?.alpha?.skins);
@@ -219,8 +221,8 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
   if(useGarageDrive.getState().panelsHidden)return;
   if(characterOpen){
    if(characterReady){
-    const index=CHARACTER_TABS.findIndex(item=>item.id===characterTab);
-    setCharacterTab(CHARACTER_TABS[(index+direction+CHARACTER_TABS.length)%CHARACTER_TABS.length].id);
+    const index=visibleCharacterTabs.findIndex(item=>item.id===characterTab);
+    setCharacterTab(visibleCharacterTabs[(index+direction+visibleCharacterTabs.length)%visibleCharacterTabs.length].id);
    }
    return;
   }
@@ -270,10 +272,10 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  </button>;
  const customizationHeader={onOpen:openCharacter,leadingAction:vehicleAction,active:characterOpen};
  return <section ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
-  {characterOpen?characterReady?<SceneTabHeader title="CHARACTER" compact tabs={CHARACTER_TABS} activeTab={characterTab}
+  {characterOpen?characterReady?<SceneTabHeader title="" tablistLabel="Character sections" compact tabs={visibleCharacterTabs} activeTab={characterTab}
     character={customizationHeader} backAction={{onClick:back}}
     onTabChange={id=>setCharacterTab(id as CharacterTab)} idPrefix="character-editor" panelId="character-editor-panel"/>
-    :<SelectionHeader title="CHARACTER" compact character={customizationHeader} backAction={{onClick:back}}/>:editing&&definition
+    :<SelectionHeader title="" compact character={customizationHeader} backAction={{onClick:back}}/>:editing&&definition
     ? <SceneTabHeader
         title="GARAGE"
         compact

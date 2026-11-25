@@ -51,6 +51,7 @@ test("invites grant access once and revocation invalidates existing cookies", as
   runInNewContext(await script.text(), {
     document: {
       querySelector: selector => selector === ".password-toggle" && toggle,
+      querySelectorAll: selector => selector === ".password-toggle" ? [toggle] : [],
       getElementById: id => id === "alpha-password" && input,
     },
     window: { addEventListener: (event, callback) => { handlers[event] = callback; } },
@@ -67,6 +68,19 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.equal(input.type, "password");
   assert.equal(input.value, password);
   assert.equal((await get("testers")).status, 403);
+  assert.equal((await get("session")).status, 401);
+  assert.match(signIn, /Sign in/);
+  assert.doesNotMatch(signIn, /Enter staging|Log out/);
+  const theme = await get("theme.js");
+  assert.equal(theme.status, 200);
+  const set = new Map();
+  const root = { dataset: {}, style: { setProperty: (key, value) => set.set(key, value) } };
+  runInNewContext(await theme.text(), {
+    localStorage: { getItem: key => key === "avenlab-preferences-v1" ? JSON.stringify({ state: { theme: "deep-purple" } }) : null },
+    document: { documentElement: root },
+  });
+  assert.equal(root.dataset.uiTheme, "deep-purple");
+  assert.equal(set.get("--app-accent"), "#a3adff");
   const admin = accounts.issueInvite("operator@example.net", true);
   const enrollment = { email: admin.email, invite: admin.code, password };
   assert.equal((await get("enroll")).headers.get("referrer-policy"), "same-origin");
@@ -77,13 +91,47 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.equal(signed.status, 303);
   assert.equal(signed.headers.get("location"), "/__alpha/account");
   const adminCookie = getCookie(signed);
-  assert.match(await (await get("account", { cookie: adminCookie })).text(), /Alpha testers/);
+  const accountPage = await (await get("account", { cookie: adminCookie })).text();
+  assert.match(accountPage, /Alpha testers/);
+  assert.match(accountPage, /Continue to game/);
+  assert.match(accountPage, /Log out/);
+  assert.doesNotMatch(accountPage, /Enter staging/);
+  assert.equal((await get("sign-in", { cookie: adminCookie })).headers.get("location"), "/");
+  assert.deepEqual(await (await get("session", { cookie: adminCookie })).json(),
+    { email: "operator@example.net", admin: true, hasMfa: false });
   assert.equal((await post("testers/invite", { email: "player@example.net" }, adminCookie, "https://example.org")).status, 403);
   assert.equal((await post("testers/invite", { email: "PLAYER@example.net" }, adminCookie)).status, 200);
   assert.equal(delivered[0][0], "player@example.net");
   const invite = new URL(delivered[0][1]).hash.slice(1);
   assert.equal((await post("enroll", { email: "else@example.net", invite, password })).status, 400);
   const player = getCookie(await post("enroll", { email: "player@example.net", invite, password }));
+  assert.deepEqual(await (await get("session", { cookie: player })).json(),
+    { email: "player@example.net", admin: false, hasMfa: false });
+  const inviteJson = (cookie, email) => fetch(url + "testers/invite", {
+    method: "POST", headers: { origin, accept: "application/json", "x-alpha-client": "alpha-account-tests", ...(cookie ? { cookie } : {}) },
+    body: new URLSearchParams({ email }),
+  });
+  assert.equal((await inviteJson(undefined, "anon@example.net")).status, 401);
+  assert.equal((await inviteJson(player, "guestinvite@example.net")).status, 403);
+  assert.deepEqual(await (await inviteJson(adminCookie, "jsoninvite@example.net")).json(),
+    { email: "jsoninvite@example.net", sent: true });
+  const request = (endpoint, fields, cookie = player) => fetch(url + endpoint, {
+    method: "POST", headers: { origin, cookie, accept: "application/json", "x-alpha-client": "alpha-account-tests" },
+    body: new URLSearchParams(fields),
+  });
+  assert.equal((await request("account/delete-request", {
+    confirmEmail: "player@example.net", password: "wrong",
+  })).status, 400);
+  const emailChange = await request("account/email-request", { newEmail: "new-player@example.net", password });
+  assert.equal(emailChange.status, 200);
+  assert.match((await emailChange.json()).message, /remains active/);
+  const deletion = await request("account/delete-request", { confirmEmail: "player@example.net", password });
+  assert.equal(deletion.status, 200);
+  assert.match((await deletion.json()).message, /Nothing has been deleted/);
+  assert.equal(accounts.viewer(player.split("=")[1]).email, "player@example.net");
+  const pending = accounts.list();
+  assert.equal(pending.emailChanges[0].new_email, "new-player@example.net");
+  assert.equal(pending.deletionRequests[0].email, "player@example.net");
   assert.equal((await post("enroll", { email: "player@example.net", invite, password })).status, 400);
   assert.equal((await get("verify", { cookie: player })).status, 204);
   assert.equal((await get("testers", { cookie: player })).status, 403);

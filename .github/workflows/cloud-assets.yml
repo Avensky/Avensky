@@ -15,6 +15,26 @@ permissions:
   contents: read
 
 jobs:
+  # Fail fast on TS/Vite errors instead of waiting for the long GLB/wardrobe
+  # integration suite. This is a build check, not an asset approval gate.
+  quick-ui-build:
+    runs-on: ubuntu-latest
+    env:
+      GIT_LFS_SKIP_SMUDGE: "1"
+      VITE_PLAYER_ONBOARDING: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - run: npm --prefix frontend ci
+      - run: npm --prefix frontend run build -- --mode staging
+        env:
+          VITE_DEPLOY_ENV: staging
+          VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
+
   staging-pointer-build:
     runs-on: ubuntu-latest
     env:
@@ -29,6 +49,7 @@ jobs:
           node-version: "24"
       - run: npm --prefix frontend ci
       - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
+      - run: node --test deploy/staging-access/portal.test.mjs
       # Vite test servers restart on wardrobe catalog updates. Run suite files sequentially
       # to avoid overlapping dependency scanners and intermittent CI-only failures.
       - run: node --test --test-concurrency=1 tests/player-onboarding.test.mjs tests/character-workshop.test.mjs tests/wardrobe-preview.test.mjs

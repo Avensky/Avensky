@@ -67,7 +67,7 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(flare.hasAttribute("data-playing"), true);
     assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
     assert.equal(document.querySelector("h1"),null);
-    assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Log in","Sign up"]);
+    assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Sign in","Sign up"]);
     const autoplay = playbackAttempts;
     document.dispatchEvent(new Event("pointerup"));
     assert.ok(playbackAttempts > autoplay,"a touch release offers another chance to play");
@@ -128,7 +128,7 @@ test("welcome picks a personality and gender before registration and lets return
       social.setState({view:null,profileStatus:"idle"});
       root.render(createElement(WelcomeScreen,{key:"returning"}));
     });
-    await act(async()=>button("Log in").click());
+    await act(async()=>button("Sign in").click());
     const loginForm=document.querySelector("form");
     loginForm.elements.login.value="lightfoot@example.net";
     loginForm.elements.password.value="a staging passphrase for test";
@@ -141,6 +141,9 @@ test("welcome picks a personality and gender before registration and lets return
     });
     assert.equal(document.querySelector('[name="characterName"]'),null);
     assert.match(document.querySelector('.welcome-character').textContent,/Track Fox/);
+    assert.equal(document.querySelector("h1"), null, "saved character selection has no redundant heading");
+    assert.ok(document.querySelector(".welcome-character-details"), "profile details accompany a larger portrait");
+    assert.ok(button("Log out"));
     assert.ok(button("New character"));
     assert.equal(button("Enter main menu"),undefined);
     await act(async()=>document.querySelector('.welcome-character').click());
@@ -161,12 +164,12 @@ test("welcome picks a personality and gender before registration and lets return
       client.receiveSocialState({ ...view, profile: saved });
     });
     assert.equal(sent.length, previouslySent, "a staged session skips old device credentials and a second login");
-    assert.equal(button("Log in"), undefined);
+    assert.equal(button("Sign in"), undefined);
     assert.match(document.querySelector(".welcome-character").textContent, /Track Fox/);
     assert.deepEqual(selectEquippedCharacter(social.getState()), fox);
     await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
     assert.ok(document.querySelector('[name="characterName"]'));
-    assert.equal(button("Log in"), undefined);
+    assert.equal(button("Sign in"), undefined);
   } finally {
     await act(async()=>root.unmount());
     await vite.close();

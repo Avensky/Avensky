@@ -12,6 +12,7 @@ import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
 import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
+import { AlphaAccountPanel } from "./AlphaAccountPanel";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
 import { CharacterPosePack } from "./CharacterPosePack";
@@ -41,6 +42,7 @@ import { CREATED_EMOTE_ID, readCreatedEmotes } from "./emoteAuthoring";
 export const CHARACTER_TABS = [
   { id: "details", label: "Details" }, { id: "body", label: "Body" }, { id: "appearance", label: "Appearance" },
   { id: "emotes", label: "Emotes" },
+  { id: "profile", label: "Profile" }, { id: "account", label: "Account" },
 ] as const;
 export type CharacterTab = typeof CHARACTER_TABS[number]["id"];
 
@@ -705,6 +707,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         {tab === "emotes" && emoteBrowser}
       </section>}
       {tab === "emotes" && emoteResultsPanel}
+      {(tab === "profile" || tab === "account") && <AlphaAccountPanel tab={tab} />}
       {playback}
       {!fitting && <div className="dressing-toolbar">{cameraTools}</div>}
       {previewZoom}

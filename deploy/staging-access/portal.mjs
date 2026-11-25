@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -7,16 +8,34 @@ import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-br
 
 const base = "/__alpha";
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
+function paletteScript() {
+  const themes = JSON.parse(readFileSync(new URL("../../frontend/src/theme/palettes.json", import.meta.url), "utf8"));
+  return `(() => {
+    const themes = ${JSON.stringify(themes)};
+    let chosen = "navy";
+    try {
+      const saved = JSON.parse(localStorage.getItem("avenlab-preferences-v1") || "{}");
+      if (Object.hasOwn(themes, saved?.state?.theme)) chosen = saved.state.theme;
+    } catch {}
+    const palette = themes[chosen];
+    const root = document.documentElement;
+    root.dataset.uiTheme = chosen;
+    root.dataset.uiScheme = palette.scheme;
+    root.style.colorScheme = palette.scheme;
+    for (const [key, color] of Object.entries(palette)) {
+      if (key !== "label" && key !== "scheme") root.style.setProperty("--app-" + key, color);
+    }
+  })();`;
+}
 const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
 })[char]);
 const form = (action, contents, label) =>
   `<form method="post" action="${base}/${action}">${contents}<button>${label}</button></form>`;
 const emailField = '<label>Email<input type="email" name="email" autocomplete="username" maxlength="254" required></label>';
-const passwordField = (newPassword = false) =>
-  `<div class="password-control"><label>Password<input id="alpha-password" type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>
-  <button type="button" class="password-toggle" aria-controls="alpha-password" hidden>Show password</button></div>
-  <script src="${base}/password.js" defer></script>`;
+const passwordField = (newPassword = false, id = "alpha-password") =>
+  `<div class="password-control"><label>Password<input id="${id}" type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>
+  <button type="button" class="password-toggle" aria-controls="${id}" hidden>Show password</button></div>`;
 const codeField = (required = false) => `<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="32"${required ? " required" : ""}></label>`;
 const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
@@ -28,28 +47,33 @@ function page(title, contents, message = "", showFlare = false) {
 </div><script src="${base}/flare.js" defer></script>` : "";
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
 <style>
-*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:#f5f1fd;background:#100b1c;font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
+*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:var(--app-text,#e6efff);background:var(--app-background,#050c18);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
 main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-.portal-flare{position:fixed;inset:0;pointer-events:none;background:#060311 url(${base}/media/purple-sunflare.webp) center/cover no-repeat}
+.portal-flare{position:fixed;inset:0;pointer-events:none;background:var(--app-background,#050c18) url(${base}/media/purple-sunflare.webp) center/cover no-repeat;opacity:.55}
 .portal-flare video{width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s ease}
 .portal-flare video[data-playing]{opacity:1}
-.portal-flare::after{content:"";position:absolute;inset:0;background:#06031166}
+.portal-flare::after{content:"";position:absolute;inset:0;background:var(--app-background,#050c18);opacity:.35}
 @media (orientation:portrait){.portal-flare video{object-fit:contain}}
 @media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
-a{color:#e5d2fd}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:inherit;padding:.6rem .8rem;border:1px solid #927db0;border-radius:.3rem;background:#231933;min-height:44px;min-width:0}
-button{color:#150c21;background:#dac2fb;font-weight:600;cursor:pointer}
+a{color:var(--app-accent,#82b7ff);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text,#e6efff);padding:.6rem .8rem;border:1px solid var(--app-line,#54749a);border-radius:0;background:var(--app-panel,#0b1729);min-height:44px;min-width:0}
+button{color:var(--app-text,#e6efff);background:var(--app-raised,#142b46);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent,#82b7ff);outline-color:var(--app-accent,#82b7ff)}
 .password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
-.password-toggle{background:#231933;color:inherit;font-size:.875rem}
+.password-toggle{background:var(--app-panel,#0b1729);color:inherit;font-size:.875rem}
 ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+</style><script src="${base}/theme.js" defer></script><script src="${base}/password.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
-  return `<p>${escape(viewer.email)}</p><nav><a href="/">Enter staging</a>${viewer.admin ? `<a href="${base}/testers">Alpha testers</a>` : ""}</nav>
+  return `<nav><a href="/">Continue to game</a>${viewer.admin ? `<a href="${base}/testers">Alpha testers</a>` : ""}</nav>
+<p>Signed in as ${escape(viewer.email)}</p>
+<h2>Email</h2><p>Request a change to your account email. Your current address remains active until verified.</p>
+${form("account/email-request", '<label>New email<input type="email" name="newEmail" autocomplete="email" maxlength="254" required></label>' + passwordField(false, "alpha-password-email"), "Request email change")}
+<h2>Profile deletion</h2><p>Request deletion for operator review. Your game profile is not deleted by this action.</p>
+${form("account/delete-request", '<label>Confirm your current email<input type="email" name="confirmEmail" maxlength="254" required></label>' + passwordField(false, "alpha-password-delete"), "Request profile deletion")}
 ${viewer.has_mfa ? "<p>Two-factor authentication is enabled.</p>"
-    : `<h2>Two-factor authentication</h2>${form("mfa/start", passwordField(), "Set up authenticator")}`}
-${form("sign-out", "", "Sign out")}`;
+    : `<h2>Two-factor authentication</h2>${form("mfa/start", passwordField(false, "alpha-password-mfa"), "Set up authenticator")}`}
+${form("sign-out", "", "Log out")}`;
 }
 
 async function readForm(req) {
@@ -94,7 +118,7 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
       + passwordField(!game), game ? "Continue" : "Sign up") + `<nav><a href="${base}/sign-in">Log in</a>
       <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, Boolean(game))
-      : page("Log in", form("sign-in", emailField + passwordField(), "Log in")
+      : page("Sign in", form("sign-in", emailField + passwordField(), "Sign in")
         + `<a href="${base}/forgot-password">Forgot password?</a>`
         + (game ? "<p>Use the email from your staging invitation and your Avensky game password. Open the invite first if you haven’t accepted it yet.</p>"
           : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
@@ -127,19 +151,21 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
 
   function testerPage(viewer, message, extra = "") {
     if (!viewer?.admin) return page("Access denied", '<a href="/">Return to staging</a>');
-    const { testers, invites, resetRequests } = accounts.list();
+    const { testers, invites, resetRequests, emailChanges, deletionRequests } = accounts.list();
     const fields = game
       ? emailField + '<details><summary>Preserve a legacy username</summary><label>Existing game username<input name="gameLogin" maxlength="24"></label></details>'
       : emailField;
     const requests = resetRequests.length ? `<h2>Password reset requests</h2>
 <p>Verify the player's identity before issuing a private reset link on the staging server.</p>
 <ul>${resetRequests.map(({ email }) => `<li>${escape(email)}</li>`).join("")}</ul>` : "";
-    return page("Alpha testers", `<nav><a href="/">Enter staging</a><a href="${base}/account">Account</a></nav>
+    return page("Alpha testers", `<nav><a href="/">Continue to game</a><a href="${base}/account">Account</a></nav>
 ${form("testers/invite", fields, mailInvite ? "Send invite" : "Create invite")}${extra}
 <h2>Testers</h2><ul>${testers.map(t => `<li>${escape(t.email)} · ${t.admin ? "Admin" : t.revoked ? "Revoked" : "Active"}${t.has_mfa ? " · 2FA" : ""}
 ${t.admin ? "" : form(t.revoked ? "testers/restore" : "testers/revoke", hideEmail(t.email), t.revoked ? "Grant access" : "Revoke access")}</li>`).join("")}</ul>
 <h2>Pending invitations</h2><ul>${invites.map(i => `<li>${escape(i.email)} · Expires ${new Date(i.expires * 1000).toISOString().slice(0, 10)}
-${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}</ul>${requests}`, message);
+${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}</ul>${requests}
+${emailChanges.length ? `<h2>Pending email changes</h2><ul>${emailChanges.map(row => `<li>${escape(row.email)} → ${escape(row.new_email)} · operator verification required</li>`).join("")}</ul>` : ""}
+${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${deletionRequests.map(row => `<li>${escape(row.email)} · game-data review required</li>`).join("")}</ul>` : ""}`, message);
   }
 
   return createServer({ requestTimeout: 12000, headersTimeout: 7000, maxHeaderSize: 8192 }, async (req, res) => {
@@ -153,6 +179,8 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
       });
       res.end(body);
     };
+    const json = (status, value) => send(status, JSON.stringify(value), { "Content-Type": "application/json; charset=utf-8" });
+    const wantsJson = req.headers.accept?.includes("application/json");
     const redirect = (location, value) => send(303, "", {
       Location: location,
       ...(value === undefined ? {} : {
@@ -187,9 +215,9 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
         return send(200, setup, { "Content-Type": "text/javascript; charset=utf-8" });
       }
       if (path === base + "/password.js") return send(200, `
-        const toggle = document.querySelector(".password-toggle");
-        const password = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
-        if (password) {
+        for (const toggle of document.querySelectorAll(".password-toggle")) {
+          const password = document.getElementById(toggle.getAttribute("aria-controls"));
+          if (!password) continue;
           toggle.hidden = false;
           const setVisible = visible => {
             password.type = visible ? "text" : "password";
@@ -213,7 +241,14 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
           document.addEventListener("keydown", play, true);
           play();
         }`, { "Content-Type": "text/javascript; charset=utf-8" });
-      if (path === base + "/sign-in") return viewer ? redirect(base + "/account") : send(200, signInPage());
+      if (path === base + "/theme.js") {
+        try { return send(200, paletteScript(), { "Content-Type": "text/javascript; charset=utf-8" }); }
+        catch { return send(503); }
+      }
+      if (path === base + "/sign-in") return viewer ? redirect("/") : send(200, signInPage());
+      if (path === base + "/session") return viewer
+        ? json(200, { email: viewer.email, admin: Boolean(viewer.admin), hasMfa: Boolean(viewer.has_mfa) })
+        : json(401, { error: "Sign in required." });
       if (path === base + "/enroll") return send(200, signInPage("", true));
       if (path === base + "/forgot-password") return send(200, forgotPasswordPage());
       if (path === base + "/reset") return send(200, resetPage());
@@ -262,7 +297,15 @@ ${form("testers/revoke", hideEmail(i.email), "Revoke invite")}</li>`).join("")}<
           "Set-Cookie": `${cookieName}=; Max-Age=0; ${cookieFlags}`,
         }) : redirect(base + "/sign-in", "");
       }
-      if (!viewer) return send(403);
+      if (!viewer) return wantsJson ? json(401, { error: "Sign in required." }) : send(403);
+      if (path === base + "/account/email-request") {
+        const result = await accounts.requestEmailChange(viewer, value("newEmail"), value("password"));
+        return wantsJson ? json(200, result) : send(200, page("Account", securityPage(viewer), result.message));
+      }
+      if (path === base + "/account/delete-request") {
+        const result = await accounts.requestDeletion(viewer, value("confirmEmail"), value("password"));
+        return wantsJson ? json(200, result) : send(200, page("Account", securityPage(viewer), result.message));
+      }
       if (path === base + "/sign-out") {
         accounts.end(viewer);
         if (game) await game.disconnect(viewer.game_profile);
@@ -279,16 +322,19 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
         return send(200, page("Recovery codes", '<p>Keep these one-use codes somewhere safe.</p><ul>'
           + codes.map(code => `<li><code>${code}</code></li>`).join("") + `</ul><a href="${base}/account">Done</a>`));
       }
-      if (!viewer.admin) return send(403);
+      if (!viewer.admin) return wantsJson ? json(403, { error: "Only alpha administrators can invite testers." }) : send(403);
       if (path === base + "/testers/invite") {
         const { email, code } = accounts.issueInvite(value("email"), false, value("gameLogin"));
         const url = origin + base + "/enroll#" + code;
         if (mailInvite) {
-          try { await mailInvite(email, url); return send(200, testerPage(viewer, "Invitation sent.")); }
-          catch { /* A functioning link can be delivered manually if mail is down. */ }
+          try {
+            await mailInvite(email, url);
+            return wantsJson ? json(200, { email, sent: true }) : send(200, testerPage(viewer, "Invitation sent."));
+          } catch { /* The administrator can share the invitation link manually. */ }
         }
-        return send(200, testerPage(viewer, mailInvite ? "Email delivery failed." : "Invitation created.",
-          `<label>Invitation link<input value="${escape(url)}" readonly></label>`));
+        return wantsJson ? json(200, { email, sent: false, url })
+          : send(200, testerPage(viewer, mailInvite ? "Email delivery failed." : "Invitation created.",
+            `<label>Invitation link<input value="${escape(url)}" readonly></label>`));
       }
       if (path === base + "/testers/revoke") {
         const profile = accounts.revoke(value("email"));
@@ -312,6 +358,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
         }
         return send(400, resetPage(message, verification));
       }
+      if (wantsJson) return json(400, { error: message });
       if (path?.startsWith(base + "/testers/")) return send(400, testerPage(viewer, message));
       return send(400, page("Account", viewer ? securityPage(viewer) : "", message));
     } finally { active--; }

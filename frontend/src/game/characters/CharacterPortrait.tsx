@@ -10,7 +10,8 @@ const PORTRAIT_QUIET_MS = 900;
 const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action"] as const;
 
 // Play, the fitting room and live scenes can display a finished portrait.
-// New GLTF and WebGL work belongs in the quiet main menu.
+// Only a selected, idle profile view is allowed to prepare a new portrait
+// outside the main menu; keep WebGL work off ordinary character turns.
 function portraitMenuAllowsWork({ screen, overlay, isModeLoading }: ReturnType<typeof useUIStore.getState>) {
   return screen === "main" && overlay === null && !isModeLoading;
 }
@@ -22,7 +23,7 @@ function schedulePortraitWork(work: () => () => void, inWelcome: boolean) {
   const canRun = () => {
     const state = useUIStore.getState();
     return document.visibilityState !== "hidden" && (portraitMenuAllowsWork(state)
-      || (inWelcome && state.screen === "welcome" && !state.isModeLoading));
+      || (inWelcome && (state.screen === "welcome" || state.screen === "heroes") && !state.isModeLoading));
   };
   const cancel = () => {
     if (timer !== undefined) window.clearTimeout(timer);
@@ -88,7 +89,7 @@ export function CharacterPortrait({ choice, label, welcomePreview }: {
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
   const canRefresh = useUIStore(state => portraitMenuAllowsWork(state)
-    || (welcomePreview === "selected" && state.screen === "welcome" && !state.isModeLoading));
+    || (welcomePreview === "selected" && (state.screen === "welcome" || state.screen === "heroes") && !state.isModeLoading));
   const dress = look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
   const key = look && url ? portraitKey(look, url, dressUrl) : "";
