@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { HairPaletteControls } from "./HairPaletteControls";
 import { useCharacterPreviewStore } from "../characterPreviewStore";
 
-export type LocalHairOption = { id: string; label: string; url: string };
+export type LocalHairOption = { id: string; label: string; url: string; mesh?: string };
 
 export const hairOptions: LocalHairOption[] = fittedHairOptions;
 export const useLocalHairstyle = create<{id:string; choose:(id:string)=>void}>()(
