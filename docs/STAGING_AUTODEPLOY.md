@@ -1,21 +1,13 @@
-# Main-to-staging automatic deployment
+# Automatic main-to-staging deploy
 
-Every push or merge to `Avensky/Avensky:main` triggers [Deploy to staging](../.github/workflows/deploy-staging.yml). Its jobs build and test the frontend, compare the commit to the latest main tip, then publish the matching bundle to `https://staging.avensky.com`. The SSH publisher receives a staging archive and always selects `publish-staging-with-game`. There is **no staging game deploy flag**.
+Every merge to `main` builds the frontend and checks the matching Rust staging server. The archive includes `asset-release.json`, containing approved paths, hashes and sizes only, never private models. The restricted receiver invokes `/usr/local/lib/avensky/auto_activate.py` to verify any new private S3 objects and activate their ETag-pinned release on the gateway. Existing proofs are reused. It restores the old gateway configuration if activation or an HTTP 206 GLB probe fails. The previous site remains active until every gate passes.
 
-The installed restricted receiver checks the candidate release ID against the private verified asset gateway. The staging game deployer fetches that exact main commit and compares input tree hashes of `avenlab-server`, `packages/wardrobe-catalog`, and `.dockerignore`. UI-only changes **do not restart the game**. Backend or wardrobe-catalog changes build a candidate container, back up the persistent staging volume, restart only the staging container, run a WebSocket handshake health probe, and restore the previous image/data on failure. The frontend symlink changes only after those gates pass.
+## One-time host setup
 
-## Private assets
+The dedicated staging SSH key is forced to the restricted receiver. It cannot change root-owned services or install a new receiver. An authorized administrator must run the reviewed `deploy/staging-assets/bootstrap-auto-activate.sh` **once** from the checkout on Vultr, using the dedicated `avensky-stage` release user. The bootstrap installs the latest receiver, root-owned verifier, staging game deployer and narrowly scoped sudoers commands; it backs up the previous receiver. No repeated per-update commands or feature flags are required after that.
 
-Asset catalogs are committed as URL, SHA-256 and size metadata; commercial GLBs remain in private Lightsail object storage. A separate Windows uploader uses the `avensky-lightsail` profile to publish approved exports under immutable `staging/objects/<sha256>` names. The candidate release must be verified with the staging read-only identity and exposed by the asset gateway **before merging new catalog metadata to main**. A merge never implicitly uploads raw private binaries from a public GitHub repository.
+Until the one-time bootstrap is installed, GitHub Actions can build releases but the older Vultr receiver can still reject a changed asset release ID. A GitHub merge alone cannot confer root access to the server.
 
-Until a dedicated on-host verifier/activator is configured, a newly introduced private asset still requires a one-time gateway manifest registration. **A successful workflow for code changes does not bypass that gate.** Track the remaining automation and asset activation work in issue #51. Existing sessions continue using the old verified release.
+## Normal workflow
 
-Once verified by the read-only asset identity, the operator can install the candidate as `verified-<64-character-release-id>.json` in `/etc/avensky-assets/` (or alongside the forced receiver's existing `--verified-manifest` path). The updated receiver accepts that exact ID only if the gateway already serves it with a valid HTTP 206 `glTF` range response. The legacy file remains unchanged for rollback; the gateway must be configured to retain the old release and serve the new one.
-
-## Live deployment
-
-The [production release workflow](../.github/workflows/frontend-release.yml) is `workflow_dispatch` only and still requires reviewed production artifacts, staging provenance, and manual approval. No archive is passed to the SSH publisher, so the operation remains `publish-frontend` and **cannot restart the staging game**.
-
-## Verify a deployment
-
-After a merge, check the `Deploy to staging` Actions run and confirm the published commit in its `publish-staging` job. Read the site's protected `/bundle.json` with a tester session; it should report the deployed main commit and verified asset release. Test a byte-range GLB request, player login and a WebSocket connection. If a release gate fails, the prior staging frontend and model release remain available; use the receiver's existing backup and game rollback mechanisms. Production is never automatically changed.
+Export approved private asset → the Windows asset uploader sends digest-keyed GLBs to Lightsail S3 → commit catalog metadata and game/UI code → merge to main → GitHub Actions builds and publishes → staging receiver verifies new assets, activates gateway if needed, deploys Rust if changed, and atomically swaps the frontend. Missing files or failed tests preserve the last working staging site. Production remains separately approved and manual.
