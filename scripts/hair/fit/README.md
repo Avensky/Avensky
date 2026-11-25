@@ -4,7 +4,7 @@
 
 **Status (2026-11-25):** original Face4 skull and original `T_Villager_Lady_Face_BaseColor.tga` texture have been identified and visualized on the actual head. The original texture ALREADY includes a soft scalp/hair-root discoloration. **Preserve that original texture on Vesper; don't generate a substitute sphere, hard brown cap, or new scalp mesh by default.** V2 inspectors and optional diagnostic extraction are written, but actual Curly Mane root fitting, Blender QA and shippable GLBs remain unimplemented/unverified.
 
-**Start by reading:** [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md) → [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
+**Start by reading:** [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) → [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md) → [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
 
 ## Vesper FIRST: original head + original scalp texture
 
@@ -77,6 +77,8 @@ Acceptance: no obviously exposed scalp holes outside intentional part, no rigid 
 
 ## Repository layout / current boundaries
 - **Existing:** `inspect_character.py`, `inspect_source.py`, `extract_source_scalp.py` (optional debug), `cap_geometry.py` + `build_scalp_cap.py` (fallback only), `character_profiles/vesper.json`, `styles/curly_mane.json`, `test_cap_geometry.py`, documentation and dev/staging comparison switches.
+- **Real-source global geometry pilot:** `coarse_scalp_alignment.py` + `auto_align_curly_mane.py` are the NEW first step, followed by explicit approval. Actual Curls UV opacity/diffuse preview and scalp-contact measurements are documented in [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md); no Blender/phone QA yet.
+- **Old conform mode disabled:** earlier nearest-skin end selection could mistake a tip for a root while the source was unaligned; do not use `pilot_curly_mane.py --mode conform`.
 - **Pilot implementation (not Blender-verified):** `fit_math.py` (unit-tested similarity alignment, root-only clump translation), `prepare_curly_mane_workbench.py` (original scalp-colored source scene), `pilot_curly_mane.py` (annotated source/target marker fit). The genuine vendor CURLY 01.FBX is now available and has been audited on real source geometry; a non-rigged static root adjustment preview exists. Curls opacity atlas, Blender skinning and visual QA are still required.
 - **Not yet implemented:** fully automatic donor root discovery, complete rig/gap checks (`validate_fit.py`), reproducible cameras (`render_qa.py`), LOD/export integration.
 - **Out of scope:** any male character/garment fitting and production UI updates.
