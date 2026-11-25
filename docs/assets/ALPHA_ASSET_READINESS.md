@@ -37,7 +37,7 @@ Updated 2026-11-24. This is an approval/integration tracker, **not** a statement
 
 ## Current Avensky runtime integration gap
 
-The production appearance catalog in `packages/wardrobe-catalog/character-appearance.json` lists only `natural` and `cropped` hair styles on `main`. The repaired 12-style pack and curly candidates are not yet wired into this catalog. Do not treat a successful Blender or GLB export as an in-game installation.
+Natural and Close crop remain the base options. The twelve Espresso fitted styles are exported and cataloged for private staging. The Body editor lists the styles enabled in the asset release. The three curly candidates still require fitting. [Private staging installation](../CLOUD_ASSETS.md#fitted-vesper-hairstyles)
 
 ## Immediate acceptance matrix
 1. Hair Style 12 on Vesper: dark brunette / ash / blonde / caramel balayage in garage lighting, sun and shade, and after reload.

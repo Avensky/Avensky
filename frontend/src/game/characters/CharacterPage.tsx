@@ -10,7 +10,7 @@ import { requestSocial } from "../../net/socialClient";
 import { selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, VILLAGER_ID, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, VILLAGER_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
@@ -588,6 +588,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     }>Stop</button>
   </div>;
   const fitting = tab === "appearance";
+  const fittedStyles = installedHairStyles(choice.id);
   const rotationDisabled = insideCar || Boolean(garageDoorForEmote(emote?.id)) || isMirrorMakeupEmote(emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
   const cameraViews = vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
@@ -669,6 +670,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
                 disabled={field === "tattoo" && saveToProfile && !bodyTattoosAvailable}
                 onChange={event => editBodyAppearance(field, event.target.value)}>
                 {CHARACTER_APPEARANCE_OPTIONS[field].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+                {field === "hair" && fittedStyles.map(style =>
+                  <option key={style.id} value={style.id}>{style.label}</option>)}
+                {field === "hair" && !CHARACTER_APPEARANCE_OPTIONS.hair.some(style => style.id === appearance.hair)
+                  && !fittedStyles.some(style => style.id === appearance.hair)
+                  && <option disabled value={appearance.hair}>Saved style unavailable</option>}
               </select>
               {field === "tattoo" && saveToProfile && !bodyTattoosAvailable && <small>Update the game server to save tattoos.</small>}
             </label>)}

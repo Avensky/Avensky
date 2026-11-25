@@ -62,7 +62,10 @@ function assetDefines(release: StagingRelease | null) {
     ? (packedPath && Object.hasOwn(release.assets, packedPath) ? packedPath : null)
     : installedPackedVesperPortrait(vesper);
 
+  const fittedHair: {id: string; url: string; sha256: string}[] = JSON.parse(readFileSync(
+    new URL("../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
   return {
+    __FITTED_HAIR_IDS__: JSON.stringify(fittedHair.filter(style => release?.assets[style.url]?.sha256 === style.sha256).map(style => style.id)),
     __STAGING_ASSET_RELEASE__: JSON.stringify(release && {
       id: release.id, paths: Object.fromEntries(Object.keys(release.assets).map(path => [path, true])),
     }),

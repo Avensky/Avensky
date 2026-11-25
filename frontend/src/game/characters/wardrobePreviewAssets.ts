@@ -1,6 +1,7 @@
 import type { Object3D } from "three";
 import { assetAvailable } from "../../assets/runtimeAssets";
-import type { CharacterLook } from "./characterCatalog";
+import { installedHairStyles, type CharacterLook } from "./characterCatalog";
+import { fitsHairRig } from "./fittedHair";
 import { getWardrobeActorBody, getWardrobeBodyDonor, isWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
 import { hasAuthoredLacedBodiceFit, hasBindableStandaloneCorset, rebuiltUnderbustPart } from "./standaloneCorset";
 import { corsetModelUrls, corsetRenderChoice, isRebuiltHighCollarUrl, isRebuiltLacedBodiceUrl, isRebuiltUnderbustUrl, wardrobeModelUrls } from "./wardrobe";
@@ -15,6 +16,7 @@ export type WardrobeAssetSources = Readonly<Partial<Record<string, Object3D | nu
 export type WardrobePreview = {
   look: CharacterLook;
   scene: Object3D;
+  hairSource?: Object3D;
   garments: WardrobeGarmentSource[];
   garmentBody?: Object3D;
   corsetScene?: Object3D;
@@ -131,7 +133,12 @@ export function resolveWardrobePreview({
   if (corsetUrl) urls.add(corsetUrl);
   const assetUrls = [...urls];
   const pendingUrls = assetUrls.filter(asset => sourceFor(asset) === undefined);
-  const unavailable = (corsetUrls.length > 0 && !corsetUrl) || requested.some(({ rejected }) => rejected)
+  const style = installedHairStyles(look.character.id).find(item => item.id === look.appearance.hair);
+  const hairScene = style ? sourceFor(style.url) : undefined;
+  if (style && hairScene === undefined) pendingUrls.push(style.url);
+  const hairMesh = style && hairScene ? hairScene.getObjectByName(style.mesh) : undefined;
+  const hairSource = fitsHairRig(hairMesh ?? undefined, skeleton) ? hairMesh : undefined;
+  const unavailable = Boolean(style && hairScene !== undefined && !hairSource) || (corsetUrls.length > 0 && !corsetUrl) || requested.some(({ rejected }) => rejected)
     || assetUrls.some(asset => sourceFor(asset) === null)
     || (needsBody && !garmentBody && (!skeleton || (needsSeparateBody && sourceFor(bodyUrl) !== undefined)));
 
@@ -151,8 +158,8 @@ export function resolveWardrobePreview({
     return loaded.item === garment.item && loaded.scene === garment.scene && loaded.authoredFit === garment.authoredFit;
   });
   const preview = sameGarments && previous.look === look && previous.scene === scene && previous.garmentBody === garmentBody
-    && previous.corsetScene === corsetScene && previous.corsetSet === corsetSet
+    && previous.corsetScene === corsetScene && previous.corsetSet === corsetSet && previous.hairSource === hairSource
     ? previous
-    : { look, scene, garments: sameGarments ? previous.garments : garments, garmentBody, corsetScene, corsetSet };
-  return { scene, pendingUrls, unavailable, preview };
+    : { look, scene, garments: sameGarments ? previous.garments : garments, garmentBody, corsetScene, corsetSet, hairSource };
+  return { scene, pendingUrls, unavailable: unavailable || Boolean(style && !hairSource), preview };
 }

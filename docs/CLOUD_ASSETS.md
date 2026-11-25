@@ -43,6 +43,22 @@ AVENSKY_PREBUILT_ASSETS="$PWD/frontend/.asset-release/prebuilt.json" npm --prefi
 
 The build rejects metadata when its tracked asset inventory or generator inputs and recipes changed. Runtime GLBs can embed textures or reference relative URLs to other assets in the same release. The verifier rejects external origins, missing sidecars and dependencies that escape the release route.
 
+### Fitted Vesper hairstyles
+
+The twelve standalone Espresso GLBs are distributed to the staging operator in a private pack. Their expected sizes and SHA-256 digests are in `packages/wardrobe-catalog/fitted-hair.json`. Use the pack matching these digests. The public repository contains the catalog and runtime code.
+
+1. Upload the selected GLBs under `staging/objects/<sha256>` using the private bucket procedure below. The upload helper in the private pack checks the files against the catalog.
+2. On the verification host, generate the staging manifest from the same commit as the frontend. Set `AVENSKY_STAGING_FITTED_HAIR=hair-12` for the first style or `all` for all twelve. A comma-separated list enables a subset. Use the same selection for the build and for verification.
+
+   ```sh
+   AVENSKY_STAGING_FITTED_HAIR=all node --input-type=module -e \
+     'import {writeFileSync} from "node:fs"; import {stagingRelease} from "./frontend/scripts/staging-release.mjs"; writeFileSync("staging-with-hair.json", JSON.stringify(stagingRelease(process.env.AVENSKY_PREBUILT_ASSETS)));'
+   node deploy/staging-assets/verify.mjs staging-with-hair.json verified-staging-with-hair.json --models-root
+   ```
+
+3. Configure the gateway to serve the newly verified manifest alongside the previous release. Point the staging receiver's verified-manifest configuration at the new file. Set the GitHub repository Actions variable `STAGING_FITTED_HAIR` to the same selection, then run **Deploy to staging** on `main`. The existing receiver checks the manifest ID before switching the frontend. The game server build must include the updated wardrobe catalog to save the new IDs.
+4. Select Vesper, open **Character → Body → Hair**, equip a style, turn her head and reload the saved profile. Check hat clearance and color on the target phone. Her glasses, harnesses and bracer are under **Appearance → Accessories → All items**.
+
 ## Verify the private bucket
 
 The staging build includes metadata for Vesper's fitted space buns, tennis dress and wedge sandals in `frontend/scripts/staging-fitted-assets.json`. The model files are installed separately in private storage for the login-protected alpha. Before changing this metadata on main, verify the new release on the staging gateway and retain the previous manifest for open sessions.

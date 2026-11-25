@@ -84,7 +84,7 @@ function HighCollarMotion({ update }: { update: () => void }) {
 }
 
 function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }: VillagerPlayback & { preview: WardrobePreview }) {
-  const { look, scene, garments, garmentBody, corsetScene, corsetSet } = preview;
+  const { look, scene, garments, garmentBody, corsetScene, corsetSet, hairSource } = preview;
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
   const fitted = usesFittedAnimation(look);
@@ -92,9 +92,9 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   const removalKey = [...look.removedClothing].sort().join(",");
   const removedClothing = useMemo(() => removalKey ? removalKey.split(",") as WardrobeRemoval[] : [], [removalKey]);
   const createModel = useCallback(() => prepareVillager(scene, {
-    female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, removedClothing,
+    female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, removedClothing,
     corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
-  }), [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, corsetScene, corsetSet]);
+  }), [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet]);
   const model = useCommittedResource(createModel);
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />

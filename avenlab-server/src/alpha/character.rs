@@ -228,6 +228,11 @@ static CAST: LazyLock<Vec<Character>> = LazyLock::new(|| {
         .expect("the built-in character catalog is valid")
 });
 
+static FITTED_HAIR: LazyLock<Vec<Outfit>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/fitted-hair.json"))
+        .expect("the fitted hairstyle catalog is valid")
+});
+
 static DRIVER_VEHICLES: LazyLock<BTreeMap<String, serde::de::IgnoredAny>> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/vehicle-drivers.json"))
         .expect("the built-in vehicle driver catalog is valid")
@@ -359,6 +364,7 @@ impl CharacterChoice {
             .into_iter()
             .all(|(field, value)| value.is_none_or(|value| {
                 (field == "color" && hex_color(value))
+                    || (field == "hair" && self.id == "mara-vega" && FITTED_HAIR.iter().any(|style| style.id == value))
                     || APPEARANCES
                         .get(field)
                         .is_some_and(|options| options.iter().any(|option| option.id == value))
@@ -371,6 +377,23 @@ impl CharacterChoice {
 mod wardrobe_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn fitted_hair_saves_only_on_vespers_rig() {
+        let mut value = json!({"id":"mara-vega","outfit":"dockwear","appearance":{
+            "hair":"hair-12","hair_color":"original","skin":"original","headwear":"none","color":"original"
+        }});
+        let equippable = |v| serde_json::from_value::<CharacterChoice>(v).unwrap().is_equippable();
+        assert!(equippable(value.clone()));
+        value["appearance"]["hair"] = json!("hair-99");
+        assert!(!equippable(value.clone()));
+        value["id"] = json!("jules-okafor");
+        value["outfit"] = json!("night-run");
+        value["appearance"]["hair"] = json!("hair-12");
+        assert!(!equippable(value.clone()));
+        value["appearance"]["hair"] = json!("natural");
+        assert!(equippable(value));
+    }
 
     #[test]
     fn body_tattoo_is_optional_and_only_accepts_catalog_styles() {

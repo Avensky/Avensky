@@ -9,7 +9,7 @@ This is the **source-safe authoring pipeline**, not an in-game hairstyle install
 - Existing straight hair silhouettes are not changed. Natural waves use straight/wavy donor strips; only the naturally curled Hair_11 uses the Curls donor atlas.
 - The **private** material-generation run produced 48 256×1024 RGBA/alpha color maps plus 12 normal and 12 AO/roughness/metallic maps.
 - Material-map QA passed for all 12. Four source-safe Python unit tests passed.
-- **Important:** Blender material binding, skinned GLB re-export, in-app visual and physical-mobile checks have **not yet run** in the current environment. This work does not grant a full alpha pass.
+- Blender 5.2.1 exported all twelve fitted Espresso GLBs with their embedded strand textures. The Avensky renderer bound each export to both the fitted reference and the shipped Vesper portrait. The head-turn and hair-color checks passed on all twelve styles. The [private staging installation](../../docs/CLOUD_ASSETS.md#fitted-vesper-hairstyles) enables the models in Vesper’s Body editor. In-game lighting and physical-mobile review remain open.
 
 ## Requirements
 

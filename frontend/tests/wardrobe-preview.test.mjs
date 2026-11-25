@@ -8,6 +8,7 @@ import { createServer } from "vite";
 function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
+      __FITTED_HAIR_IDS__: JSON.stringify(["hair-12"]),
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),
@@ -159,6 +160,23 @@ test("the wardrobe resolver requests donors and authored tiers in order", async 
       ...defaultRequest, look: characterLook(DEFAULT_CHARACTER), sources: { village },
     }).preview;
     assert(previous);
+
+    const hairUrl = "/models/characters/female/hair/Hair_12_espresso.glb";
+    const hairLook = characterLook({ ...DEFAULT_CHARACTER, appearance: { ...previous.look.appearance, hair: "hair-12" } });
+    const hairPreview = sources => resolveWardrobePreview({ ...defaultRequest, look: hairLook, sources: { village, ...sources }, previous });
+    assert.deepEqual(hairPreview({}).pendingUrls, [hairUrl]);
+    const compatibleHair = makeGarmentAvailable(hairUrl, { name: "Hair_12" });
+    assert.equal(hairPreview({ [hairUrl]: compatibleHair }).preview.hairSource, compatibleHair.getObjectByName("Hair_12"));
+    const reordered = makeGarmentAvailable(hairUrl, { name: "Hair_12", shape: "reordered" });
+    assert.equal(hairPreview({ [hairUrl]: reordered }).preview.hairSource, reordered.getObjectByName("Hair_12"));
+    const incompatible = makeGarmentAvailable(hairUrl, { name: "Hair_12" });
+    incompatible.getObjectByName("Hair_12").skeleton.bones[0].name = "different-rig";
+    for (const missing of [null, incompatible]) {
+      const fallback = hairPreview({ [hairUrl]: missing });
+      assert.equal(fallback.unavailable, true);
+      assert.equal(fallback.preview.scene, village);
+      assert.equal(fallback.preview.hairSource, undefined);
+    }
 
     const stockSkirt = characterLook({ ...DEFAULT_CHARACTER, garments: { skirt: "village-skirt" } });
     const originalPortrait = makeVillageAvailable("village-raw");
