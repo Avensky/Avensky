@@ -28,6 +28,8 @@ def arguments():
     parser.add_argument("--after", default="AVFIT_CurlyMane_GLOBAL_PREVIEW")
     parser.add_argument("--scalp-group", default="AV_ScalpRegion")
     parser.add_argument("--framing-hair", help="Use this original baseline with the before object to keep the prior framing and lights")
+    parser.add_argument("--framing-before", help="Optional original before object for exact reuse of the prior framing")
+    parser.add_argument("--after-inserts", help="Separate source-curl insert mesh shown only after")
     parser.add_argument("--diffuse", type=Path, required=True)
     parser.add_argument("--opacity", type=Path, required=True)
     parser.add_argument("--normal", type=Path)
@@ -250,8 +252,8 @@ def main():
                            for name in (args.head, args.before, args.after))
     if not all(obj and obj.type == "MESH" and obj.data.uv_layers.active for obj in (head, before, after)):
         raise ValueError("Expected the UV-mapped original Face4 and both Curly Mane objects")
-    if len({head, before, after}) != 3:
-        raise ValueError("Head and comparison meshes must be distinct")
+    if head in (before, after) or (before == after and not args.after_inserts):
+        raise ValueError("Use a separate head and either two hair meshes or one hair mesh with after-only inserts")
     maps = {"diffuse": args.diffuse, "opacity": args.opacity}
     if args.normal:
         maps["normal"] = args.normal
@@ -267,15 +269,23 @@ def main():
     head_points = world_positions(head)
     extent = float(np.ptp(head_points, axis=0).max())
     framing = bpy.context.scene.objects.get(args.framing_hair) if args.framing_hair else after
-    if not framing or framing.type != "MESH":
+    framing_before = bpy.context.scene.objects.get(args.framing_before) if args.framing_before else before
+    if not all(obj and obj.type == "MESH" for obj in (framing_before, framing)):
         raise ValueError("Framing hair mesh is missing")
-    points = np.concatenate((head_points, world_positions(before), world_positions(framing)))
+    points = np.concatenate((head_points, world_positions(framing_before), world_positions(framing)))
     center = (points.max(0) + points.min(0)) / 2
     scene, camera, lights = create_scene(args, center, extent)
     beauty_head = mesh_copy(scene, head)
     head_materials(beauty_head, skin)
     diagnostic_head, triangles = mask_head(scene, head, weights)
-    donors = [mesh_copy(scene, obj) for obj in (before, after)]
+    sources = [before, after]
+    if args.after_inserts:
+        insert = bpy.context.scene.objects.get(args.after_inserts)
+        if not insert or insert.type != "MESH" or insert in {head, before, after} or not insert.data.uv_layers.active:
+            raise ValueError("The after-only insert must be a separate mesh with the source opacity UV")
+        sources.append(insert)
+    donors = [mesh_copy(scene, obj) for obj in sources]
+    stages = (("before", donors[:1]), ("after", donors[1:]))
     hair_materials = []
     for obj in donors:
         uv = obj.data.uv_layers.active.name
@@ -294,7 +304,8 @@ def main():
         "scalp_group": args.scalp_group, "scalp_triangles": triangles,
         "scalp_status": head.get("avensky_scalp_status", "GROUP_STATUS_UNSPECIFIED"),
         "before_object": before.name, "after_object": after.name,
-        "framing_hair": framing.name,
+        "framing_hair": framing.name, "framing_before": framing_before.name,
+        "after_inserts": args.after_inserts,
         "samples": args.samples, "seed": 29, "size": args.size,
         "beauty_denoised": True, "diagnostics_denoised": False, "views": {},
     }
@@ -319,9 +330,9 @@ def main():
                     path = Path(temporary) / f"{view}-reference.exr"
                     reference = capture(scene, path, mask=True)
                     save_mask(reference, out / f"{view}-scalp-reference.png")
-                for label, selected in zip(("before", "after"), donors):
+                for label, selected in stages:
                     for obj in donors:
-                        obj.hide_render = obj != selected
+                        obj.hide_render = obj not in selected
                     if diagnostic:
                         path = Path(temporary) / f"{view}-{label}.exr"
                         visible = capture(scene, path, mask=True)
