@@ -46,8 +46,8 @@ test("the workshop floor uses the authored slab under the removable vehicle plat
   const display = prepareGarageDisplay(source);
   const slab = display.root.getObjectByName("BASE_Full");
   assert.deepEqual(slab.geometry.groups.map(({ materialIndex }) => materialIndex), [1, 0]);
-  assert.equal(slab.material[1].name, "Sealed workshop concrete");
-  assert.ok(slab.material[1].roughness > .8);
+  assert.equal(slab.material[1].name, "Workshop slab");
+  assert.ok(slab.material[1].roughness >= .35 && slab.material[1].roughness <= .5);
   assert.equal(display.root.getObjectByName("Sol_CUBE").visible, false);
   assert.equal(tiles.visible, true);
   assert.equal(geometry.groups.length, 0);
@@ -72,4 +72,36 @@ test("the 0999 counter borrows the original zero segments across nested author t
   assert.deepEqual(leading.position.toArray(), [5 - 22.60, 10, 15 + 1.13]);
   assert.equal(source.getObjectByName(leading.name), undefined);
   display.dispose();
+});
+
+test("the work lamp and neon use their real transformed faces and distinct light colors", async () => {
+  const { collectGarageFixtures } = await import("../src/game/preview/garageFixtures.ts");
+  const room = new Group(), face = new MeshStandardMaterial({ name: "LIGHT " }), geometry = new PlaneGeometry();
+  for (const [name, x] of [["Cube.001", 3], ["Base_Light.001", -4]]) {
+    const fixture = new Group(); fixture.userData.name = name; fixture.position.set(x, 3, -2);
+    fixture.add(new Mesh(geometry, face)); room.add(fixture);
+  }
+  room.position.x = 1;
+  const display = prepareGarageDisplay(room);
+  const fixtures = collectGarageFixtures(display.root);
+  applyGarageLighting(display.root, "navy", false, 0);
+  fixtures.updateEmission();
+  const lamp = fixtures.lights.getObjectByName("garage-work-light-3x4");
+  const rack = fixtures.lights.getObjectByName("garage-neon-rack");
+  assert.deepEqual(lamp.position.toArray(), [4, 3, -2]);
+  assert.deepEqual(rack.position.toArray(), [-3, 3, -2]);
+  assert.deepEqual(lamp.target.position.toArray(), [0, .65, 0]);
+  assert.ok(lamp.intensity > 0 && lamp.color.r > lamp.color.b);
+  assert.equal(rack.intensity, 0);
+  applyGarageLighting(display.root, "forest", false);
+  fixtures.updateEmission();
+  assert.ok(rack.intensity > 0 && rack.color.g > rack.color.r);
+  assert.equal(face.emissive.getHex(), 0);
+  fixtures.dispose(); display.dispose(); geometry.dispose(); face.dispose();
+});
+
+test("old saves use concrete and brushed steel persists independently of the garage theme", () => {
+  assert.equal(sanitizeGarageEffects({ theme: "forest" }).floorFinish, "concrete");
+  assert.equal(sanitizeGarageEffects({ floorFinish: "unknown" }).floorFinish, "concrete");
+  assert.equal(sanitizeGarageEffects({ theme: "auto", floorFinish: "metal" }).floorFinish, "metal");
 });

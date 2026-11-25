@@ -1,4 +1,5 @@
 import { Material, Mesh, MeshStandardMaterial, type Object3D } from "three";
+import { isGarageWorkLight } from "./garageFixtures.ts";
 import { fitMechanicsFloor } from "./mechanicsFloor.ts";
 import { tagGarageAccent } from "../../theme/garageLighting.ts";
 
@@ -53,8 +54,8 @@ export function prepareGarageDisplay(scene: Object3D) {
         material.envMapIntensity = 0.9;
         break;
       case "Material.006":
-        material.emissive.setRGB(1, 1, 1);
-        material.emissiveIntensity = 1.55;
+        material.emissive.set("#fff1dc");
+        material.emissiveIntensity = 3;
         break;
       case "Sol cubique":
         material.color.set("#3b332d");
@@ -74,8 +75,8 @@ export function prepareGarageDisplay(scene: Object3D) {
       case "Fond":
         material.userData.garageSurface = "garage-panel";
         material.color.setRGB(0.075, 0.08, 0.095);
-        material.metalness = 0.4;
-        material.roughness = 0.24;
+        material.metalness = 0.12;
+        material.roughness = 0.68;
         material.envMapIntensity = 1.1;
         break;
       case "Material.001":
@@ -103,6 +104,7 @@ export function prepareGarageDisplay(scene: Object3D) {
       tagGarageAccent(material, greenBase || material.name.trim() === "SDC");
     return material;
   };
+  let workLight: MeshStandardMaterial | undefined;
   root.traverse((object) => {
     // The authored four-corner fixture stays in the GLB; the rotating display
     // and its reflection probe omit it. Never hide or edit the cached source.
@@ -112,6 +114,17 @@ export function prepareGarageDisplay(scene: Object3D) {
     object.material = Array.isArray(object.material)
       ? object.material.map(prepare)
       : prepare(object.material);
+    // The freestanding twelve-cell work light shares the neon material in the
+    // export. Give its bulbs a warm white phosphor so the bay retains neutral task lighting.
+    if (isGarageWorkLight(object)) {
+      if (!workLight) {
+        workLight = object.material.clone();
+        workLight.userData.garageAccent = false;
+        workLight.emissive.set("#ffead5");
+        workLight.emissiveIntensity = 3.2;
+      }
+      object.material = workLight;
+    }
   });
   const disposeFloor = fitMechanicsFloor(root);
   // The front bank only contains 999. The rear bank contains complete zero
@@ -131,6 +144,6 @@ export function prepareGarageDisplay(scene: Object3D) {
   // copies are owned by this display, including on selection-screen remounts.
   return {
     root,
-    dispose: () => { disposeFloor?.(); materials.forEach(material => material.dispose()); },
+    dispose: () => { disposeFloor?.(); workLight?.dispose(); materials.forEach(material => material.dispose()); },
   };
 }

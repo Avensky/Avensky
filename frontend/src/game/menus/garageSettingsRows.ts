@@ -100,6 +100,12 @@ export function garageSettingsRows(
         update({ environmentReflections: !settings.environmentReflections }),
     },
     {
+      id: "garage-floorFinish",
+      label: "Floor finish",
+      value: settings.floorFinish === "metal" ? "Brushed steel" : "Sealed concrete",
+      action: () => update({ floorFinish: settings.floorFinish === "metal" ? "concrete" : "metal" }),
+    },
+    {
       id: "garage-floorReflections",
       label: "Floor reflections",
       value: settings.floorReflections ? "On" : "Off",
