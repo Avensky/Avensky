@@ -1,33 +1,41 @@
-# Vesper scalp V2 — first usable geometry milestone
+# Vesper female hair — source-first quickstart and safe resume
 
-**Status:** authoring-only implementation. Pure geometry tests pass locally; Blender and game visual QA have **not** been run against the private Vesper source. Do not merge, auto-install, or deploy resulting geometry.
+**Status:** the original **complete Face4** and **actual Face BaseColor with natural scalp discoloration** have been identified and rendered together. Source inventory/prototype scripts exist; a validated Curly Mane fit, Blender/phone QA and GLB output are NOT finished. Work is **Vesper-only**; male hair and clothes remain paused.
 
-## UPDATE: use the ORIGINAL full skull, not a generated dome
+**First read:** [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) and [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md). Don't start over with synthetic scalp caps or recolored flat-card textures.
 
-After inspecting the six original uploaded `SK_Village_Lady*.fbx` source files, we confirmed that `SK_Village_Lady_Face4.fbx` already includes the **entire skull surface**. Its main Face material extends across the crown and back of head. Therefore the primary Vesper pipeline is to **extract a thin dark-root region from the source head mesh** with the existing UVs and rig, not to approximate the skull with a sphere. See [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md).
+## The correct first action: use Vesper's real scalp color
 
-**First Blender action:** import `SK_Village_Lady_Face4.fbx` into a **private** neutral-pose Blender .blend, locate the object `Face4`, and paint an `AV_ScalpRegion` vertex group over the upper skull including crown/sides/back but excluding ears, forehead, face, and eyelids. Save a new private working scene (e.g. `vesper-face4-scalp-guides.blend`). Use 1.0 weight on approved regions and 0 outside. This is a one-time per-character guide, not one group per hairstyle.
+**Required original inputs:** `SK_Village_Lady_Face4.fbx` and **`T_Villager_Lady_Face_BaseColor.tga`** (not `Face_BaseColor_ID`). Optionally load the original skeleton from `SK_Village_Lady.fbx` and stock `SK_Village_Lady_Hair20.fbx` as a retained comparison.
 
-Then inspect the candidate region without writing any source file. These example axis/unit values MUST be verified from the imported Blender scene:
+1. Open a PRIVATE neutral character Blender scene and import the original Face4 FBX/rig.
+2. Verify actual imported object names, UVs, transforms, bone names, camera axis and meters-per-unit. Do not assume raw FBX units are Blender meters.
+3. Assign the real `T_Villager_Lady_Face_BaseColor.tga` to the original Face4 skin material using **its original UVs**. Verify it shows Vesper's actual skin color and natural speckled gray-brown scalp/hairline fade. No extra cap, sphere, or brown paint at this step.
+4. Save a locked neutral head reference scene and front/back/left/right/top/three-quarter fixed-camera screenshots with the hair hidden.
+5. Import one original donor style (Curly Mane) with its **own** matching UV/texture atlas. Fit and check actual root strips against the source Face4 surface. **This root-only fitter is not implemented yet; do not run a fictional `fit_hair.py` command.**
+6. If there are actual gaps after a first fit, supplement only those areas with local follicle/root pigment or sparse under-clumps. Preserve intentional part lines and the source scalp texture.
+7. Only after a successful fit and source-verified six-view QA proceed to LOD/export, game and phone checks.
+
+**No new scalp cap is needed as a prerequisite.** Original Face4 already covers the skull and its Face BaseColor supplies a better follicle appearance than the previous solid-color overlay.
+
+## Optional diagnostics only — source-derived scalp extraction
+
+If visual QA shows a specific gap that needs a separate local root-covering layer, you **may** create a private prototype from selected original Face4 faces. This remains experimental; it uses a uniform debug material and **does not restore the original scalp texture on its own**.
+
+- In a private `.blend`, manually annotate a vertex group `AV_ScalpRegion` on Face4 (include only approved coverage; exclude ears, eyes, face and forehead below the hairline).
+- Run `extract_source_scalp.py` in dry-run mode with verified `--meters-per-world-unit`.
+- Only if the region is satisfactory, add `--write --output-blend` to produce a **new** private .blend for review. Do not replace the default Face4 or ship the matte debug surface.
+
+Example (change Windows paths, imported object/material names and units to the actual scene):
 
 ```powershell
-blender -b "C:\AvenskyPrivate\vesper-face4-scalp-guides.blend" --python scripts/hair/fit/extract_source_scalp.py -- --head-object Face4 --region-group AV_ScalpRegion --face-material Face --meters-per-world-unit 1.0 --report "C:\AvenskyPrivate\fit\source-scalp-preflight.json"
+blender -b "C:\AvenskyPrivate\vesper-face4-skin.blend" --python scripts/hair/fit/extract_source_scalp.py -- --head-object Face4 --region-group AV_ScalpRegion --face-material Face --meters-per-world-unit 1.0 --report "C:\AvenskyPrivate\fit\scalp-debug-preflight.json"
 ```
 
-After inspecting the counts, Blender face group and screenshot angles, save a **NEW** authoring-only blend:
-
-```powershell
-blender -b "C:\AvenskyPrivate\vesper-face4-scalp-guides.blend" --python scripts/hair/fit/extract_source_scalp.py -- --head-object Face4 --region-group AV_ScalpRegion --face-material Face --meters-per-world-unit 1.0 --report "C:\AvenskyPrivate\fit\source-scalp-authoring.json" --write --output-blend "C:\AvenskyPrivate\vesper-source-scalp-v2.blend"
-```
-
-The extracted scalp is a **matte color-only prototype**. Test root color, UVs, scalp penetration, jaw/forehead/ear exclusion, head animations and shape-key effects; add root wisps/density separately. Do not export or publish a fitted GLB until those checks pass. It deliberately refuses to act if the author-approved `AV_ScalpRegion` group is missing.
-
-**Do not mistake the FBX source units for Blender units:** the original FBX says Y-up and UnitScaleFactor=1 (conventionally centimeters) and is about 166 units tall. Confirm whether Blender imported into meters/centimeters before selecting the `--meters-per-world-unit` argument. The example 1.0 means **one meter per Blender world unit**, which may be WRONG if the import retains original centimeter units.
-
-The source-derived path replaces Steps 2 and 3 below for Vesper. The manually traced loop plus spherical loft below is only a contingency for a future character whose original head geometry is genuinely incomplete.
+**Important:** Original FBX is Y-up with a centimeter-style scale convention. The example `1.0` is *not* verified and may be wrong after import. Document actual imported world units before attempting any mm offset or export.
 
 ## Why the old cap must remain separate
-The runtime `villager-scalp-cap` is a bonnet/hood fallback constructed from hard-coded spherical coordinates in `villagerModel.ts`. It is **not** a measurement-derived universal scalp. Keep it for its existing headwear use. The new `AVSK_ScalpFoundation_V2` is a separate Blender-authored, head-specific foundation to evaluate for imported hairstyles.
+The runtime `villager-scalp-cap` is a bonnet/hood fallback constructed from hard-coded spherical coordinates in `villagerModel.ts`. It is **not** a measurement-derived universal scalp. Preserve its existing headwear behavior, but **do not enable it globally**. The separate synthetic `AVSK_ScalpFoundation_V2` is an earlier fallback prototype, **unnecessary for Vesper when Face4 and real Face BaseColor are intact**.
 
 ### New modules
 - `inspect_character.py`: read-only inspection of Vesper GLB or private Blender scene, listing head/face candidate meshes, open boundaries and head-bone candidates.
@@ -35,6 +43,10 @@ The runtime `villager-scalp-cap` is a bonnet/hood fallback constructed from hard
 - `build_scalp_cap.py`: Blender dry run by default; generates UVs and dark matte root material, safely attaches to a named head bone, and saves only to a **new** .blend with explicit `--write`.
 - `test_cap_geometry.py`: non-Blender unit tests for topology, winding, orientation and invalid geometry.
 - `RUNTIME_COMPARISON.md`: previously added optional development/staging comparison for old cap vs imported hair backing.
+
+## Fallback only: characters whose actual source head is incomplete
+
+The rest of the earlier instructions (`AV_HairlineLoop`, `AV_Crown`, `build_scalp_cap.py`, and `run-scalp.ps1 -Mode cap-build`) document an **older synthetic-cap path**. They are NOT steps to perform for Vesper in this project. Retained for reference; do not use or optimize these while female fitting remains the scope.
 
 ## Windows shortcut: no Blender PATH configuration required
 
