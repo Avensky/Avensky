@@ -11,7 +11,23 @@ import { createMenuDirections, menuNeutral } from "../../controls/menuDirections
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { navigateFormRows } from "../social/formRows";
 
+function moveNotices(card: HTMLElement) {
+  const body = card.closest(".garage-entry-body");
+  if (!body) return;
+  let notices = body.querySelector<HTMLElement>(".garage-notices");
+  for (const message of card.querySelectorAll<HTMLElement>('[role="alert"],[role="status"]')) {
+    if (!notices) {
+      notices = document.createElement("aside");
+      notices.className = "garage-notices";
+      notices.setAttribute("aria-label", "Announcements and issues");
+      body.prepend(notices);
+    }
+    notices.append(message);
+  }
+}
+
 function attachController(form: HTMLElement) {
+  moveNotices(form);
   const islands: ReturnType<typeof createRoot>[] = [];
   const credentials = form.querySelector<HTMLFormElement>(".garage-credentials");
   const login = credentials?.querySelector<HTMLInputElement>('input[name="email"]')?.value ?? "";
@@ -178,4 +194,8 @@ function attach() {
   if (card && !card.querySelector(".garage-gamepad-controls")) attachController(card);
 }
 window.addEventListener("avensky:portal-form", attach);
+window.addEventListener("avensky:portal-notice", () => {
+  const card = document.querySelector<HTMLElement>(".garage-entry-card");
+  if (card) moveNotices(card);
+});
 attach();

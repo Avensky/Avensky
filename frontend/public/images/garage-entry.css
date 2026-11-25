@@ -35,7 +35,7 @@
    instead of its contents so text, focus rings and controller hints stay opaque. */
 :root {
   --garage-menu-panel: color-mix(in srgb, color-mix(in srgb, #101012 82%, var(--app-panel)) 88%, transparent);
-  --garage-menu-row: color-mix(in srgb, #252426 50%, transparent);
+  --garage-menu-row: color-mix(in srgb, #252426 65%, transparent);
   --garage-menu-ink: #fcf4e9;
   --garage-menu-muted: #d8cfc5;
   --garage-menu-line: #ffffff38;
@@ -245,4 +245,25 @@ body.garage-entry .garage-entry-card:not(.garage-entry-account)::before { conten
 }
 .garage-entry-card [role="button"]:focus-visible {
   outline:2px solid var(--garage-menu-accent); outline-offset:-3px;
+}
+
+
+/* Anchor chrome to the screen; inset the content inside the angled tab. */
+.garage-entry-header.angled-tab-header { position:fixed; top:0; left:0; margin:0; }
+.garage-entry-header.angled-tab-header > div:first-child {
+  padding-left:max(12px,env(safe-area-inset-left));
+  padding-top:env(safe-area-inset-top);
+  height:calc(var(--angled-header-height) + env(safe-area-inset-top));
+}
+.garage-notices {
+  position:absolute; left:max(3vw,env(safe-area-inset-left)); top:25%;
+  width:min(40vw,32rem); max-height:50svh; overflow:auto;
+  color:var(--garage-menu-ink); font-size:clamp(14px,1.3vw,18px);
+  line-height:1.45; pointer-events:auto;
+}
+.garage-notices:empty { display:none; }
+.garage-notices :is(p,[role="alert"]) { margin:0 0 .7rem; padding:.6rem .8rem; background:var(--garage-menu-row); border-left:2px solid var(--garage-menu-accent); }
+.garage-entry .garage-field input { font-size:max(16px,1rem); }
+@media (max-width:600px) and (orientation:portrait) {
+  .garage-notices { top:calc(var(--menu-angled-header-height) + env(safe-area-inset-top) + 1rem); left:1rem; width:calc(100% - 2rem); max-height:25svh; }
 }

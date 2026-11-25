@@ -12,6 +12,7 @@
     const message = card.querySelector('[role="alert"]') ?? card.appendChild(document.createElement("p"));
     message.setAttribute("role", "alert");
     message.textContent = text;
+    window.dispatchEvent(new Event("avensky:portal-notice"));
   }
   async function navigate(url, options) {
     if (pending) return;

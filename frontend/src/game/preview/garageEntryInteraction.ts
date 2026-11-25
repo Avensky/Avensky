@@ -1,5 +1,5 @@
 export type EntryMotion = {
-  yaw: number; pitch: number; dragging: boolean; lastInput?: number;
+  yaw: number; pitch: number; dragging: boolean; lastInput?: number; dragStarted?: number; targetYaw?: number; targetPitch?: number;
   invalidate?: () => void;
 };
 
@@ -32,13 +32,15 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
       return;
     }
     wake();
-    if (event.button !== 0 || (event.target as Element).closest(".garage-entry-card,.garage-entry-header,.text-keyboard")) return;
+    if (event.button !== 0 || (event.target as Element).closest(".garage-entry-card,.garage-entry-header,.garage-notices,.text-keyboard")) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
     motion.dragging = true;
-    motion.lastInput = performance.now();
+    motion.dragStarted = performance.now();
+    motion.lastInput = motion.dragStarted;
     if (root.dataset.garageReady !== "true") {
       motion.yaw = 0; motion.pitch = 0;
     }
+    motion.targetYaw = motion.yaw; motion.targetPitch = motion.pitch;
     root.setPointerCapture(event.pointerId);
     motion.invalidate?.();
     event.preventDefault();
@@ -46,8 +48,8 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
   document.addEventListener("pointermove", event => {
     if (isLogin()) wake();
     if (!pointer || pointer.id !== event.pointerId) return;
-    motion.yaw = Math.max(-.12, Math.min(.12, motion.yaw + (event.clientX - pointer.x) * .0007));
-    motion.pitch = Math.max(-.045, Math.min(.045, motion.pitch + (event.clientY - pointer.y) * .00045));
+    motion.targetYaw = Math.max(-.12, Math.min(.12, (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * .0007));
+    motion.targetPitch = Math.max(-.045, Math.min(.045, (motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * .00045));
     motion.lastInput = performance.now();
     pointer.x = event.clientX; pointer.y = event.clientY;
     motion.invalidate?.();
@@ -60,6 +62,7 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     }
     if (pointer?.id !== event.pointerId) return;
     pointer = null; motion.dragging = false;
+    motion.targetYaw = undefined; motion.targetPitch = undefined;
     motion.lastInput = performance.now();
     if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
     motion.invalidate?.();
@@ -86,7 +89,8 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     wake();
   }, { signal: scope.signal });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { pointer = null; motion.dragging = false; }
+    if (document.hidden) { pointer = null; motion.dragging = false;
+    motion.targetYaw = undefined; motion.targetPitch = undefined; }
     else { motion.lastInput = performance.now(); wake(); motion.invalidate?.(); }
   }, { signal: scope.signal });
   return scope;
