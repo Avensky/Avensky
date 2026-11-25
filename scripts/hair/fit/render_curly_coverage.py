@@ -13,10 +13,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from export_curly_fit_probe import digest, ensure_actual_texture, group_array
 from scalp_coverage_metrics import measure_exposure
 
+TOP_DIRECTION = (0, 0, 1)
 VIEWS = {
     "front": (0, -1, 0), "back": (0, 1, 0),
     "left": (1, 0, 0), "right": (-1, 0, 0),
-    "top": (0, 0, 1), "three-quarter": (1, -1, .22),
+    "top": TOP_DIRECTION, "three-quarter": (1, -1, .22),
 }
 
 
@@ -26,6 +27,7 @@ def arguments():
     parser.add_argument("--before", default="Curly_Mane")
     parser.add_argument("--after", default="AVFIT_CurlyMane_GLOBAL_PREVIEW")
     parser.add_argument("--scalp-group", default="AV_ScalpRegion")
+    parser.add_argument("--framing-hair", help="Use this original baseline with the before object to keep the prior framing and lights")
     parser.add_argument("--diffuse", type=Path, required=True)
     parser.add_argument("--opacity", type=Path, required=True)
     parser.add_argument("--normal", type=Path)
@@ -155,7 +157,7 @@ def set_camera(camera, direction, center, points):
     facing = Vector(direction).normalized()
     # With +Z view, set top-image up to the rear (+Y) and show the front at bottom.
     rotation = facing.to_track_quat("Z", "Y")
-    if direction == VIEWS["top"]:
+    if direction == TOP_DIRECTION:
         rotation.identity()
     rotation = rotation.to_matrix()
     projected = (points - center) @ np.asarray(rotation)
@@ -264,7 +266,10 @@ def main():
         raise ValueError("Mark the original Face4 scalp region first")
     head_points = world_positions(head)
     extent = float(np.ptp(head_points, axis=0).max())
-    points = np.concatenate((head_points, world_positions(before), world_positions(after)))
+    framing = bpy.context.scene.objects.get(args.framing_hair) if args.framing_hair else after
+    if not framing or framing.type != "MESH":
+        raise ValueError("Framing hair mesh is missing")
+    points = np.concatenate((head_points, world_positions(before), world_positions(framing)))
     center = (points.max(0) + points.min(0)) / 2
     scene, camera, lights = create_scene(args, center, extent)
     beauty_head = mesh_copy(scene, head)
@@ -289,6 +294,7 @@ def main():
         "scalp_group": args.scalp_group, "scalp_triangles": triangles,
         "scalp_status": head.get("avensky_scalp_status", "GROUP_STATUS_UNSPECIFIED"),
         "before_object": before.name, "after_object": after.name,
+        "framing_hair": framing.name,
         "samples": args.samples, "seed": 29, "size": args.size,
         "beauty_denoised": True, "diagnostics_denoised": False, "views": {},
     }
