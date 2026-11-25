@@ -7,6 +7,8 @@ import { hairOptions, useLocalHairstyle, type LocalHairOption } from "./LocalHai
 import { prepareHairDye } from "./hairDye";
 import { useHairPaletteStore } from "./hairPalette";
 import { prepareHairShoulderDepth } from "./HairShoulderDepth";
+import { prepareScalpCap } from "../villagerModel";
+import { parseHairScalpAudit } from "./hairScalpAudit.mjs";
 
 function waveClearance(material: MeshStandardMaterial, depth: ReturnType<typeof prepareHairShoulderDepth>) {
   const uniforms = {
@@ -134,6 +136,10 @@ function FittedHair({ root, style }: { root: Object3D; style: LocalHairOption })
     }));
     if (!parts.length || bindings.some(matched=>matched.length!==actor.skeleton.bones.length || matched.some(bone=>!bone))) return;
 
+    const auditMode = parseHairScalpAudit(typeof window === "undefined" ? "" : window.location.search,
+      import.meta.env.DEV || import.meta.env.MODE === "staging");
+    const showBacking = auditMode === "backing";
+    const capAudit = auditMode === "legacy-cap" || auditMode === "cap-only";
     const group = new Group();
     group.name = "fitted-local-hairstyle";
     const materials: MeshStandardMaterial[] = [];
@@ -143,7 +149,7 @@ function FittedHair({ root, style }: { root: Object3D; style: LocalHairOption })
     const contact = style.id === "Space_Buns" ? prepareHairShoulderDepth(root) : undefined;
     parts.forEach((part,i) => {
       // Let the character's own scalp show through the hair part.
-      if (part.material instanceof MeshStandardMaterial && part.material.name.endsWith("Crown backing")) return;
+      if (!showBacking && part.material instanceof MeshStandardMaterial && part.material.name.endsWith("Crown backing")) return;
       const skinned = part.clone(false);
       const skin = new Skeleton(bindings[i].filter(bone=>bone!==undefined),part.skeleton.boneInverses);
       skeletons.push(skin);
@@ -163,8 +169,23 @@ function FittedHair({ root, style }: { root: Object3D; style: LocalHairOption })
         }
         skinned.material=material;
       }
+      skinned.visible = auditMode !== "cap-only";
       group.add(skinned);
     });
+    // The debug cap is an exact copy of the current bonnet-era generator, not a
+    // proposed universal fit. Never manufacture or mutate this geometry normally.
+    const existingCap = root.getObjectByName("villager-scalp-cap");
+    const previousCapVisibility = existingCap?.visible;
+    const diagnosticCap = capAudit && !existingCap ? prepareScalpCap(root) : undefined;
+    const cap = existingCap ?? diagnosticCap;
+    if (cap && capAudit) {
+      cap.visible = true;
+      if (diagnosticCap) {
+        const { palette, original } = useHairPaletteStore.getState();
+        const mat = diagnosticCap.material;
+        mat.color.set(original ? "#38271f" : palette.roots);
+      }
+    }
     const original = ["HAIR_HAIR20", "villager-short-hair"].flatMap(name => {
       const part = root.getObjectByName(name);
       return part ? [{part, visible:part.visible}] : [];
@@ -221,6 +242,12 @@ function FittedHair({ root, style }: { root: Object3D; style: LocalHairOption })
       stop();
       group.removeFromParent();
       for (const {part, visible} of original) part.visible = visible;
+      if (existingCap && previousCapVisibility !== undefined) existingCap.visible = previousCapVisibility;
+      if (diagnosticCap) {
+        diagnosticCap.removeFromParent();
+        diagnosticCap.geometry.dispose();
+        diagnosticCap.material.dispose();
+      }
       materials.forEach(material=>material.dispose());
       skeletons.forEach(skeleton=>skeleton.dispose());
       contact?.dispose();
