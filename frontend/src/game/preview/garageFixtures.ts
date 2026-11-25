@@ -22,7 +22,7 @@ export function collectGarageFixtures(room: Object3D) {
     if (!(node instanceof Mesh) || !(node.material instanceof MeshStandardMaterial)) return;
     const face = node.material;
     const slot = face.name.trim();
-    if (slot !== "LIGHT" && slot !== "Material.006") return;
+    if ((slot !== "LIGHT" && slot !== "Material.006") || face.emissiveIntensity === 0) return;
     let mirror = surfaces.get(face);
     if (!mirror) {
       mirror = new MeshBasicMaterial({ side: DoubleSide });
@@ -43,11 +43,14 @@ export function collectGarageFixtures(room: Object3D) {
     const light = new SpotLight();
     light.name = ceiling ? "garage-ceiling-" + owner : workLamp ? "garage-work-light-3x4" : "garage-neon-rack";
     new Box3().setFromObject(node, true).getCenter(light.position);
-    light.target.position.set(ceiling ? light.position.x : 0, ceiling ? 0 : .65, ceiling ? light.position.z : 0);
-    light.angle = ceiling ? 1.43 : rack ? 1.4 : .82;
+    light.target.position.set(
+      rack ? light.position.x - 1.2 : ceiling ? light.position.x : 0,
+      rack ? light.position.y : ceiling ? 0 : .65,
+      rack ? light.position.z : ceiling ? light.position.z : 0);
+    light.angle = ceiling ? .92 : rack ? 1.35 : .72;
     light.penumbra = ceiling ? .7 : .88;
-    light.distance = 20;
-    lamps.push({ light, face, output: ceiling ? 9 : workLamp ? 12.75 : 4.5 });
+    light.distance = rack ? 5 : 16;
+    lamps.push({ light, face, output: ceiling ? 7 : workLamp ? 9 : 5 });
     lights.add(light, light.target);
   });
   return {
