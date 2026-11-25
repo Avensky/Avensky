@@ -19,20 +19,21 @@ const defaultColors = Object.entries(themes.navy)
   .map(([key, color]) => `--app-${key}:${color}`).join(";");
 
 const sourceEntry = new URL("../../frontend/src/theme/garageEntry.ts", import.meta.url);
-const { garageBackdrop, garageBrandHeader, garageCredentials, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
+const { garageBackdrop, garageBrandHeader, garageCredentials, GARAGE_ENTRY_MASK, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
 const sourceImages = new URL("../../frontend/public/images/", import.meta.url);
 const entryImages = existsSync(sourceImages) ? sourceImages : new URL("file:///srv/avensky-staging/frontend/current/images/");
 const entryAssets = new Map([
   ["logo.svg", "image/svg+xml"], ["entry-icons.svg", "image/svg+xml"],
-  [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
+  [GARAGE_ENTRY_MASK, "image/webp"], [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
 ]);
 function paletteScript() {
   return `(() => {
     const themes = ${JSON.stringify(themes)};
-    let chosen = "navy";
+    let chosen = "navy", garage;
     try {
       const saved = JSON.parse(localStorage.getItem("avenlab-preferences-v1") || "{}");
       if (Object.hasOwn(themes, saved?.state?.theme)) chosen = saved.state.theme;
+      if (Object.hasOwn(themes, saved?.state?.garageEffects?.theme)) garage = saved.state.garageEffects.theme;
     } catch {}
     try { localStorage.setItem(${JSON.stringify(GARAGE_ENTRY_STORAGE_KEY)}, ${JSON.stringify(GARAGE_ENTRY_POSTER)}); } catch {}
     const palette = themes[chosen];
@@ -41,7 +42,7 @@ function paletteScript() {
     root.dataset.uiScheme = palette.scheme;
     root.style.colorScheme = palette.scheme;
     for (const [key, color] of Object.entries(palette)) {
-      if (key !== "label" && key !== "scheme") root.style.setProperty("--app-" + key, color);
+      if (key !== "label" && key !== "scheme") root.style.setProperty("--app-" + key, key.startsWith("garage-") ? themes[garage ?? chosen][key] : color);
     }
   })();`;
 }
@@ -254,7 +255,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         try {
           const info = await stat(file);
           const etag = `W/"${info.size}-${Math.trunc(info.mtimeMs)}"`;
-          const headers = { "Content-Type": type, "Cache-Control": name === GARAGE_ENTRY_POSTER ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
+          const headers = { "Content-Type": type, "Cache-Control": (name === GARAGE_ENTRY_POSTER || name === GARAGE_ENTRY_MASK) ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
           if (req.headers["if-none-match"] === etag) return send(304, "", headers);
           return send(200, await readFile(file), headers);
         } catch { return send(404); }

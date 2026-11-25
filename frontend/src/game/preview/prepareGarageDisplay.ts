@@ -107,6 +107,19 @@ export function prepareGarageDisplay(scene: Object3D) {
       ? object.material.map(prepare)
       : prepare(object.material);
   });
+  // The front bank only contains 999. The rear bank contains complete zero
+  // segments. Reuse one in the vacant first socket of the front bank.
+  const zero = root.getObjectByName("Cube026");
+  if (zero instanceof Mesh && root.getObjectByName("Cube024")) {
+    root.updateWorldMatrix(true, true);
+    const leading = zero.clone();
+    leading.name = "garage-counter-leading-zero";
+    leading.matrix.copy(root.matrixWorld).invert().multiply(zero.matrixWorld);
+    leading.matrix.decompose(leading.position, leading.quaternion, leading.scale);
+    leading.position.x -= 22.60;
+    leading.position.z += 1.13;
+    root.add(leading);
+  }
   // Geometry and textures still belong to useGLTF's cache. Only our material
   // copies are owned by this display, including on selection-screen remounts.
   return {

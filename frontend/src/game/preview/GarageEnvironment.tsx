@@ -1,29 +1,29 @@
 import { Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { Environment, Html, Lightformer } from "@react-three/drei";
+import { Environment, Html, Lightformer, useTexture } from "@react-three/drei";
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { createPortal, useThree } from "@react-three/fiber";
 import { Box3, BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { Showroom, ShowroomFloor } from "./Showroom";
+import { GARAGE_MODEL_PATH } from "./garageModel";
+import { selectedGarageTheme } from "../../theme/catalog";
+import { createGarageWalls } from "./garageWalls";
+import wallFinishUrl from "./garage-wall-finish.webp";
 import { garagePlacement } from "./garagePlacement";
 import { prepareGarageDisplay } from "./prepareGarageDisplay";
 import { GarageGlow } from "./GarageGlow";
 import { GarageFloorReflection } from "./GarageFloorReflection";
 import { completeGarageStructure } from "./completeGarageStructure";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
-import { applyGarageLighting, tagGarageAccent } from "../../theme/garageLighting";
+import { applyGarageLighting, SELECTION_CRIMSON, tagGarageAccent } from "../../theme/garageLighting";
 import { createGarageReflectionSnapshot } from "./garageReflectionSnapshot";
 import { usePreviewPaint } from "./usePreviewPaint";
 import { isCompactPreview } from "./previewBudget";
 
-// Vite serves files in public/ at the URL root. Presentation fixes below are
-// specific to Garage Special; keep the ship out of the car selection roster.
-export const GARAGE_MODEL_PATH =
-  "/models/world/garage_special.glb?v=complete-1";
 const GARAGE_DISPLAY_SCALE = 0.06;
 type GarageProps = {
   turntable: Group | null;
-  accentOverride?: string | null;
+  selectionLighting?: boolean;
   onPlatformReady?: (footprint: [number, number]) => void;
   onSettled?: () => void;
   reflectFloor?: boolean;
@@ -40,7 +40,7 @@ function GarageUnavailable({ onSettled }: Pick<GarageProps, "onSettled">) {
   </>;
 }
 
-export function GarageEnvironment({ turntable, onPlatformReady, onSettled, accentOverride = null, allowLoad = true, reflectFloor = true, floorCaptureRate }: GarageProps & {
+export function GarageEnvironment({ turntable, onPlatformReady, onSettled, selectionLighting = false, allowLoad = true, reflectFloor = true, floorCaptureRate }: GarageProps & {
   allowLoad?: boolean;
 }) {
   const loadRoom = usePreviewPaint(allowLoad);
@@ -55,7 +55,7 @@ export function GarageEnvironment({ turntable, onPlatformReady, onSettled, accen
             turntable={turntable}
             onPlatformReady={onPlatformReady}
             onSettled={onSettled}
-            accentOverride={accentOverride}
+            selectionLighting={selectionLighting}
             reflectFloor={reflectFloor}
             floorCaptureRate={floorCaptureRate}
           /> : floor}
@@ -65,10 +65,12 @@ export function GarageEnvironment({ turntable, onPlatformReady, onSettled, accen
   );
 }
 
-function GarageModel({ turntable, onPlatformReady, onSettled, accentOverride = null, reflectFloor = true, floorCaptureRate }: GarageProps) {
+function GarageModel({ turntable, onPlatformReady, onSettled, selectionLighting = false, reflectFloor = true, floorCaptureRate }: GarageProps) {
   const compact = useThree(s => isCompactPreview(s.size.width));
-  const theme = usePreferencesStore((s) => s.theme),
+  const invalidate = useThree(s => s.invalidate);
+  const theme = usePreferencesStore(selectedGarageTheme),
     contrast = usePreferencesStore((s) => s.highContrast);
+  const accentOverride = selectionLighting && theme === "scarlet" ? SELECTION_CRIMSON : null;
   const brightness = usePreferencesStore(
     (s) => s.garageEffects.accentBrightness * .49,
   );
@@ -76,6 +78,7 @@ function GarageModel({ turntable, onPlatformReady, onSettled, accentOverride = n
     (s) => s.garageEffects.environmentReflections,
   );
   const { scene } = useAssetGLTF(GARAGE_MODEL_PATH, "/draco/");
+  const finish = useTexture(wallFinishUrl);
   const prepared = useMemo(() => {
     const display = prepareGarageDisplay(scene);
     display.root.scale.multiplyScalar(GARAGE_DISPLAY_SCALE);
@@ -180,19 +183,19 @@ function GarageModel({ turntable, onPlatformReady, onSettled, accentOverride = n
     }
 
     const completed = completeGarageStructure(display.root);
+    const walls = createGarageWalls(finish);
+    display.root.add(walls.mesh);
     // The full-plane tile overlay covers the original grey floor edging.
     // Follow the authored wall frame when restoring that perimeter finish.
     const wallFrame = display.root.getObjectByName("SEMI_Murs");
     const perimeter = wallFrame
       ? new Box3().setFromObject(wallFrame, true)
       : null;
-    const cameraBounds = perimeter?.clone() ?? null;
-    if (cameraBounds) {
-      const ceiling = display.root.getObjectByName("FOND_01");
-      const ceilingBounds = ceiling ? new Box3().setFromObject(ceiling, true) : null;
-      cameraBounds.min.y = floorY;
-      if (ceilingBounds && !ceilingBounds.isEmpty()) cameraBounds.max.y = ceilingBounds.min.y;
-    }
+    const cameraBounds = new Box3().setFromObject(walls.mesh);
+    const ceiling = display.root.getObjectByName("FOND_01");
+    const ceilingBounds = ceiling ? new Box3().setFromObject(ceiling, true) : null;
+    cameraBounds.min.y = floorY;
+    if (ceilingBounds && !ceilingBounds.isEmpty()) cameraBounds.max.y = ceilingBounds.min.y;
     return {
       ...display,
       cameraBounds,
@@ -202,18 +205,20 @@ function GarageModel({ turntable, onPlatformReady, onSettled, accentOverride = n
       perimeter,
       structure: completed.structure,
       dispose: () => {
+        walls.dispose();
         completed.dispose();
         stageGeometries.forEach((geometry) => geometry.dispose());
         stageMaterials.forEach((material) => material.dispose());
         display.dispose();
       },
     };
-  }, [scene]);
+  }, [scene, finish]);
   useEffect(() => () => prepared.dispose(), [prepared]);
   useLayoutEffect(() => {
     for (const root of [prepared.root, prepared.platform, prepared.structure])
       applyGarageLighting(root, theme, contrast, brightness, accentOverride);
-  }, [prepared, theme, contrast, brightness, accentOverride]);
+    invalidate();
+  }, [prepared, theme, contrast, brightness, accentOverride, invalidate]);
   const probeReady = usePreviewPaint();
   const probe = useMemo(
     () =>

@@ -11,6 +11,9 @@ import { OnScreenKeyboard } from "./components/text/OnScreenKeyboard";
 import { useUIStore } from "./store/menus/uiStore";
 import { GarageMenuBackdrop } from "./game/welcome/GarageMenuBackdrop";
 import { WelcomeScreen } from "./game/welcome/WelcomeScreen";
+import { useSocialStore } from "./store/social/socialStore";
+import { PLAYER_ONBOARDING, stagingAccountPortal } from "./game/welcome/config";
+import { preloadGarage } from "./game/preview/garageModel";
 import { useAppTheme } from "./theme";
 
 const GameUI = lazy(() => import("./game/GameUI").then(module => ({ default: module.GameUI })));
@@ -19,6 +22,7 @@ export default function App() {
   const mobilePortrait = useMobilePortrait();
   const welcome = useUIStore((state) => state.screen === "welcome");
   const showGarageBackdrop = useUIStore(state => state.screen === "welcome" || state.screen === "main" || state.screen === "queue");
+  const signedIn = useSocialStore(s => s.stagingSignIn || Boolean(s.registeredProfile && s.view?.profile));
   const rotate = mobilePortrait && !welcome;
   useAppTheme();
 
@@ -42,6 +46,11 @@ export default function App() {
   useEffect(() => {
     connectRustServer();
   }, []);
+
+  useEffect(() => {
+    // On staging the protected app document is delivered after portal sign-in.
+    if (stagingAccountPortal || !PLAYER_ONBOARDING || signedIn) preloadGarage();
+  }, [signedIn]);
 
   // Onboarding needs the social socket, but has no driving input to send.
   useEffect(() => {

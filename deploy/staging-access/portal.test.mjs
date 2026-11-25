@@ -79,7 +79,8 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.match(signIn, /<script src="\/__alpha\/password\.js" defer><\/script>/);
   assert.doesNotMatch(signIn, /name="code"|<video|<canvas|flare\.js|Play as guest|Vehicle/);
   assert.match(signIn, /garage-entry-brand/);
-  assert.match(signIn, /class="garage-entry-sign">Avensky</);
+  assert.doesNotMatch(signIn, /garage-entry-sign/);
+  assert.match(signIn, /garage-entry-walls/);
   const css = await get("entry/garage-entry.css");
   assert.equal(css.status, 200);
   const poster = signIn.match(/src="\/__alpha\/(entry\/garage-entry[^"]*\.webp)"/)[1];
@@ -125,11 +126,12 @@ test("invites grant access once and revocation invalidates existing cookies", as
   const set = new Map();
   const root = { dataset: {}, style: { setProperty: (key, value) => set.set(key, value) } };
   runInNewContext(await theme.text(), {
-    localStorage: { getItem: key => key === "avenlab-preferences-v1" ? JSON.stringify({ state: { theme: "deep-purple" } }) : null },
+    localStorage: { getItem: key => key === "avenlab-preferences-v1" ? JSON.stringify({ state: { theme: "deep-purple", garageEffects: { theme: "forest" } } }) : null },
     document: { documentElement: root },
   });
   assert.equal(root.dataset.uiTheme, "deep-purple");
   assert.equal(set.get("--app-accent"), "#a3adff");
+  assert.equal(set.get("--app-garage-panel"), "#6e886f");
   const admin = accounts.issueInvite("operator@example.net", true);
   const enrollment = { email: admin.email, invite: admin.code, password };
   assert.equal((await get("enroll")).headers.get("referrer-policy"), "same-origin");

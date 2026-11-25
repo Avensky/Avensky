@@ -1,5 +1,5 @@
 import { Color, Mesh, MeshStandardMaterial, type Object3D } from "three";
-import type { UITheme } from "./catalog";
+import { UI_THEMES, type UITheme } from "./catalog.ts";
 
 /** Scene emission colors follow the saved UI theme, including light palettes
  * whose dark text accents would otherwise make poor luminous fixtures. */
@@ -53,13 +53,13 @@ export function applyGarageLighting(
     for (const material of Array.isArray(node.material)
       ? node.material
       : [node.material]) {
-      if (
-        !(material instanceof MeshStandardMaterial) ||
-        !material.userData.garageAccent ||
-        visited.has(material)
-      )
-        continue;
+      if (!(material instanceof MeshStandardMaterial) || visited.has(material)) continue;
       visited.add(material);
+      const surface: unknown = material.userData.garageSurface;
+      if (surface === "garage-wall" || surface === "garage-panel" || surface === "garage-stripe") {
+        material.color.set(UI_THEMES[theme][surface]);
+      }
+      if (!material.userData.garageAccent) continue;
       const fixtureColor = !contrast && material.userData.garageAccentComplement ? complement : color;
       material.emissive.copy(fixtureColor);
       material.emissiveIntensity =

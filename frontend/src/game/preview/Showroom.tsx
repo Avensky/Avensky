@@ -3,9 +3,9 @@ export function Showroom({ floor = true }: { floor?: boolean }) {
   return <>
     <color attach="background" args={["#080c16"]} />
     <fog attach="fog" args={["#080c16", 20, 55]} />
-    <hemisphereLight args={["#bac9e1", "#151d30", 0.44]} />
-    <directionalLight position={[-6, 8, -4]} color="#bacfff" intensity={0.37} />
-    <directionalLight position={[6, 5, 4]} color="#e1e6ef" intensity={0.29} />
+    <hemisphereLight args={["#fffaf3", "#9da6b1", 1.12]} />
+    <directionalLight position={[-6, 8, -4]} color="#ecf1f6" intensity={0.56} />
+    <directionalLight position={[6, 5, 4]} color="#fffbf5" intensity={0.63} />
     {/* Broad light reads on paint and faces without hot reflections on the hood. */}
     <spotLight name="vehicle-key-spot" position={[3, 6.5, 4]} color="#fff1db" intensity={64} angle={0.59} penumbra={0.92} distance={18} decay={2} />
     <spotLight name="vehicle-rim-spot" position={[-4, 5.5, -3]} color="#b2cbff" intensity={30} angle={0.64} penumbra={0.92} distance={17} decay={2} />

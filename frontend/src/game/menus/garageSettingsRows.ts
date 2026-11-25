@@ -4,10 +4,14 @@ import {
   type GarageEffects,
 } from "../../store/preferences/garageEffects";
 
+import { UI_THEMES, type GarageTheme } from "../../theme/catalog";
+
+const roomThemes = ["auto", ...Object.keys(UI_THEMES)] as GarageTheme[];
+
 type NumberKey = {
   [K in keyof GarageEffects]: GarageEffects[K] extends number ? K : never;
 }[keyof GarageEffects];
-const cycle = (values: number[], value: number, dir = 1) =>
+const cycle = <T,>(values: T[], value: T, dir = 1) =>
   values[
     (Math.max(0, values.indexOf(value)) + dir + values.length) % values.length
   ];
@@ -36,6 +40,12 @@ export function garageSettingsRows(
   const percent = (value: number) => `${Math.round(value * 100)}%`;
   const glowOff = contrast || !settings.bloom;
   return [
+    {
+      id: "garage-theme",
+      label: "Garage theme",
+      value: settings.theme === "auto" ? "Follow app theme" : UI_THEMES[settings.theme].label,
+      action: (dir) => update({ theme: cycle(roomThemes, settings.theme, dir) }),
+    },
     {
       id: "garage-bloom",
       label: "Bloom glow",
@@ -113,7 +123,7 @@ export function garageSettingsRows(
     ),
     {
       id: "garage-reset",
-      label: "Restore garage effects",
+      label: "Restore garage defaults",
       value: "Reset",
       action: () => update({ ...DEFAULT_GARAGE_EFFECTS }),
     },
