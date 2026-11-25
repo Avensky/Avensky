@@ -114,30 +114,60 @@ function baseStagingRelease(prebuiltFile) {
   return release;
 }
 
-export function stagingRelease(prebuiltFile, fittedHair = process.env.AVENSKY_STAGING_FITTED_HAIR) {
+/**
+ * A checked-in registry determines every approved private asset in staging.
+ * Adding a new pack means adding its metadata catalog, never an Actions variable.
+ * Catalogs store paths, hashes and lengths only; the GLB bytes stay in private S3.
+ */
+export function collectApprovedPrivateAssets(catalogs) {
+  if (!Array.isArray(catalogs) || !catalogs.length) throw new Error("Expected approved private asset catalogs");
+  const assets = {};
+  for (const catalog of catalogs) {
+    if (catalog === null || typeof catalog !== "object") throw new Error("Invalid private asset catalog");
+    const entries = Array.isArray(catalog)
+      ? catalog.map(item => [item?.url, item])
+      : Object.entries(catalog);
+    for (const [path, entry] of entries) {
+      if (!isAssetPath(path) || !sha256.test(entry?.sha256)
+        || !Number.isSafeInteger(entry.size) || entry.size <= 0) {
+        throw new Error("Invalid private asset metadata for " + String(path));
+      }
+      const existing = assets[path];
+      if (existing && (existing.sha256 !== entry.sha256 || existing.size !== entry.size)) {
+        throw new Error("Conflicting approved private asset metadata for " + path);
+      }
+      assets[path] = { sha256: entry.sha256, size: entry.size };
+    }
+  }
+  return assets;
+}
+
+function approvedPrivateAssets() {
+  const files = JSON.parse(readFileSync(new URL("./staging-private-asset-catalogs.json", import.meta.url), "utf8"));
+  if (!Array.isArray(files) || !files.length || new Set(files).size !== files.length) {
+    throw new Error("Invalid private asset catalog registry");
+  }
+  const catalogs = files.map(path => {
+    if (typeof path !== "string"
+      || !/^(?:frontend\/scripts|packages\/wardrobe-catalog)\/[a-z0-9_./-]+\.json$/.test(path)
+      || path.split("/").some(part => part === "." || part === "..")) {
+      throw new Error("Unsafe private asset catalog path: " + String(path));
+    }
+    return JSON.parse(readFileSync(new URL("../../" + path, import.meta.url), "utf8"));
+  });
+  return collectApprovedPrivateAssets(catalogs);
+}
+
+export function stagingRelease(prebuiltFile) {
   const release = baseStagingRelease(prebuiltFile);
-  const fitted = JSON.parse(readFileSync(new URL("./staging-fitted-assets.json", import.meta.url), "utf8"));
-  for (const [path, entry] of Object.entries(fitted)) {
+  const approved = approvedPrivateAssets();
+  for (const [path, entry] of Object.entries(approved)) {
     const existing = release.assets[path];
     if (existing && (existing.sha256 !== entry.sha256 || existing.size !== entry.size)) {
-      throw new Error("Fitted staging metadata disagrees with the release for " + path);
+      throw new Error("Approved private asset conflicts with tracked release for " + path);
     }
   }
-  const assets = { ...release.assets, ...fitted };
-  if (fittedHair?.trim()) {
-    const styles = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
-    const ids = fittedHair.trim() === "all" ? styles.map(style => style.id) : fittedHair.split(",").map(id => id.trim());
-    for (const id of new Set(ids)) {
-      const style = styles.find(style => style.id === id);
-      if (!style) throw new Error("Unknown fitted hairstyle: " + id);
-      const existing = assets[style.url];
-      if (existing && (existing.sha256 !== style.sha256 || existing.size !== style.size)) {
-        throw new Error("Hair staging metadata disagrees with the release for " + style.url);
-      }
-      assets[style.url] = { sha256: style.sha256, size: style.size };
-    }
-  }
-  return validateRelease(sealRelease({ ...release, assets }));
+  return validateRelease(sealRelease({ ...release, assets: { ...release.assets, ...approved } }));
 }
 
 export function localGlbEntry(path) {

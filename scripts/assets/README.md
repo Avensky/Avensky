@@ -42,7 +42,7 @@ Unregister-ScheduledTask -TaskName "Avensky Private Staging Asset Watcher" -Conf
 
 ## Staging activation, rollback and remaining infrastructure task
 
-1. Approve the private export and update the public metadata manifest (logical URL, exact size, SHA-256) on a feature branch. Merge **metadata and code only** to main.
+1. Approve the private export and update the public metadata manifest (logical URL, exact size, SHA-256) on a feature branch. Add new catalog paths to `frontend/scripts/staging-private-asset-catalogs.json`. Do **not** merge until staging verification and gateway activation are complete.
 2. The Windows watcher automatically publishes matching models to private S3. An upload alone **does not activate** a release.
 3. The trusted staging operator generates a new asset release from the **same main commit**, runs deploy/staging-assets/verify.mjs with read-only AWS credentials, and installs the verified release in the staging gateway while retaining the old one for current sessions.
 4. The existing main-branch Deploy to staging workflow automatically builds the frontend. The receiver compares its asset-release ID to the gateway's verified release before activating the frontend; it fails closed on a mismatch.

@@ -33,7 +33,6 @@ jobs:
       - run: npm --prefix frontend run build -- --mode staging
         env:
           VITE_DEPLOY_ENV: staging
-          AVENSKY_STAGING_FITTED_HAIR: ${{ vars.STAGING_FITTED_HAIR }}
           VITE_RUST_WS_URL: wss://api-staging.avensky.com/ws/
           VITE_PLAYER_ONBOARDING: ${{ vars.STAGING_PLAYER_ONBOARDING }}
           VITE_OPEN_WORLD_ID: ${{ vars.STAGING_OPEN_WORLD_ID }}

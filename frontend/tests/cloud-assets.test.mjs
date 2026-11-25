@@ -1,9 +1,10 @@
 import { createHash } from "node:crypto";
 import { once } from "node:events";
+import { readFileSync } from "node:fs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveAssetUrl } from "../src/assets/assetPaths.ts";
-import { sealRelease, validateRelease, stagingRelease } from "../scripts/staging-release.mjs";
+import { collectApprovedPrivateAssets, sealRelease, validateRelease, stagingRelease } from "../scripts/staging-release.mjs";
 import { checkPrebuiltColliders } from "../scripts/prebuilt-colliders.mjs";
 import { assetGateway } from "../../deploy/staging-assets/gateway.mjs";
 import { checkDependencies, verifyObject, verifyStoredObject } from "../../deploy/staging-assets/verify-release.mjs";
@@ -11,19 +12,37 @@ import { signedObjectReader, storageKey } from "../../deploy/staging-assets/obje
 
 const path = "/models/city/a, b.glb";
 
-test("staging includes only the requested privately installed hair and preserves the accessory catalog", () => {
-  const baseline = stagingRelease(undefined, "");
-  const pilot = stagingRelease(undefined, "hair-12");
-  const all = stagingRelease(undefined, "all");
-  const paths = release => Object.keys(release.assets).filter(url => url.startsWith("/models/characters/female/hair/"));
-  assert.equal(paths(baseline).length, 0);
-  assert.deepEqual(paths(pilot), ["/models/characters/female/hair/Hair_12_espresso.glb"]);
-  assert.equal(paths(all).length, 12);
-  assert.notEqual(pilot.id, baseline.id);
-  assert.deepEqual(all.assets["/models/characters/female/wardrobe/bracers/bracer-01.garage.glb"],
-    baseline.assets["/models/characters/female/wardrobe/bracers/bracer-01.garage.glb"]);
-  assert.throws(() => stagingRelease(undefined, "unlisted"), /Unknown fitted hairstyle/);
+test("staging automatically includes all approved private hair and fitted wardrobe assets", () => {
+  const release = stagingRelease();
+  const hair = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
+  const fitted = JSON.parse(readFileSync(new URL("../scripts/staging-fitted-assets.json", import.meta.url), "utf8"));
+  const paths = Object.keys(release.assets).filter(url => url.startsWith("/models/characters/female/hair/"));
+  assert.equal(hair.length, 12);
+  assert.deepEqual(paths.sort(), hair.map(style => style.url).sort());
+  for (const { url, sha256, size } of hair) {
+    assert.deepEqual(release.assets[url], { sha256, size });
+  }
+  for (const [url, entry] of Object.entries(fitted)) {
+    assert.deepEqual(release.assets[url], entry);
+  }
+  assert.ok(Object.keys(release.assets).length >= 546);
 });
+
+test("private asset catalogs accept both mapping and list formats without per-pack flags", () => {
+  const first = { "/models/a.glb": { sha256: "a".repeat(64), size: 42 } };
+  const second = [{ id: "foo", url: "/models/b.glb", sha256: "b".repeat(64), size: 80 }];
+  assert.deepEqual(collectApprovedPrivateAssets([first, second]), {
+    "/models/a.glb": { sha256: "a".repeat(64), size: 42 },
+    "/models/b.glb": { sha256: "b".repeat(64), size: 80 },
+  });
+  assert.deepEqual(collectApprovedPrivateAssets([first, first]), first);
+  assert.throws(() => collectApprovedPrivateAssets([first, { "/models/a.glb": { sha256: "b".repeat(64), size: 42 } }]), /Conflicting/);
+  assert.throws(() => collectApprovedPrivateAssets([[{ url: "/models/../secret.glb", sha256: "a".repeat(64), size: 42 }]]), /Invalid/);
+  assert.throws(() => collectApprovedPrivateAssets([[{ url: "/models/c.glb", sha256: "invalid", size: 42 }]]), /Invalid/);
+  assert.throws(() => collectApprovedPrivateAssets([[{ url: "/models/c.glb", sha256: "a".repeat(64), size: 0 }]]), /Invalid/);
+  assert.throws(() => collectApprovedPrivateAssets([]), /Expected/);
+});
+
 const nextLod = "/models/city/a-low.glb";
 const texture = "/textures/a.webp";
 const etag = '"' + "a".repeat(32) + '"';
