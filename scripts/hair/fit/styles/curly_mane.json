@@ -37,7 +37,7 @@
     "npc-silhouette"
   ],
   "license": "VERIFY_BEFORE_DISTRIBUTION",
-  "status": "real-fbx-inspected-offline-pilot",
+  "status": "source-textured-global-candidate-awaiting-blender-approval",
   "source_fbx_metadata": {
     "up_axis_metadata": "Y",
     "raw_height_axis": "Z",
@@ -56,8 +56,27 @@
     "affected_vertices": 819,
     "max_apparent_vertex_shift_cm": 2,
     "remaining_curl_sections_to_classify": 214,
-    "original_opacity_atlas": "MISSING",
+    "original_opacity_atlas": "NOW_SUPPLIED_AND_SOFTWARE_TESTED",
     "blender_visual_qa": "NOT_RUN",
     "game_readiness": "NOT_READY"
+  },
+  "source_alignment_candidate": {
+    "status": "OFFLINE_SOURCE_COORDINATES_ONLY",
+    "source_units_verified_in_blender": false,
+    "uniform_scale": 0.92,
+    "translation_xyz_source_units": [
+      -1,
+      -21.65,
+      -1.05
+    ],
+    "root_candidate_count": 209,
+    "candidates_within_2_units_before": 0,
+    "candidates_within_2_units_after": 166,
+    "scale_hit_lower_bound": true,
+    "approval_required": true,
+    "do_not_apply_raw_numbers_in_blender": true,
+    "face_basecolor": "T_Villager_Lady_Face_BaseColor.tga",
+    "curls_diffuse": "DIFFUSE_AUBURN.png",
+    "curls_opacity": "OPACITY.png"
   }
 }
