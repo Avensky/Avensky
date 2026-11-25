@@ -1,6 +1,17 @@
 # Universal Hairstyle Fitting — Avensky V2 (design and acceptance spec)
 
-Status: **measured-scalp authoring milestone implemented; actual Vesper fitting pending**. The branch has a read-only character and hairstyle inspector, tested portable cap geometry, and an opt-in Blender builder. The user's actual Vesper scalp ring/crown have not been measured and no fitted GLB exists. Existing accepted hairstyles and live assets are unchanged. See [QUICKSTART.md](QUICKSTART.md) for executable commands and prerequisites.
+Status: **original Face4 skull directly inspected; source-derived scalp extractor implemented; Blender sign-off pending**. The uploaded original Face4 FBX contains the crown, sides and back of the head, so Vesper's preferred approach is an annotated selection of those *existing triangles*, not the old bonnet sphere or the landmark loft. No fitted GLB has been exported or integrated. See [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) and [QUICKSTART.md](QUICKSTART.md).
+
+## Vesper FIRST: derive the scalp from Face4 (confirmed source)
+
+The original `SK_Village_Lady_Face4.fbx` includes the full upper skull (6,330 vertices / 8,915 triangles for the Face4 mesh). A distinct `SK_Village_Lady_Hair20.fbx` contains 7,303 hair triangles, many of them open cards. **We should not create a second guessed spherical skull.**
+
+1. Import the original Face4 FBX into a PRIVATE neutral-pose Blender scene, inspect and identify its main `Face` skin surface and armature.
+2. Mark the actual upper skull once with the `AV_ScalpRegion` vertex group. Exclude face, ears, eyelids and visible bare forehead below the intended hairline. Create a candidate preview and visually refine its boundary; the first numerical proposal incorrectly shaded some ears and had jagged face edges.
+3. Use `extract_source_scalp.py` in DRY RUN. It requires the existing vertex group and source Face material, measures the coverage and preserves original UVs/rig attachment. `--write` makes a **new** prototype .blend, never changing the source.
+4. Review the thin dark-root covering, then fit the independent original Curly Mane root geometry and volume layers to the same physical skull. The cap is NOT a substitute for curls/clumps.
+
+`build_scalp_cap.py` + `cap_geometry.py` from the earlier prototype remain **fallback tools only for characters whose source head genuinely lacks a complete skull**; do not use their constructed dome as Vesper's default.
 
 ## Why V1 did not solve the gaps
 The existing `scripts/hair/blender_apply_batch.py` explicitly preserves the twelve fitted meshes' vertex positions, topology, skin, UVs and shape keys. It improves the material only. The donor texture archive contains three *separate* FBX meshes (`CURLY 01.FBX`, `CURLY 02.FBX`, `CURLY 03.FBX`) with their own geometry/UVs; the V1 material donor workflow does not fit those geometry meshes to Vesper. See `docs/assets/CURLY_SET_AUDIT.md`.
