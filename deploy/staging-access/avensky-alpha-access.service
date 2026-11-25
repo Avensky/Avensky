@@ -1,19 +1,23 @@
 [Unit]
-Description=Avensky staging tester access portal
-After=network.target
+Description=Avensky staging sign-in
+After=network.target docker.service
+RequiresMountsFor=/var/lib/docker/volumes/avensky-staging_avensky_staging_data/_data/staging
 
 [Service]
 Type=simple
-User=avensky-alpha
-Group=avensky-alpha
-StateDirectory=avensky-alpha
-StateDirectoryMode=0700
-Environment=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha
+# The game's existing private SQLite file and rollback journals are owned by UID 10001.
+User=10001
+Group=10001
+RuntimeDirectory=avensky-player
+RuntimeDirectoryMode=0700
 EnvironmentFile=/etc/avensky/staging-alpha.env
+Environment=AVENSKY_GAME_DATABASE=/run/avensky-player/social.sqlite3
+BindPaths=/var/lib/docker/volumes/avensky-staging_avensky_staging_data/_data/staging:/run/avensky-player
 ExecStart=/usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs
 Restart=on-failure
 NoNewPrivileges=yes
 ProtectSystem=strict
+ReadWritePaths=/run/avensky-player
 ProtectHome=yes
 PrivateTmp=yes
 UMask=0077

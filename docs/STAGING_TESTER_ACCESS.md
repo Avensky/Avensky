@@ -1,6 +1,6 @@
 # Staging tester access
 
-For the invite-only release that uses game credentials, use the [single sign-in rollout](STAGING_UNIFIED_SIGN_IN.md). This guide covers the earlier portal preview with separate credentials.
+**Historical preview.** The current service uses the game database and requires the game bridge key. Use the [single sign-in rollout and operator commands](STAGING_UNIFIED_SIGN_IN.md#vultr-cutover) for an active staging installation. The commands below describe the retired separate-password service.
 
 The [alpha portal](../deploy/staging-access/portal.mjs) replaces the staging website's shared browser password dialog with individual tester access. It runs on Vultr at loopback port 9061 under its own account. Caddy asks the portal to authenticate both the staging site and its private model route. The Lightsail bucket, asset gateway on port 9060, and GitHub release connection keep their existing credentials. [Caddy forward-auth reference](https://caddyserver.com/docs/caddyfile/directives/forward_auth)
 

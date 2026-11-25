@@ -14,6 +14,7 @@ const LIVE_SOCKET = "wss://api.avensky.com/ws/";
 const LIVE_PAGE_HOST = "play.avensky.com";
 const LIVE_API_HOST = "api.avensky.com";
 export const STAGING_PORTAL_ORIGIN = "https://staging.avensky.com";
+export const STAGING_SIGN_IN_PATH = "/sign-in";
 export const STAGING_PORTAL_SOCKET = "wss://staging.avensky.com/ws/";
 
 export function resolveDeploymentEnvironment(mode: string, deployment?: string): DeploymentEnvironment {

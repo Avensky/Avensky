@@ -64,13 +64,8 @@ function matchingStep(secret, code, lastStep) {
     step > lastStep && timingSafeEqual(Buffer.from(code), Buffer.from(totp(secret, step))));
 }
 
-export function testerAccounts(path, key, game) {
-  if (!Buffer.isBuffer(key) || key.length !== 32) throw Error("Set a 32-byte alpha access encryption key.");
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const db = new DatabaseSync(path);
+export function initializeAccessTables(db) {
   db.exec(`
-    PRAGMA foreign_keys = ON;
-    PRAGMA busy_timeout = 3000;
     CREATE TABLE IF NOT EXISTS testers (
       email TEXT PRIMARY KEY, salt TEXT NOT NULL, password TEXT NOT NULL,
       admin INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
@@ -113,6 +108,14 @@ export function testerAccounts(path, key, game) {
       digest TEXT PRIMARY KEY REFERENCES invitations(digest) ON DELETE CASCADE, login TEXT NOT NULL
     );
   `);
+}
+
+export function testerAccounts(path, key, game) {
+  if (!Buffer.isBuffer(key) || key.length !== 32) throw Error("Set a 32-byte alpha access encryption key.");
+  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
+  const db = new DatabaseSync(path);
+  db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000");
+  initializeAccessTables(db);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const all = sql => db.prepare(sql).all();

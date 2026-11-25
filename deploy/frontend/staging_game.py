@@ -85,9 +85,19 @@ def activate(image):
     wait_ready()
 
 
+PORTAL = "avensky-alpha-access.service"
+
+
+def portal_running():
+    return Path("/run/systemd/system").is_dir() and subprocess.run(
+        ["systemctl", "is-active", "--quiet", PORTAL], check=False).returncode == 0
+
+
 def recover():
     pending = STATE / "pending.json"
     state = json.loads(pending.read_text())
+    if state.get("portal_active"):
+        subprocess.run(["systemctl", "stop", PORTAL], check=True)
     if state["snapshot_complete"]:
         compose("stop", "game")
         sync_volume((STATE / "snapshot").resolve(strict=True), volume_path())
@@ -95,6 +105,8 @@ def recover():
     else:
         subprocess.run(["docker", "start", state["container"]], check=True)
         wait_ready()
+    if state.get("portal_active"):
+        subprocess.run(["systemctl", "start", PORTAL], check=True)
     pending.unlink()
     print("Recovered the previous staging game", flush=True)
 
@@ -135,14 +147,18 @@ def deploy(commit):
     subprocess.run(["docker", "tag", current["Image"], IMAGE + ":rollback"], check=True)
     backup = STATE / "snapshot"
     backup.mkdir(exist_ok=True)
-    state = {"container": current["Id"], "snapshot_complete": False}
+    state = {"container": current["Id"], "snapshot_complete": False, "portal_active": portal_running()}
     record(state)
     try:
+        if state["portal_active"]:
+            subprocess.run(["systemctl", "stop", PORTAL], check=True)
         compose("stop", "game")
         sync_volume(data, backup)
         state["snapshot_complete"] = True
         record(state)
         activate(candidate)
+        if state["portal_active"]:
+            subprocess.run(["systemctl", "start", PORTAL], check=True)
     except (OSError, subprocess.SubprocessError, RuntimeError, KeyboardInterrupt):
         recover()
         raise

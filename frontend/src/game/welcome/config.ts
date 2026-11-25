@@ -1,9 +1,9 @@
 import { GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } from "../../theme/garageEntry";
 
-export const PLAYER_ONBOARDING = import.meta.env.VITE_PLAYER_ONBOARDING === "1";
-
 export const stagingAccountPortal = import.meta.env.MODE === "staging" && typeof window !== "undefined"
   && window.location.hostname === "staging.avensky.com";
+
+export const PLAYER_ONBOARDING = stagingAccountPortal || import.meta.env.VITE_PLAYER_ONBOARDING === "1";
 
 function entryAssetRoot() {
   // Installations can roll out the game and the standalone sign-in portal separately.

@@ -1,6 +1,7 @@
 # Staging-only example. Merge these handlers into the existing staging site.
 staging.avensky.com {
-	handle /__alpha/* {
+	@accountPortal path /sign-in /__alpha/*
+	handle @accountPortal {
 		reverse_proxy 127.0.0.1:9061 {
 			header_up X-Alpha-Client {remote_host}
 		}

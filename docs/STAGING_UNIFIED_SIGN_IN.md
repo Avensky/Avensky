@@ -1,6 +1,6 @@
 # One sign-in for Avensky staging
 
-The staging game account owns the password and player data. The portal stores invite access, optional authenticators, and website sessions attached to game profile IDs. The same game profile keeps its character names, equipped outfits, achievements, and world saves. The unified mode replaces the shared browser password prompt and the separate portal password together.
+At `/sign-in`, a tester uses the approved email and game password. The existing staging game database stores the player account, characters, alpha invitations, optional authenticators and browser sessions in one physical SQLite file. The same game profile keeps its character names, equipped outfits, achievements, and world saves. The unified mode replaces the shared browser password prompt and the separate portal password together.
 
 ## How the services fit together
 
@@ -9,7 +9,8 @@ flowchart LR
     Browser[Phone or desktop] --> Caddy[Caddy on Vultr]
     Caddy -->|Sign-in and account pages| Portal[Staging portal]
     Portal -->|Private account requests| Game[Rust staging game]
-    Game --> Profiles[(Existing staging player database)]
+    Game --> Profiles[(Staging SQLite database)]
+    Portal -->|Invites and sessions| Profiles
     Caddy -->|Session check| Portal
     Caddy -->|Approved page requests| Site[Staging frontend]
     Caddy -->|Authorized WebSockets| Game
@@ -20,7 +21,7 @@ flowchart LR
     GitHub -->|Staging game image| Game
 ```
 
-The portal renders sign-in and invitation pages on loopback port 9061. It calls an authenticated game account bridge on the staging Rust port, 9002. Rust keeps sole access to its player database. Caddy checks an HTTPS session cookie before serving the app and model requests. The staging app connects directly to `wss://staging.avensky.com/ws/` on startup and reconnect, so the browser can send that same cookie. Caddy asks the internal verifier on loopback port 9062 for a short-lived signed admission. Rust validates it and binds that connection to the existing profile. Guest enrollment can upgrade the staging profile stored in the original browser.
+The portal renders sign-in and invitation pages on loopback port 9061. It calls an authenticated game account bridge on the staging Rust port, 9002. Rust owns player records and verifies game passwords. The portal uses separate access tables in the same database. Caddy checks an HTTPS session cookie before serving the app and model requests. The staging app connects directly to `wss://staging.avensky.com/ws/` on startup and reconnect, so the browser can send that same cookie. Caddy asks the internal verifier on loopback port 9062 for a short-lived signed admission. Rust validates it and binds that connection to the existing profile. Guest enrollment can upgrade the staging profile stored in the original browser.
 
 With the staging gate enabled, Rust requires an admission for all game sockets, including the old API hostname. The deployment probe can still complete a loopback WebSocket upgrade. Without an admission that socket closes before registering a client. A device-only game token issued before cutover can be redeemed on an invite to preserve the guest's saves.
 
@@ -33,108 +34,42 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 - An operator can preserve a legacy username by specifying it in **Alpha testers** when creating the invite or by passing `--game-login EXISTING_USERNAME` to `invite-admin`. The tester still enters only their email and game password.
 - The staging signup path requires an invite. Revoking alpha access blocks new sessions and private model requests and disconnects the active game session. The player profile and saves are retained.
 
-The unified portal stores admissions in `/var/lib/avensky-alpha/game-access.sqlite3`. The previous preview database is available for rollback. A portal session created when the player accepts an invite also authenticates their game connection. The portal serves the static garage still, logo and entry styles from the published frontend. The app, models, and multiplayer endpoint use the same invite gate.
-
-## Recover a staging game password
-
-1. Select **Forgot password?** and submit the email used for the staging invitation. Portal administrators can see recent requests under **Alpha testers**.
-2. After verifying the player's identity, the staging operator issues a one-use reset link from Vultr and sends it privately. Links expire after 30 minutes. Issuing a replacement invalidates any earlier link for that game profile.
-
-   ```sh
-   read -r -p 'Verified staging email: ' alpha_email
-   systemd-run --wait --pipe --quiet --uid=avensky-alpha \
-     -p EnvironmentFile=/etc/avensky/staging-alpha.env \
-     --setenv=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha \
-     /usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs reset-password "$alpha_email"
-   ```
-
-3. Open the link in your browser, enter the same email, and choose a new password. The form asks for an authenticator or recovery code if you enabled 2FA. The game server changes the password on the existing profile and ends prior sessions.
-4. If staging admission is still pending or expired, accept a valid invitation with the new password. For an invite-only guest without a game password, start with a fresh invite in the browser that has the guest save.
-
-Use the updated staging Rust game image before installing the updated portal modules. The recovery commands use the existing private staging bridge. The portal stores request emails and hashed reset tokens. The game server writes only the new credential record into the existing profile. If the bridge fails during redemption, issue a fresh link after resolving the service error.
+The portal unit binds the named game volume’s staging directory into its private mount namespace. Its `/run/avensky-player/social.sqlite3` and the Rust game’s `/data/staging/social.sqlite3` are the same file. An old `/__alpha/sign-in` bookmark redirects to `/sign-in`. Returning signed-in players continue to character selection. A portal session created when the player accepts an invite also authenticates their game connection. The portal serves the static garage still, logo and entry styles from the published frontend. The app, models, and multiplayer endpoint use the same invite gate.
 
 ## Vultr cutover
 
-Publish the release with the staging game enabled first. The new build supports the existing staging routes until the game key and unified Caddy routes are enabled. This rollout uses the existing staging game volume and the existing asset release. Protect ports 9002, 9061, and 9062 at loopback.
-
-If the game already has the matching sign-in key and its bridge responds, a portal or frontend-only release needs no game restart. Install the portal modules from the new published commit and restart only `avensky-alpha-access`. When the key is enabled before the Caddy switch, the old browser password may still load the old entry screen while the former multiplayer connection closes. Apply the staging Caddy template to put the normal sign-in form and authenticated connection on the same host.
-
-1. From the published commit, install `accounts.mjs`, `game-bridge.mjs`, and `portal.mjs` from `deploy/staging-access/` into `/usr/local/lib/avensky/staging-access/`. Install `palettes.json`, `garageEntry.ts`, and `branding.ts` from the same revision of `frontend/src/theme/` beside the modules. Keep a copy of the prior portal modules and both existing service configurations. Use Node 24.
-2. Set the same new, random 64-hex-character secret as `AVENSKY_ALPHA_GAME_KEY` in `/etc/avensky/staging-alpha.env` and `AVENLAB_STAGING_SIGN_IN_KEY` in the staging game's environment. Keep the existing `AVENSKY_ALPHA_KEY`. Store both files as root with mode 0600. An `env_file` under the staging Compose game's service can load a root-owned file. Leave `AVENLAB_ENV=staging` and the named staging volume in place.
-3. Recreate just the staging game with its current reviewed image and the updated operator-managed Compose file, then restart `avensky-alpha-access`. Before changing Caddy, issue an admin invite. Under the existing staging guard, enter the invited email and password and open `/__alpha/account` on the same tab. Verify the administrator can create a second manual invite.
-4. Merge the handlers in [staging-unified.Caddyfile](../deploy/staging-access/staging-unified.Caddyfile) into the `staging.avensky.com` site and remove its shared Basic Auth. Preserve the actual staging release root and other host blocks. The public portal goes to 9061 and the WebSocket auth preflight goes to 9062. Never reverse-proxy the 9062 listener as a browser endpoint. Validate the full Caddyfile and reload Caddy.
-5. In a fresh mobile browser session, confirm the website goes to the ordinary sign-in form, an uninvited user cannot join, and an approved player sees the saved characters and outfits after one sign-in. Verify anonymous model and socket requests return 401, an approved model request returns 206 for a byte range, and revocation disconnects a tester. Check 2FA and reconnect with a saved profile.
-
-On the host with the existing release helper, the following root commands prepare the currently published staging revision. First confirm `publish-staging` reported success for both the game and frontend.
+For the existing staging installation, run this as root on Vultr after the frontend publisher reports success for the change. The installer reads the revision the staging frontend actually serves. It backs up the database, imports the previous unified access records, updates the portal and Caddy, and verifies the public garage page. The game can stay online. The host must already have its staging bridge key, the managed `avensky-alpha-access` unit, and the local `avensky-staging_avensky_staging_data` volume.
 
 ```bash
-(
-  set -euo pipefail
-  umask 077
-  alpha_backup="/root/avensky-before-unified-$(date +%Y%m%d-%H%M%S)"
-  alpha_dir=/usr/local/lib/avensky/staging-access
-  alpha_source=/var/lib/avensky-staging-deploy/source.git
-  alpha_web=$(readlink -f /srv/avensky-staging/frontend/current)
-  alpha_commit=$(basename "$(dirname "$alpha_web")")
-  install -d -m 0700 "$alpha_backup"
-  cp -a "$alpha_dir" /etc/avensky/staging-alpha.env \
-    /etc/avensky/staging-game.compose.yaml /etc/caddy/Caddyfile "$alpha_backup/"
-  for file in accounts.mjs game-bridge.mjs portal.mjs staging-unified.Caddyfile; do
-    git --git-dir="$alpha_source" show "$alpha_commit:deploy/staging-access/$file" > "$alpha_backup/$file"
-  done
-  for file in palettes.json garageEntry.ts branding.ts; do
-    git --git-dir="$alpha_source" show "$alpha_commit:frontend/src/theme/$file" > "$alpha_backup/$file"
-  done
-  /usr/bin/node --check "$alpha_backup/accounts.mjs"
-  /usr/bin/node --check "$alpha_backup/game-bridge.mjs"
-  /usr/bin/node --check "$alpha_backup/portal.mjs"
-  install -m 0644 "$alpha_backup"/{accounts.mjs,game-bridge.mjs,portal.mjs,palettes.json,garageEntry.ts,branding.ts,staging-unified.Caddyfile} "$alpha_dir/"
-  if ! grep -q '^AVENSKY_ALPHA_GAME_KEY=' /etc/avensky/staging-alpha.env; then
-    alpha_key=$(openssl rand -hex 32)
-    printf 'AVENSKY_ALPHA_GAME_KEY=%s\n' "$alpha_key" >> /etc/avensky/staging-alpha.env
-    chmod 0600 /etc/avensky/staging-alpha.env
-    printf 'AVENLAB_STAGING_SIGN_IN_KEY=%s\n' "$alpha_key" > /etc/avensky/staging-unified-game.env
-  fi
-  test -s /etc/avensky/staging-unified-game.env
-  printf 'Previous configs and modules saved in %s\n' "$alpha_backup"
-)
+set -e
+revision=$(basename "$(dirname "$(readlink -e /srv/avensky-staging/frontend/current)")")
+script=$(mktemp)
+git --git-dir=/var/lib/avensky-staging-deploy/source.git show "$revision:deploy/staging-access/install-sign-in.sh" > "$script"
+bash "$script"
+rm -f "$script"
 ```
 
-In `/etc/avensky/staging-game.compose.yaml`, add the following under `services.game`. If that service already has an `env_file` list, append this entry.
+Use `bash "$script" --fresh` for a first cutover with an empty invitation list. Existing game accounts and saved characters survive either choice. A successful migration records its version inside the game database, so repeating the installer preserves subsequent invites and revocations. The old access file remains an offline backup. A legacy portal with its own password hashes requires fresh email invitations. The installer refuses to copy its password hashes.
 
-```yaml
-    env_file:
-      - /etc/avensky/staging-unified-game.env
-```
+The default installer handles a standalone staging site in `/etc/caddy/Caddyfile`. For a host using imported Caddy fragments, route the exact `/sign-in` path to the same loopback portal as `/__alpha/*` using the staging template. Preserve the private socket verifier and asset gate. Install the service, database migration and staging release helper together before enabling the new route. On future game releases the helper pauses both database users before taking or restoring its cold snapshot. Frontend-only releases keep both processes running.
 
-Keep the staging game on its deployed release image while applying the environment change. This restarts the staging player session once.
+For a first-time host, configure `AVENLAB_ENV=staging`, the existing named game volume, and matching 64-hex staging bridge keys in the game (`AVENLAB_STAGING_SIGN_IN_KEY`) and portal (`AVENSKY_ALPHA_GAME_KEY`). Keep `AVENSKY_ALPHA_KEY` stable for encrypted two-factor data and use Node 24. The game initializes its own player database first. Follow the unit and Caddy templates under `deploy/staging-access/` for an initial installation. Bind the public portal to loopback 9061 and its internal socket verifier to loopback 9062.
+
+## Operator invitations and password recovery
+
+The game account owns the password. A manager can issue a tester invite from the signed-in character Profile tab. For the first admin or a password reset, use this shell function as the staging operator. It runs with the same UID, database path and encryption settings as the running service.
 
 ```bash
-(
-  set -euo pipefail
-  alpha_compose=/etc/avensky/staging-game.compose.yaml
-  stage_game=$(docker compose -p avensky-staging -f "$alpha_compose" ps -q game)
-  [ -n "$stage_game" ]
-  stage_image=$(docker inspect --format '{{.Config.Image}}' "$stage_game")
-  [[ "$stage_image" == avensky-staging-game:* ]]
-  docker compose -p avensky-staging -f "$alpha_compose" config --quiet
-  printf 'services:\n  game:\n    image: "%s"\n' "$stage_image" |
-    docker compose -p avensky-staging -f "$alpha_compose" -f - up -d --no-deps --no-build --pull never --force-recreate game
-  systemctl restart avensky-alpha-access
-)
+staging_account() {
+  systemd-run --wait --pipe --quiet --collect --uid=10001 --gid=10001 \
+    -p UMask=0077 -p EnvironmentFile=/etc/avensky/staging-alpha.env \
+    -p BindPaths=/var/lib/docker/volumes/avensky-staging_avensky_staging_data/_data/staging:/run/avensky-player \
+    --setenv=AVENSKY_GAME_DATABASE=/run/avensky-player/social.sqlite3 \
+    /usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs "$@"
+}
 ```
 
-Create the first administrator as the server operator using the same command as in the preview. It creates an invite for the unified store when the portal game key is configured.
-
-```sh
-read -r -p 'Alpha administrator email: ' alpha_admin
-systemd-run --wait --pipe --quiet --uid=avensky-alpha \
-  -p EnvironmentFile=/etc/avensky/staging-alpha.env \
-  --setenv=AVENSKY_ALPHA_STATE=/var/lib/avensky-alpha \
-  /usr/bin/node /usr/local/lib/avensky/staging-access/portal.mjs invite-admin "$alpha_admin"
-```
-
-To roll back, restore the previous staging Caddy and service configurations, recreate only the staging game using the previous configuration, and restart the portal. The new admissions database can be kept for a later retry. The game database is shared across staging releases as before.
+Use `staging_account invite-admin EMAIL` to obtain the first private admin invitation. Use `staging_account reset-password EMAIL` after verifying a tester's identity. Send the resulting one-use URL privately. A reset link expires after 30 minutes and a successful reset ends old sessions. Pending, expired and revoked alpha access still requires a valid invitation. For a legacy game login, use the existing `--game-login LOGIN` invitation option.
 
 ## Mail is independent
 
