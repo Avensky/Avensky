@@ -79,6 +79,7 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
   }, capture);
   for (const event of ["focusin", "input", "wheel"]) document.addEventListener(event, wake, { signal: scope.signal });
   window.addEventListener("avensky:garage-ready", wake, { signal: scope.signal });
+  window.addEventListener("avensky:portal-form", wake, { signal: scope.signal });
   window.addEventListener("avensky:garage-activity", wake, { signal: scope.signal });
   window.addEventListener("avenlab:panel-action", event => {
     if (root.dataset.garageUiIdle === "true" && isLogin()) event.stopImmediatePropagation();
