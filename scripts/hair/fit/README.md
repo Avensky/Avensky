@@ -1,6 +1,6 @@
 # Universal Hairstyle Fitting — Avensky V2 (design and acceptance spec)
 
-Status: **authoring specification / implementation pending**. This branch does not yet make a new wearable or alter the twelve accepted hairstyles. Target: Vesper Vega, then other rigged characters using separate character profiles.
+Status: **measured-scalp authoring milestone implemented; actual Vesper fitting pending**. The branch has a read-only character and hairstyle inspector, tested portable cap geometry, and an opt-in Blender builder. The user's actual Vesper scalp ring/crown have not been measured and no fitted GLB exists. Existing accepted hairstyles and live assets are unchanged. See [QUICKSTART.md](QUICKSTART.md) for executable commands and prerequisites.
 
 ## Why V1 did not solve the gaps
 The existing `scripts/hair/blender_apply_batch.py` explicitly preserves the twelve fitted meshes' vertex positions, topology, skin, UVs and shape keys. It improves the material only. The donor texture archive contains three *separate* FBX meshes (`CURLY 01.FBX`, `CURLY 02.FBX`, `CURLY 03.FBX`) with their own geometry/UVs; the V1 material donor workflow does not fit those geometry meshes to Vesper. See `docs/assets/CURLY_SET_AUDIT.md`.
@@ -75,12 +75,24 @@ scripts/hair/
 ```
 All commercial FBX, paid texture maps, generated vendor derivatives, and previews stay outside the public repository unless rights are independently confirmed. The public branch should only contain our original scripts/config/docs and test fixtures.
 
-## CLI proposal (not runnable yet)
-```bash
-blender -b --python scripts/hair/fit/inspect_source.py -- --character /private/vesper_neutral.blend --style /private/CURLY\ 01.FBX --config scripts/hair/fit/styles/curly_mane.json --report /private/fit/inspection.json
-blender -b /private/vesper_neutral.blend --python scripts/hair/fit/fit_hair.py -- --config scripts/hair/fit/styles/curly_mane.json --source /private/CURLY\ 01.FBX --out /private/fit/curly_mane.blend --report /private/fit/curly_mane.json
+## Implemented Blender authoring commands
+
+1. Inspect the character's actual head meshes and armature, from its **real binary GLB** (not a Git LFS pointer):
+```sh
+blender -b --python scripts/hair/fit/inspect_character.py -- --character-glb /private/vesper.garage.glb --report /private/fit/vesper-head.json
 ```
-These are target interfaces for implementation; do not run as if the files exist.
+2. Inspect vendor geometry without fitting:
+```sh
+blender -b /private/vesper_head_guides.blend --python scripts/hair/fit/inspect_source.py -- --source "/private/CURLY 01.FBX" --config scripts/hair/fit/styles/curly_mane.json --report /private/fit/curly-source.json
+```
+3. After authoring a closed `AV_HairlineLoop` and `AV_Crown`, **dry-run** the cap generator (armature/bone/up/units shown are examples, verify from the source):
+```sh
+blender -b /private/vesper_head_guides.blend --python scripts/hair/fit/build_scalp_cap.py -- --armature-object Armature --head-bone head --up-vector 0,0,1 --meters-per-unit 1.0 --report /private/fit/cap-preflight.json
+```
+4. The `--write --output-blend /private/vesper_scalp_foundation_v2.blend` option writes only a NEW editable Blender file. See [QUICKSTART.md](QUICKSTART.md) for full instructions and required visual QA.
+5. Later phases (`fit_hair.py`, root deformation and GLB/LOD exporter) remain **not implemented**, and are not safe to run from previous command examples.
+
+Local pure-Python geometry tests: `python -m unittest discover -s scripts/hair/fit -p 'test_*.py' -v`. Blender integration and photo QA still pending.
 
 ## Responsibilities and compatibility
 - **Wardrobe branch:** Blender authoring, geometry, rig fit, private assets, automated QA, exports and fit manifests.
