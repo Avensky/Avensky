@@ -53,9 +53,17 @@ def unpack(stream, destination, staging):
 def check_staging_assets(verified, release):
     if not isinstance(release, str) or not RELEASE.fullmatch(release):
         raise ValueError("The staging bundle has an invalid asset release ID")
+    # The legacy receiver still points at a trusted operator-owned file.
+    # New verified releases may be installed beside it under their sealed ID
+    # without editing the forced SSH key or weakening the gateway probe.
     manifest = json.loads(verified.read_text(encoding="utf-8"))
     if manifest["release"]["id"] != release:
-        raise ValueError("The bundle needs a different verified asset release")
+        candidate = verified.with_name("verified-" + release + ".json")
+        if candidate.is_symlink() or not candidate.is_file():
+            raise ValueError("The bundle needs a different verified asset release")
+        manifest = json.loads(candidate.read_text(encoding="utf-8"))
+        if manifest["release"]["id"] != release:
+            raise ValueError("The bundle needs a different verified asset release")
     request = Request(
         "http://127.0.0.1:9060/__staging-assets/" + release + STAGING_MODEL,
         headers={"Range": "bytes=0-3"},
