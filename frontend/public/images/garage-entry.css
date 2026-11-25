@@ -141,3 +141,24 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 }
 
 .garage-entry-card .garage-recovery :is(a,summary,button) { color:var(--garage-menu-accent); }
+
+/* Credentials float as individual bars over the shared garage. */
+.garage-entry-card:has(.garage-credentials) { background: transparent; }
+.garage-entry-card:has(.garage-credentials)::before { content: none; }
+.garage-credentials .garage-field,
+.garage-credentials .garage-sign-in {
+  --login-bar-shape: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px), 0 8px);
+  clip-path: var(--login-bar-shape);
+}
+.garage-credentials .garage-field {
+  background: var(--garage-menu-line);
+  padding: 1px;
+}
+.garage-credentials .garage-field input {
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px), 0 7px);
+  border: 0;
+}
+.garage-credentials .garage-field:focus-within { background: var(--garage-menu-accent); }
+.garage-entry-card .garage-credentials :is(input,.garage-sign-in):focus {
+  outline-offset: -3px;
+}
