@@ -15,6 +15,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hair", default="AVFIT_CurlyMane_GLOBAL_PREVIEW")
     parser.add_argument("--output-name", default="AVFIT_CurlyMane_LOCAL_REVIEW")
+    parser.add_argument("--fore-aft-only", action="store_true",
+                        help="Allow pitch about world X and fore-aft world Y translation only")
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--out-blend", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
@@ -45,6 +47,7 @@ def main():
     seen = set()
     changed = 0
     max_transform_error = 0.
+    max_lateral_change = 0.
     for row in plan:
         i = row["component"]
         if type(i) is not int or i in seen or not 0 <= i < len(groups):
@@ -58,6 +61,11 @@ def main():
                 or not np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-7, rtol=0)
                 or not np.isclose(np.linalg.det(rotation), 1, atol=1e-7, rtol=0)):
             raise ValueError("Each edit must be a proper rigid transform in Blender world coordinates")
+        if a.fore_aft_only and (
+            not np.allclose(rotation[0], (1, 0, 0), atol=1e-7, rtol=0)
+            or not np.allclose((after - before)[[0, 2]], 0, atol=1e-7, rtol=0)
+        ):
+            raise ValueError("Fore-aft edits require pitch and world Y translation only")
         indices = np.asarray(groups[i])
         points = original[indices]
         if np.min(np.linalg.norm(points - before, axis=1)) > .04:
@@ -73,7 +81,10 @@ def main():
             rotated = normals[affected_loops] @ normal_transform.T
             normals[affected_loops] = rotated / np.linalg.norm(rotated, axis=1)[:, None]
         max_transform_error = max(max_transform_error, float(np.linalg.norm(recovered - moved, axis=1).max()))
+        max_lateral_change = max(max_lateral_change, float(np.abs(recovered[:, 0] - points[:, 0]).max()))
         changed += len(indices)
+    if a.fore_aft_only and max_lateral_change > .000001:
+        raise ValueError("Unexpected lateral movement in the stored fore-aft edit")
     if max_transform_error > .000005:
         raise ValueError("Unexpected coordinate precision loss")
     edited = hair.copy()
@@ -96,6 +107,7 @@ def main():
         "untouched_vertices": len(mesh.vertices) - changed,
         "added_vertices": 0, "added_triangles": 0,
         "max_transform_error_m": max_transform_error, "approved_for_release": False,
+        "fore_aft_only": a.fore_aft_only, "max_lateral_change_m": max_lateral_change,
     }
     bpy.ops.wm.save_as_mainfile(filepath=str(out), compress=True)
     report.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
