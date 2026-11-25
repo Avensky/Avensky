@@ -221,12 +221,24 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
     };
     const json = (status, value) => send(status, JSON.stringify(value), { "Content-Type": "application/json; charset=utf-8" });
     const wantsJson = req.headers.accept?.includes("application/json");
+    const signInRequired = () => wantsJson ? json(401, { error: "Sign in required." }) : send(403);
     const redirect = (location, value) => send(303, "", {
       Location: location,
       ...(value === undefined ? {} : {
         "Set-Cookie": `${cookieName}=${value}; Max-Age=${value ? SESSION_AGE : 0}; ${cookieFlags}`,
       }),
     });
+    const finishSignIn = async (location, token) => {
+      const winner = game && accounts.viewer(token);
+      if (winner) {
+        // The commit is authoritative. Rust also revalidates its active session
+        // against the same database if the immediate notification is lost.
+        try { await game.sessionChanged(winner.game_profile, winner.digest); }
+        catch { console.warn("The game will recheck the current staging session."); }
+      }
+      if (!accounts.viewer(token)) return send(409, signInPage("A newer sign-in was completed. Sign in again to continue."));
+      return redirect(location, token);
+    };
     const factorRateLimited = () => send(429, signInPage("Too many incorrect codes. Wait five minutes, then log in again."),
       { "Retry-After": "300" });
     let viewer;
@@ -314,16 +326,16 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       if (path === signInPath && !value("challenge")) {
         const result = await accounts.beginSignIn(value("email"), value("password"));
         if (result.locked) return factorRateLimited();
-        return result.challenge ? send(200, factorPage(result.challenge)) : redirect("/", result.session);
+        return result.challenge ? send(200, factorPage(result.challenge)) : await finishSignIn("/", result.session);
       }
       if (path === signInPath || path === base + "/sign-in/code") {
         const result = accounts.completeSignIn(value("challenge"), value("code").trim());
-        if (result.session) return redirect("/", result.session);
+        if (result.session) return await finishSignIn("/", result.session);
         if (result.locked) return factorRateLimited();
         if (result.challenge) return send(400, factorPage(result.challenge, "The authentication code is incorrect."));
         return send(400, signInPage("The verification step ended. Enter your email and password to try again."));
       }
-      if (path === base + "/enroll") return redirect(game ? "/" : base + "/account",
+      if (path === base + "/enroll") return await finishSignIn(game ? "/" : base + "/account",
         await accounts.enroll(value("email"), value("invite").trim(), value("password"), value("deviceToken")));
       if (path === base + "/forgot-password") {
         accounts.requestPasswordReset(value("email"));
@@ -342,7 +354,9 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
           "Set-Cookie": `${cookieName}=; Max-Age=0; ${cookieFlags}`,
         }) : redirect(signInPath, "");
       }
-      if (!viewer) return wantsJson ? json(401, { error: "Sign in required." }) : send(403);
+      // A session can change while the POST body is arriving.
+      viewer = accounts.viewer(sessionCookie(req));
+      if (!viewer) return signInRequired();
       if (path === base + "/account/email-request") {
         const result = await accounts.requestEmailChange(viewer, value("newEmail"), value("password"));
         return wantsJson ? json(200, result) : send(200, page("Account", securityPage(viewer), result.message));
@@ -352,9 +366,9 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         return wantsJson ? json(200, result) : send(200, page("Account", securityPage(viewer), result.message));
       }
       if (path === base + "/sign-out") {
-        accounts.end(viewer);
-        if (game) await game.disconnect(viewer.game_profile);
-        return redirect(signInPath, "");
+        if (accounts.end(viewer) && game) await game.disconnect(viewer.game_profile, viewer.digest);
+        // A concurrent login in another tab may have set a newer HttpOnly cookie.
+        return redirect(signInPath, accounts.hasSession(viewer.email) ? undefined : "");
       }
       if (path === base + "/mfa/start") {
         const seed = await accounts.beginMfa(viewer, value("password"));
@@ -372,10 +386,12 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
         const { email, code } = accounts.issueInvite(value("email"), false, value("gameLogin"));
         const url = origin + base + "/enroll#" + code;
         if (mailInvite) {
-          try {
-            await mailInvite(email, url);
-            return wantsJson ? json(200, { email, sent: true }) : send(200, testerPage(viewer, "Invitation sent."));
-          } catch { /* The administrator can share the invitation link manually. */ }
+          let delivered = false;
+          try { await mailInvite(email, url); delivered = true; }
+          catch { /* The administrator can share the invitation link manually. */ }
+          viewer = accounts.viewer(sessionCookie(req));
+          if (!viewer?.admin) return signInRequired();
+          if (delivered) return wantsJson ? json(200, { email, sent: true }) : send(200, testerPage(viewer, "Invitation sent."));
         }
         return wantsJson ? json(200, { email, sent: false, url })
           : send(200, testerPage(viewer, mailInvite ? "Email delivery failed." : "Invitation created.",
@@ -391,7 +407,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
     } catch (error) {
       // Database, filesystem and mail failures are private to the operator.
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
-      if (path === signInPath || path === base + "/enroll")
+      if (path === signInPath || path === base + "/sign-in/code" || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
       if (path === base + "/forgot-password") return send(400, forgotPasswordPage(message));
       if (path === base + "/reset" || path === base + "/reset/verify") {
@@ -403,9 +419,12 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
         }
         return send(400, resetPage(message, verification));
       }
+      try { viewer = accounts.viewer(sessionCookie(req)); }
+      catch { return send(503); }
+      if (!viewer) return signInRequired();
       if (wantsJson) return json(400, { error: message });
       if (path?.startsWith(base + "/testers/")) return send(400, testerPage(viewer, message));
-      return send(400, page("Account", viewer ? securityPage(viewer) : "", message));
+      return send(400, page("Account", securityPage(viewer), message));
     } finally { active--; }
   });
 }

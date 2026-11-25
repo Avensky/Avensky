@@ -26,7 +26,7 @@ import {
 import { performanceRecorder as recorder } from "../performance/measurements";
 import { handlingSample } from "../performance/handling";
 import { useChatStore } from "../store/chat/chatStore";
-import {useSocialStore} from '../store/social/socialStore';
+import {useSocialStore, type EntryIssue} from '../store/social/socialStore';
 import {useUIStore} from '../store/menus/uiStore';
 import {useSelectionStore} from '../store/selection/selectionStore';
 import {useWorldCatalog} from '../store/selection/worldCatalog';
@@ -41,6 +41,8 @@ let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
 let setupTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let reconnectEnabled = false;
+// Ignore late verification responses after an explicit teardown or a newer welcome.
+let sessionGeneration = 0;
 let pingSentMs: number | null = null;
 let vehicleChangeSequence = 0;
 let lastSnapshotReceiptMs: number | null = null;
@@ -400,6 +402,24 @@ function scheduleReconnect() {
   );
 }
 
+function pauseEntry(issue: EntryIssue) {
+  disconnectRustServer();
+  resetHub();
+  resetHubControls();
+  useSocialStore.setState({ entryIssue: issue, profileOwner: null, cachedCosmetics: null });
+  useUIStore.getState().setScreen("welcome");
+  if (issue.kind === "session-replaced" || issue.kind === "session-expired") {
+    // If the public form can't load, the same notice and a retry stay in the garage.
+    void returnToStagingSignIn(false, issue.kind).catch(() => {});
+  }
+}
+
+/** Explicit retry also releases a live transport stuck waiting for its profile. */
+export function retryEntryConnection() {
+  disconnectRustServer();
+  connectRustServer();
+}
+
 function finiteTuple(value: unknown, length: number): boolean {
   return (
     Array.isArray(value) &&
@@ -464,12 +484,20 @@ export function connectRustServer(): WebSocket {
   // Old callbacks cannot clear or close the replacement session.
   const isCurrent = () => socket === connection && reconnectEnabled;
 
-  const handleLoss = () => {
+  const handleLoss = (event?: CloseEvent) => {
     if (!isCurrent()) return;
     if (usesStagingPortal) {
+      const kind = event?.code === 4001 ? "session-replaced" : event?.code === 4002 ? "other-tab"
+        : event?.code === 4003 ? "session-expired" : null;
+      if (kind) { pauseEntry({ kind }); return; }
+    }
+    const issue = useSocialStore.getState().entryIssue;
+    if (issue?.kind === "server") { pauseEntry(issue); return; }
+    if (usesStagingPortal) {
+      const generation = sessionGeneration;
       void fetch("/__alpha/verify", { cache: "no-store" }).then(response => {
-        if (response.status === 401 && reconnectEnabled && (!socket || socket.readyState !== WebSocket.OPEN))
-          return returnToStagingSignIn();
+        if (response.status === 401 && generation === sessionGeneration && reconnectEnabled)
+          pauseEntry({ kind: "session-expired" });
       }).catch(() => { /* The normal reconnect flow handles network loss. */ });
     }
     resetHub();
@@ -522,13 +550,9 @@ export function connectRustServer(): WebSocket {
     }, 5000);
   };
 
+  // Browser errors are followed by close. Its code distinguishes a lost
+  // transport from a replaced session; the watchdog covers silent peers.
   connection.onclose = handleLoss;
-
-  connection.onerror = () => {
-    if (!isCurrent()) return;
-    // Only the close handler owns cleanup and retries.
-    connection.close();
-  };
 
   connection.onmessage = (event) => {
     if (!isCurrent()) return;
@@ -589,6 +613,7 @@ export function connectRustServer(): WebSocket {
         return;
       case "welcome":
         if (typeof message.player_id !== "string") return;
+        sessionGeneration++;
         if (setupTimer !== null) clearTimeout(setupTimer);
         setupTimer = null;
         if (message.packed_input_version === 1) packedInputPeers.add(connection);
@@ -628,7 +653,13 @@ export function connectRustServer(): WebSocket {
         useChatStore.getState().receive(message.data);
         return;
       case "social_error":
-        console.warn(message.message || "Social connection unavailable");
+        if (!useSocialStore.getState().view) {
+          useSocialStore.setState({ entryIssue: { kind: "server", message:
+            typeof message.message === "string" && message.message.trim()
+              ? message.message : "The game server could not open your profile." } });
+        } else if (typeof message.message === "string") {
+          useChatStore.getState().notify(message.message);
+        }
         return;
       case "session_restored":
         if(resumeIntent&&resumeIntent.step==="waiting"){
@@ -783,6 +814,7 @@ export function connectRustServer(): WebSocket {
 
 // App teardown must cancel retry timers as well as closing the live connection.
 export function disconnectRustServer() {
+  sessionGeneration++;
   forgetRecovery();hadLocalBody=false;missingBodySince=null;
   reconnectEnabled = false;
   clearTimers();

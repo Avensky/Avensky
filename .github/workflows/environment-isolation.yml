@@ -6,6 +6,9 @@ on:
       - "frontend/src/net/rustSocket.ts"
       - "frontend/tests/deployment-environment.test.mjs"
       - "frontend/tests/session-recovery.test.mjs"
+      - "frontend/tests/staging-session-close.test.mjs"
+      - "frontend/tests/garage-session-navigation.test.mjs"
+      - "deploy/staging-access/*.mjs"
       - "frontend/.env*"
       - "avenlab-server/src/deployment_env.rs"
       - "avenlab-server/src/main.rs"
@@ -13,6 +16,8 @@ on:
       - "avenlab-server/src/server/**"
       - "avenlab-server/src/alpha/character.rs"
       - "avenlab-server/src/net.rs"
+      - "avenlab-server/src/net/staging_gate.rs"
+      - "avenlab-server/src/outbox.rs"
       - "avenlab-server/src/social/**"
       - "avenlab-server/Cargo.*"
       - "packages/wardrobe-catalog/vehicle-drivers.json"
@@ -39,7 +44,7 @@ jobs:
       - name: Type-check frontend integration
         run: npm --prefix frontend run typecheck
       - name: Verify game recovery after reconnect and fresh sign-in
-        run: node --test tests/session-recovery.test.mjs
+        run: node --test tests/session-recovery.test.mjs tests/staging-session-close.test.mjs tests/garage-session-navigation.test.mjs
         working-directory: frontend
 
   server-environment:
@@ -47,10 +52,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
       - name: Verify persistent data paths are isolated
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml deployment_env::tests
       - name: Verify account migration and outfit recovery
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml account_survives_a_restart
+      - name: Verify staging admission and active-session replacement
+        run: cargo test --locked --manifest-path avenlab-server/Cargo.toml staging_
+      - name: Switch devices with the sign-in portal and live game
+        run: |
+          cargo build --locked --manifest-path avenlab-server/Cargo.toml
+          AVENSKY_TEST_GAME_BIN="$PWD/avenlab-server/target/debug/avenlab-server" node --test deploy/staging-access/session-handoff.test.mjs
       - name: Verify game master permissions and world selection
         run: cargo test --locked --manifest-path avenlab-server/Cargo.toml game_master_
       - name: Verify saved body customization

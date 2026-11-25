@@ -31,9 +31,9 @@ pub(super) async fn approve_fixture_match(s: &Server, room: usize) {
     data.authored.match_sources.insert(room, (source.id, revision));
     data.worlds.insert(source.id, source);
 }
-async fn client(server: &Server, name: &str) -> (String, Value, watch::Receiver<Option<String>>) {
+async fn test_socket(server: &Server) -> (String, watch::Receiver<Option<String>>, crate::outbox::Receiver) {
     let player = id();
-    let (tx, _rx) = crate::outbox::channel();
+    let (tx, rx) = crate::outbox::channel();
     let (frame, _frame) = watch::channel(None);
     let (social, view) = watch::channel(None);
     let (input_tx, input) = watch::channel(None);
@@ -46,13 +46,17 @@ async fn client(server: &Server, name: &str) -> (String, Value, watch::Receiver<
                 social,
                 input,
                 input_tx,
-                profile_id: None,
+                profile_id: None, staging_session: None,
                 world_id: None,
                 team: Team::Blue,
             },
         )
         .await
         .unwrap();
+    (player, view, rx)
+}
+async fn client(server: &Server, name: &str) -> (String, Value, watch::Receiver<Option<String>>) {
+    let (player, view, _rx) = test_socket(server).await;
     let result = server
         .handle(&player, json!({"action":"identify","name":name}))
         .await
@@ -61,6 +65,15 @@ async fn client(server: &Server, name: &str) -> (String, Value, watch::Receiver<
 }
 async fn world(server: &Server, player: &str, name: &str, password: &str, listed: bool) -> usize {
     server.handle(player,json!({"action":"world_create","name":name,"map":"road_precision","password":password,"listed":listed})).await.unwrap()["world_id"].as_u64().unwrap() as usize
+}
+fn portal_fixture(server: &Server, profile: &str) -> rusqlite::Connection {
+    let db = rusqlite::Connection::open(server.path.with_extension("sqlite3")).unwrap();
+    db.execute_batch("CREATE TABLE game_profiles(email TEXT PRIMARY KEY, profile_id TEXT UNIQUE);
+        CREATE TABLE testers(email TEXT PRIMARY KEY, revoked INTEGER);
+        CREATE TABLE sessions(digest TEXT PRIMARY KEY, email TEXT, expires INTEGER, login_protocol INTEGER DEFAULT 1);
+        INSERT INTO testers VALUES ('tester',0);").unwrap();
+    db.execute("INSERT INTO game_profiles VALUES ('tester',?1)",[profile]).unwrap();
+    db
 }
 async fn cleanup(server: Server) {
     let _ = tokio::fs::remove_dir_all(server.path.parent().unwrap()).await;
@@ -186,14 +199,94 @@ async fn account_survives_a_restart_and_restores_the_same_character_and_outfit()
     staged.profile_id = None;
     server.disconnect(&phone).await;
     server.register("staged".into(), staged).await.unwrap();
-    server.attach_staging_profile("staged", profile_id, crate::net::staging_now_ms()).await.unwrap();
+    let digest = "a".repeat(64);
+    let expires = timestamp() + 600;
+    let db = portal_fixture(&server, profile_id);
+    db.execute("INSERT INTO sessions VALUES (?1,'tester',?2,2)", rusqlite::params![digest,expires]).unwrap();
+    let staged_tx = server.connections.lock().await["staged"].tx.clone();
+    server.attach_staging_profile("staged", profile_id, crate::net::staging_now_ms(), expires, Some(&digest)).await.unwrap();
     assert_eq!(server.connections.lock().await["staged"].profile_id.as_deref(), Some(profile_id));
     assert_eq!(server.data.lock().await.profiles[profile_id].progression.character.as_ref().unwrap().outfit, "race-crew");
     let issued = crate::net::staging_now_ms();
     server.staging_account(&json!({"action":"disconnect","profile_id":profile_id})).await.unwrap();
-    assert!(*server.connections.lock().await["staged"].tx.failure().borrow());
-    assert!(server.attach_staging_profile("staged", profile_id, issued).await.is_err());
+    assert_eq!(*staged_tx.failure().borrow(), Some(crate::outbox::CloseReason::SessionEnded));
+    assert!(server.attach_staging_profile("staged", profile_id, issued, expires, Some(&digest)).await.is_err());
     cleanup(server).await;
+}
+
+#[tokio::test]
+async fn staging_session_handoff_checkpoints_and_fences_old_connections() {
+    use crate::outbox::CloseReason::{DuplicateTab, Replaced, SessionEnded};
+    let mut s = alpha_server();
+    s.accounts = Some(AccountAccess::default());
+    let account = s.staging_account(&json!({"action":"register","name":"Session driver",
+        "login":"session-tester","password":"a strong test-only passphrase"})).await.unwrap();
+    let profile = account["profile_id"].as_str().unwrap();
+    let db = portal_fixture(&s, profile);
+    let expires = timestamp() + 3600;
+    let (a, b, c) = ("a".repeat(64), "b".repeat(64), "c".repeat(64));
+    let grant = |digest: &str, version: u8| db.execute("INSERT INTO sessions VALUES(?1,'tester',?2,?3)",
+        rusqlite::params![digest, expires, version]).unwrap();
+    grant(&a, 1);
+    let now = crate::net::staging_now_ms;
+    let (old, _, _messages) = test_socket(&s).await;
+    let (new, _, _messages2) = test_socket(&s).await;
+    let (other, _, _messages3) = test_socket(&s).await;
+    let old_tx = s.connections.lock().await[&old].tx.clone();
+    // Pre-upgrade verifier, two indistinguishable legacy grants in the same second.
+    grant(&c, 1);
+    assert_eq!(s.attach_staging_profile(&old, profile, now(), expires, None).await, Err(SessionEnded));
+    db.execute("DELETE FROM sessions WHERE digest=?1", [&c]).unwrap();
+    s.attach_staging_profile(&old, profile, now(), expires, None).await.unwrap();
+    assert_eq!(s.attach_staging_profile(&other, profile, now(), expires, Some(&a)).await, Err(DuplicateTab));
+    s.handle(&old, json!({"action":"character_create","name":"Original racer","style":"night-shift","body":"female"})).await.unwrap();
+    mode(&s, &old, "sandbox", "tank").await;
+    s.spawn(&old, "road_precision", "tank").await.unwrap();
+    let runtime = s.runtime(&old).await.unwrap();
+    let world_id = s.connections.lock().await[&old].world_id;
+    // Emulate losing the new portal's bridge notification. The signed admission still wins.
+    db.execute("DELETE FROM sessions", []).unwrap();
+    grant(&b, 2);
+    assert_eq!(s.attach_staging_profile(&other, profile, now(), expires, None).await, Err(SessionEnded));
+    assert_eq!(s.attach_staging_profile(&other, profile, now(), expires, Some(&a)).await, Err(Replaced));
+    s.attach_staging_profile(&new, profile, now(), expires, Some(&b)).await.unwrap();
+    assert_eq!(*old_tx.failure().borrow(), Some(Replaced));
+    assert_eq!(s.connections.lock().await[&new].world_id, world_id);
+    assert!(runtime.lock().await.physics.vehicles.contains_key(&new));
+    assert!(!runtime.lock().await.physics.vehicles.contains_key(&old));
+    assert!(s.spawn(&old, "road_precision", "tank").await.is_err());
+    s.disconnect(&old).await;
+    assert!(runtime.lock().await.physics.vehicles.contains_key(&new));
+    s.handle(&new, json!({"action":"mode_leave"})).await.unwrap();
+    let write = |name: &str| json!({"action":"character_create","name":name,"style":"night-shift","body":"male"});
+    assert!(s.handle(&old, write("Stale racer")).await.is_err());
+    s.handle(&new, write("New racer")).await.unwrap();
+    s.disconnect(&old).await;
+    // Out-of-order callbacks from the displaced browser do not touch the latest owner.
+    for action in ["session_changed", "disconnect"] {
+        s.staging_account(&json!({"action":action,"profile_id":profile,"session_digest":a})).await.unwrap();
+    }
+    assert_eq!(s.connections.lock().await[&new].profile_id.as_deref(), Some(profile));
+    assert_eq!(s.data.lock().await.profiles[profile].characters.len(), 2);
+    assert_eq!(s.attach_staging_profile(&other, profile, now(), expires, Some(&b)).await, Err(DuplicateTab));
+    let new_tx = s.connections.lock().await[&new].tx.clone();
+    db.execute("DELETE FROM sessions", []).unwrap();
+    grant(&c, 2);
+    // Normally the trusted login callback retires the old owner before a new socket is opened.
+    // The winning proof can already be in flight when the callback reaches Rust.
+    let issued_before_callback = now();
+    s.staging_account(&json!({"action":"session_changed","profile_id":profile,"session_digest":c})).await.unwrap();
+    assert_eq!(*new_tx.failure().borrow(), Some(Replaced));
+    s.attach_staging_profile(&other, profile, issued_before_callback, expires, Some(&c)).await.unwrap();
+    let other_tx = s.connections.lock().await[&other].tx.clone();
+    db.execute("DELETE FROM sessions", []).unwrap();
+    // Missed revocation notification also retires an idle owner; current accounts remain intact.
+    s.recheck_staging_sessions().await;
+    assert_eq!(*other_tx.failure().borrow(), Some(SessionEnded));
+    assert!(!s.connections.lock().await.contains_key(&other));
+    let (after_logout, _, _messages4) = test_socket(&s).await;
+    assert_eq!(s.attach_staging_profile(&after_logout, profile, now(), expires, Some(&c)).await, Err(SessionEnded));
+    cleanup(s).await;
 }
 
 #[tokio::test]
@@ -221,13 +314,14 @@ async fn staging_invite_upgrades_a_guest_without_replacing_the_profile() {
         .account.as_mut().unwrap().issue();
     let old_password = "a new device recovery passphrase";
     let new_password = "a replacement staging passphrase";
+    let previous_tx = server.connections.lock().await[&desktop].tx.clone();
     let issued = crate::net::staging_now_ms();
     server.staging_account(&json!({
         "action": "reset_password", "profile_id": id, "login": "driver@example.net",
         "password": new_password
     })).await.unwrap();
-    assert!(*server.connections.lock().await[&desktop].tx.failure().borrow());
-    assert!(server.attach_staging_profile(&desktop, id, issued).await.is_err());
+    assert_eq!(*previous_tx.failure().borrow(), Some(crate::outbox::CloseReason::SessionEnded));
+    assert!(server.attach_staging_profile(&desktop, id, issued, timestamp()+600, None).await.is_err());
     let denied = server.staging_account(&json!({
         "action": "check", "login": "driver@example.net", "password": old_password
     })).await.unwrap_err();

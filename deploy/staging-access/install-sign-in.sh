@@ -3,7 +3,7 @@
 set -euo pipefail
 umask 077
 [[ $EUID == 0 ]] || { echo "Run on the staging host as root." >&2; exit 1; }
-[[ $# == 0 || ( $# == 1 && ( $1 == --fresh || $1 == --ui-only ) ) ]] || { echo "Usage: install-sign-in.sh [--fresh | --ui-only]" >&2; exit 1; }
+[[ $# == 0 || ( $# == 1 && ( $1 == --fresh || $1 == --portal-only || $1 == --ui-only ) ) ]] || { echo "Usage: install-sign-in.sh [--fresh | --portal-only | --ui-only]" >&2; exit 1; }
 state=/var/lib/avensky-staging-deploy
 exec 9>"$state/deploy.lock"
 flock -x 9
@@ -11,34 +11,49 @@ web=$(readlink -e /srv/avensky-staging/frontend/current)
 commit=$(basename "$(dirname "$web")")
 [[ $commit =~ ^[0-9a-f]{40}$ && -s $web/images/garage-entry.css ]]
 lib=/usr/local/lib/avensky/staging-access
-if [[ ${1:-} == --ui-only ]]; then
-  # Refresh an already installed portal from the same revision as its public assets.
+check_game_version() {
+  # Use the signed, read-only loopback metadata request. The service manager
+  # supplies the key; neither it nor a player credential appears in argv.
+  systemd-run --quiet --wait --pipe --collect -p DynamicUser=yes -p NoNewPrivileges=yes \
+    -p EnvironmentFile=/etc/avensky/staging-alpha.env -p "LoadCredential=game-bridge.mjs:$1/game-bridge.mjs" \
+    /usr/bin/node --input-type=module -e '
+      const { gameBridge } = await import(process.env.CREDENTIALS_DIRECTORY + "/game-bridge.mjs");
+      if (!await gameBridge(process.env.AVENSKY_ALPHA_GAME_KEY).supportsSessionTakeover())
+        throw Error("Publish the session-aware staging game before refreshing the portal.");
+    '
+}
+if [[ ${1:-} == --portal-only || ${1:-} == --ui-only ]]; then
+  # The gate, issuer and portal must all run the same protocol revision.
   systemctl is-active --quiet avensky-alpha-access.service
   for asset in garage-runtime.json sign-in-navigation.js sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     [[ -s $web/images/$asset ]]
   done
-  backup=$(mktemp -d /root/avensky-sign-in-ui-XXXXXXXX)
+  backup=$(mktemp -d /root/avensky-sign-in-portal-XXXXXXXX)
   mkdir "$backup/candidate"
-  files=(portal.mjs garageEntry.ts branding.ts palettes.json)
+  files=(portal.mjs accounts.mjs game-bridge.mjs shared-database.mjs garageEntry.ts branding.ts palettes.json)
   for name in "${files[@]}"; do
     path=frontend/src/theme/$name
-    if [[ $name == portal.mjs ]]; then path=deploy/staging-access/$name; fi
+    if [[ $name == *.mjs ]]; then path=deploy/staging-access/$name; fi
     cp -p "$lib/$name" "$backup/$name"
     git --git-dir="$state/source.git" show "$commit:$path" > "$backup/candidate/$name"
   done
-  node --check "$backup/candidate/portal.mjs"
-  rollback_ui() {
+  node --input-type=module -e 'await import(process.argv[1] + "/portal.mjs")' "$backup/candidate"
+  check_game_version "$backup/candidate"
+  rollback_portal() {
     trap - ERR
-    echo "Restoring the previous sign-in UI from $backup" >&2
+    echo "Restoring the previous sign-in portal from $backup" >&2
     for name in "${files[@]}"; do cp -p "$backup/$name" "$lib/$name"; done
     systemctl restart avensky-alpha-access.service
   }
-  trap rollback_ui ERR
+  trap rollback_portal ERR
   for name in "${files[@]}"; do install -m 0644 "$backup/candidate/$name" "$lib/$name"; done
   systemctl restart avensky-alpha-access.service
   url=http://127.0.0.1:9061
   curl --noproxy '*' --retry 8 --retry-all-errors --retry-delay 1 -fsS "$url/sign-in" -o "$backup/login.html"
   grep -q '/__alpha/entry/sign-in-input.js' "$backup/login.html"
+  gate_status=$(curl --noproxy '*' -sS -o /dev/null -w '%{http_code}' \
+    -H 'Origin: https://staging.avensky.com' http://127.0.0.1:9062/socket)
+  [[ $gate_status == 401 ]]
   for asset in garage-room.js sign-in-navigation.js sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     curl --noproxy '*' -fsS "$url/__alpha/entry/$asset" -o /dev/null
   done
@@ -49,7 +64,7 @@ if [[ ${1:-} == --ui-only ]]; then
     "https://staging.avensky.com$garage_path" -o "$backup/garage-header"
   [[ $(head -c 4 "$backup/garage-header") == glTF ]]
   trap - ERR
-  echo "Sign-in UI updated to $commit. Previous files: $backup"
+  echo "Sign-in portal updated to $commit. Previous files: $backup"
   exit 0
 fi
 
@@ -74,6 +89,7 @@ done
 node --check "$candidate/portal.mjs"
 node --check "$candidate/shared-database.mjs"
 grep -Eq '^AVENSKY_ALPHA_GAME_KEY=.' /etc/avensky/staging-alpha.env
+check_game_version "$candidate"
 cp -a "$lib" "$backup/portal"
 cp -a "$unit" "$backup/previous.service"
 cp -a "$config" "$backup/Caddyfile"

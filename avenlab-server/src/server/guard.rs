@@ -62,7 +62,7 @@ mod tests {
     }
     async fn client(server:&Server,name:&str)->(String,Value){
         let player=id();let(tx,_rx)=crate::outbox::channel();let(frame,_frame)=watch::channel(None);let(social,_social)=watch::channel(None);let(input_tx,input)=watch::channel(None);
-        server.register(player.clone(),Connection{tx,frame:frame.into(),social,input,input_tx,profile_id:None,world_id:None,team:Team::Red}).await.unwrap();
+        server.register(player.clone(),Connection{tx,frame:frame.into(),social,input,input_tx,profile_id:None,staging_session:None,world_id:None,team:Team::Red}).await.unwrap();
         let identity=server.handle(&player,json!({"action":"identify","name":name})).await.unwrap();(player,identity)
     }
     async fn fixture(hero:&str)->(Server,String,Value){

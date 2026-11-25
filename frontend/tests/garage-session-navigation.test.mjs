@@ -19,9 +19,9 @@ test("repeated portal and game handoffs carry one canvas and reuse the loaded ga
   window.fetch = async (url, options) => {
     const path = new URL(url, base).pathname;
     posts.push([options.method, path]);
-    const signingOut = path === "/__alpha/sign-out";
-    return { ok: true, url: base + (signingOut ? "/sign-in" : "/"), headers: new Headers({ "content-type": "text/html" }),
-      text: async () => signingOut ? form : game };
+    const publicForm = path === "/__alpha/sign-out" || (path === "/sign-in" && options.credentials === "omit");
+    return { ok: true, url: base + (publicForm ? "/sign-in" : "/"), headers: new Headers({ "content-type": "text/html" }),
+      text: async () => publicForm ? form : game };
   };
   window.addEventListener("avensky:leave-game", () => document.querySelector("#root").remove());
   window.addEventListener("avensky:resume-game", event => {
@@ -46,6 +46,11 @@ test("repeated portal and game handoffs carry one canvas and reuse the loaded ga
     }
     assert.deepEqual(posts, ["/__alpha/sign-out", "/__alpha/sign-out", "/sign-in", "/__alpha/sign-out", "/sign-in"]
       .map(path => ["POST", path]));
+    posts.length = 0;
+    await window.avenskyPortalNavigation.showSignIn(false, "You signed in on another device.");
+    assert.deepEqual(posts, [[undefined, "/sign-in"]], "a replaced socket never posts a logout");
+    assert.match(document.querySelector(".garage-notices").textContent, /another device/);
+    assert.equal(document.querySelector("canvas"), canvas);
     assert.equal(document.querySelectorAll("canvas").length, 1);
   } finally {
     window.close();

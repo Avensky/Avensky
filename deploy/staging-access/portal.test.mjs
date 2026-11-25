@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 import { once } from "node:events";
 import { DatabaseSync } from "node:sqlite";
 import { checkSharedDatabase, consolidateAccess } from "./shared-database.mjs";
-import { createHmac, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
 import { testerAccounts, totp } from "./accounts.mjs";
@@ -244,7 +244,8 @@ test("authenticator enrollment requires the password and recovery codes are one-
   const invite = accounts.issueInvite("mfa@example.net");
   const value = await accounts.enroll(invite.email, invite.code, password);
   const secondDevice = (await accounts.beginSignIn(invite.email, password)).session;
-  const viewer = accounts.viewer(value);
+  assert.equal(accounts.viewer(value), undefined);
+  const viewer = accounts.viewer(secondDevice);
   await assert.rejects(accounts.beginMfa(viewer, "a different passphrase"));
   const encoded = await accounts.beginMfa(viewer, password);
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
@@ -253,7 +254,7 @@ test("authenticator enrollment requires the password and recovery codes are one-
   const code = totp(key, Math.floor(Date.now() / 30000));
   const codes = accounts.enableMfa(viewer, code);
   assert.equal(codes.length, 8);
-  assert.equal(accounts.viewer(secondDevice), undefined);
+  assert.equal(accounts.viewer(secondDevice).email, invite.email);
   const badPassword = await post("sign-in", { email: invite.email, password: "a different passphrase" });
   assert.equal(badPassword.status, 400);
   assert.doesNotMatch(await badPassword.text(), /name="code"|name="challenge"/);
@@ -268,7 +269,9 @@ test("authenticator enrollment requires the password and recovery codes are one-
   const rejected = await post("sign-in/code", { challenge, code });
   assert.equal(rejected.status, 400);
   assert.match(await rejected.text(), /The authentication code is incorrect/);
+  assert.equal(accounts.viewer(secondDevice).email, invite.email);
   const completed = await post("../sign-in", { challenge, code: codes[0] });
+  assert.equal(accounts.viewer(secondDevice), undefined);
   assert.equal(completed.status, 303);
   const cookie = completed.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(url + "verify", { headers: { cookie } })).status, 204);
@@ -339,7 +342,8 @@ test("one invitation form signs in by email and gates sockets and assets", async
       if (email === "tester@example.net" && deviceToken === "c".repeat(64)) return testerId;
       throw Error("Unknown game account.");
     },
-    async disconnect(profile) { calls.push(profile); },
+    async sessionChanged(profile, digest) { calls.push(["session_changed", profile, digest]); },
+    async disconnect(profile, digest) { calls.push(["disconnect", profile, digest]); },
   };
   const accounts = testerAccounts(":memory:", randomBytes(32), game);
   const portal = createPortal({ origin, accounts, game });
@@ -373,9 +377,9 @@ test("one invitation form signs in by email and gates sockets and assets", async
   const linked = await post("enroll", { ...enrollment, password });
   assert.equal(linked.status, 303);
   assert.equal(linked.headers.get("location"), "/");
-  const adminCookie = linked.headers.get("set-cookie").split(";")[0];
+  const enrolledCookie = linked.headers.get("set-cookie").split(";")[0];
   const entry = new URL("/sign-in", url);
-  const restored = await fetch(entry, { headers: { cookie: adminCookie }, redirect: "manual" });
+  const restored = await fetch(entry, { headers: { cookie: enrolledCookie }, redirect: "manual" });
   assert.equal(restored.status, 303);
   assert.equal(restored.headers.get("location"), "/");
   const wrongPassword = await post("../sign-in", { email: admin.email, password: "a wrong game password" });
@@ -383,8 +387,17 @@ test("one invitation form signs in by email and gates sockets and assets", async
   assert.equal(wrongPassword.status, 400);
   assert.equal(unknownEmail.status, 400);
   assert.equal(await wrongPassword.text(), await unknownEmail.text());
+  assert.equal(calls.filter(call => call[0] === "session_changed").length, 1);
+  assert.equal((await fetch(socket, { headers: { origin, cookie: enrolledCookie } })).status, 204);
   const reauth = await post("../sign-in", { email: admin.email, password });
   assert.equal(reauth.status, 303);
+  const adminCookie = reauth.headers.get("set-cookie").split(";")[0];
+  assert.equal((await fetch(socket, { headers: { origin, cookie: enrolledCookie } })).status, 401);
+  assert.equal((await fetch(url + "session", { headers: { cookie: enrolledCookie } })).status, 401);
+  assert.equal((await post("sign-out", {}, enrolledCookie)).status, 403);
+  assert.equal((await fetch(socket, { headers: { origin, cookie: adminCookie } })).status, 204);
+  assert.equal(calls.filter(call => call[0] === "session_changed").length, 2);
+  assert.equal(calls.filter(call => call[0] === "disconnect").length, 0);
 
   const manual = await post("testers/invite", { email: "tester@example.net" }, adminCookie);
   assert.equal(manual.status, 200);
@@ -399,16 +412,84 @@ test("one invitation form signs in by email and gates sockets and assets", async
   assert.equal(allowed.status, 204);
   assert.equal(allowed.headers.get("x-avensky-alpha-bridge"), null);
   assert.equal(allowed.headers.get("x-avensky-alpha-profile"), testerId);
-  const signed = `avensky-staging-ws:${testerId}:${allowed.headers.get("x-avensky-alpha-issued")}:${allowed.headers.get("x-avensky-alpha-expires")}`;
-  assert.equal(allowed.headers.get("x-avensky-alpha-proof"), createHmac("sha256", key).update(signed).digest("hex"));
+  const digest = createHash("sha256").update(cookie.split("=")[1]).digest("hex");
+  assert.deepEqual(calls.at(-1), ["session_changed", testerId, digest]);
+  const signed = `avensky-staging-ws:${testerId}:${allowed.headers.get("x-avensky-alpha-issued")}:${allowed.headers.get("x-avensky-alpha-expires")}:${digest}`;
+  assert.equal(allowed.headers.get("x-avensky-alpha-proof"), `${digest}.${createHmac("sha256", key).update(signed).digest("hex")}`);
   const assets = await fetch(url + "verify", { headers: { cookie, "x-forwarded-uri": "/__staging-assets/release/car.glb" } });
   assert.equal(assets.status, 204);
   assert.equal(assets.headers.get("x-avensky-alpha-proof"), null);
 
   assert.equal((await post("testers/revoke", { email: "tester@example.net" }, adminCookie)).status, 303);
-  assert.equal(calls.at(-1), testerId);
+  assert.deepEqual(calls.at(-1), ["disconnect", testerId, undefined]);
   assert.equal((await fetch(socket, { headers: { origin, cookie } })).status, 401);
   assert.equal((await fetch(url + "verify", { headers: { cookie } })).status, 401);
+});
+
+test("delayed login and logout acknowledgments cannot replace a newer cookie", async t => {
+  const profile = "f".repeat(32);
+  let onGrant = async () => {}, onEnd = async () => {};
+  const game = {
+    async enroll() { return profile; },
+    async authenticate(_email, value) {
+      if (value !== password) throw Error(LOGIN_FAILED);
+      return profile;
+    },
+    sessionChanged: (...args) => onGrant(...args),
+    disconnect: (...args) => onEnd(...args),
+  };
+  const accounts = testerAccounts(":memory:", randomBytes(32), game);
+  const invite = accounts.issueInvite("rotate@example.net", true);
+  const original = await accounts.enroll(invite.email, invite.code, password);
+  const sending = Promise.withResolvers(), delivered = Promise.withResolvers();
+  const server = createPortal({ origin, accounts, game, mailInvite: async () => {
+    sending.resolve();
+    await delivered.promise;
+  } });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); accounts.close(); });
+  const post = (path, cookie, fields = { email: invite.email, password }) => fetch(`http://127.0.0.1:${server.address().port}${path}`, {
+    method: "POST", redirect: "manual", headers: { origin, ...(cookie ? { cookie } : {}) },
+    body: new URLSearchParams(fields),
+  });
+  const holding = Promise.withResolvers(), release = Promise.withResolvers();
+  onGrant = async () => {
+    onGrant = async () => {};
+    holding.resolve();
+    await release.promise;
+  };
+  const late = post("/sign-in");
+  await holding.promise;
+  assert.equal(accounts.viewer(original), undefined);
+  const winner = (await post("/sign-in")).headers.get("set-cookie").split(";")[0];
+  release.resolve();
+  const stale = await late;
+  assert.equal(stale.status, 409);
+  assert.equal(stale.headers.get("set-cookie"), null);
+  const viewer = accounts.viewer(winner.split("=")[1]);
+  const ending = Promise.withResolvers(), disconnected = Promise.withResolvers();
+  onEnd = async (id, digest) => {
+    assert.equal(id, profile);
+    assert.equal(digest, viewer.digest);
+    ending.resolve();
+    await disconnected.promise;
+  };
+  const logout = post("/__alpha/sign-out", winner);
+  await ending.promise;
+  assert.equal(accounts.viewer(winner.split("=")[1]), undefined);
+  const next = await post("/sign-in");
+  disconnected.resolve();
+  assert.equal((await logout).headers.get("set-cookie"), null);
+  const nextCookie = next.headers.get("set-cookie").split(";")[0];
+  assert.equal(accounts.viewer(nextCookie.split("=")[1]).game_profile, profile);
+  const pendingInvite = post("/__alpha/testers/invite", nextCookie, { email: "invited@example.net" });
+  await sending.promise;
+  assert.equal((await post("/sign-in")).status, 303);
+  delivered.resolve();
+  const retiredResponse = await pendingInvite;
+  assert.equal(retiredResponse.status, 403);
+  assert.equal(await retiredResponse.text(), "");
 });
 
 test("a moderator can preserve a legacy profile without presenting a second login form", async t => {
@@ -448,6 +529,7 @@ test("private game reset links preserve the profile and require a separate invit
       assert.equal(login, email);
       currentPassword = next;
     },
+    async sessionChanged() {},
     async serverId() { return "b".repeat(32); },
   };
   const accounts = testerAccounts(":memory:", randomBytes(32), game);
@@ -532,6 +614,10 @@ test("access migration shares the player's SQLite file and preserves invites, se
   old.revoke(revoked.email);
   old.issueInvite("next@example.net");
   old.close();
+  // Exercise a deployed pre-takeover database, which predates the proof version column.
+  const legacy = new DatabaseSync(previous);
+  legacy.exec("ALTER TABLE sessions DROP COLUMN login_protocol");
+  legacy.close();
 
   const db = new DatabaseSync(target);
   db.exec("CREATE TABLE player_profiles(id TEXT PRIMARY KEY, document TEXT NOT NULL); CREATE TABLE social_state(singleton INTEGER PRIMARY KEY, document TEXT); INSERT INTO social_state VALUES(1,'{}')");
@@ -543,14 +629,24 @@ test("access migration shares the player's SQLite file and preserves invites, se
   assert.equal(consolidateAccess(target, previous), "imported alpha access");
   checkSharedDatabase(target);
   assert.equal(db.prepare("SELECT document FROM player_profiles WHERE id=?").get(player.id).document, JSON.stringify(player));
+  // Pre-takeover releases could retain more than one unexpired browser cookie.
+  const olderCookie = randomBytes(32).toString("hex");
+  db.prepare("INSERT INTO sessions(digest,email,expires) SELECT ?,email,expires-1 FROM sessions WHERE email=?")
+    .run(createHash("sha256").update(olderCookie).digest("hex"), player.account.login);
   const current = testerAccounts(target, key, game);
   try {
     assert.equal(current.viewer(cookie).game_profile, player.id);
+    assert.equal(current.viewer(olderCookie), undefined);
+    assert.equal(db.prepare("SELECT login_protocol FROM sessions WHERE email=?").get(player.account.login).login_protocol, 1);
     const { challenge } = await current.beginSignIn(admin.email, password);
-    assert.ok(current.completeSignIn(challenge, codes[0]).session);
+    const latest = current.completeSignIn(challenge, codes[0]).session;
+    assert.ok(current.viewer(latest));
+    assert.equal(db.prepare("SELECT login_protocol FROM sessions WHERE email=?").get(player.account.login).login_protocol, 2);
+    assert.equal(current.viewer(cookie), undefined);
     await assert.rejects(current.beginSignIn(other.account.login, password));
     assert.deepEqual(current.list().invites.map(invite => invite.email), ["next@example.net"]);
-    current.end(current.viewer(cookie));
+    current.end(current.viewer(latest));
+    assert.equal(current.viewer(olderCookie), undefined);
     assert.equal(consolidateAccess(target, previous), "already consolidated");
     assert.equal(current.viewer(cookie), undefined);
     assert.equal(db.prepare("SELECT count(*) AS n FROM testers WHERE password<>'' OR salt<>''").get().n, 0);

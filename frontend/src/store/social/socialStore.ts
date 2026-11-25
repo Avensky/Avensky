@@ -2,6 +2,9 @@ import type { AlphaView, Progression, GameMode } from "../alpha/alphaStore";
 import type { VehicleDriver } from "../../game/characters/driverRoster";
 import type { CharacterChoice } from "../../game/characters/characterCatalog";
 import { create } from "zustand";
+import type { SessionEndReason } from "../../net/stagingAccount";
+
+export type EntryIssue = { kind: "other-tab" | SessionEndReason } | { kind: "server"; message: string };
 
 export type SocialPerson = {
   id: string;
@@ -114,6 +117,7 @@ export const useSocialStore = create<{
   bodyTattoosAvailable: boolean;
   registeredProfile: boolean;
   profileStatus: "idle" | "restoring" | "ready" | "error";
+  entryIssue: EntryIssue | null;
   profileScope: "device" | "tab" | null;
   /** Editor key retained through a transport reconnect. Actions still require the current view. */
   profileOwner: string | null;
@@ -133,6 +137,7 @@ export const useSocialStore = create<{
   bodyTattoosAvailable: false,
   registeredProfile: false,
   profileStatus: "idle",
+  entryIssue: null,
   profileScope: null,
   profileOwner: null,
   cachedCosmetics: null,
@@ -148,6 +153,7 @@ export const useSocialStore = create<{
       bodyTattoosAvailable: false,
       registeredProfile: false,
       profileStatus: "idle",
+      entryIssue: null,
       profileScope: null,
       view: null,
       message: "Connecting to the game server…",
@@ -276,7 +282,7 @@ export const useSocialStore = create<{
         && incoming.cosmetics_revision <= current.cosmetics_revision
         ? { ...view.profile, progression: { ...incoming, ...cosmeticsFrom(current) } }
         : view.profile;
-      return { view: { ...view, profile }, profileOwner: profile.id, profileStatus: "ready", message: "Connected",
+      return { view: { ...view, profile }, profileOwner: profile.id, profileStatus: "ready", entryIssue: null, message: "Connected",
         cachedCosmetics: profile.progression ? cosmeticsFrom(profile.progression) : null };
     });
   },

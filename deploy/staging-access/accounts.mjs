@@ -76,7 +76,8 @@ export function initializeAccessTables(db) {
     );
     CREATE TABLE IF NOT EXISTS sessions (
       digest TEXT PRIMARY KEY, email TEXT NOT NULL REFERENCES testers(email),
-      expires INTEGER NOT NULL, pending_mfa TEXT, pending_until INTEGER
+      expires INTEGER NOT NULL, pending_mfa TEXT, pending_until INTEGER,
+      login_protocol INTEGER NOT NULL DEFAULT 1
     );
     CREATE TABLE IF NOT EXISTS recovery (
       email TEXT NOT NULL REFERENCES testers(email), digest TEXT NOT NULL, PRIMARY KEY(email, digest)
@@ -108,6 +109,8 @@ export function initializeAccessTables(db) {
       digest TEXT PRIMARY KEY REFERENCES invitations(digest) ON DELETE CASCADE, login TEXT NOT NULL
     );
   `);
+  if (!db.prepare("PRAGMA table_info(sessions)").all().some(column => column.name === "login_protocol"))
+    db.exec("ALTER TABLE sessions ADD COLUMN login_protocol INTEGER NOT NULL DEFAULT 1");
 }
 
 export function testerAccounts(path, key, game) {
@@ -115,7 +118,6 @@ export function testerAccounts(path, key, game) {
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path);
   db.exec("PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 3000");
-  initializeAccessTables(db);
   const get = (sql, ...args) => db.prepare(sql).get(...args);
   const run = (sql, ...args) => db.prepare(sql).run(...args);
   const all = sql => db.prepare(sql).all();
@@ -145,11 +147,26 @@ export function testerAccounts(path, key, game) {
     cipher.setAuthTag(bytes.subarray(-16));
     return Buffer.concat([cipher.update(bytes.subarray(12, -16)), cipher.final()]);
   }
+  // Older builds allowed several sessions per account. Keep the newest grant on
+  // upgrade so logging it out cannot uncover an older, still-valid cookie.
+  transaction(() => {
+    initializeAccessTables(db);
+    run("DELETE FROM sessions WHERE expires <= ?", now());
+    db.exec(`DELETE FROM sessions WHERE rowid IN (
+      SELECT id FROM (SELECT rowid AS id,
+        ROW_NUMBER() OVER (PARTITION BY email ORDER BY expires DESC, rowid DESC) AS ordinal FROM sessions)
+      WHERE ordinal > 1)`);
+  });
+  function requireSession(viewer) {
+    if (!get("SELECT 1 FROM sessions WHERE digest = ? AND email = ? AND expires > ?", viewer.digest, viewer.email, now()))
+      throw Error("Sign in again to continue.");
+  }
+  // Enrollment and completed sign-in call this inside their write transaction.
   function session(email) {
     run("DELETE FROM sessions WHERE expires <= ?", now());
-    run("DELETE FROM sessions WHERE email = ? AND digest NOT IN (SELECT digest FROM sessions WHERE email = ? ORDER BY expires DESC LIMIT 7)", email, email);
+    run("DELETE FROM sessions WHERE email = ?", email);
     const value = token();
-    run("INSERT INTO sessions (digest, email, expires) VALUES (?, ?, ?)", hash(value), email, now() + SESSION_AGE);
+    run("INSERT INTO sessions (digest, email, expires, login_protocol) VALUES (?, ?, ?, 2)", hash(value), email, now() + SESSION_AGE);
     return value;
   }
   async function validPassword(record, password) {
@@ -205,15 +222,19 @@ export function testerAccounts(path, key, game) {
         WHERE s.digest = ? AND s.expires > ? AND t.revoked = 0`, hash(value), now());
       return game && !viewer?.game_profile ? undefined : viewer;
     },
-    end(viewer) { run("DELETE FROM sessions WHERE digest = ?", viewer.digest); },
+    end(viewer) { return run("DELETE FROM sessions WHERE digest = ?", viewer.digest).changes === 1; },
+    hasSession(email) { return Boolean(get("SELECT 1 FROM sessions WHERE email = ? AND expires > ?", email, now())); },
     async requestEmailChange(viewer, raw, password) {
       const newEmail = emailAddress(raw);
       return withCredentials(viewer.email, async () => {
         if (newEmail === viewer.email) throw Error("Choose a different email address.");
         if (tester(newEmail)) throw Error("That email is already registered.");
         if (!await validPassword(tester(viewer.email), password)) throw Error("Verify your current password.");
-        run("INSERT INTO account_email_requests(email,new_email,requested_at) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET new_email=excluded.new_email,requested_at=excluded.requested_at",
-          viewer.email, newEmail, now());
+        transaction(() => {
+          requireSession(viewer);
+          run("INSERT INTO account_email_requests(email,new_email,requested_at) VALUES(?,?,?) ON CONFLICT(email) DO UPDATE SET new_email=excluded.new_email,requested_at=excluded.requested_at",
+            viewer.email, newEmail, now());
+        });
         return { message: "Email change requested. Your current email remains active until the operator verifies the change." };
       });
     },
@@ -221,8 +242,11 @@ export function testerAccounts(path, key, game) {
       return withCredentials(viewer.email, async () => {
         if (confirmation !== viewer.email) throw Error("Enter your account email to confirm the request.");
         if (!await validPassword(tester(viewer.email), password)) throw Error("Verify your current password.");
-        run("INSERT INTO profile_deletion_requests(email,requested_at) VALUES(?,?) ON CONFLICT(email) DO UPDATE SET requested_at=excluded.requested_at",
-          viewer.email, now());
+        transaction(() => {
+          requireSession(viewer);
+          run("INSERT INTO profile_deletion_requests(email,requested_at) VALUES(?,?) ON CONFLICT(email) DO UPDATE SET requested_at=excluded.requested_at",
+            viewer.email, now());
+        });
         return { message: "Profile deletion requested for operator review. Nothing has been deleted." };
       });
     },

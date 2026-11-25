@@ -52,8 +52,12 @@ export function consolidateAccess(path, source) {
         throw Error("Expected the existing unified game-access database.");
       if (db.prepare("SELECT 1 FROM prior.testers WHERE salt<>'' OR password<>'' LIMIT 1").get())
         throw Error("Separate portal passwords cannot be imported as game credentials.");
+      const priorSessionProtocol = db.prepare("PRAGMA prior.table_info(sessions)").all().some(row => row.name === "login_protocol");
       for (const table of tables.filter(t => priorTables.has(t))) {
-        const columns = db.prepare(`PRAGMA main.table_info(${table})`).all().map(row => row.name).join(",");
+        const columns = db.prepare(`PRAGMA main.table_info(${table})`).all()
+          .map(row => row.name)
+          .filter(name => table !== "sessions" || name !== "login_protocol" || priorSessionProtocol)
+          .join(",");
         db.exec(`INSERT INTO main.${table} (${columns}) SELECT ${columns} FROM prior.${table}`);
       }
       const unmatched = db.prepare(`SELECT 1 FROM main.testers t LEFT JOIN main.game_profiles g USING(email)

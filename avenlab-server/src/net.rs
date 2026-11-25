@@ -6,6 +6,7 @@ pub use staging_gate::StagingGate;
 pub(crate) use staging_gate::{PROOF_MAX_AGE_MS, staging_now_ms};
 use staging_gate::Admission;
 use crate::{
+    outbox::CloseReason,
     server::{Connection, Server},
     spawn::Team,
     state::{InputPacket, PhysicsFrame},
@@ -62,6 +63,15 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
         .await
         .expect("Failed to bind WebSocket listener");
     println!("WebSocket listening on {address}");
+    if gate.is_some() {
+        let server = server.clone();
+        tokio::spawn(async move {
+            loop {
+                tokio::time::sleep(Duration::from_secs(15)).await;
+                server.recheck_staging_sessions().await;
+            }
+        });
+    }
     let handshakes = Arc::new(Semaphore::new(32));
     while let Ok((stream, _peer)) = listener.accept().await {
         // This limit applies before register() can enforce the live-client cap.
@@ -89,12 +99,13 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
                     staging_gate::service_bridge(&server, socket).await;
                     return;
                 }
-                Admission::Player { profile_id, seconds, issued } => Some((profile_id, seconds, issued)),
+                Admission::Player { profile_id, expires, issued, session } => Some((profile_id, expires, issued, session)),
             };
             drop(permit);
             let (write, mut read) = socket.split();
             let (tx, mut rx) = crate::outbox::channel();
             let mut overflow = tx.failure();
+            let mut writer_close = overflow.clone();
             let (frame_tx, mut frame_rx) = watch::channel::<Option<Arc<PhysicsFrame>>>(None);
             let (social_tx, mut social_rx) = watch::channel::<Option<String>>(None);
             let (input_tx, input_rx) = watch::channel::<Option<InputPacket>>(None);
@@ -115,8 +126,17 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
                 let mut heartbeat = tokio::time::interval(Duration::from_secs(8));
                 heartbeat.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
                 loop {
+                    let close = *writer_close.borrow_and_update();
+                    if let Some(reason) = close {
+                        if let Some((code, text)) = reason.notice() {
+                            let frame = tungstenite::protocol::CloseFrame { code: code.into(), reason: text.into() };
+                            let _ = tokio::time::timeout(Duration::from_secs(2), write.send(Message::Close(Some(frame)))).await;
+                        }
+                        return;
+                    }
                     let messages = tokio::select! {
                         biased;
+                        changed = writer_close.changed() => { if changed.is_err() { return; } continue; }
                         _ = heartbeat.tick() => {
                             if !matches!(tokio::time::timeout(Duration::from_secs(5),
                                 write.send(Message::Ping(Vec::new()))).await, Ok(Ok(()))) { return; }
@@ -176,7 +196,7 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
                 social: social_tx,
                 input: input_rx,
                 input_tx: input_tx.clone(),
-                profile_id: None,
+                profile_id: None, staging_session: None,
                 world_id: None,
                 team: Team::Blue,
             };
@@ -187,9 +207,10 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
             }
             let server_id = server.data.lock().await.server_id.clone();
             let _=tx.send(json!({"type":"welcome","player_id":player,"room_id":0,"team":"blue","spawned":false,"social_version":1,"packed_input_version":1,"compact_snapshot_version":crate::snapshot_wire::VERSION,"snapshot_hz":30,"server_id":server_id,"player_accounts":server.player_accounts_enabled(),"body_tattoos":true,"staging_sign_in":approved.is_some()}).to_string());
-            if let Some((profile, _, issued)) = &approved {
-                if let Err(error) = server.attach_staging_profile(&player, profile, *issued).await {
-                    let _ = tx.send(json!({"type":"social_error","message":error}).to_string());
+            if let Some((profile, expires, issued, session)) = &approved {
+                if let Err(reason) = server.attach_staging_profile(&player, profile, *issued, *expires, session.as_deref()).await {
+                    tx.close(reason);
+                    finish_writer(&mut writer, Some(reason)).await;
                     server.disconnect(&player).await;
                     return;
                 }
@@ -206,15 +227,15 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
             let identify_deadline = tokio::time::Instant::now() + Duration::from_secs(30);
             let mut identified = approved.is_some();
             let session_deadline = tokio::time::Instant::now() + Duration::from_secs(
-                approved.as_ref().map(|(_, seconds, _)| *seconds).unwrap_or_default());
+                approved.as_ref().map(|(_, expires, _, _)| expires.saturating_sub(crate::social::model::timestamp())).unwrap_or_default());
             loop {
-                if *overflow.borrow() { break; }
+                if overflow.borrow().is_some() { break; }
                 let next = tokio::select! {
                     biased;
                     _=overflow.changed()=>break,
                     _=&mut writer=>break,
                     _=tokio::time::sleep_until(identify_deadline), if !identified=>break,
-                    _=tokio::time::sleep_until(session_deadline), if approved.is_some()=>break,
+                    _=tokio::time::sleep_until(session_deadline), if approved.is_some()=>{ tx.close(CloseReason::SessionEnded); break; },
                     next=tokio::time::timeout(Duration::from_secs(20),read.next())=>match next{Ok(value)=>value,Err(_)=>break},
                 };
                 let Some(Ok(message)) = next else { break; };
@@ -413,9 +434,18 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
             }
             // Stop transport immediately, even if world cleanup is waiting
             // behind another control-plane operation.
-            writer.abort();
+            let close_reason = *overflow.borrow();
+            finish_writer(&mut writer, close_reason).await;
             drop(read);
             server.disconnect(&player).await;
         });
     }
+}
+
+async fn finish_writer(writer: &mut tokio::task::JoinHandle<()>, reason: Option<CloseReason>) {
+    if reason.and_then(CloseReason::notice).is_some() && !writer.is_finished() {
+        // Give the protocol close frame a bounded opportunity to reach the browser.
+        let _ = tokio::time::timeout(Duration::from_secs(2), &mut *writer).await;
+    }
+    writer.abort();
 }
