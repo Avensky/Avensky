@@ -63,7 +63,7 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   return <section className="alpha-account-panel menu-panel-frame" aria-label={tab === "profile" ? "Character profile" : "Account settings"} data-controller-rows>
     {tab === "profile" ? <>
       <div className="alpha-profile-hero">
-        <div className="alpha-profile-portrait"><CharacterPortrait choice={active?.appearance ?? player?.progression?.character} label={active?.name ?? player?.name ?? "Player portrait"} /></div>
+        <div className="alpha-profile-portrait"><CharacterPortrait choice={active?.appearance ?? player?.progression?.character} label={active?.name ?? player?.name ?? "Player portrait"} welcomePreview="selected" /></div>
         <div className="alpha-profile-facts">
           <strong>{active?.name ?? player?.name ?? "Player"}</strong>
           <span>{active ? styleName(active.style) : "Your character"}</span>
