@@ -33,7 +33,7 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 - An operator can preserve a legacy username by specifying it in **Alpha testers** when creating the invite or by passing `--game-login EXISTING_USERNAME` to `invite-admin`. The tester still enters only their email and game password.
 - The staging signup path requires an invite. Revoking alpha access blocks new sessions and private model requests and disconnects the active game session. The player profile and saves are retained.
 
-The unified portal stores admissions in `/var/lib/avensky-alpha/game-access.sqlite3`. The previous preview database is available for rollback. A portal session created when the player accepts an invite also authenticates their game connection. The two public media aliases in the Caddy template serve the purple flare during sign-in. The app, models, and multiplayer endpoint use the same invite gate.
+The unified portal stores admissions in `/var/lib/avensky-alpha/game-access.sqlite3`. The previous preview database is available for rollback. A portal session created when the player accepts an invite also authenticates their game connection. The portal serves the static garage still, logo and entry styles from the published frontend. The app, models, and multiplayer endpoint use the same invite gate.
 
 ## Recover a staging game password
 
@@ -59,7 +59,7 @@ Publish the release with the staging game enabled first. The new build supports 
 
 If the game already has the matching sign-in key and its bridge responds, a portal or frontend-only release needs no game restart. Install the portal modules from the new published commit and restart only `avensky-alpha-access`. When the key is enabled before the Caddy switch, the old browser password may still load the old entry screen while the former multiplayer connection closes. Apply the staging Caddy template to put the normal sign-in form and authenticated connection on the same host.
 
-1. From the published commit, install `accounts.mjs`, `game-bridge.mjs`, and `portal.mjs` from `deploy/staging-access/` into `/usr/local/lib/avensky/staging-access/`. Install the same revision of `frontend/src/theme/palettes.json` beside the modules. Keep a copy of the prior portal modules and both existing service configurations. Use Node 24.
+1. From the published commit, install `accounts.mjs`, `game-bridge.mjs`, and `portal.mjs` from `deploy/staging-access/` into `/usr/local/lib/avensky/staging-access/`. Install `palettes.json`, `garageEntry.ts`, and `branding.ts` from the same revision of `frontend/src/theme/` beside the modules. Keep a copy of the prior portal modules and both existing service configurations. Use Node 24.
 2. Set the same new, random 64-hex-character secret as `AVENSKY_ALPHA_GAME_KEY` in `/etc/avensky/staging-alpha.env` and `AVENLAB_STAGING_SIGN_IN_KEY` in the staging game's environment. Keep the existing `AVENSKY_ALPHA_KEY`. Store both files as root with mode 0600. An `env_file` under the staging Compose game's service can load a root-owned file. Leave `AVENLAB_ENV=staging` and the named staging volume in place.
 3. Recreate just the staging game with its current reviewed image and the updated operator-managed Compose file, then restart `avensky-alpha-access`. Before changing Caddy, issue an admin invite. Under the existing staging guard, enter the invited email and password and open `/__alpha/account` on the same tab. Verify the administrator can create a second manual invite.
 4. Merge the handlers in [staging-unified.Caddyfile](../deploy/staging-access/staging-unified.Caddyfile) into the `staging.avensky.com` site and remove its shared Basic Auth. Preserve the actual staging release root and other host blocks. The public portal goes to 9061 and the WebSocket auth preflight goes to 9062. Never reverse-proxy the 9062 listener as a browser endpoint. Validate the full Caddyfile and reload Caddy.
@@ -82,11 +82,13 @@ On the host with the existing release helper, the following root commands prepar
   for file in accounts.mjs game-bridge.mjs portal.mjs staging-unified.Caddyfile; do
     git --git-dir="$alpha_source" show "$alpha_commit:deploy/staging-access/$file" > "$alpha_backup/$file"
   done
-  git --git-dir="$alpha_source" show "$alpha_commit:frontend/src/theme/palettes.json" > "$alpha_backup/palettes.json"
+  for file in palettes.json garageEntry.ts branding.ts; do
+    git --git-dir="$alpha_source" show "$alpha_commit:frontend/src/theme/$file" > "$alpha_backup/$file"
+  done
   /usr/bin/node --check "$alpha_backup/accounts.mjs"
   /usr/bin/node --check "$alpha_backup/game-bridge.mjs"
   /usr/bin/node --check "$alpha_backup/portal.mjs"
-  install -m 0644 "$alpha_backup"/{accounts.mjs,game-bridge.mjs,portal.mjs,palettes.json,staging-unified.Caddyfile} "$alpha_dir/"
+  install -m 0644 "$alpha_backup"/{accounts.mjs,game-bridge.mjs,portal.mjs,palettes.json,garageEntry.ts,branding.ts,staging-unified.Caddyfile} "$alpha_dir/"
   if ! grep -q '^AVENSKY_ALPHA_GAME_KEY=' /etc/avensky/staging-alpha.env; then
     alpha_key=$(openssl rand -hex 32)
     printf 'AVENSKY_ALPHA_GAME_KEY=%s\n' "$alpha_key" >> /etc/avensky/staging-alpha.env

@@ -78,10 +78,10 @@ export function GameUI() {
     useUIStore.getState().setScreen("social");
   }, [socialReady]);
   const menuPreview = screen === "heroes" || screen === "hero_select" || screen === "mode_select"
-    || screen === "queue" || screen === "sandbox_setup";
-  // Remember the last preview while Main covers it. Other screens release it.
+    || screen === "sandbox_setup";
+  // Main and the waiting line cover a previous preview without warming a new scene.
   const [lastMenuPreview, setLastMenuPreview] = useState<MenuScreen | null>(null);
-  const retainedPreview = screen === "main" && !isModeLoading ? lastMenuPreview : null;
+  const retainedPreview = (screen === "main" || screen === "queue") && !isModeLoading ? lastMenuPreview : null;
   const previewScreen = menuPreview ? screen : retainedPreview;
   if (previewScreen !== lastMenuPreview) setLastMenuPreview(previewScreen);
   const needsCanvas = previewScreen !== null || screen === "sandbox"
@@ -96,7 +96,7 @@ export function GameUI() {
   // stage; only actual garage interaction shots need that environment.
   const vehicleEmote = characterEmoteNeedsGarage(characterTab, previewCamera, previewEmoteId, previewInsideCar);
   const [collapsed, setCollapsed] = useState(false);
-  const previewPaused = previewScreen === "queue";
+  const previewPaused = retainedPreview !== null;
 
   return (
     <div className="relative game-wrapper" data-live-world={screen === "sandbox" || undefined}>

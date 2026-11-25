@@ -188,12 +188,11 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       },
     );
     await t.test(
-      "the static sunflare and reduced motion leave the main menu usable",
+      "the main menu stays usable without loading a background video",
       async () => {
         await reset();
-        assert.ok(document.querySelector(".main-menu .menu-flare-background"));
-        const loop = document.querySelector(".main-menu video");
-        assert.ok(loop.autoplay && loop.loop && loop.muted && loop.playsInline);
+        assert.equal(document.querySelector(".main-menu .menu-flare-background"), null);
+        assert.equal(document.querySelector(".main-menu video"), null);
         await key("Enter", "Enter");
         assert.equal(ui.getState().screen, "mode_select");
         await reset();
@@ -206,8 +205,8 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         await act(async () =>
           preferences.getState().update({ reducedMotion: false }),
         );
-        assert.ok(document.querySelector(".main-menu .menu-flare-background"));
-        assert.ok(document.querySelector(".main-menu video"));
+        assert.equal(document.querySelector(".main-menu .menu-flare-background"), null);
+        assert.equal(document.querySelector(".main-menu video"), null);
       },
     );
     await t.test(

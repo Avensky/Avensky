@@ -44,7 +44,7 @@ export function ModeLoadingScreen() {
 
   return (
     <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-black text-cyan-100">
-      <MenuFlareBackground animated />
+      {(screen === "sandbox" || screen === "world_builder") && <MenuFlareBackground animated />}
 
       <div className="relative z-10 w-[min(90vw,560px)] rounded-2xl border border-cyan-400/30 bg-slate-950/90 p-6 shadow-2xl shadow-cyan-500/20">
         <p className="text-xs uppercase tracking-[0.4em] text-yellow-300">

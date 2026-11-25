@@ -4,7 +4,6 @@ import { GameButton } from "../../components/GameButton";
 import { useCallback, useEffect, useRef } from "react";
 import { MenuLogo } from "../../components/menus/MenuLogo";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { MainMenuProfile } from "./MainMenuProfile";
 
 import { MAIN_MENU_ITEMS } from "./menuItems";
@@ -31,7 +30,6 @@ export function MainMenu() {
 
   return (
     <div className="game-ui menu-surface menu-home main-menu relative z-30">
-      <MenuFlareBackground animated />
       <MainMenuProfile focusMenu={focusSelection} />
       <div className="menu-home-content">
         <section className="main-menu-identity" aria-label="Avensky">

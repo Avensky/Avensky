@@ -783,7 +783,7 @@ test("alpha selection, queue and HUD route to their own state owners", async (t)
       },
     );
     await t.test(
-      "queue shows the server position over the sunflare and B cancels the actual ticket",
+      "queue shows the server position without starting a second background and B cancels the actual ticket",
       async () => {
         const { QueueScreen } = await load("game/alpha/QueueScreen.tsx");
         await act(async () => {
@@ -809,7 +809,7 @@ test("alpha selection, queue and HUD route to their own state owners", async (t)
           document.querySelector(".alpha-queue-position").textContent,
           /#3/,
         );
-        assert.ok(document.querySelector(".menu-flare-background"));
+        assert.equal(document.querySelector(".menu-flare-background"), null);
         assert.equal(document.querySelector("video"), null);
         await act(async () => route("back"));
         const command = sent.at(-1);

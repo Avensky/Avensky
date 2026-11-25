@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { readFile, stat } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { isAbsolute, join, resolve } from "node:path";
@@ -14,6 +15,14 @@ const defaultColors = Object.entries(themes.navy)
   .filter(([key]) => key !== "label" && key !== "scheme")
   .map(([key, color]) => `--app-${key}:${color}`).join(";");
 
+const sourceEntry = new URL("../../frontend/src/theme/garageEntry.ts", import.meta.url);
+const { garageBackdrop, garageBrandHeader, garageCredentials, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
+const sourceImages = new URL("../../frontend/public/images/", import.meta.url);
+const entryImages = existsSync(sourceImages) ? sourceImages : new URL("file:///srv/avensky-staging/frontend/current/images/");
+const entryAssets = new Map([
+  ["logo.svg", "image/svg+xml"], ["entry-icons.svg", "image/svg+xml"],
+  [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
+]);
 function paletteScript() {
   return `(() => {
     const themes = ${JSON.stringify(themes)};
@@ -22,6 +31,7 @@ function paletteScript() {
       const saved = JSON.parse(localStorage.getItem("avenlab-preferences-v1") || "{}");
       if (Object.hasOwn(themes, saved?.state?.theme)) chosen = saved.state.theme;
     } catch {}
+    try { localStorage.setItem(${JSON.stringify(GARAGE_ENTRY_STORAGE_KEY)}, ${JSON.stringify(GARAGE_ENTRY_POSTER)}); } catch {}
     const palette = themes[chosen];
     const root = document.documentElement;
     root.dataset.uiTheme = chosen;
@@ -47,27 +57,28 @@ const readLinkFragment = `<script src="${base}/invite.js"></script>`;
 const backToSignIn = `<a class="portal-back" href="${base}/sign-in" aria-label="Back to sign in" title="Back to sign in"><span aria-hidden="true">‹</span></a>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
-function page(title, contents, message = "", showFlare = false) {
-  const background = showFlare ? `<div class="portal-flare" aria-hidden="true">
-<video muted playsinline loop preload="none" src="${base}/media/purple-sunflare-loop.mp4"></video>
-</div><script src="${base}/flare.js" defer></script>` : "";
+function page(title, contents, message = "", garage = false) {
+  if (garage) {
+    const signIn = garage === "login";
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${escape(title)} · Avensky</title><style>html{color-scheme:${themes.navy.scheme};${defaultColors}}</style>
+<script src="${base}/theme.js"></script><link rel="stylesheet" href="${base}/entry/garage-entry.css">
+<script src="${base}/password.js" defer></script></head><body class="garage-entry">
+${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card" aria-label="${escape(title)}">
+${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}
+</section></main></body></html>`;
+  }
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
 <style>
 *{box-sizing:border-box}html{color-scheme:${themes.navy.scheme};${defaultColors}}body{margin:0;color:var(--app-text);background:var(--app-background);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
 main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-.portal-flare{position:fixed;inset:0;pointer-events:none;background:var(--app-background) url(${base}/media/purple-sunflare.webp) center/cover no-repeat;opacity:.55}
-.portal-flare video{width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s ease}
-.portal-flare video[data-playing]{opacity:1}
-.portal-flare::after{content:"";position:absolute;inset:0;background:var(--app-background);opacity:.35}
-@media (orientation:portrait){.portal-flare video{object-fit:contain}}
-@media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
 a{color:var(--app-accent);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text);padding:.6rem .8rem;border:1px solid var(--app-line);border-radius:0;background:var(--app-panel);min-height:44px;min-width:0}
 button{color:var(--app-text);background:var(--app-raised);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent);outline-color:var(--app-accent)}
 .password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
 .password-toggle{background:var(--app-panel);color:inherit;font-size:.875rem}
 ul{padding:0;list-style:none}li{border-top:1px solid var(--app-line);padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 .portal-back{display:inline-grid;place-items:center;width:44px;height:44px;color:var(--app-text);border:1px solid var(--app-line);background:var(--app-panel);font-size:1.6rem}.portal-back:focus-visible{outline:2px solid var(--app-accent)}code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style><script src="${base}/theme.js"></script><script src="${base}/password.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+</style><script src="${base}/theme.js"></script><script src="${base}/password.js" defer></script><main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
@@ -123,23 +134,21 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
     return invite ? page("Join the alpha", form("enroll", emailField
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
       + passwordField(!game), game ? "Continue" : "Sign up") + `<nav>${backToSignIn}
-      <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, Boolean(game))
-      : page("Sign in", form("sign-in", emailField + passwordField(), "Sign in")
-        + `<a href="${base}/forgot-password">Forgot password?</a>`
-        + (game ? "<p>Use the email from your staging invitation and your Avensky game password. Open the invite first if you haven’t accepted it yet.</p>"
-          : `<a href="${base}/enroll">Sign up</a>`), message, Boolean(game));
+      <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, true)
+      : page("Sign in", `<form method="post" action="${base}/sign-in" class="garage-credentials">${garageCredentials(true)}</form>
+        <div class="garage-recovery"><a href="${base}/forgot-password">Forgot password?</a></div>`, message, "login");
   }
 
   function factorPage(challenge, message) {
     return page("Verify your sign-in", form("sign-in/code",
       `<input type="hidden" name="challenge" value="${escape(challenge)}">` + codeField(true), "Verify")
-      + `${backToSignIn}`, message, Boolean(game));
+      + `${backToSignIn}`, message, true);
   }
 
   function forgotPasswordPage(message) {
     return page("Forgot password?", "<p>Use the email from your staging invitation. The staging operator sends reset links privately.</p>"
       + form("forgot-password", emailField, "Request password reset")
-      + `<nav><a href="${base}/reset">I have a reset link</a>${backToSignIn}</nav>`, message, Boolean(game));
+      + `<nav><a href="${base}/reset">I have a reset link</a>${backToSignIn}</nav>`, message, true);
   }
 
   function resetPage(message, verification) {
@@ -152,7 +161,7 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
     }
     return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
       + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField(), "Set new password")
-      + `${backToSignIn}` + readLinkFragment, message);
+      + `${backToSignIn}` + readLinkFragment, message, true);
   }
 
   function testerPage(viewer, message, extra = "") {
@@ -180,7 +189,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       res.writeHead(status, {
         // A same-origin form submission needs its Origin header for the check below.
         "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "same-origin",
-        "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        "Content-Security-Policy": "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
         "X-Content-Type-Options": "nosniff", ...headers,
       });
       res.end(body);
@@ -232,21 +241,19 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
           toggle.addEventListener("click", () => setVisible(password.type === "password"));
           window.addEventListener("pageshow", () => setVisible(false));
         }`, { "Content-Type": "text/javascript; charset=utf-8" });
-      if (path === base + "/flare.js" && game) return send(200, `
-        const video = document.querySelector(".portal-flare video");
-        if (video && !matchMedia("(prefers-reduced-motion: reduce)").matches) {
-          video.defaultMuted = true;
-          video.muted = true;
-          const play = () => {
-            if (!document.hidden && video.paused) video.play().catch(() => {});
-          };
-          video.addEventListener("playing", () => { video.dataset.playing = ""; }, { once: true });
-          document.addEventListener("pointerup", play, { passive: true, capture: true });
-          document.addEventListener("touchend", play, { passive: true, capture: true });
-          document.addEventListener("visibilitychange", play);
-          document.addEventListener("keydown", play, true);
-          play();
-        }`, { "Content-Type": "text/javascript; charset=utf-8" });
+      if (path.startsWith(base + "/entry/")) {
+        const name = path.slice((base + "/entry/").length);
+        const type = entryAssets.get(name);
+        if (!type) return send(404);
+        const file = new URL(name, entryImages);
+        try {
+          const info = await stat(file);
+          const etag = `W/"${info.size}-${Math.trunc(info.mtimeMs)}"`;
+          const headers = { "Content-Type": type, "Cache-Control": name === GARAGE_ENTRY_POSTER ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
+          if (req.headers["if-none-match"] === etag) return send(304, "", headers);
+          return send(200, await readFile(file), headers);
+        } catch { return send(404); }
+      }
       if (path === base + "/theme.js") {
         try { return send(200, paletteScript(), { "Content-Type": "text/javascript; charset=utf-8" }); }
         catch { return send(503); }
