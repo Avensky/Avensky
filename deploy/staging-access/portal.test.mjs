@@ -99,6 +99,9 @@ test("invites grant access once and revocation invalidates existing cookies", as
   const entry = await fetch(new URL("/sign-in", url), { redirect: "manual" });
   assert.equal(entry.status, 200);
   const signIn = await entry.text();
+  assert.match(signIn, /name="viewport" content="[^"]*viewport-fit=cover/);
+  assert.match(signIn, /name="apple-mobile-web-app-capable" content="yes"/);
+  assert.match(signIn, /name="apple-mobile-web-app-status-bar-style" content="black-translucent"/);
   assert.match(signIn, /<form method="post" action="\/sign-in"/);
   assert.match(signIn, /id="alpha-password" type="password" name="password"/);
   assert.match(signIn, /<button type="button"[^>]+aria-controls="alpha-password" hidden>Show password/);
