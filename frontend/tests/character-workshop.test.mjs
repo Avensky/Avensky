@@ -17,7 +17,7 @@ test("workshop authoring saves bounded pose tracks and resolves fitted chair tar
   } });
   try {
     const { CHARACTER_TABS } = await load("CharacterPage.tsx");
-    assert.deepEqual(CHARACTER_TABS.map(item => item.id), ["details", "body", "appearance", "emotes"]);
+    assert.deepEqual(CHARACTER_TABS.map(item => item.id), ["details", "body", "appearance", "emotes", "profile", "account"]);
 
     const { createdEmoteClip, defaultEmoteFrame, creatorTimeline, readCreatedEmotes, writeCreatedEmotes } = await load("emoteAuthoring.ts");
     const frames = [defaultEmoteFrame(), { ...defaultEmoteFrame("pose-greeting"), hold: .8, hands: "Open", facing: "Left" }];

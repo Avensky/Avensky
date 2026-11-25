@@ -66,7 +66,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const overlay=useUIStore(s=>s.overlay);
  const owner=useSocialStore(s=>s.view?.profile.id??s.profileOwner);
  const connected=useSocialStore(s=>Boolean(s.view));
- const stagingSignedIn=useSocialStore(s=>s.stagingSignIn);
+ const stagingSignedIn=useSocialStore(s=>s.stagingSignIn && s.profileStatus==="ready" && Boolean(s.view?.profile));
  const visibleCharacterTabs=stagingSignedIn?CHARACTER_TABS:CHARACTER_TABS.filter(item=>item.id!=="profile"&&item.id!=="account");
  const main=useHeroLoadouts(s=>s.ownerId===owner?s.defaultHero:null);
  const mainDefinition=HEROES.find(item=>item.id===main);
@@ -75,7 +75,8 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const [chosen,setHero]=useState<string|null>(null);
  const hero=chosen??mainDefinition?.id??null;
  const [page,setPage]=useState<WorkshopPage>("heroes");
- const [characterTab,setCharacterTab]=useState<CharacterTab>("appearance");
+ const [selectedCharacterTab,setCharacterTab]=useState<CharacterTab>("appearance");
+ const characterTab=!stagingSignedIn&&(selectedCharacterTab==="profile"||selectedCharacterTab==="account")?"appearance":selectedCharacterTab;
  const [characterReady,setCharacterReady]=useState(false);
  const beforeCharacterClose=useRef<()=>Promise<boolean>>(null);
  const previousCharacterPage=useRef<WorkshopPage>("heroes");

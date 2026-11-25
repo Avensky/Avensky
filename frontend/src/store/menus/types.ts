@@ -71,7 +71,8 @@ export type UIState = {
   setCockpitTab: (tab: CockpitTab) => void;
   openCockpit: (tab?: CockpitTab) => void;
   screen: MenuScreen;
-  setScreen: (screen: MenuScreen) => void;
+  welcomeSection: "account" | null;
+  setScreen: { (screen: MenuScreen): void; (screen: "welcome", section: "account"): void };
 
   overlay: UIOverlay;
   setOverlay: (overlay: UIOverlay) => void;

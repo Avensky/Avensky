@@ -707,7 +707,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         {tab === "emotes" && emoteBrowser}
       </section>}
       {tab === "emotes" && emoteResultsPanel}
-      {(tab === "profile" || tab === "account") && <AlphaAccountPanel tab={tab} />}
+      {(tab === "profile" || tab === "account") && <AlphaAccountPanel key={JSON.stringify([connectedOwner, tab])} tab={tab} />}
       {playback}
       {!fitting && <div className="dressing-toolbar">{cameraTools}</div>}
       {previewZoom}

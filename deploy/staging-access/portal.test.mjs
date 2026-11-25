@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 import { once } from "node:events";
 import { createHmac, randomBytes } from "node:crypto";
 import test from "node:test";
@@ -10,6 +14,31 @@ import { gameSocketGate, LOGIN_FAILED } from "./game-bridge.mjs";
 const origin = "https://staging.avensky.com";
 const password = "a separate staging passphrase for QA";
 const newPassword = "a new separate staging passphrase for QA";
+
+test("the installed standalone sign-in uses the palette shipped with the app", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "avensky-portal-"));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  for (const name of ["accounts.mjs", "game-bridge.mjs", "portal.mjs"]) {
+    await copyFile(new URL(name, import.meta.url), join(dir, name));
+  }
+  await copyFile(new URL("../../frontend/src/theme/palettes.json", import.meta.url), join(dir, "palettes.json"));
+  const installed = await import(pathToFileURL(join(dir, "portal.mjs")).href);
+  const accounts = testerAccounts(":memory:", randomBytes(32));
+  const server = installed.createPortal({ origin, accounts });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  try {
+    const url = `http://127.0.0.1:${server.address().port}/__alpha/`;
+    const theme = await fetch(url + "theme.js");
+    assert.equal(theme.status, 200);
+    const page = await (await fetch(url + "sign-in")).text();
+    assert.match(page, /<script src="\/__alpha\/theme\.js"><\/script>/);
+    assert.match(page, /--app-accent:#[a-f0-9]{6}/);
+  } finally {
+    await new Promise(resolve => server.close(resolve));
+    accounts.close();
+  }
+});
 
 test("invites grant access once and revocation invalidates existing cookies", async t => {
   const accounts = testerAccounts(":memory:", randomBytes(32));

@@ -93,7 +93,8 @@ test('tab players preserve main credentials and Quickplay waits for a confirmed 
    await act(async()=>{reply(guest,{profile_id:'guest',token:'e'.repeat(64)});client.receiveSocialState(view('guest','GUEST'));});
    assert.equal(JSON.parse(localStorage.getItem(menuKey)).id,'device');
    assert.equal(JSON.parse(dom.window.sessionStorage.getItem(menuKey+':tab')).id,'guest');
-   assert.match(trigger.textContent,/Guest/);
+   assert.match(trigger.textContent,/GUEST/);
+   assert.equal([...panel.querySelectorAll('button')].some(button=>button.textContent==='Account'),false);
    await act(async()=>trigger.click());
    await act(async()=>route('activate'));
    const restore=sent.at(-1);assert.equal(restore.token,'f'.repeat(64));

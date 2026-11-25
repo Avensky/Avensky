@@ -26,9 +26,11 @@ export const useUIStore = create<UIState>()((set, get, api) => ({
       set({ overlay: "cockpit", cockpitTab });
   },
   screen: PLAYER_ONBOARDING ? "welcome" : "main",
-  setScreen: (screen) => {
+  welcomeSection: null,
+  setScreen: (screen, section?: "account") => {
     set({
       screen,
+      welcomeSection: screen === "welcome" ? section ?? null : null,
       overlay: null,
       vehicleSelectionParent: null,
       settingsParent: null,

@@ -106,14 +106,14 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
       {!available && <p role="status">Connect to the game server to sign in.</p>}
       {error && <p role="alert">{error}</p>}
       <div className="main-menu-profile-options">
-        {stagingSignIn && signedIn && <button type="button" className="menu-control menu-panel-frame"
-          onClick={() => window.location.assign("/__alpha/account")}>Account</button>}
+        {stagingSignIn && signedIn && status === "ready" && <button type="button" className="menu-control menu-panel-frame"
+          onClick={() => useUIStore.getState().setScreen("welcome", "account")}>Account</button>}
         {PLAYER_ONBOARDING && !registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => useUIStore.getState().setScreen("welcome")}>Player options</button>}
         {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={busy}
           onClick={() => useUIStore.getState().setScreen("welcome")}>Switch character</button>}
         {PLAYER_ONBOARDING && registered && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
-          onClick={() => void signOut()}>{signingOut ? "Signing out…" : "Sign out"}</button>}
+          onClick={() => void signOut()}>{signingOut ? "Logging out…" : "Log out"}</button>}
         {!PLAYER_ONBOARDING && !signedIn && <button type="button" className="menu-control menu-panel-frame" disabled={!available || busy}
           onClick={() => void connect(signInDeviceProfile)}>Sign in on this device</button>}
         {!PLAYER_ONBOARDING && !guest && <button type="button" className="menu-control menu-panel-frame" disabled={busy}

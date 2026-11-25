@@ -1,4 +1,5 @@
 import { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
+import { MenuIcon } from "../../components/menus/MenuIcon";
 import { useUIStore } from "../../store/menus/uiStore";
 import { bakeCharacterPortrait, peekCharacterPortrait, subscribeCharacterPortrait } from "./bakeCharacterPortrait";
 import { getWardrobeGarment, wardrobeGarmentModelUrl } from "./wardrobeGarments";
@@ -80,11 +81,13 @@ function portraitKey(look: CharacterLook, url: string, outfitUrl?: string) {
 }
 
 /** Render the saved look from its authored model while the menus are idle. */
-export function CharacterPortrait({ choice, label, welcomePreview }: {
+type PortraitProps = {
   choice: CharacterChoice | null | undefined;
   label?: string;
   welcomePreview?: "candidate" | "selected";
-}) {
+};
+
+export function CharacterPortrait({ choice, label, welcomePreview }: PortraitProps) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
@@ -113,4 +116,11 @@ export function CharacterPortrait({ choice, label, welcomePreview }: {
   return needsBake
     ? <span className="character-portrait character-portrait--loading" aria-hidden="true" />
     : null;
+}
+
+export function ProfilePortrait(props: PortraitProps) {
+  return <span className="profile-portrait-frame" aria-hidden="true">
+    <MenuIcon name="profile" />
+    <CharacterPortrait {...props} />
+  </span>;
 }

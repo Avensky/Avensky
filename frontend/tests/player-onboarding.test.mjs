@@ -68,6 +68,12 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
     assert.equal(document.querySelector("h1"),null);
     assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Sign in","Sign up"]);
+    assert.equal(button("Account"), undefined);
+    await act(async () => social.setState({ profileStatus: "restoring" }));
+    assert.equal(button("Sign in"), undefined);
+    assert.equal(button("Sign up"), undefined);
+    assert.match(document.querySelector('[role="status"]').textContent, /Restoring/);
+    await act(async () => social.setState({ profileStatus: "idle" }));
     const autoplay = playbackAttempts;
     document.dispatchEvent(new Event("pointerup"));
     assert.ok(playbackAttempts > autoplay,"a touch release offers another chance to play");
@@ -169,6 +175,35 @@ test("welcome picks a personality and gender before registration and lets return
     assert.deepEqual(selectEquippedCharacter(social.getState()), fox);
     await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
     assert.ok(document.querySelector('[name="characterName"]'));
+    assert.ok(button("Log out"));
+    assert.ok(button("Account"));
+    const previousFetch = globalThis.fetch;
+    globalThis.fetch = async () => Response.json({ email: "tester@example.net", admin: false, hasMfa: true });
+    try {
+      await act(async () => button("Account").click());
+      const settings = document.querySelector('[aria-label="Account settings"]');
+      assert.ok(settings);
+      assert.equal(settings.querySelector('input[type="password"]'), null);
+      const row = label => [...settings.querySelectorAll("button")].find(item => item.textContent.startsWith(label));
+      await act(async () => row("Email").click());
+      settings.querySelector('input[type="password"]').value = "unsent";
+      await act(async () => row("Delete profile").click());
+      assert.equal(settings.querySelector('input[name="newEmail"]'), null);
+      assert.equal(settings.querySelector('input[type="password"]').value, "");
+      await act(async () => document.querySelector('button[aria-label="Back"]').click());
+      assert.ok(document.querySelector('[name="characterName"]'));
+      await act(async () => ui.getState().setScreen("welcome", "account"));
+      assert.ok(document.querySelector('[aria-label="Account settings"]'));
+      await act(async () => document.querySelector('button[aria-label="Back"]').click());
+      assert.equal(ui.getState().screen, "main");
+      await act(async () => ui.getState().setScreen("welcome"));
+    } finally { globalThis.fetch = previousFetch; }
+    assert.equal(document.querySelector('button[aria-label="Back"]'), null);
+    await act(async () => window.dispatchEvent(new CustomEvent("avenlab:panel-action", { detail: "back" })));
+    assert.ok(document.querySelector('[name="characterName"]'));
+    assert.equal(button("Sign in"), undefined);
+    await act(async () => social.setState({ stagingSignIn: false, registeredProfile: true }));
+    assert.ok(button("Log out"), "a restored registered profile with no characters can log out");
     assert.equal(button("Sign in"), undefined);
   } finally {
     await act(async()=>root.unmount());
