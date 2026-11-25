@@ -176,7 +176,7 @@ class ReleaseTest(unittest.TestCase):
             stage, production, approved = (path / name for name in ("stage", "production", "approved"))
             for root in (stage, production, approved):
                 root.mkdir()
-            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage"})
+            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage", "asset-release.json": json.dumps({"id": ASSETS}).encode()})
             bad = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS),
                              "web/index.html": b"stage", "asset-release.json": json.dumps({"id": "c" * 64}).encode()})
             with patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(bad))):
