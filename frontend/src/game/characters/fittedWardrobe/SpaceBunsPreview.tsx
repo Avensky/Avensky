@@ -121,7 +121,8 @@ function FittedHair({ root, style }: { root: Object3D; style: LocalHairOption })
 
   useLayoutEffect(() => {
     const actor = getWardrobeActorBody(root);
-    const hair = scene.getObjectByName(style.id);
+    // Imported hair catalog IDs (hair-01) differ from GLB mesh names (Hair_01).
+    const hair = scene.getObjectByName(style.mesh ?? style.id);
     const head = root.getObjectByName("head");
     if (!actor || !hair || !head) return;
     const parts: SkinnedMesh[] = [];

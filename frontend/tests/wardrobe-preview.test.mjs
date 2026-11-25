@@ -5,10 +5,24 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { createServer } from "vite";
 
+test("catalog hair styles appear in the preview menu with their GLB mesh names", async () => {
+  const server = wardrobePreviewServer();
+  try {
+    const module = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/alphaAssets.ts");
+    assert.ok(module.fittedHairOptions.some(style => style.id === "hair-12"
+      && style.label === "Long with bangs"
+      && style.mesh === "Hair_12"
+      && style.url.endsWith("/Hair_12_espresso.glb")));
+  } finally {
+    await server.close();
+  }
+});
+
 function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
       __FITTED_HAIR_IDS__: JSON.stringify(["hair-12"]),
+      __FITTED_HAIR_STYLES__: JSON.stringify([{ id: "hair-12", label: "Long with bangs", url: "/models/characters/female/hair/Hair_12_espresso.glb", mesh: "Hair_12" }]),
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),
