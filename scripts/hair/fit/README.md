@@ -4,7 +4,7 @@
 
 **Status (2026-11-25):** original Face4 skull and original `T_Villager_Lady_Face_BaseColor.tga` texture have been identified and visualized on the actual head. The original texture ALREADY includes a soft scalp/hair-root discoloration. **Preserve that original texture on Vesper; don't generate a substitute sphere, hard brown cap, or new scalp mesh by default.** V2 inspectors and optional diagnostic extraction are written, but actual Curly Mane root fitting, Blender QA and shippable GLBs remain unimplemented/unverified.
 
-**Start by reading:** [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
+**Start by reading:** [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
 
 ## Vesper FIRST: original head + original scalp texture
 
@@ -77,7 +77,8 @@ Acceptance: no obviously exposed scalp holes outside intentional part, no rigid 
 
 ## Repository layout / current boundaries
 - **Existing:** `inspect_character.py`, `inspect_source.py`, `extract_source_scalp.py` (optional debug), `cap_geometry.py` + `build_scalp_cap.py` (fallback only), `character_profiles/vesper.json`, `styles/curly_mane.json`, `test_cap_geometry.py`, documentation and dev/staging comparison switches.
-- **Not yet implemented:** `fit_hair.py` (root-only geometry fit), `validate_fit.py` (rig/UV/gap checks), `render_qa.py` (reproducible camera matrix), LOD/export integration.
+- **Pilot implementation (not Blender-verified):** `fit_math.py` (unit-tested similarity alignment, root-only clump translation), `prepare_curly_mane_workbench.py` (original scalp-colored source scene), `pilot_curly_mane.py` (annotated source/target marker fit). The genuine vendor CURLY 01.FBX raw bytes still need to be supplied in an accessible form before the actual Curly Mane fit can be tested.
+- **Not yet implemented:** fully automatic donor root discovery, complete rig/gap checks (`validate_fit.py`), reproducible cameras (`render_qa.py`), LOD/export integration.
 - **Out of scope:** any male character/garment fitting and production UI updates.
 
 Keep all original/purchased vendor FBX, source maps, new .blend working copies and redistributed derivatives private unless licensing establishes release rights. Never publish just because a technical test passes.
