@@ -42,6 +42,7 @@ jobs:
           test -z "$(find frontend/dist-staging -type f -iname '*.glb' -print -quit)"
           test ! -e frontend/dist-staging/.asset-release
           mkdir snapshot
+          cp frontend/.asset-release/staging.json snapshot/asset-release.json
           mv frontend/dist-staging snapshot/web
           node --input-type=module -e '
             import { writeFileSync, readFileSync } from "node:fs";

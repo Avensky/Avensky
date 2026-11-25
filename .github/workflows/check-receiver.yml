@@ -29,6 +29,7 @@ jobs:
       - run: bash -n deploy/frontend/ssh-publish.sh
       - run: bash deploy/frontend/test_ssh_publish.sh
       - run: python3 deploy/frontend/test_publish.py
+      - run: python3 -m py_compile deploy/staging-assets/auto_activate.py
       - name: Test staging restart, session preservation and recovery with Docker
         env:
           TEST_DOCKER: ${{ github.event_name == 'pull_request' && '1' || '0' }}
