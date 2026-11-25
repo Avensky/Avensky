@@ -73,7 +73,7 @@ For a future pack, commit a manifest containing only logical URLs, SHA-256 diges
    ~~~
 
 4. Install the new verified file outside the web root, and serve **both the current and candidate releases** from the staging gateway, preserving open sessions. Ensure the local staging gateway returns HTTP 206 and `glTF` for the candidate hair byte-range request. Do not remove either previous verified manifest.
-5. Merge the reviewed change to `main`. The `Deploy to staging` workflow uses the registry by default, and the existing receiver refuses to publish unless the candidate release ID matches the verified staging gateway. Staging game-server updates must separately include the latest character catalog to save the new IDs.
+5. Merge the reviewed change to `main`. The `Deploy to staging` workflow uses the registry by default, and the existing receiver refuses to publish unless the candidate release ID matches the verified staging gateway. The staging publisher also checks and deploys the matching Rust game server from the same `main` commit, skipping Docker restarts when the server and wardrobe catalog inputs are unchanged. Its backup, WebSocket health gate, and rollback protect the current staging game.
 
 This order ensures a missing/unverified export cannot break the live staging site. The old staging release remains active until the candidate is verified. Production deployment remains manual.
 

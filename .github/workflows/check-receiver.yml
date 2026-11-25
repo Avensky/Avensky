@@ -27,6 +27,7 @@ jobs:
           lfs: false
           persist-credentials: false
       - run: bash -n deploy/frontend/ssh-publish.sh
+      - run: bash deploy/frontend/test_ssh_publish.sh
       - run: python3 deploy/frontend/test_publish.py
       - name: Test staging restart, session preservation and recovery with Docker
         env:

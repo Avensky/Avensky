@@ -77,7 +77,6 @@ jobs:
           RELEASE_USER: ${{ vars.RELEASE_USER }}
           RELEASE_SSH_KEY: ${{ secrets.RELEASE_SSH_KEY }}
           RELEASE_KNOWN_HOSTS: ${{ vars.RELEASE_KNOWN_HOSTS }}
-          STAGING_GAME_DEPLOY_ENABLED: ${{ vars.STAGING_GAME_DEPLOY_ENABLED }}
           GH_TOKEN: ${{ github.token }}
         run: |
           tip=$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq .commit.sha)
