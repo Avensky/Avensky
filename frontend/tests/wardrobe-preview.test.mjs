@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+
+const expectedHairStyles = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
 import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -9,10 +12,15 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
   const server = wardrobePreviewServer();
   try {
     const module = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/alphaAssets.ts");
-    assert.ok(module.fittedHairOptions.some(style => style.id === "hair-12"
-      && style.label === "Long with bangs"
-      && style.mesh === "Hair_12"
-      && style.url.endsWith("/Hair_12_espresso.glb")));
+    for (const entry of expectedHairStyles) {
+      assert.ok(module.fittedHairOptions.some(style => style.id === entry.id
+        && style.label === entry.label && style.url === entry.url && style.mesh === entry.mesh));
+    }
+    const hair = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/LocalHairFeatures.tsx");
+    assert.equal(hair.STOCK_HAIR_LABEL, "Long braid and bonnet");
+    assert.equal(hair.previewStockBonnet(true, true, hair.STOCK_HAIR_ID), true);
+    assert.equal(hair.previewStockBonnet(true, true, expectedHairStyles[0].id), false);
+    assert.equal(hair.previewStockBonnet(false, true, hair.STOCK_HAIR_ID), false);
   } finally {
     await server.close();
   }
@@ -44,7 +52,8 @@ test("fitting camera stays on the safe stage-facing side during character rotati
 function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
-      __FITTED_HAIR_IDS__: JSON.stringify(["hair-12"]),
+      __FITTED_HAIR_IDS__: JSON.stringify(expectedHairStyles.map(({ id }) => id)),
+      __FITTED_HAIR_STYLES__: JSON.stringify(expectedHairStyles.map(({ id, label, url, mesh }) => ({ id, label, url, mesh }))),
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),

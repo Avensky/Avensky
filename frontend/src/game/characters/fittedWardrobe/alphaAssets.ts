@@ -1,8 +1,5 @@
-import fittedHairManifest from "../../../../../packages/wardrobe-catalog/fitted-hair.json";
-
 declare const __FITTED_HAIR_URLS__: string[];
-declare const __FITTED_HAIR_IDS__: string[];
-
+declare const __FITTED_HAIR_STYLES__: Array<{ id: string; label: string; url: string; mesh: string }>;
 
 const folder = "/models/characters/female/wardrobe/alpha";
 export const fittedHairCatalog = [
@@ -16,9 +13,10 @@ export const fittedTennisGarments = [
 const installedHair = typeof __FITTED_HAIR_URLS__ === "undefined" ? [] : __FITTED_HAIR_URLS__;
 // One catalog is the source of truth: adding a fitted-hair.json record and a
 // private staging asset automatically grows the selection menu at the next build.
-const stagedHairIds = new Set(typeof __FITTED_HAIR_IDS__ === "undefined" ? [] : __FITTED_HAIR_IDS__);
+// The build injects this directly from the registered fitted-hair.json records,
+// filtering out unregistered S3 URLs. Do not maintain a second manual hair list.
+const stagedHair = typeof __FITTED_HAIR_STYLES__ === "undefined" ? [] : __FITTED_HAIR_STYLES__;
 export const fittedHairOptions = [
   ...fittedHairCatalog.filter(style => installedHair.includes(style.url)),
-  ...fittedHairManifest.filter(style => stagedHairIds.has(style.id))
-    .map(({ id, label, url, mesh }) => ({ id, label, url, mesh })),
+  ...stagedHair,
 ];
