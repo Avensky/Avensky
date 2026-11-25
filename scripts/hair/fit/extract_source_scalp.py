@@ -151,6 +151,7 @@ def clone_selected(head, selection, args):
     try:
         bm.from_mesh(cloned.data)
         bm.faces.ensure_lookup_table()
+        bm.faces.index_update()
         selected = set(selection)
         unwanted = [f for f in bm.faces if f.index not in selected]
         bmesh.ops.delete(bm, geom=unwanted, context="FACES")
