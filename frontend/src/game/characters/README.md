@@ -46,15 +46,18 @@ hands above these gowns as the character lowers into the chair. The nightgown
 also lifts its layered hem away from bare feet during a stride. These adjustments
 run when the outfit loads and use the character's existing skinning in motion.
 
-The Linen nightgown keeps the source's separate binding and UV islands. Its
-sleeves wrap around the character's open-arm bind pose. A profile sampled from
+The Linen nightgown has a provisional pass for Sleepwear. Its skirt and hem
+binding use one fitted surface with the original trim atlas. Its sleeves wrap
+around the character's open-arm bind pose. A profile sampled from
 the body donor limits the rear folds and leaves clearance over the skin. The
 medieval gowns and kaftans blend sleeve weights from shoulder through wrist
 while the bodice keeps its own rigging. This fit runs on garment load.
 
 The Laced linen dress keeps the gathered shirt at the neckline, the sleeve
-flares and the center skirt panel. Concealed inner faces are cut against the
-outer layer so the lining stays below the laced bodice. The original normal
+flares and the center skirt panel. Its flared cuffs move with their forearms,
+and its skirt layers share the same pelvis and thigh motion. The underskirt
+turns under the waist and has extra clearance beneath the overdress. This
+outfit is still under development. The original normal
 atlases supply seams and quilting. Small repeating textures and distinct
 roughness values differentiate linen, twill, satin, quilted cloth and leather.
 

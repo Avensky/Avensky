@@ -70,7 +70,7 @@ export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean, bo
   const rearRight = fittedLinen && body && rearProfile(right, body);
   const point = new Vector3(), offset = new Vector3(), center = new Vector3();
 
-  return (source: BufferGeometry, fitted?: BufferGeometry, sleeveBinding = false) => {
+  return (source: BufferGeometry, fitted?: BufferGeometry, sleeveBinding = false, lacedLinenSleeve = false) => {
     const position = source.getAttribute("position"), joints = source.getAttribute("skinIndex"), weights = source.getAttribute("skinWeight");
     if (!position || !joints || !weights) return fitted;
     const skin = fitted ?? source;
@@ -91,7 +91,12 @@ export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean, bo
       const shoulder = MathUtils.smoothstep(upper, .035, .42) * MathUtils.smoothstep(across, .147, .22);
       const axisSupport = shoulder * (1 - MathUtils.smoothstep(radius, .042, .09));
       const sleeve = Math.max(MathUtils.smoothstep(armInfluence(arm, source, i), .37, .85), .8 * axisSupport);
-      const amount = sleeve * Math.max(.88 * shoulder, MathUtils.smoothstep(bend, -.12, -.015));
+      // The far corners of this flared cuff were exported with pelvis and
+      // thigh influences. Use the sleeve's shape to find the entire cuff.
+      const flare = lacedLinenSleeve
+        ? MathUtils.smoothstep(across, .155, .215) * (1 - MathUtils.smoothstep(point.y, 1.16, 1.28))
+        : 0;
+      const amount = Math.max(flare, sleeve * Math.max(.88 * shoulder, MathUtils.smoothstep(bend, -.12, -.015)));
       const linenFit = fittedLinen ? sleeve * MathUtils.smoothstep(upper, .09, .42) : 0;
       // The rear shoulder fold spans the sleeve and clavicle. Fit that seam
       // even where the authored torso weights dilute its arm influence.
@@ -100,8 +105,8 @@ export function prepareDressSleeves(skeleton: Skeleton, fittedLinen: boolean, bo
       const rearFit = rear ? Math.max(rearShoulder, sleeve * MathUtils.smoothstep(upper, .015, .25)
         * MathUtils.smoothstep(across, .147, .202)) : 0;
       if (Math.max(amount, linenFit, rearFit) < .001) continue;
-      const lower = MathUtils.smoothstep(bend, -.042, .062);
-      const wrist = .48 * MathUtils.smoothstep(forearm, .67, 1.12);
+      const lower = Math.max(MathUtils.smoothstep(bend, -.042, .062), flare * MathUtils.smoothstep(bend, -.07, .003));
+      const wrist = (1 - flare) * .48 * MathUtils.smoothstep(forearm, .67, 1.12);
       const blend = new Map<number, number>();
       for (let channel = 0; channel < 4; channel++) {
         const joint = skinJoints.getComponent(i, channel);

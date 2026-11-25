@@ -306,17 +306,26 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
     .setAttribute("uv", new Float32BufferAttribute([0, 1, 1, 1, 1, 0], 2));
   original.computeVertexNormals();
   const rearFold = original.clone(), body = original.clone();
+  const flaredSleeve = original.clone();
+  flaredSleeve.attributes.position.setXYZ(0, .322, .876, .015);
+  flaredSleeve.attributes.skinIndex.setXYZW(0, 1, 6, 7, 0);
+  flaredSleeve.attributes.skinWeight.setXYZW(0, .44, .27, .29, 0);
   rearFold.attributes.position.setXYZ(0, .211, 1.235, -.125);
   body.attributes.position.setXYZ(0, .211, 1.235, -.052);
   rearFold.attributes.position.setXYZ(1, -.16, 1.342, -.118);
   body.attributes.position.setXYZ(1, -.16, 1.342, -.067);
-  let sleeve, band, fittedFold;
+  let sleeve, band, fittedFold, fittedFlare;
   try {
     const { prepareDressSleeves } = await vite.ssrLoadModule("/src/game/characters/dressSleeves.ts");
     const fit = prepareDressSleeves(skeleton, true);
     sleeve = fit(original);
     band = fit(original, undefined, true);
     fittedFold = prepareDressSleeves(skeleton, true, body)(rearFold);
+    fittedFlare = prepareDressSleeves(skeleton, false)(flaredSleeve, undefined, false, true);
+    assert.equal(fittedFlare.attributes.skinIndex.getX(0), 1);
+    assert.equal(fittedFlare.attributes.skinWeight.getX(0), 1, "the flared cuff follows the forearm through the entire bend");
+    assert.equal(fittedFlare.attributes.position.getY(2), flaredSleeve.attributes.position.getY(2));
+    assert.deepEqual([...fittedFlare.attributes.uv.array], [...flaredSleeve.attributes.uv.array]);
     assert(fittedFold.attributes.position.getZ(0) > -.087, "the rear sleeve still wraps the measured upper arm");
     assert(fittedFold.attributes.position.getZ(0) < -.053, "the rear sleeve leaves clearance for skin");
     assert(fittedFold.attributes.position.getZ(1) > -.09, "the rear shoulder seam stays near the open-arm fit");
@@ -336,12 +345,52 @@ test("gown cuff and binding follow the forearm without changing the skirt or aut
     assert.equal(original.attributes.skinIndex.getX(0), 0, "the shared source is immutable");
   } finally {
     fittedFold?.dispose();
+    fittedFlare?.dispose();
+    flaredSleeve.dispose();
     rearFold.dispose();
     body.dispose();
     band?.dispose();
     sleeve?.dispose();
     original.dispose();
     skeleton.dispose();
+    await vite.close();
+  }
+});
+
+test("the laced linen skirt keeps clearance and follows the overdress as the legs move", async () => {
+  const vite = await createServer({
+    configFile: false, appType: "custom", logLevel: "error",
+    optimizeDeps: { noDiscovery: true, include: [] },
+    server: { middlewareMode: true, hmr: false, ws: false, watch: null },
+  });
+  const panel = (width, z) => {
+    const geometry = new BufferGeometry().setIndex([0, 1, 2, 1, 3, 2])
+      .setAttribute("position", new Float32BufferAttribute([0, .4, z, width, .4, z, 0, 1.06, z, width, 1.06, z], 3))
+      .setAttribute("skinIndex", new Uint16BufferAttribute(16, 4))
+      .setAttribute("skinWeight", new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4))
+      .setAttribute("uv", new Float32BufferAttribute([0, 0, 1, 0, 0, 1, 1, 1], 2));
+    geometry.computeVertexNormals();
+    return geometry;
+  };
+  const outerSource = panel(.32, .20), innerSource = panel(.13, .19);
+  let fitted = [];
+  try {
+    const { fitLacedLinenLayers, LACED_LINEN_OVERDRESS, LACED_LINEN_UNDERSKIRT } =
+      await vite.ssrLoadModule("/src/game/characters/lacedLinenLayers.ts");
+    const bones = ["pelvis", "thigh_l", "thigh_r"].map(name => Object.assign(new Bone(), { name }));
+    const outer = { name: LACED_LINEN_OVERDRESS, geometry: outerSource, skeleton: { bones } };
+    const inner = { name: LACED_LINEN_UNDERSKIRT, geometry: innerSource };
+    fitted = fitLacedLinenLayers([outer, inner]);
+    assert.equal(fitted.length, 2);
+    assert.ok(inner.geometry.attributes.position.count > innerSource.attributes.position.count);
+    const center = [...Array(inner.geometry.attributes.position.count).keys()].find(i =>
+      inner.geometry.attributes.position.getX(i) === 0 && inner.geometry.attributes.position.getY(i) < .41);
+    assert.ok(inner.geometry.attributes.position.getZ(center) <= .166);
+    const sharedWeights = (geometry, i) => [...geometry.attributes.skinWeight.array.slice(i * 4, i * 4 + 4)];
+    assert.deepEqual(sharedWeights(outer.geometry, 0), sharedWeights(inner.geometry, center));
+    assert.ok(sharedWeights(inner.geometry, center)[1] > .29, "the center panel follows both thighs");
+  } finally {
+    for (const geometry of [outerSource, innerSource, ...fitted]) geometry.dispose();
     await vite.close();
   }
 });
