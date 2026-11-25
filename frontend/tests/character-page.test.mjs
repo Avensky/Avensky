@@ -129,7 +129,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('[aria-label="Reset vehicle zoom"]');
     assert.equal(zoom.getState().level, 0);
     await click('[data-open-character]');
-    assert.equal(title(), 'CHARACTER');
+    assert.equal(find('.menu-frame-header h1'), null);
+    assert.ok(find('.menu-frame-header [data-header-back]'));
     assert.equal(headerPortrait().dataset.style, 'deferred', 'wardrobe entry keeps the cold vehicle bake deferred');
     assert.equal(find('.hero-roster'), null);
     assert.equal(find('[role=tab]'), null);
@@ -255,7 +256,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       });
     };
     await acknowledge(requests[0], choice);
-    const characterTabs = '[role=tablist][aria-label="CHARACTER sections"]';
+    const characterTabs = '[role=tablist][aria-label="Character sections"]';
     const identityTab = `${characterTabs} #character-editor-tab-body`;
     const identityControl = find(identityTab);
     assert.deepEqual([...document.querySelectorAll(`${characterTabs} [role=tab]`)].map(node => node.textContent),

@@ -1,5 +1,5 @@
 import {applyTeamIdentityColors} from './matchTeamTheme.ts';
-import palettes from './palettes.json';
+import palettes from './palettes.json' with { type: 'json' };
 
 /** Base palettes are always available. Never gate readable UI behind progress. */
 // The staging sign-in portal and the React app import the same palette JSON.

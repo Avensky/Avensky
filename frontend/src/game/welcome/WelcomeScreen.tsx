@@ -5,8 +5,10 @@ import { useUIStore } from "../../store/menus/uiStore";
 import { useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { characterLook } from "../characters/characterCatalog";
 import { attitudeName, CHARACTER_STYLES, styleLook, styleName, type CharacterBody } from "../characters/characterStyles";
-import { CharacterPortrait } from "../characters/CharacterPortrait";
+import { AlphaAccountPanel } from "../characters/AlphaAccountPanel";
+import { CharacterPortrait, ProfilePortrait } from "../characters/CharacterPortrait";
 import { navigateFormRows } from "../social/formRows";
+import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import "./welcomeScreen.css";
 
@@ -44,6 +46,8 @@ export function WelcomeScreen() {
   const [step, setStep] = useState<Step>("welcome");
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
   const [newPlayer, setNewPlayer] = useState(false);
+  const openedFromMenu = useUIStore(state => state.welcomeSection === "account");
+  const [showSettings, setShowSettings] = useState(false);
   const [showAccountEntry, setShowAccountEntry] = useState(false);
   const [name, setName] = useState("");
   const [body, setBody] = useState<CharacterBody>("female");
@@ -54,7 +58,8 @@ export function WelcomeScreen() {
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const rememberedPlayer = step === "welcome" && !showAccountEntry && (stagingSignIn || profile?.characters?.length) ? profile : undefined;
+  const signedIn = Boolean(profile && (stagingSignIn || registered));
+  const rememberedPlayer = step === "welcome" && (signedIn || (!showAccountEntry && profile?.characters?.length)) ? profile : undefined;
   const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
@@ -64,14 +69,22 @@ export function WelcomeScreen() {
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
+  const sessionPending = screen === "welcome" && (!connected || restoring || stagingSignIn);
+  const accountRoot = signedIn && (screen === "characters" || (screen === "create" && !slots?.length));
+  const accountOpen = accountRoot && stagingSignIn && (showSettings || openedFromMenu);
   const showStagingSignIn = connectionSlow && !connected && import.meta.env.MODE === "staging"
     && window.location.hostname === "staging.avensky.com";
 
   function back() {
     if (pending.current || restoring) return;
+    if (accountOpen) {
+      if (openedFromMenu) useUIStore.getState().setScreen("main");
+      else setShowSettings(false);
+      return;
+    }
     // Never log out via Escape or controller Back. The explicit Log out
     // button is the only way to invalidate an active tester session.
-    if (screen === "characters" && (stagingSignIn || registered)) return;
+    if (accountRoot) return;
     setError("");
     if (step === "register" && newPlayer) { setStep("save"); return; }
     if (step === "save") { setStep("create"); return; }
@@ -89,7 +102,7 @@ export function WelcomeScreen() {
     if (!busy && !window.matchMedia?.("(pointer: coarse)")?.matches
         && !root.current?.contains(document.activeElement))
       root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled)")?.focus({ preventScroll:true });
-  }, [screen, busy, connected]);
+  }, [screen, busy, connected, accountOpen]);
 
   useEffect(() => {
     if (connected) {
@@ -190,7 +203,15 @@ export function WelcomeScreen() {
     setConfirmedProfile(undefined);
     setStep("welcome");
     setShowAccountEntry(true);
+    setNewPlayer(false);
+    setName("");
+    setStyle(undefined);
+    setBody("female");
   }
+  const navigation = accountRoot ? <>
+    <button type="button" onClick={() => void run(logOut)} disabled={busy}>Log out</button>
+    {stagingSignIn && <button type="button" onClick={() => setShowSettings(true)} disabled={busy}>Account</button>}
+  </> : <MenuBackButton label="Back" onClick={back} disabled={busy} />;
   const labels: Record<Step, string> = {
     welcome: "Account access", create: "Create your character", save: "Save your character",
     register: "Create an account", login: "Sign in", characters: "Saved characters",
@@ -207,13 +228,16 @@ export function WelcomeScreen() {
       }
     }}>
       <div className="welcome-scroll">
-      <div className="welcome-layout" data-step={screen} data-authenticated={stagingSignIn || undefined}>
+      <div className="welcome-layout" data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
       <div className="welcome-art" aria-hidden="true">
         <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
       </div>
-      <section className="welcome-panel" aria-label={label}>
-        {screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
-        {screen === "create" ? <form key="new-character" onSubmit={event => {
+      <section className="welcome-panel" aria-label={accountOpen ? "Account" : label}>
+        {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
+        {accountOpen ? <>
+          <div data-controller-row><MenuBackButton label="Back" onClick={back} /></div>
+          <AlphaAccountPanel key={player?.id} tab="account" />
+        </> : screen === "create" ? <form key="new-character" onSubmit={event => {
             event.preventDefault();
             if (!draft || !connected || !accounts) return;
             if (player) void run(() => enter(player.id, "character_create", draft));
@@ -244,7 +268,7 @@ export function WelcomeScreen() {
               })}
             </div>
             <div className="welcome-actions" data-controller-row>
-              <button type="button" onClick={back} disabled={busy}>Back</button>
+              {navigation}
               <button type="submit" className="welcome-primary" disabled={!draft || busy || !connected || (!player && !newPlayer)}>
                 {player ? "Create character" : "Continue"}
               </button>
@@ -255,7 +279,7 @@ export function WelcomeScreen() {
               {slots.map(slot => <button type="button" key={slot.id} className="welcome-character"
                 disabled={busy || !connected || !slot.appearance}
                 onClick={() => { if (player) void run(() => enter(player.id, "character_select", { character_id: slot.id })); }}>
-                <CharacterPortrait choice={slot.appearance ?? undefined} label={slot.name}
+                <ProfilePortrait choice={slot.appearance ?? undefined} label={slot.name}
                   welcomePreview={player?.active_character_id === slot.id ? "selected" : "candidate"} />
                 <div className="welcome-character-details"><strong>{slot.name}</strong>
                   <span>{styleName(slot.style)}</span><small>Level {slot.level}</small>
@@ -264,10 +288,7 @@ export function WelcomeScreen() {
               </button>)}
             </div>}
             <div className="welcome-actions" data-controller-row>
-              {(registered || stagingSignIn)
-                ? <button type="button" onClick={() => void run(logOut)} disabled={busy}>Log out</button>
-                : <button type="button" onClick={back} disabled={busy}>Back</button>}
-              {stagingSignIn && <button type="button" onClick={() => window.location.assign("/__alpha/account")} disabled={busy}>Account</button>}
+              {navigation}
               {registered && slots && slots.length < 4 &&
                 <button type="button" onClick={() => {
                   if (player) setConfirmedProfile(player.id);
@@ -282,7 +303,7 @@ export function WelcomeScreen() {
               <button type="button" disabled={!draft || busy || !connected} onClick={() => {
                 if (draft) void run(async () => finishDraft(await selectGuestProfile("Guest"), draft));
               }}>Play as guest</button>
-              <button type="button" disabled={busy} onClick={back}>Back</button>
+              {navigation}
             </div>
         </> : screen === "login" || screen === "register" ? (
           <form key={screen} method="post" onSubmit={authenticate}>
@@ -297,18 +318,17 @@ export function WelcomeScreen() {
               </label>
               {screen === "register" && <p className="welcome-help">Use at least 15 characters.</p>}
             <div className="welcome-actions" data-controller-row>
-              <button type="button" onClick={back} disabled={busy}>Back</button>
+              {navigation}
               <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{label}</button>
             </div>
           </form>
-        ) : stagingSignIn ? null : <>
+        ) : sessionPending || signedIn ? null : <>
           <div className="welcome-entry-options" data-controller-row>
             <button type="button" className="welcome-primary" disabled={busy || !accounts}
               onClick={() => { setError(""); setStep("login"); }}>Sign in</button>
             <button type="button" disabled={busy || !accounts} onClick={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
-              else if (profile && registered) { setConfirmedProfile(profile.id); setStep("characters"); }
               else { setNewPlayer(true); setStep("create"); }
             }}>Sign up</button>
           </div>

@@ -305,3 +305,17 @@ button.character-header-profile { cursor: pointer; }
   .character-controls--right .character-appearance { grid-template-columns: minmax(0,1fr); }
   .character-page--editor .character-controls--bottom { gap: 6px; }
 }
+
+.profile-portrait-frame {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  width: 100%;
+  overflow: hidden;
+  background: var(--app-raised);
+  border: 1px solid var(--app-line);
+}
+.profile-portrait-frame > * { grid-area: 1 / 1; }
+.profile-portrait-frame > .menu-icon { width: 38%; height: 38%; color: var(--app-muted); }
+.profile-portrait-frame:has(img) > .menu-icon { visibility: hidden; }
+.profile-portrait-frame > img { width: 100%; height: 100%; object-fit: cover; }

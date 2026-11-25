@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { isAbsolute, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -8,8 +8,13 @@ import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-br
 
 const base = "/__alpha";
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
+const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.meta.url);
+const themes = JSON.parse(readFileSync(existsSync(sourcePalettes) ? sourcePalettes : new URL("./palettes.json", import.meta.url), "utf8"));
+const defaultColors = Object.entries(themes.navy)
+  .filter(([key]) => key !== "label" && key !== "scheme")
+  .map(([key, color]) => `--app-${key}:${color}`).join(";");
+
 function paletteScript() {
-  const themes = JSON.parse(readFileSync(new URL("../../frontend/src/theme/palettes.json", import.meta.url), "utf8"));
   return `(() => {
     const themes = ${JSON.stringify(themes)};
     let chosen = "navy";
@@ -39,6 +44,7 @@ const passwordField = (newPassword = false, id = "alpha-password") =>
 const codeField = (required = false) => `<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="32"${required ? " required" : ""}></label>`;
 const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
+const backToSignIn = `<a class="portal-back" href="${base}/sign-in" aria-label="Back to sign in" title="Back to sign in"><span aria-hidden="true">‹</span></a>`;
 const hideEmail = email => `<input type="hidden" name="email" value="${escape(email)}">`;
 
 function page(title, contents, message = "", showFlare = false) {
@@ -47,21 +53,21 @@ function page(title, contents, message = "", showFlare = false) {
 </div><script src="${base}/flare.js" defer></script>` : "";
   return `<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escape(title)} · Avensky</title>
 <style>
-*{box-sizing:border-box}html{color-scheme:dark}body{margin:0;color:var(--app-text,#e6efff);background:var(--app-background,#050c18);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
+*{box-sizing:border-box}html{color-scheme:${themes.navy.scheme};${defaultColors}}body{margin:0;color:var(--app-text);background:var(--app-background);font:1rem system-ui;min-height:100dvh;display:grid;align-items:center}
 main{position:relative;width:min(calc(100% - 2rem),34rem);margin:2rem auto}h1{font-size:1.5rem;margin:0 0 1rem}
-.portal-flare{position:fixed;inset:0;pointer-events:none;background:var(--app-background,#050c18) url(${base}/media/purple-sunflare.webp) center/cover no-repeat;opacity:.55}
+.portal-flare{position:fixed;inset:0;pointer-events:none;background:var(--app-background) url(${base}/media/purple-sunflare.webp) center/cover no-repeat;opacity:.55}
 .portal-flare video{width:100%;height:100%;object-fit:cover;background:#000;opacity:0;transition:opacity .2s ease}
 .portal-flare video[data-playing]{opacity:1}
-.portal-flare::after{content:"";position:absolute;inset:0;background:var(--app-background,#050c18);opacity:.35}
+.portal-flare::after{content:"";position:absolute;inset:0;background:var(--app-background);opacity:.35}
 @media (orientation:portrait){.portal-flare video{object-fit:contain}}
 @media (prefers-reduced-motion:reduce){.portal-flare video{display:none}}
-a{color:var(--app-accent,#82b7ff);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text,#e6efff);padding:.6rem .8rem;border:1px solid var(--app-line,#54749a);border-radius:0;background:var(--app-panel,#0b1729);min-height:44px;min-width:0}
-button{color:var(--app-text,#e6efff);background:var(--app-raised,#142b46);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent,#82b7ff);outline-color:var(--app-accent,#82b7ff)}
+a{color:var(--app-accent);text-decoration:none}a:hover{text-decoration:none}form,label,ul{display:grid;gap:.6rem}label[hidden]{display:none}form{margin:.8rem 0}input,button{font:inherit;color:var(--app-text);padding:.6rem .8rem;border:1px solid var(--app-line);border-radius:0;background:var(--app-panel);min-height:44px;min-width:0}
+button{color:var(--app-text);background:var(--app-raised);font-weight:600;cursor:pointer}button:is(:hover,:focus-visible){border-color:var(--app-accent);outline-color:var(--app-accent)}
 .password-control{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.5rem;align-items:end}
-.password-toggle{background:var(--app-panel,#0b1729);color:inherit;font-size:.875rem}
-ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
-code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style><script src="${base}/theme.js" defer></script><script src="${base}/password.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+.password-toggle{background:var(--app-panel);color:inherit;font-size:.875rem}
+ul{padding:0;list-style:none}li{border-top:1px solid var(--app-line);padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
+.portal-back{display:inline-grid;place-items:center;width:44px;height:44px;color:var(--app-text);border:1px solid var(--app-line);background:var(--app-panel);font-size:1.6rem}.portal-back:focus-visible{outline:2px solid var(--app-accent)}code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
+</style><script src="${base}/theme.js"></script><script src="${base}/password.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
@@ -72,7 +78,7 @@ ${form("account/email-request", '<label>New email<input type="email" name="newEm
 <h2>Profile deletion</h2><p>Request deletion for operator review. Your game profile is not deleted by this action.</p>
 ${form("account/delete-request", '<label>Confirm your current email<input type="email" name="confirmEmail" maxlength="254" required></label>' + passwordField(false, "alpha-password-delete"), "Request profile deletion")}
 ${viewer.has_mfa ? "<p>Two-factor authentication is enabled.</p>"
-    : `<h2>Two-factor authentication</h2>${form("mfa/start", passwordField(false, "alpha-password-mfa"), "Set up authenticator")}`}
+    : `<h2 id="two-factor">Two-factor authentication</h2>${form("mfa/start", passwordField(false, "alpha-password-mfa"), "Set up authenticator")}`}
 ${form("sign-out", "", "Log out")}`;
 }
 
@@ -116,7 +122,7 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
   function signInPage(message, invite = false) {
     return invite ? page("Join the alpha", form("enroll", emailField
       + linkField("invite", "Invitation code") + (game ? '<input type="hidden" name="deviceToken">' : "")
-      + passwordField(!game), game ? "Continue" : "Sign up") + `<nav><a href="${base}/sign-in">Log in</a>
+      + passwordField(!game), game ? "Continue" : "Sign up") + `<nav>${backToSignIn}
       <a href="${base}/forgot-password">Forgot password?</a></nav>` + readLinkFragment, message, Boolean(game))
       : page("Sign in", form("sign-in", emailField + passwordField(), "Sign in")
         + `<a href="${base}/forgot-password">Forgot password?</a>`
@@ -127,13 +133,13 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
   function factorPage(challenge, message) {
     return page("Verify your sign-in", form("sign-in/code",
       `<input type="hidden" name="challenge" value="${escape(challenge)}">` + codeField(true), "Verify")
-      + `<a href="${base}/sign-in">Back to log in</a>`, message, Boolean(game));
+      + `${backToSignIn}`, message, Boolean(game));
   }
 
   function forgotPasswordPage(message) {
     return page("Forgot password?", "<p>Use the email from your staging invitation. The staging operator sends reset links privately.</p>"
       + form("forgot-password", emailField, "Request password reset")
-      + `<nav><a href="${base}/reset">I have a reset link</a><a href="${base}/sign-in">Log in</a></nav>`, message, Boolean(game));
+      + `<nav><a href="${base}/reset">I have a reset link</a>${backToSignIn}</nav>`, message, Boolean(game));
   }
 
   function resetPage(message, verification) {
@@ -146,7 +152,7 @@ export function createPortal({ origin, accounts, mailInvite, game }) {
     }
     return page("Reset alpha password", '<p>Include an authenticator or recovery code if you enabled two-factor authentication.</p>'
       + form("reset", emailField + linkField("reset", "Reset code") + passwordField(true) + codeField(), "Set new password")
-      + `<a href="${base}/sign-in">Log in</a>` + readLinkFragment, message);
+      + `${backToSignIn}` + readLinkFragment, message);
   }
 
   function testerPage(viewer, message, extra = "") {
@@ -261,7 +267,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       `<a href="${base}/sign-in">Return to sign-in</a>`,
       "Open the portal or your original invitation link directly in your browser and try again."));
     const client = req.headers["x-alpha-client"] ?? req.socket.remoteAddress;
-    if (!admit(client)) return send(429, page("Try again shortly", `<a href="${base}/sign-in">Log in</a>`), { "Retry-After": "60" });
+    if (!admit(client)) return send(429, page("Try again shortly", `${backToSignIn}`), { "Retry-After": "60" });
     active++;
     let resetInput;
     try {
@@ -283,7 +289,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       if (path === base + "/forgot-password") {
         accounts.requestPasswordReset(value("email"));
         return send(200, page("Request received", "<p>If the email matches a staging account, the staging operator can send you a private reset link.</p>"
-          + `<a href="${base}/sign-in">Log in</a>`, "", Boolean(game)));
+          + `${backToSignIn}`, "", Boolean(game)));
       }
       if (game && path === base + "/reset/verify") {
         const code = value("reset").trim();
@@ -293,7 +299,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         resetInput = { email: value("email"), code: value("reset").trim() };
         await accounts.resetPassword(resetInput.email, resetInput.code, value("password"), value("code").trim());
         return game ? send(200, page("Password updated", "<p>Use your new password to sign in. If you still have an invitation to accept, open the invite first.</p>"
-          + `<a href="${base}/sign-in">Log in</a>`, "", true), {
+          + `${backToSignIn}`, "", true), {
           "Set-Cookie": `${cookieName}=; Max-Age=0; ${cookieFlags}`,
         }) : redirect(base + "/sign-in", "");
       }

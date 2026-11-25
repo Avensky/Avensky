@@ -4,7 +4,7 @@
   height: var(--welcome-height, 100dvh);
   z-index: 1;
   overflow: hidden;
-  color: var(--app-text,#e6efff);
+  color: var(--app-text);
   isolation: isolate;
   touch-action: pan-y;
 }
@@ -45,32 +45,32 @@
 .welcome-panel input, .welcome-panel button, .welcome-panel select {
   min-height: 2.75rem;
   min-width: 0;
-  border: 1px solid var(--app-line,#54749a);
+  border: 1px solid var(--app-line);
   border-radius: 0;
-  background: var(--app-panel,#0b1729);
+  background: var(--app-panel);
   color: inherit;
   font: inherit;
   padding: .55rem .8rem;
 }
 .welcome-panel input { width: 100%; font-size: 1rem; }
 .welcome-panel button { cursor: pointer; }
-.welcome-panel button:not(:disabled):hover { border-color: var(--app-accent,#82b7ff); background: var(--app-raised,#142b46); }
-.welcome-panel :is(button, input, select):focus-visible { outline: 2px solid var(--app-accent,#82b7ff); outline-offset: 3px; }
+.welcome-panel button:not(:disabled):hover { border-color: var(--app-accent); background: var(--app-raised); }
+.welcome-panel :is(button, input, select):focus-visible { outline: 2px solid var(--app-accent); outline-offset: 3px; }
 .welcome-panel button:disabled { cursor: default; opacity: .56; }
-.welcome-panel .welcome-primary { background: var(--app-accent,#82b7ff); color: var(--app-background,#050c18); border-color: var(--app-accent,#82b7ff); font-weight: 700; }
-.welcome-panel .welcome-primary:not(:disabled):hover { background: var(--app-accent,#82b7ff); }
+.welcome-panel .welcome-primary { background: var(--app-accent); color: var(--app-background); border-color: var(--app-accent); font-weight: 700; }
+.welcome-panel .welcome-primary:not(:disabled):hover { background: var(--app-accent); }
 .welcome-panel form, .welcome-panel label, .welcome-entry-options { display: grid; gap: .55rem; }
 .welcome-panel form { gap: .85rem; }
 .welcome-panel form label { font-size: .9rem; font-weight: 600; }
 .welcome-entry-options { margin-top: .6rem; }
 [data-step="welcome"] .welcome-entry-options { margin-top: 0; }
-.welcome-help { color: var(--app-muted,#a6b9d3); margin: .65rem 0; font-size: .875rem; }
+.welcome-help { color: var(--app-muted); margin: .65rem 0; font-size: .875rem; }
 .welcome-error { color: #ffc3cc; margin: .65rem 0; font-size: .875rem; }
 .welcome-actions, .welcome-characters { display: flex; flex-wrap: wrap; align-items: stretch; gap: .65rem; margin-top: .5rem; }
 .welcome-character { flex: 1 1 7.5rem; display: grid; justify-items: center; gap: .2rem; }
 .welcome-character .character-portrait { width: min(100%, 5rem); aspect-ratio: 1; }
 .welcome-character span { font-size: .8rem; }
-.welcome-panel button[aria-pressed="true"] { border-color: var(--app-accent,#82b7ff); background: var(--app-raised,#142b46); box-shadow: inset 0 0 0 1px var(--app-accent,#82b7ff); }
+.welcome-panel button[aria-pressed="true"] { border-color: var(--app-accent); background: var(--app-raised); box-shadow: inset 0 0 0 1px var(--app-accent); }
 @media (max-width: 680px) and (orientation: portrait) {
   .welcome-layout { grid-template-columns: minmax(0, 1fr); align-content: center; }
   .welcome-art img { width: min(29vw, 13svh); }
@@ -90,7 +90,7 @@
 .welcome-layout[data-step="characters"] .welcome-panel{width:min(92vw,860px)}
 .welcome-layout[data-step="characters"] .welcome-characters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:.75rem}
 .welcome-layout[data-step="characters"] .welcome-character{display:grid;grid-template-columns:minmax(100px,42%) minmax(0,1fr);align-items:center;justify-items:stretch;gap:clamp(10px,2vw,25px);text-align:left;padding:clamp(8px,1.5vw,18px);background:var(--app-panel);border:1px solid var(--app-line);min-height:150px}
-.welcome-layout[data-step="characters"] .welcome-character .character-portrait{width:100%;height:auto;max-width:none;aspect-ratio:1;object-fit:cover;background:var(--app-raised);border:1px solid var(--app-line)}
+.welcome-layout[data-step="characters"] .welcome-character .character-portrait{width:100%;height:auto;max-width:none;aspect-ratio:1;object-fit:cover;}
 .welcome-character-details{min-width:0;display:grid;gap:5px;align-content:center}
 .welcome-character-details strong{font-size:clamp(18px,2.6vw,31px);line-height:1.1}
 .welcome-character-details span{font-size:clamp(12px,1.4vw,16px);color:var(--app-text)}
@@ -98,5 +98,10 @@
 .welcome-layout[data-step="characters"] .welcome-actions{justify-content:flex-end}
 @media(max-height:500px) and (orientation:landscape){.welcome-layout[data-step="characters"] .welcome-character{min-height:100px;grid-template-columns:minmax(85px,28%) 1fr}.welcome-character-details strong{font-size:18px}}
 
-.welcome-layout[data-authenticated="true"][data-step="welcome"]{grid-template-columns:minmax(0,1fr);align-content:center}
-.welcome-layout[data-authenticated="true"][data-step="welcome"] .welcome-art{display:none}
+.welcome-layout[data-session-pending]{grid-template-columns:minmax(0,1fr);align-content:center}
+.welcome-layout[data-session-pending] .welcome-art{display:none}
+
+.welcome-layout[data-step="account"] { grid-template-columns: 1fr; }
+.welcome-layout[data-step="account"] .welcome-art { display: none; }
+.welcome-layout[data-step="account"] .welcome-panel { display: grid; gap: .6rem; width: min(100%, 36rem); }
+.welcome-panel .alpha-account-panel { position: static; width: 100%; overflow: visible; }

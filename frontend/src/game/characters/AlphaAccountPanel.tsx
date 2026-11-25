@@ -1,13 +1,30 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
 import { useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
 import { signOutPlayerProfile } from "../../net/socialClient";
 import { alphaAction, alphaSession, type AlphaSession } from "../../net/stagingAccount";
+import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
 import { styleName } from "../characters/characterStyles";
-import { CharacterPortrait } from "../characters/CharacterPortrait";
+import { ProfilePortrait } from "../characters/CharacterPortrait";
 import "./alphaAccountPanel.css";
 
 type Tab = "profile" | "account";
+
+type Setting = "email" | "security" | "delete";
+
+function AccountRow({ label, value, icon, expanded, onToggle, children }: {
+  label: string; value?: string; icon: MenuIconName; expanded: boolean; onToggle: () => void; children: ReactNode;
+}) {
+  const id = useId();
+  return <section className="alpha-setting" data-setting={icon}>
+    <div data-controller-row>
+      <button type="button" className="alpha-setting-toggle" onClick={onToggle} aria-expanded={expanded} aria-controls={id}>
+        <MenuIcon name={icon} /><span><strong>{label}</strong>{value && <small>{value}</small>}</span>
+      </button>
+    </div>
+    <div id={id} hidden={!expanded}>{expanded && children}</div>
+  </section>;
+}
 
 export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   const player = useSocialStore(s => s.view?.profile);
@@ -17,6 +34,7 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   const [unavailable, setUnavailable] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
+  const [openSetting, setOpenSetting] = useState<Setting | null>(null);
   const [inviteUrl, setInviteUrl] = useState("");
 
   useEffect(() => {
@@ -48,6 +66,11 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
     } finally { setBusy(false); }
   }
 
+  function toggle(setting: Setting) {
+    setOpenSetting(current => current === setting ? null : setting);
+    setMessage("");
+  }
+
   async function logout() {
     if (busy) return;
     setBusy(true);
@@ -63,46 +86,51 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   return <section className="alpha-account-panel menu-panel-frame" aria-label={tab === "profile" ? "Character profile" : "Account settings"} data-controller-rows>
     {tab === "profile" ? <>
       <div className="alpha-profile-hero">
-        <div className="alpha-profile-portrait"><CharacterPortrait choice={active?.appearance ?? player?.progression?.character} label={active?.name ?? player?.name ?? "Player portrait"} welcomePreview="selected" /></div>
+        <ProfilePortrait choice={active?.appearance ?? player?.progression?.character} label={active?.name ?? player?.name ?? "Player portrait"} welcomePreview="selected" />
         <div className="alpha-profile-facts">
           <strong>{active?.name ?? player?.name ?? "Player"}</strong>
           <span>{active ? styleName(active.style) : "Your character"}</span>
           <span>Level {active?.level ?? 1}</span>
-          <small>{player?.characters?.length ?? 0} saved character(s)</small>
-          {session && <small>{session.email}</small>}
+          <small>{player?.characters?.length ?? 0} saved {player?.characters?.length === 1 ? "character" : "characters"}</small>
         </div>
       </div>
       {session?.admin && <section className="alpha-profile-invite">
         <h2>Alpha tester invites</h2>
-        <p>Invite another tester to this private staging build.</p>
         <form onSubmit={event => void submit(event, "testers/invite")}>
-          <label>Email <input name="email" type="email" maxLength={254} autoComplete="off" required /></label>
-          <button type="submit" className="menu-control" disabled={busy}>Create invite</button>
+          <label data-controller-row>Email <input name="email" type="email" maxLength={254} autoComplete="off" required /></label>
+          <div data-controller-row><button type="submit" className="menu-control" disabled={busy}>Create invite</button></div>
         </form>
-        {inviteUrl && <label>Private invitation link
+        {inviteUrl && <label data-controller-row>Private invitation link
           <input value={inviteUrl} readOnly onFocus={event => event.currentTarget.select()} />
         </label>}
       </section>}
       {session && !session.admin && <p className="alpha-account-hint">Alpha invitations are managed by the game master.</p>}
     </> : <>
-      <h2>Email & account</h2>
-      {session && <p>Signed in as <strong>{session.email}</strong></p>}
-      {session && <form onSubmit={event => void submit(event, "account/email-request")}>
-        <label>New email <input name="newEmail" type="email" maxLength={254} autoComplete="email" required /></label>
-        <label>Current password <input name="password" type="password" autoComplete="current-password" required /></label>
-        <button type="submit" className="menu-control" disabled={busy}>Request email change</button>
-        <small>Email changes require verification; your old email remains active until reviewed.</small>
-      </form>}
-      {session && <section className="alpha-account-danger">
-        <h2>Profile deletion</h2>
-        <p>Request permanent removal for review. This does not immediately delete characters or worlds.</p>
-        <form onSubmit={event => void submit(event, "account/delete-request")}>
-          <label>Type your account email <input name="confirmEmail" type="email" maxLength={254} autoComplete="off" required /></label>
-          <label>Current password <input name="password" type="password" autoComplete="current-password" required /></label>
-          <button type="submit" className="menu-control" disabled={busy}>Request profile deletion</button>
-        </form>
-      </section>}
-      {session && <button type="button" className="menu-control" disabled={busy} onClick={() => void logout()}>Log out</button>}
+      {session && <>
+        <AccountRow label="Email" value={session.email} icon="email" expanded={openSetting === "email"} onToggle={() => toggle("email")}>
+          <form onSubmit={event => void submit(event, "account/email-request")}>
+            <label data-controller-row>New email <input name="newEmail" type="email" maxLength={254} autoComplete="email" required /></label>
+            <label data-controller-row>Current password <input name="password" type="password" autoComplete="current-password" required /></label>
+            <small>Your current email stays active until the change is verified.</small>
+            <div data-controller-row><button type="submit" className="menu-control" disabled={busy}>Request email change</button></div>
+          </form>
+        </AccountRow>
+        <AccountRow label="Sign-in & security" icon="lock" expanded={openSetting === "security"} onToggle={() => toggle("security")}>
+          <div className="alpha-setting-body" data-controller-row>
+            <p>Two-factor authentication is {session.hasMfa ? "enabled" : "off"}.</p>
+            {!session.hasMfa && <button type="button" className="menu-control" onClick={() => window.location.assign("/__alpha/account#two-factor")}>Set up authenticator</button>}
+          </div>
+        </AccountRow>
+        <AccountRow label="Delete profile" icon="trash" expanded={openSetting === "delete"} onToggle={() => toggle("delete")}>
+          <form onSubmit={event => void submit(event, "account/delete-request")}>
+            <small>An operator reviews your request before deleting your profile.</small>
+            <label data-controller-row>Confirm your email <input name="confirmEmail" type="email" maxLength={254} autoComplete="off" required /></label>
+            <label data-controller-row>Current password <input name="password" type="password" autoComplete="current-password" required /></label>
+            <div data-controller-row><button type="submit" className="menu-control" disabled={busy}>Request profile deletion</button></div>
+          </form>
+        </AccountRow>
+        <div data-controller-row><button type="button" className="menu-control" disabled={busy} onClick={() => void logout()}>Log out</button></div>
+      </>}
     </>}
     {unavailable && <p role="status" className="alpha-account-hint">{unavailable}
       {" "}<a href="/__alpha/account">Open account portal</a>
