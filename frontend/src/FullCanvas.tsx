@@ -1,6 +1,7 @@
+import { setGaragePreview } from "./game/preview/LiveGarage";
 import { useUIStore } from "./store/menus";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { useEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { useRenderSettingsStore } from "./store/presentation/renderSettingsStore";
 import { PerformanceProbe } from "./performance/PerformanceProbe";
 
@@ -69,6 +70,29 @@ export function FullCanvas({
   const reducedMotion = usePreferencesStore(s => s.reducedMotion);
   const compact = useSyncExternalStore(subscribeViewport, compactViewport, () => false) && preview;
   const demand = authoring || paused || (preview && (compact || reducedMotion));
+  const previewSlot = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    if (!preview) return;
+    setGaragePreview({
+      demand, shadows: shadows && !compact, dpr: compact ? Math.min(dpr, 1) : dpr,
+      contents: <>
+        {roomReady && <RevealPreview />}
+        {compact && !paused && !reducedMotion && <PreviewFrameClock />}
+        <ScoreboardSceneCover /><PerformanceProbe />{children}
+      </>,
+    });
+  }, [preview, demand, compact, shadows, dpr, roomReady, paused, reducedMotion, children]);
+  useLayoutEffect(() => {
+    if (!preview) return;
+    const room = document.querySelector<HTMLElement>("[data-live-garage]");
+    const home = document.querySelector(".garage-menu-backdrop");
+    if (room) previewSlot.current?.append(room);
+    return () => {
+      setGaragePreview(null);
+      if (room && home) home.append(room);
+    };
+  }, [preview]);
+  if (preview) return <div ref={previewSlot} className="garage-preview-slot" aria-hidden="true" />;
   return (
     <div
       style={{
@@ -84,8 +108,7 @@ export function FullCanvas({
       }}
     >
       <Canvas
-        className={preview ? "garage-canvas" : undefined}
-        frameloop={covered && preview ? "never" : demand ? "demand" : "always"}
+        frameloop={demand ? "demand" : "always"}
         camera={{ position: [0, 10, 20], fov: 50, far: 2000 }}
         dpr={compact ? Math.min(dpr, 1) : dpr}
         shadows={shadows && !compact}
@@ -96,8 +119,6 @@ export function FullCanvas({
           failIfMajorPerformanceCaveat: false,
         }}
       >
-        {preview && roomReady && <RevealPreview />}
-        {compact && !covered && !paused && !authoring && !reducedMotion && <PreviewFrameClock />}
         <ScoreboardSceneCover />
         <PerformanceProbe />
         {children}

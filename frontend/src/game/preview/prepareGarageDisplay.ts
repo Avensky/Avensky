@@ -1,4 +1,5 @@
 import { Material, Mesh, MeshStandardMaterial, type Object3D } from "three";
+import { fitMechanicsFloor } from "./mechanicsFloor.ts";
 import { tagGarageAccent } from "../../theme/garageLighting.ts";
 
 // Presentation edits from the source model's Sketchfab viewer are absent from
@@ -56,17 +57,22 @@ export function prepareGarageDisplay(scene: Object3D) {
         material.emissiveIntensity = 1.55;
         break;
       case "Sol cubique":
-        material.color.setRGB(0.005, 0.005, 0.006);
-        material.metalness = 1;
-        material.roughness = 0.08;
+        material.color.set("#3b332d");
+        material.metalness = .42;
+        material.roughness = .42;
         break;
       case "Sol_CAR":
         material.color.setRGB(0.008, 0.008, 0.009);
         material.metalness = 1;
         material.roughness = 0.2;
         break;
-      case "Fond":
       case "Murs":
+        material.userData.garageSurface = "garage-wall";
+        material.metalness = .1;
+        material.roughness = .78;
+        break;
+      case "Fond":
+        material.userData.garageSurface = "garage-panel";
         material.color.setRGB(0.075, 0.08, 0.095);
         material.metalness = 0.4;
         material.roughness = 0.24;
@@ -107,6 +113,7 @@ export function prepareGarageDisplay(scene: Object3D) {
       ? object.material.map(prepare)
       : prepare(object.material);
   });
+  const disposeFloor = fitMechanicsFloor(root);
   // The front bank only contains 999. The rear bank contains complete zero
   // segments. Reuse one in the vacant first socket of the front bank.
   const zero = root.getObjectByName("Cube026");
@@ -124,6 +131,6 @@ export function prepareGarageDisplay(scene: Object3D) {
   // copies are owned by this display, including on selection-screen remounts.
   return {
     root,
-    dispose: () => materials.forEach((material) => material.dispose()),
+    dispose: () => { disposeFloor?.(); materials.forEach(material => material.dispose()); },
   };
 }

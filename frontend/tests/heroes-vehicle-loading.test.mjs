@@ -53,7 +53,7 @@ function stageFixture() {
           path === '@react-three/drei' || unrelated.includes(path.split('/').at(-1)) ? 'from "' + surfaces + '"' : original);
       }
       if (id.endsWith('/StagedVehiclePreviewModel.tsx') || id.endsWith('/VehiclePreviewModel.tsx'))
-        return source.replace(/from ["']@react-three\/drei["']/g, 'from "' + surfaces + '"');
+        return source.replace(/from ["'](?:@react-three\/drei|\.\.\/\.\.\/assets\/useAssetGLTF)["']/g, 'from "' + surfaces + '"');
     },
     resolveId(id) { if (id === surfaces) return '\0' + surfaces; },
     load(id) {
@@ -61,11 +61,12 @@ function stageFixture() {
         import { createElement, useLayoutEffect } from 'react';
         let load;
         export const setLoader = value => { load = value; };
-        export const useGLTF = path => load(path);
+        export const useGLTF = path => load(path), useAssetGLTF = useGLTF;
         export const Html = () => createElement('group', { name: 'missing-car' });
         export const GarageDriver = () => null, PerspectiveCamera = () => null;
         export const FittingMirrorDisplay = () => null, PreviewLoadingStatus = () => null;
         export const PreviewTurntable = ({ children, onReady }) => createElement('group', { ref: onReady }, children);
+        export const VehiclePlatform = () => null;
         export const GarageEnvironment = ({ onSettled }) => {
           useLayoutEffect(() => onSettled(), [onSettled]);
           return null;

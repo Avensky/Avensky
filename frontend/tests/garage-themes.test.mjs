@@ -1,8 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Group, Mesh, MeshStandardMaterial, PlaneGeometry, Texture } from "three";
-import { entryRoomGeometry } from "../src/game/welcome/entryRoomGeometry.ts";
-import { createGarageWalls } from "../src/game/preview/garageWalls.ts";
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry } from "three";
 import { prepareGarageDisplay } from "../src/game/preview/prepareGarageDisplay.ts";
 import { applyGarageLighting } from "../src/theme/garageLighting.ts";
 import { selectedGarageTheme, UI_THEMES } from "../src/theme/catalog.ts";
@@ -16,49 +14,46 @@ test("new rooms use Pit Wall while saved room and follow-interface choices persi
   assert.equal(selectedGarageTheme({ theme: "white", garageEffects: sanitizeGarageEffects({ theme: "forest" }) }), "forest");
 });
 
-test("all saved palettes repaint one set of inward-facing wall panels with the entry colors", () => {
-  const texture = new Texture();
-  const { mesh, dispose } = createGarageWalls(texture);
-  const { geometry, material } = mesh;
-  assert.equal(geometry.index.count / 3, 24);
-  assert.equal(geometry.groups.length, 3);
-  const normals = geometry.getAttribute("normal");
-  assert.equal(normals.getZ(0), 1);
-  assert.equal(normals.getX(4), -1);
+test("all garage themes recolor the authored walls in place", () => {
+  const source = new Group();
+  const geometry = new PlaneGeometry();
+  const material = new MeshStandardMaterial({ name: "Murs" });
+  source.add(new Mesh(geometry, material));
+  const display = prepareGarageDisplay(source);
+  const wall = display.root.children[0];
   for (const [theme, palette] of Object.entries(UI_THEMES)) {
-    applyGarageLighting(mesh, theme, false);
-    assert.equal(mesh.geometry, geometry);
-    for (const surface of material) {
-      assert.equal("#" + surface.color.getHexString(), palette[surface.userData.garageSurface]);
-      assert.equal(surface.map, texture);
-    }
+    applyGarageLighting(display.root, theme, false);
+    assert.equal(wall.geometry, geometry);
+    assert.equal("#" + wall.material.color.getHexString(), palette["garage-wall"]);
   }
-  let textureDisposals = 0;
-  texture.addEventListener("dispose", () => textureDisposals++);
-  dispose();
-  assert.equal(textureDisposals, 0);
-  texture.dispose();
+  assert.equal(material.color.getHex(), 0xffffff);
+  display.dispose();
+  material.dispose();
+  geometry.dispose();
 });
 
-test("the shared room draws only the adjoining back and left walls from the authored garage", () => {
-  const wall = createGarageWalls(new Texture());
-  const { geometry } = wall.mesh;
-  const { vertices, solidCount, glowCount } = entryRoomGeometry();
-  const position = geometry.getAttribute("position");
-  const uv = geometry.getAttribute("uv");
-  let start = 0;
-  for (let i = 0; i < geometry.index.count; i++) {
-    const side = Math.floor(i / 6) % 4;
-    if (side !== 0 && side !== 3) continue;
-    const index = geometry.index.getX(i);
-    assert.deepEqual(Array.from(vertices.subarray(start, start + 3)), [position.getX(index), position.getY(index), position.getZ(index)]);
-    assert.deepEqual(Array.from(vertices.subarray(start + 6, start + 8)), [uv.getX(index), uv.getY(index)]);
-    start += 9;
-  }
-  assert.equal(vertices[start + 8], 3, "the floor follows exactly six wall panels");
-  assert.ok(glowCount > 0);
-  assert.equal(vertices.length, 9 * (solidCount + glowCount));
-  wall.dispose();
+test("the workshop floor uses the authored slab under the removable vehicle platform", () => {
+  const source = new Group();
+  const geometry = new BufferGeometry();
+  geometry.setAttribute("position", new Float32BufferAttribute([
+    0,0,0, 2,0,0, 0,0,2, 0,0,0, 0,2,0, 2,0,0,
+  ], 3));
+  const shell = new Mesh(geometry, new MeshStandardMaterial({ name: "Fond" }));
+  shell.name = "BASE_Full";
+  const tiles = new Group();
+  tiles.name = "Sol_CUBE";
+  source.add(shell, tiles);
+  const display = prepareGarageDisplay(source);
+  const slab = display.root.getObjectByName("BASE_Full");
+  assert.deepEqual(slab.geometry.groups.map(({ materialIndex }) => materialIndex), [1, 0]);
+  assert.equal(slab.material[1].name, "Sealed workshop concrete");
+  assert.ok(slab.material[1].roughness > .8);
+  assert.equal(display.root.getObjectByName("Sol_CUBE").visible, false);
+  assert.equal(tiles.visible, true);
+  assert.equal(geometry.groups.length, 0);
+  display.dispose();
+  geometry.dispose();
+  shell.material.dispose();
 });
 
 test("the 0999 counter borrows the original zero segments across nested author transforms", () => {

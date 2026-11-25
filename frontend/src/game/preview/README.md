@@ -1,6 +1,6 @@
 # Vehicle-selection garage
 
-The login and pre-game menus share one garage in GarageMenuBackdrop. VehiclePreview.tsx owns the interactive camera and turntable. GarageEnvironment.tsx lights the actors on a transparent canvas above the cached room. VehiclePreviewModel.tsx normalizes lineup presentation.
+Sign-in, character selection, the Play menu, and Heroes share the live `/models/world/garage_special.glb` object. `LiveGarage.tsx` owns the canvas, the room and the entry camera. `prepareGarageDisplay.ts` applies material changes to the authored meshes. Changes here apply to every garage screen. VehiclePreview adds its actors, camera and optional turntable to that same scene. The empty room renders on demand. Its mechanics floor uses the original continuous slab in BASE_Full. The vehicle owns the display disk and its reflection, so removing the car exposes the same slab.
 
 ## How to edit
 

@@ -14,7 +14,7 @@ lib=/usr/local/lib/avensky/staging-access
 if [[ ${1:-} == --ui-only ]]; then
   # Refresh an already installed portal from the same revision as its public assets.
   systemctl is-active --quiet avensky-alpha-access.service
-  for asset in garage-room.js garage-wall-finish.webp sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+  for asset in garage-runtime.json sign-in-navigation.js sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     [[ -s $web/images/$asset ]]
   done
   backup=$(mktemp -d /root/avensky-sign-in-ui-XXXXXXXX)
@@ -39,9 +39,15 @@ if [[ ${1:-} == --ui-only ]]; then
   url=http://127.0.0.1:9061
   curl --noproxy '*' --retry 8 --retry-all-errors --retry-delay 1 -fsS "$url/sign-in" -o "$backup/login.html"
   grep -q '/__alpha/entry/sign-in-input.js' "$backup/login.html"
-  for asset in garage-room.js garage-wall-finish.webp sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+  for asset in garage-room.js sign-in-navigation.js sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     curl --noproxy '*' -fsS "$url/__alpha/entry/$asset" -o /dev/null
   done
+  # Exercise the same unsigned model request the browser makes, through the local staging vhost.
+  garage_path=$(node -p 'JSON.parse(require("node:fs").readFileSync(process.argv[1],"utf8")).model' "$web/images/garage-runtime.json")
+  [[ $garage_path =~ ^/__staging-assets/[[:xdigit:]]{64}/models/world/garage_special[.]glb$ ]]
+  curl --noproxy '*' --resolve staging.avensky.com:443:127.0.0.1 --range 0-3 -fsS \
+    "https://staging.avensky.com$garage_path" -o "$backup/garage-header"
+  [[ $(head -c 4 "$backup/garage-header") == glTF ]]
   trap - ERR
   echo "Sign-in UI updated to $commit. Previous files: $backup"
   exit 0
@@ -182,11 +188,11 @@ fi
 "${migration[@]}" /usr/bin/node "$lib/portal.mjs" consolidate-access "$source_arg"
 systemctl start avensky-alpha-access
 curl --noproxy '*' --retry 8 --retry-all-errors --retry-delay 1 -fsS http://127.0.0.1:9061/sign-in -o "$candidate/login.html"
-grep -q 'garage-entry-photo' "$candidate/login.html"
+grep -q 'data-live-garage' "$candidate/login.html"
 # Preserve the original Caddyfile ownership and mode.
 cat "$candidate/Caddyfile" > "$config"
 systemctl reload caddy
 curl --noproxy '*' --resolve staging.avensky.com:443:127.0.0.1 -fsS https://staging.avensky.com/sign-in -o "$candidate/public.html"
-grep -q 'garage-entry-photo' "$candidate/public.html"
+grep -q 'data-live-garage' "$candidate/public.html"
 trap - ERR
 echo "Staging is serving the garage at https://staging.avensky.com/sign-in"

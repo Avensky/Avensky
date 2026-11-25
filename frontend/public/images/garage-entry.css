@@ -10,33 +10,9 @@
   position: fixed; inset: 0; overflow: hidden; pointer-events: none;
   background: var(--app-background);
 }
-.garage-entry-plate {
-  position: absolute; width: max(100%, 216.67svh); aspect-ratio: 19.5 / 9;
-  left: 50%; top: 50%; transform: translate(-50%,-50%);
-}
-.garage-entry-photo { display:block; width:100%; height:100%; }
-.garage-entry-scene::after {
-  content: ""; position: absolute; inset: 0;
-  background: linear-gradient(90deg, transparent 30%, rgb(3 8 13 / .16) 70%, rgb(3 8 13 / .40));
-}
-.garage-entry-plate { isolation: isolate; }
-.garage-entry-finish {
-  position: absolute; inset: 0; mix-blend-mode: multiply;
-  mask: url("./garage-wall-mask.4688e14d5cc9.webp") left / 300% 100% no-repeat;
-}
-.garage-entry-panels { background-color: var(--app-garage-panel); }
-.garage-entry-stripe { mask-position: center; background-color: var(--app-garage-stripe); }
-.garage-entry-walls { mask-position: right; background-color: var(--app-garage-wall); }
-avensky-garage-room.garage-entry-scene { display: block; user-select: none; background: var(--app-background, #201a16); }
-avensky-garage-room.garage-entry-scene::after { content: none; }
-avensky-garage-room .garage-entry-photo, avensky-garage-room > canvas {
-  position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover;
-}
-avensky-garage-room[data-ready] .garage-entry-photo { visibility: hidden; }
-@view-transition { navigation: auto; }
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(*) { animation-duration: 0s; }
-}
+[data-live-garage] { display:block; pointer-events:none; user-select:none; background:var(--app-background, #201a16); }
+[data-live-garage]:has(.garage-canvas) { pointer-events:auto; }
+[data-live-garage] canvas { display:block; }
 .garage-entry-header.angled-tab-header {
   z-index: 1;
   pointer-events: none;
@@ -53,13 +29,10 @@ avensky-garage-room[data-ready] .garage-entry-photo { visibility: hidden; }
 }
 .garage-entry-card {
   box-sizing: border-box; position: relative; isolation: isolate; width: min(100%,clamp(290px,40vw,475px));
-  padding: clamp(17px,2.4vw,34px); --corner: 11px;
-  --card-cut: polygon(var(--corner) 0,calc(100% - var(--corner)) 0,100% var(--corner),100% calc(100% - var(--corner)),calc(100% - var(--corner)) 100%,var(--corner) 100%,0 calc(100% - var(--corner)),0 var(--corner));
+  padding: clamp(17px,2.4vw,34px);
 }
-.garage-entry-card::before,.garage-entry-card::after {
-  content: ""; position: absolute; z-index: -1; inset: 0; clip-path: var(--card-cut); background: var(--app-line);
-}
-.garage-entry-card::after { inset: 1px; background: color-mix(in srgb,var(--app-background) 78%,var(--app-panel)); }
+.garage-entry-card:has(.garage-credentials) { background:transparent; border:0; box-shadow:none; }
+.garage-entry-card:not(:has(.garage-credentials)) { background:color-mix(in srgb,var(--app-panel) 68%,transparent); }
 .garage-credentials { display: grid; gap: .67rem; margin: 0; }
 .garage-credentials fieldset { display: grid; gap: .67rem; min-width: 0; padding: 0; border: 0; margin: 0; }
 .garage-field { display: flex; align-items: center; position: relative; min-width: 0; }
@@ -102,7 +75,6 @@ avensky-garage-room[data-ready] .garage-entry-photo { visibility: hidden; }
 .garage-entry-card p { margin:.4rem 0; }
 .garage-entry-card [role="alert"] { border-inline-start:2px solid var(--app-accent); padding-inline-start:.7rem; }
 @media (max-width:600px) and (orientation:portrait) {
-  .garage-entry-plate { transform: translate(-40%, -50%); }
   .garage-entry-body { align-items:end; justify-items:center; padding:1rem 1rem max(2rem,env(safe-area-inset-bottom)); }
   .garage-entry-card { width:min(100%,390px); }
 }
@@ -133,3 +105,6 @@ html[data-ui-theme] .garage-menu-backdrop:not([hidden]) ~ .game-wrapper :is(.men
 html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hidden]) ~ .game-wrapper .menu-frame[role=dialog] {
   background: color-mix(in srgb, var(--app-background) 76%, transparent);
 }
+
+.garage-credentials .garage-field input { background:color-mix(in srgb,var(--app-panel) 72%,transparent); }
+.garage-recovery :is(a,summary,button) { text-shadow:0 1px 3px #000; }

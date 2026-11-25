@@ -46,21 +46,6 @@ canvas {
     var(--app-background) 75%
   );
 }
-.garage-canvas canvas {
-  opacity: 0;
-  transition: opacity 160ms ease-out;
-}
-.garage-canvas canvas[data-preview-ready="true"] {
-  opacity: 1;
-}
-html[data-reduce-motion="true"] .garage-canvas canvas {
-  transition: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  .garage-canvas canvas {
-    transition: none;
-  }
-}
 .MainMenu,
 .PauseMenu,
 .SettingsMenu,
@@ -77,3 +62,6 @@ html[data-reduce-motion="true"] .garage-canvas canvas {
 .garage-loading-muted { color: var(--app-muted); }
 .garage-loading-track { background: var(--app-raised); border-color: var(--app-line); }
 .garage-loading-fill { background: var(--app-accent); }
+
+/* Put the shared canvas at the interactive stage’s pointer depth. */
+.garage-preview-slot { position:fixed; inset:0; z-index:0; }

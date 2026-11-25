@@ -15,7 +15,7 @@ const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
 const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.meta.url);
 const themes = JSON.parse(readFileSync(existsSync(sourcePalettes) ? sourcePalettes : new URL("./palettes.json", import.meta.url), "utf8"));
 const sourceEntry = new URL("../../frontend/src/theme/garageEntry.ts", import.meta.url);
-const { garageBackdrop, garageBrandHeader, garageCredentials, DEFAULT_GARAGE_THEME, GARAGE_ENTRY_PORTRAIT, GARAGE_ENTRY_MASK, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
+const { garageBackdrop, garageBrandHeader, garageCredentials, DEFAULT_GARAGE_THEME, GARAGE_MODEL_PATH } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
 const defaultColors = Object.entries(themes[DEFAULT_GARAGE_THEME])
   .filter(([key]) => key !== "label" && key !== "scheme")
   .map(([key, color]) => `--app-${key}:${key.startsWith("garage-") ? themes[DEFAULT_GARAGE_THEME][key] : color}`).join(";");
@@ -26,11 +26,14 @@ const entryImages = existsSync(sourceImages) ? sourceImages : new URL("file:///s
 // portal reads both the built module and the other assets from the published release.
 const controllerImages = existsSync(sourceImages) ? new URL("../../frontend/dist-staging/images/", import.meta.url) : entryImages;
 const entryAssets = new Map([
-  ["garage-room.js", "text/javascript"], ["garage-wall-finish.webp", "image/webp"],
+  ["sign-in-navigation.js", "text/javascript"],
   ["sign-in-input.js", "text/javascript"], ["sign-in-controller.js", "text/javascript"], ["sign-in-controller.css", "text/css"],
   ["logo.svg", "image/svg+xml"], ["entry-icons.svg", "image/svg+xml"],
-  [GARAGE_ENTRY_PORTRAIT, "image/webp"], [GARAGE_ENTRY_MASK, "image/webp"], [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
+  ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
 ]);
+// The release build enumerates the garage entry's static imports. Only its existing
+// GLB, its Draco decoder and those exact public modules may load before sign-in.
+const runtimeFile = new URL("garage-runtime.json", controllerImages);
 function paletteScript() {
   return `(() => {
     const themes = ${JSON.stringify(themes)};
@@ -44,7 +47,7 @@ function paletteScript() {
       if (room === "auto") garage = chosen;
       else if (Object.hasOwn(themes, room)) garage = room;
     } catch {}
-    try { localStorage.setItem(${JSON.stringify(GARAGE_ENTRY_STORAGE_KEY)}, ${JSON.stringify(GARAGE_ENTRY_POSTER)}); } catch {}
+    document.documentElement.dataset.garageTheme = garage;
     const palette = themes[chosen];
     const root = document.documentElement;
     root.dataset.uiTheme = chosen;
@@ -77,8 +80,8 @@ function page(title, contents, message = "", garage = false) {
 <script type="module" src="${base}/entry/garage-room.js"></script>
 <script src="${base}/theme.js"></script><link rel="stylesheet" href="${base}/entry/garage-entry.css">
 <script src="${base}/password.js" defer></script>
-<script src="${base}/entry/sign-in-input.js" defer></script></head><body class="garage-entry">
-${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card${garage ? "" : " garage-entry-account"}" data-controller-rows aria-label="${escape(title)}">
+<script src="${base}/entry/sign-in-input.js" defer></script><script src="${base}/entry/sign-in-navigation.js" defer></script></head><body class="garage-entry">
+${garageBackdrop()}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card${garage ? "" : " garage-entry-account"}" data-controller-rows aria-label="${escape(title)}">
 ${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}
 </section></main></body></html>`;
 }
@@ -109,7 +112,23 @@ async function readForm(req) {
   return key => fields.get(key) ?? "";
 }
 
-export function createPortal({ origin, accounts, mailInvite, game }) {
+export function createPortal({ origin, accounts, mailInvite, game, garageManifest = runtimeFile }) {
+  let liveGarage, checkedAt = 0;
+  function garageRuntime() {
+    if (Date.now() - checkedAt < 1000) return liveGarage;
+    checkedAt = Date.now();
+    try {
+      const parsed = JSON.parse(readFileSync(garageManifest, "utf8"));
+      if (!Array.isArray(parsed.modules) || !parsed.modules.includes(parsed.entry) ||
+          !parsed.modules.every(path => typeof path === "string" && /^\/assets\/[\w.-]+\.js$/.test(path)) ||
+          typeof parsed.model !== "string" || !parsed.model.endsWith(GARAGE_MODEL_PATH) ||
+          !/^\/__staging-assets\/[a-f0-9]{64}$/.test(parsed.model.slice(0, -GARAGE_MODEL_PATH.length))) throw Error("Invalid garage release");
+      liveGarage = { entry: parsed.entry, paths: new Set([...parsed.modules, parsed.model,
+        "/draco/draco_wasm_wrapper.js", "/draco/draco_decoder.wasm", "/draco/draco_decoder.js"]) };
+    } catch { liveGarage = undefined; }
+    return liveGarage;
+  }
+
   if (new URL(origin).protocol !== "https:" || new URL(origin).origin !== origin)
     throw Error("Use the HTTPS origin of the staging site.");
   const attempts = new Map();
@@ -193,7 +212,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       res.writeHead(status, {
         // A same-origin form submission needs its Origin header for the check below.
         "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store", "Referrer-Policy": "same-origin",
-        "Content-Security-Policy": "default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self'; media-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'",
+        "Content-Security-Policy": `default-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'wasm-unsafe-eval'; worker-src 'self' blob:; connect-src 'self' ${origin.replace('https:', 'wss:')}; img-src 'self' blob: data:; font-src 'self' data:; media-src 'self' blob:; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
         "X-Content-Type-Options": "nosniff", ...headers,
       });
       res.end(body);
@@ -215,6 +234,8 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
       if (path === base + "/verify") {
         if (viewer) return send(204);
         const requested = req.headers["x-forwarded-uri"] ?? "";
+        if (typeof requested === "string" && (requested.startsWith("/assets/") || requested.startsWith("/draco/") || requested.startsWith("/__staging-assets/")) &&
+            garageRuntime()?.paths.has(requested)) return send(204);
         return requested.startsWith("/") && !requested.startsWith("/__staging-assets/")
           && req.headers.accept?.includes("text/html") ? redirect(signInPath) : send(401);
       }
@@ -247,13 +268,17 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         }`, { "Content-Type": "text/javascript; charset=utf-8" });
       if (path.startsWith(base + "/entry/")) {
         const name = path.slice((base + "/entry/").length);
+        if (name === "garage-room.js") {
+          const runtime = garageRuntime();
+          return runtime ? redirect(runtime.entry) : send(503);
+        }
         const type = entryAssets.get(name);
         if (!type) return send(404);
-        const file = new URL(name, (name === "garage-room.js" || name.startsWith("sign-in-controller.")) ? controllerImages : entryImages);
+        const file = new URL(name, name.startsWith("sign-in-controller.") ? controllerImages : entryImages);
         try {
           const info = await stat(file);
           const etag = `W/"${info.size}-${Math.trunc(info.mtimeMs)}"`;
-          const headers = { "Content-Type": type, "Cache-Control": (name === GARAGE_ENTRY_POSTER || name === GARAGE_ENTRY_PORTRAIT || name === GARAGE_ENTRY_MASK) ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
+          const headers = { "Content-Type": type, "Cache-Control": "public, max-age=300", ETag: etag };
           if (req.headers["if-none-match"] === etag) return send(304, "", headers);
           return send(200, await readFile(file), headers);
         } catch { return send(404); }

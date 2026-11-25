@@ -1,23 +1,15 @@
 import { useEffect, useLayoutEffect, useMemo } from "react";
 import { Environment, Lightformer } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
-import { Box3, BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
+import { BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
 import { selectedGarageTheme } from "../../theme/catalog";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { applyGarageLighting, SELECTION_CRIMSON, tagGarageAccent } from "../../theme/garageLighting";
 import { GarageFloorReflection } from "./GarageFloorReflection";
 import { GarageGlow } from "./GarageGlow";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
-import { wallCorners, wallCourses, wallHeight } from "./garageWallLayout";
-import { ShowroomLights } from "./Showroom";
 import { isCompactPreview } from "./previewBudget";
-
 const origin = new Vector3();
-const scale = .06;
-const cameraBounds = new Box3(
-  new Vector3(wallCorners[0][0] * scale, 0, wallCorners[0][1] * scale),
-  new Vector3(wallCorners[2][0] * scale, wallHeight * wallCourses[2].top * scale, wallCorners[2][1] * scale),
-);
 
 function createDisplayPlatform(center: Vector3, floorY: number, radius: number) {
   const platform = new Group();
@@ -103,29 +95,35 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
   } };
 }
 
-// Only interactive objects are drawn on this canvas. The shared garage stays visible underneath.
-export function GarageEnvironment({ turntable, showPlatform, onSettled, selectionLighting, floorCaptureRate }: {
-  turntable: Group | null;
-  showPlatform: boolean;
-  onSettled: () => void;
+// Actors and the optional turntable share the authored garage scene and its active camera.
+export function VehiclePlatform({ turntable, selectionLighting, floorCaptureRate }: {
+  turntable: Group;
   selectionLighting: boolean;
   floorCaptureRate?: number;
 }) {
-  const compact = useThree(state => isCompactPreview(state.size.width));
+  const scene = useThree(state => state.scene);
   const invalidate = useThree(state => state.invalidate);
   const theme = usePreferencesStore(selectedGarageTheme);
   const contrast = usePreferencesStore(state => state.highContrast);
   const brightness = usePreferencesStore(state => state.garageEffects.accentBrightness);
-  const reflections = usePreferencesStore(state => state.garageEffects.environmentReflections);
   const floorReflection = usePreferencesStore(state => state.garageEffects.floorReflections && state.garageEffects.reflectionStrength > 0);
   const radius = DEFAULT_PREVIEW_PLATFORM[0] / 2;
-  const stage = useMemo(() => showPlatform ? createDisplayPlatform(origin, 0, radius) : null, [showPlatform, radius]);
-  useEffect(() => () => stage?.dispose(), [stage]);
+  const stage = useMemo(() => createDisplayPlatform(origin, 0, radius), [radius]);
+  useEffect(() => () => stage.dispose(), [stage]);
   useLayoutEffect(() => {
-    if (stage) applyGarageLighting(stage.platform, theme, contrast, brightness * .64,
+    applyGarageLighting(stage.platform, theme, contrast, brightness * .64,
       selectionLighting && theme === "scarlet" ? SELECTION_CRIMSON : null);
     invalidate();
   }, [stage, theme, contrast, brightness, selectionLighting, invalidate]);
+  return <>
+    {createPortal(<primitive object={stage.platform} dispose={null} />, turntable)}
+    {floorReflection && createPortal(<GarageFloorReflection radius={radius} turntable={turntable} captureRate={floorCaptureRate} />, scene)}
+  </>;
+}
+
+export function GarageEnvironment({ onSettled }: { onSettled: () => void }) {
+  const compact = useThree(state => isCompactPreview(state.size.width));
+  const reflections = usePreferencesStore(state => state.garageEffects.environmentReflections);
   useLayoutEffect(onSettled, [onSettled]);
   // Capture softboxes once. Opening another menu never loads a second room model or HDR image.
   const softboxes = useMemo(() => reflections && (
@@ -136,11 +134,7 @@ export function GarageEnvironment({ turntable, showPlatform, onSettled, selectio
     </Environment>
   ), [compact, reflections]);
   return <>
-    <ShowroomLights />
     <GarageGlow />
-    <object3D name="garage-camera-envelope" userData={{ bounds: cameraBounds }} />
     {softboxes}
-    {turntable && stage && createPortal(<primitive object={stage.platform} dispose={null} />, turntable)}
-    {turntable && stage && floorReflection && <GarageFloorReflection radius={radius} turntable={turntable} captureRate={floorCaptureRate} />}
   </>;
 }

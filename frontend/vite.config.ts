@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { garageBackdrop, GARAGE_ENTRY_PORTRAIT, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } from "./src/theme/garageEntry.ts";
+import { garageBackdrop, GARAGE_MODEL_PATH } from "./src/theme/garageEntry.ts";
 import { build, defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -99,7 +99,8 @@ export default defineConfig(({ command, mode }) => {
   const release = staging ? stagingRelease(process.env.AVENSKY_PREBUILT_ASSETS) : null;
   return {
     publicDir: staging && command === "serve" ? false : undefined,
-    define: assetDefines(release),
+    define: { ...assetDefines(release), __GARAGE_MODEL_URL__: JSON.stringify(release
+      ? "/__staging-assets/" + release.id + GARAGE_MODEL_PATH : GARAGE_MODEL_PATH) },
     // The road workbench has its own virtual bundle / preview build. Scanning all
     // preview HTML at app startup wasted work and attempted to resolve that bundle.
     optimizeDeps: { entries: ["index.html"] },
@@ -108,6 +109,7 @@ export default defineConfig(({ command, mode }) => {
       copyPublicDir: !staging,
       rollupOptions: {
         input: [
+          fileURLToPath(new URL("./src/game/welcome/garageRoomElement.ts", import.meta.url)),
           fileURLToPath(new URL("./index.html", import.meta.url)),
           fileURLToPath(new URL("./previews/wardrobe-asset.html", import.meta.url)),
         ],
@@ -121,26 +123,31 @@ export default defineConfig(({ command, mode }) => {
           order: "post",
           handler(html) {
             if (!html.includes("<!-- staging garage -->")) return html;
-            // Choose the warmed portal URL only when that portal published this exact room.
-            return html.replace("<!-- staging garage -->", `<template id="startup-garage">${garageBackdrop("/images")}</template>
-              <script>(function(){
-                const template=document.getElementById("startup-garage");
-                const room=template.content.firstElementChild;
-                try { if (localStorage.getItem(${JSON.stringify(GARAGE_ENTRY_STORAGE_KEY)}) === ${JSON.stringify(GARAGE_ENTRY_POSTER)}) {
-                  room.dataset.finish=room.dataset.finish.replace("/images/","/__alpha/entry/");
-                  room.querySelector("source").srcset="/__alpha/entry/"+${JSON.stringify(GARAGE_ENTRY_PORTRAIT)};
-                  room.querySelector("img").src="/__alpha/entry/"+${JSON.stringify(GARAGE_ENTRY_POSTER)};
-                } } catch {}
-                template.replaceWith(room);
-              })();</script>`);
+            return html.replace("<!-- staging garage -->", garageBackdrop());
           },
         },
       },
       release && {
         name: "staging-public-files",
+        generateBundle(_, bundle) {
+          const entry = Object.values(bundle).find(chunk => chunk.type === "chunk" && chunk.isEntry &&
+            chunk.facadeModuleId?.endsWith("/game/welcome/garageRoomElement.ts"));
+          if (!entry || entry.type !== "chunk") throw new Error("Missing live garage entry");
+          const modules = new Set<string>();
+          function include(file: string) {
+            const chunk = bundle[file];
+            if (modules.has("/" + file) || !chunk || chunk.type !== "chunk") return;
+            modules.add("/" + file);
+            for (const dependency of chunk.imports) include(dependency);
+          }
+          include(entry.fileName);
+          this.emitFile({ type: "asset", fileName: "images/garage-runtime.json", source: JSON.stringify({
+            entry: "/" + entry.fileName, modules: [...modules], model: "/__staging-assets/" + release.id + GARAGE_MODEL_PATH,
+          }) });
+        },
         async writeBundle(options) {
-          // The portal serves only the small wall renderer and the optional controller menu.
-          for (const [name, entry] of [["sign-in-controller", "signInController.tsx"], ["garage-room", "garageRoomElement.ts"]]) await build({
+          // The optional controller keyboard is independent of the shared garage module graph.
+          for (const [name, entry] of [["sign-in-controller", "signInController.tsx"]]) await build({
             configFile: false, root: frontend, publicDir: false,
             define: { "process.env.NODE_ENV": JSON.stringify("production") },
             build: {

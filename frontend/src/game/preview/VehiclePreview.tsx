@@ -11,7 +11,7 @@ import { GarageDriver } from "../characters/GarageDriver";
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { StagedVehiclePreviewModel } from "./StagedVehiclePreviewModel";
-import { GarageEnvironment } from "./GarageEnvironment";
+import { GarageEnvironment, VehiclePlatform } from "./GarageEnvironment";
 import { PreviewTurntable } from "./PreviewTurntable";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
 import { useSocialStore } from "../../store/social/socialStore";
@@ -390,8 +390,7 @@ export function VehiclePreview({
   const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={vehicleMissing} cockpit={insideCar} visible={!characterOnly} />;
   return (
     <>
-      <GarageEnvironment turntable={turntable} selectionLighting={staging}
-        showPlatform={showPlatform} onSettled={roomSettled} floorCaptureRate={fittingRoom ? 12 : undefined} />
+      <GarageEnvironment onSettled={roomSettled} />
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
       <PerspectiveCamera ref={cameraRef} name="garage-preview-camera" makeDefault>
@@ -423,7 +422,9 @@ export function VehiclePreview({
                   platform={DEFAULT_PREVIEW_PLATFORM} model={vehicleId} driver={vehicleEmotes ? driver : garageDriver} previewPacks={vehicleEmotes}
                   motion={motion} onDriverFit={reportDriverFit} onSettled={vehicleReady} allowDriver={roomReady}
                   garageOpen={garageOpen} garageCameraAnchors={workshop} reducedMotion={reducedMotion} active={!characterOnly} diagnostics={!wardrobeOpen}
-                  summon={Boolean(settledVehicle && waitingForCar && !stationary && !reducedMotion)} />
+                  summon={Boolean(settledVehicle && waitingForCar && !stationary && !reducedMotion)}>
+                  {turntable && <VehiclePlatform turntable={turntable} selectionLighting={staging} floorCaptureRate={fittingRoom ? 12 : undefined} />}
+                </StagedVehiclePreviewModel>
               </Suspense>
             </AssetBoundary>}
           </group>
