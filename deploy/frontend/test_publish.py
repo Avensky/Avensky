@@ -64,6 +64,51 @@ class ReleaseTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     publish.check_staging_assets(verified, "c" * 64)
 
+    def test_operator_installed_release_by_id_without_ssh_config_change(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            legacy = root / "verified-staging.json"
+            legacy.write_text(json.dumps({"release": {"id": ASSETS}}))
+            current = "c" * 64
+            candidate = root / ("verified-" + current + ".json")
+            candidate.write_text(json.dumps({"release": {"id": current}}))
+            with patch.object(publish, "urlopen") as open_url:
+                open_url.return_value.__enter__.return_value.status = 206
+                open_url.return_value.__enter__.return_value.read.return_value = b"glTF"
+                publish.check_staging_assets(legacy, current)
+                self.assertIn(current, open_url.call_args.args[0].full_url)
+            candidate.unlink()
+            candidate.write_text(json.dumps({"release": {"id": ASSETS}}))
+            with self.assertRaisesRegex(ValueError, "different verified"):
+                publish.check_staging_assets(legacy, current)
+            candidate.unlink()
+            candidate.symlink_to(legacy)
+            with self.assertRaisesRegex(ValueError, "different verified"):
+                publish.check_staging_assets(legacy, current)
+
+    def test_gateway_manifest_directory_is_trusted_when_receiver_uses_legacy_path(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            assets = root / "gateway"
+            assets.mkdir()
+            legacy = root / "legacy" / "verified-staging.json"
+            legacy.parent.mkdir()
+            legacy.write_text(json.dumps({"release": {"id": ASSETS}}))
+            new_id = "c" * 64
+            candidate = assets / ("verified-" + new_id + ".json")
+            candidate.write_text(json.dumps({"release": {"id": new_id}}))
+            with (patch.object(publish, "STAGING_VERIFIED_ASSET_ROOT", assets),
+                  patch.object(publish, "urlopen") as open_url):
+                open_url.return_value.__enter__.return_value.status = 206
+                open_url.return_value.__enter__.return_value.read.return_value = b"glTF"
+                publish.check_staging_assets(legacy, new_id)
+                self.assertIn(new_id, open_url.call_args.args[0].full_url)
+            candidate.unlink()
+            candidate.symlink_to(legacy)
+            with patch.object(publish, "STAGING_VERIFIED_ASSET_ROOT", assets):
+                with self.assertRaisesRegex(ValueError, "different verified"):
+                    publish.check_staging_assets(legacy, new_id)
+
     def test_game_failure_keeps_previous_frontend_and_no_receipt(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)

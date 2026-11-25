@@ -21,6 +21,7 @@ MAX_ENTRIES = 20_000
 SHA = re.compile(r"[a-f0-9]{40}")
 RELEASE = re.compile(r"[a-f0-9]{64}")
 STAGING_MODEL = "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb"
+STAGING_VERIFIED_ASSET_ROOT = Path("/etc/avensky-assets")
 
 
 def unpack(stream, destination, staging):
@@ -53,9 +54,24 @@ def unpack(stream, destination, staging):
 def check_staging_assets(verified, release):
     if not isinstance(release, str) or not RELEASE.fullmatch(release):
         raise ValueError("The staging bundle has an invalid asset release ID")
+    # The legacy receiver still points at a trusted operator-owned file.
+    # New verified releases may be installed beside it under their sealed ID
+    # without editing the forced SSH key or weakening the gateway probe.
     manifest = json.loads(verified.read_text(encoding="utf-8"))
     if manifest["release"]["id"] != release:
-        raise ValueError("The bundle needs a different verified asset release")
+        filename = "verified-" + release + ".json"
+        # The gateway may use /etc/avensky-assets even when the older SSH
+        # receiver still points to /etc/avensky/verified-staging.json.
+        candidates = [verified.with_name(filename), STAGING_VERIFIED_ASSET_ROOT / filename]
+        for candidate in candidates:
+            if candidate.is_symlink() or not candidate.is_file():
+                continue
+            recorded = json.loads(candidate.read_text(encoding="utf-8"))
+            if recorded["release"]["id"] == release:
+                manifest = recorded
+                break
+        else:
+            raise ValueError("The bundle needs a different verified asset release")
     request = Request(
         "http://127.0.0.1:9060/__staging-assets/" + release + STAGING_MODEL,
         headers={"Range": "bytes=0-3"},

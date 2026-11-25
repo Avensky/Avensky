@@ -22,9 +22,12 @@ umask 077
 printf '%s\n' "${RELEASE_SSH_KEY:?}" > "$ssh_files/key"
 printf '%s\n' "${RELEASE_KNOWN_HOSTS:?}" > "$ssh_files/known_hosts"
 
+# The archive is supplied only by main's staging workflow. Its publisher always
+# checks the staging game inputs, skipping a restart if the code/catalog is unchanged.
+# The manually approved production workflow passes no archive and never touches the game.
 operation=publish-frontend
-if [[ ${STAGING_GAME_DEPLOY_ENABLED:-false} == true ]]; then
-  [[ -n ${2:-} ]] || { echo "The staging game requires a staging bundle." >&2; exit 1; }
+if [[ -n ${2:-} ]]; then
+  [[ -f $2 && -r $2 ]] || { echo "Cannot read the staging bundle" >&2; exit 1; }
   operation=publish-staging-with-game
 fi
 

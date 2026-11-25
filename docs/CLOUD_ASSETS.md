@@ -43,21 +43,40 @@ AVENSKY_PREBUILT_ASSETS="$PWD/frontend/.asset-release/prebuilt.json" npm --prefi
 
 The build rejects metadata when its tracked asset inventory or generator inputs and recipes changed. Runtime GLBs can embed textures or reference relative URLs to other assets in the same release. The verifier rejects external origins, missing sidecars and dependencies that escape the release route.
 
-### Fitted Vesper hairstyles
+### Approved private catalogs (hair, garments, future packs)
 
-The twelve standalone Espresso GLBs are distributed to the staging operator in a private pack. Their expected sizes and SHA-256 digests are in `packages/wardrobe-catalog/fitted-hair.json`. Use the pack matching these digests. The public repository contains the catalog and runtime code.
+All approved private assets are included automatically in staging. The checked-in registry
+`frontend/scripts/staging-private-asset-catalogs.json` lists metadata-only catalogs.
+Currently it includes:
 
-1. Upload the selected GLBs under `staging/objects/<sha256>` using the private bucket procedure below. The upload helper in the private pack checks the files against the catalog.
-2. On the verification host, generate the staging manifest from the same commit as the frontend. Set `AVENSKY_STAGING_FITTED_HAIR=hair-12` for the first style or `all` for all twelve. A comma-separated list enables a subset. Use the same selection for the build and for verification.
+- `packages/wardrobe-catalog/fitted-hair.json`: 12 fitted Vesper Espresso hairstyles.
+- `frontend/scripts/staging-fitted-assets.json`: fitted Space Buns, tennis dress and wedge sandals.
 
-   ```sh
-   AVENSKY_STAGING_FITTED_HAIR=all node --input-type=module -e \
-     'import {writeFileSync} from "node:fs"; import {stagingRelease} from "./frontend/scripts/staging-release.mjs"; writeFileSync("staging-with-hair.json", JSON.stringify(stagingRelease(process.env.AVENSKY_PREBUILT_ASSETS)));'
-   node deploy/staging-assets/verify.mjs staging-with-hair.json verified-staging-with-hair.json --models-root
-   ```
+For a future pack, commit a manifest containing only logical URLs, SHA-256 digests, and byte counts, then add its path to the registry. Both arrays of `{url, sha256, size, ...}` records and URL-to-`{sha256, size}` maps are supported. Do not commit commercial model bytes, and **do not create a feature-specific Actions variable**.
 
-3. Configure the gateway to serve the newly verified manifest alongside the previous release. Point the staging receiver's verified-manifest configuration at the new file. Set the GitHub repository Actions variable `STAGING_FITTED_HAIR` to the same selection, then run **Deploy to staging** on `main`. The existing receiver checks the manifest ID before switching the frontend. The game server build must include the updated wardrobe catalog to save the new IDs.
-4. Select Vesper, open **Character → Body → Hair**, equip a style, turn her head and reload the saved profile. Check hat clearance and color on the target phone. Her glasses, harnesses and bracer are under **Appearance → Accessories → All items**.
+1. From an authorized workstation, export the final GLBs, review licenses and hashes, and use the [private upload watcher](../scripts/assets/README.md) to send approved files to `staging/objects/<sha256>` in the private Lightsail bucket.
+2. **Before merging the catalog update to main**, generate a candidate manifest on an isolated checkout of the proposed commit. Do not change production or the existing staging checkout:
+
+   ~~~sh
+   node --input-type=module -e '
+     import {writeFileSync} from "node:fs";
+     import {stagingRelease} from "./frontend/scripts/staging-release.mjs";
+     const candidate = stagingRelease(process.env.AVENSKY_PREBUILT_ASSETS);
+     writeFileSync("staging-candidate.json", JSON.stringify(candidate));
+     console.log("Proposed asset release", candidate.id, Object.keys(candidate.assets).length);'
+   ~~~
+
+3. Verify the candidate from the trusted staging host using its read-only AWS identity. The verifier reuses trusted ETag proofs for unchanged assets in the existing verified release, and streams **all new or changed models** to validate hashes, byte lengths and dependencies. It writes an ETag-pinned manifest only if every needed check passes. The private gateway continues enforcing `If-Match` on each reused ETag:
+
+   ~~~sh
+   node deploy/staging-assets/verify.mjs staging-candidate.json verified-staging-candidate.json --models-root --reuse-verified /etc/avensky-assets/verified-tennis-alpha.json
+   ~~~
+
+4. Install the new verified file outside the web root, and serve **both the current and candidate releases** from the staging gateway, preserving open sessions. Ensure the local staging gateway returns HTTP 206 and `glTF` for the candidate hair byte-range request. Do not remove either previous verified manifest.
+5. Merge the reviewed change to `main`. The `Deploy to staging` workflow uses the registry by default, and the existing receiver refuses to publish unless the candidate release ID matches the verified staging gateway. The staging publisher also checks and deploys the matching Rust game server from the same `main` commit, skipping Docker restarts when the server and wardrobe catalog inputs are unchanged. Its backup, WebSocket health gate, and rollback protect the current staging game.
+
+This order ensures a missing/unverified export cannot break the live staging site. The old staging release remains active until the candidate is verified. Production deployment remains manual.
+
 
 ## Automatic private asset uploads
 

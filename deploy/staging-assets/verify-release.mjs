@@ -90,3 +90,16 @@ export async function verifyObject(response, path, entry, assets) {
   if (!objectTag.test(etag ?? "")) throw new Error("Missing AWS object ETag");
   return etag;
 }
+
+
+/**
+ * Reuse the read-only, ETag-pinned proof of an unchanged object from a trusted
+ * previously verified manifest. Gateway If-Match checks still reject mutations.
+ */
+export function reusableVerifiedObject(previous, path, current) {
+  const was = previous?.assets?.[path];
+  const object = previous?.objects?.[path];
+  if (!was || !object || was.sha256 !== current.sha256 || was.size !== current.size) return null;
+  if (!objectTag.test(object.etag ?? "") || !storageLayouts(path).includes(object.layout)) return null;
+  return { etag: object.etag, layout: object.layout };
+}
