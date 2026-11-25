@@ -13,7 +13,7 @@ The right solution is **a thin, head-surface-derived scalp/root covering, with a
 | --- | --- | --- |
 | `SK_Village_Lady.fbx` | Combined character | Includes Face4, Hair20, body, bonnet and other meshes; standard named `head` bone |
 | `SK_Village_Lady_Face4.fbx` | 6,330 vertices / 8,915 triangles | **Complete crown/back/side skull** in main Face material, not just facial features. Contains separate eye/facial material polygons and face shape keys |
-| `SK_Village_Lady_Hair20.fbx` | 6,687 vertices / 7,303 triangles | Separate long hair/braid geometry, with many open card boundaries (5,468 single-face boundary edges); not a fully enclosed scalp cap |
+| `SK_Village_Lady_Hair20.fbx` | 6,687 vertices / 7,303 triangles | Separate long hair/braid geometry, with many open card boundaries (5,468 single-face boundary edges; 301 open components); not a fully enclosed scalp cap |
 | `SK_Village_Lady_Body.fbx` | Full character body+face+hair variant | Main BodyMesh ends at neck/head junction; separate Face4 carries skull surface |
 | `SK_Village_Lady_Body(1).fbx` | BodyMesh only | Does not include a head scalp |
 | `SK_Village_Lady_BodyMeshCut.fbx` | Cut body mesh | Not a source for scalp reconstruction |
