@@ -162,3 +162,17 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 .garage-entry-card .garage-credentials :is(input,.garage-sign-in):focus {
   outline-offset: -3px;
 }
+
+.garage-credentials .garage-field { clip-path: none; }
+.garage-credentials .garage-field input { clip-path: none; }
+.garage-credentials > .garage-field:first-child,
+.garage-credentials fieldset > .garage-field:first-child {
+  clip-path: polygon(8px 0, calc(100% - 8px) 0, 100% 8px, 100% 100%, 0 100%, 0 8px);
+}
+.garage-credentials > .garage-field:first-child input,
+.garage-credentials fieldset > .garage-field:first-child input {
+  clip-path: polygon(7px 0, calc(100% - 7px) 0, 100% 7px, 100% 100%, 0 100%, 0 7px);
+}
+.garage-credentials .garage-sign-in {
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px));
+}
