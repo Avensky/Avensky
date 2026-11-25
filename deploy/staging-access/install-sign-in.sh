@@ -62,8 +62,45 @@ trap 'rm -f "$candidate_config"' EXIT
 cp "$candidate/Caddyfile" "$candidate_config"
 caddy validate --config "$candidate_config" --adapter caddyfile
 echo "Staging revision $commit. Rollback files: $backup"
+
+# Docker records numeric owners on the volume. Host systemd also needs a
+# passwd and group entry when it starts the migration and the portal.
+ensure_portal_identity() {
+  local name=avensky-staging current_user database by_id by_name
+  current_user=$(systemctl show --property=User --value avensky-alpha-access.service)
+  if [[ -n $current_user && $(id -u "$current_user" 2>/dev/null || :) == 10001 ]] &&
+     getent group 10001 >/dev/null; then
+    return 0
+  fi
+  for database in passwd group; do
+    by_id=$(getent "$database" 10001 || :)
+    by_name=$(getent "$database" "$name" || :)
+    if [[ $by_id != "$by_name" ]]; then
+      echo "Host $database entry for $name or ID 10001 is assigned elsewhere. Review the existing identity before cutover." >&2
+      return 1
+    fi
+  done
+  systemd-sysusers - <<'IDENTITY'
+g avensky-staging 10001
+u avensky-staging 10001:avensky-staging "Avensky staging sign-in" /nonexistent /usr/sbin/nologin
+IDENTITY
+  if [[ $(id -u "$name"):$(id -g "$name") != 10001:10001 ]]; then
+    echo "$name must have UID and primary GID 10001. Review the existing identity before cutover." >&2
+    return 1
+  fi
+}
+ensure_portal_identity
+# Exercise the same launch credentials and mounted database path while the old portal is online.
+systemd-run --quiet --wait --pipe --collect --uid=10001 --gid=10001 \
+  -p "BindPaths=$volume/staging:/run/avensky-player" \
+  /usr/bin/test -w /run/avensky-player/social.sqlite3 || {
+    echo "Systemd could not access the staging player database as 10001:10001. The existing portal is still running." >&2
+    exit 1
+  }
+
 systemctl stop avensky-alpha-access
 rollback() {
+  echo "Sign-in installer failed at line $1 (exit $2). Restoring the previous services." >&2
   systemctl stop avensky-alpha-access || true
   cp -a "$backup/portal/." "$lib/"
   cp -a "$backup/previous.service" "$unit"
@@ -74,7 +111,7 @@ rollback() {
   systemctl reload caddy
   echo "Restored the previous services. Backups: $backup" >&2
 }
-trap 'rollback' ERR
+trap 'rollback "$LINENO" "$?"' ERR
 # Online SQLite backup captures a consistent snapshot even while the game is running.
 python3 - "$player_db" "$backup/social.sqlite3" <<'PY'
 import pathlib, sqlite3, sys
