@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry } from "three";
+import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3 } from "three";
 import { prepareGarageDisplay } from "../src/game/preview/prepareGarageDisplay.ts";
 import { applyGarageLighting } from "../src/theme/garageLighting.ts";
 import { selectedGarageTheme, UI_THEMES } from "../src/theme/catalog.ts";
@@ -68,7 +68,9 @@ test("the 0999 counter borrows the original zero segments across nested author t
   const display = prepareGarageDisplay(source);
   const leading = display.root.getObjectByName("garage-counter-leading-zero");
   assert.equal(leading.geometry, geometry);
-  assert.equal(leading.material, display.root.getObjectByName("Cube026").material);
+  assert.notEqual(leading.material, display.root.getObjectByName("Cube026").material);
+  assert.equal(leading.material.emissiveIntensity, 0);
+  assert.equal(leading.material.emissive.getHex(), 0);
   assert.deepEqual(leading.position.toArray(), [5 - 22.60, 10, 15 + 1.13]);
   assert.equal(source.getObjectByName(leading.name), undefined);
   display.dispose();
@@ -86,22 +88,57 @@ test("the work lamp and neon use their real transformed faces and distinct light
   const fixtures = collectGarageFixtures(display.root);
   applyGarageLighting(display.root, "navy", false, 0);
   fixtures.updateEmission();
-  const lamp = fixtures.lights.getObjectByName("garage-work-light-3x4");
-  const rack = fixtures.lights.getObjectByName("garage-neon-rack");
-  assert.deepEqual(lamp.position.toArray(), [4, 3, -2]);
-  assert.deepEqual(rack.position.toArray(), [-3, 3, -2]);
-  assert.deepEqual(lamp.target.position.toArray(), [0, .65, 0]);
+  const lamp = fixtures.lights.getObjectByName("garage-work-light-3x4-0");
+  const rack = fixtures.lights.getObjectByName("garage-neon-rack-0");
+  assert.ok(lamp.position.distanceTo(new Vector3(4,3,-2)) < .04);
+  assert.ok(rack.position.distanceTo(new Vector3(-3,3,-2)) < .04);
+  assert.equal(lamp.isPointLight, true);
   assert.ok(lamp.intensity > 0 && lamp.color.r > lamp.color.b);
-  assert.equal(rack.intensity, 0);
+  assert.ok(rack.intensity > 0 && rack.color.r > rack.color.b);
+  fixtures.updateEmission({rack:0});
+  assert.equal(rack.intensity,0);
   applyGarageLighting(display.root, "forest", false);
   fixtures.updateEmission();
-  assert.ok(rack.intensity > 0 && rack.color.g > rack.color.r);
+  assert.ok(rack.intensity > 0 && rack.color.r > rack.color.b);
   assert.equal(face.emissive.getHex(), 0);
   fixtures.dispose(); display.dispose(); geometry.dispose(); face.dispose();
 });
 
 test("old saves use concrete and brushed steel persists independently of the garage theme", () => {
   assert.equal(sanitizeGarageEffects({ theme: "forest" }).floorFinish, "concrete");
+  assert.equal(sanitizeGarageEffects({}).rackBrightness, 1);
+  assert.equal(sanitizeGarageEffects({rackBrightness:NaN}).rackBrightness, 1);
+  assert.equal(sanitizeGarageEffects({workBrightness:10}).workBrightness, 2);
+  assert.equal(sanitizeGarageEffects({ceilingBrightness:-2}).ceilingBrightness, 0);
   assert.equal(sanitizeGarageEffects({ floorFinish: "unknown" }).floorFinish, "concrete");
   assert.equal(sanitizeGarageEffects({ theme: "auto", floorFinish: "metal" }).floorFinish, "metal");
+});
+
+test("a merged bulb mesh produces one local source per connected bulb and independent bank controls", async () => {
+  const { collectGarageFixtures } = await import("../src/game/preview/garageFixtures.ts");
+  const geometry = new BufferGeometry(), vertices = [];
+  for (let i = 0; i < 18; i++) {
+    const x = (i % 3) * 2, y = Math.floor(i / 3) * 2;
+    vertices.push(x,y,0, x+1,y,0, x,y+1,0, x+1,y,0, x+1,y+1,0, x,y+1,0);
+  }
+  geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
+  const parent = new Group(); parent.userData.name = "Base_Light.001";
+  parent.position.set(4, 2, -3); parent.scale.setScalar(.2);
+  const material = new MeshStandardMaterial({name:"LIGHT ", emissive:"#ffead5", emissiveIntensity:2});
+  parent.add(new Mesh(geometry, material));
+  const fixtures = collectGarageFixtures(parent);
+  fixtures.updateEmission();
+  const bulbs = fixtures.lights.children.filter(n => n.isPointLight);
+  assert.equal(bulbs.length, 18);
+  assert.equal(new Set(bulbs.map(n => n.position.toArray().join(","))).size, 18);
+  assert.equal(fixtures.lights.children.filter(n => n.isSprite).length, 18);
+  const intensity = bulbs[0].intensity;
+  fixtures.updateEmission({rack:.5});
+  assert.equal(bulbs[0].intensity, intensity / 2);
+  fixtures.updateEmission({rack:.5});
+  assert.equal(bulbs[0].intensity, intensity / 2, "repeated edits cannot compound");
+  fixtures.updateEmission({rack:0});
+  assert.ok(bulbs.every(n => n.intensity === 0));
+  assert.equal(material.emissiveIntensity, 0);
+  fixtures.dispose(); geometry.dispose(); material.dispose();
 });

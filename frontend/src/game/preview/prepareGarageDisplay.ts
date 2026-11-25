@@ -32,7 +32,7 @@ export function prepareGarageDisplay(scene: Object3D) {
         material.emissive.setRGB(0.02350918, 0.95040749, 0.00495542);
         // Native counter faces and the horizontal rack bars share this slot.
         // Bright cores lift both fixtures without adding a broad green light.
-        material.emissiveIntensity = 4;
+        material.emissiveIntensity = 1.2;
         break;
       case "SDC":
         material.color.setRGB(0.008, 0.08, 0.002);
@@ -119,9 +119,10 @@ export function prepareGarageDisplay(scene: Object3D) {
         object.material instanceof MeshStandardMaterial && object.material.name.trim() === "LIGHT") {
       if (!rackLight) {
         rackLight = object.material.clone();
-        rackLight.emissiveIntensity *= 1.6;
-        rackLight.color.set("#34291b");
-        rackLight.userData.garageAccentIntensity *= 1.6;
+        rackLight.userData.garageAccent = false;
+        rackLight.color.set("#39332b");
+        rackLight.emissive.set("#ffead5");
+        rackLight.emissiveIntensity = 2.2;
       }
       object.material = rackLight;
     }
@@ -132,7 +133,7 @@ export function prepareGarageDisplay(scene: Object3D) {
         workLight = object.material.clone();
         workLight.userData.garageAccent = false;
         workLight.emissive.set("#ffead5");
-        workLight.emissiveIntensity = 3.2;
+        workLight.emissiveIntensity = 2.2;
       }
       object.material = workLight;
     }
@@ -145,6 +146,9 @@ export function prepareGarageDisplay(scene: Object3D) {
     root.updateWorldMatrix(true, true);
     const leading = zero.clone();
     leading.name = "garage-counter-leading-zero";
+    const darkTube = new MeshStandardMaterial({ color: "#292520", emissiveIntensity: 0, roughness: .4, metalness: .25 });
+    leading.material = darkTube;
+    materials.set(darkTube, darkTube);
     leading.matrix.copy(root.matrixWorld).invert().multiply(zero.matrixWorld);
     leading.matrix.decompose(leading.position, leading.quaternion, leading.scale);
     leading.position.x -= 22.60;

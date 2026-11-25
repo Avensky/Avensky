@@ -35,7 +35,7 @@
    instead of its contents so text, focus rings and controller hints stay opaque. */
 :root {
   --garage-menu-panel: color-mix(in srgb, color-mix(in srgb, #101012 82%, var(--app-panel)) 88%, transparent);
-  --garage-menu-row: color-mix(in srgb, #252426 78%, transparent);
+  --garage-menu-row: color-mix(in srgb, #383638 98%, transparent);
   --garage-menu-ink: #fcf4e9;
   --garage-menu-muted: #d8cfc5;
   --garage-menu-line: #ffffff38;
@@ -181,7 +181,7 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 /* Keep each menu bar independent of the room behind it. */
 .main-menu-actions .menu-action-list::before { content: none; }
 .garage-credentials {
-  --login-bar-fill: color-mix(in srgb, #383638 96%, transparent);
+  --login-bar-fill: var(--garage-menu-row);
   --login-bar-border: #b7aaa080;
 }
 .garage-credentials .garage-field { background: var(--login-bar-border); }

@@ -81,11 +81,14 @@ export function garageSettingsRows(
     ),
     number(
       "accentBrightness",
-      "Accent brightness",
+      "Neon sign brightness",
       [0, 0.5, 0.75, 1, 1.5, 2, 3],
       percent,
       "Brightness of the theme-colored fixtures and their reflections.",
     ),
+    number("rackBrightness", "Left rack bulbs", [0, .25, .5, .75, 1, 1.5, 2], percent),
+    number("workBrightness", "Work light bulbs", [0, .25, .5, .75, 1, 1.5, 2], percent),
+    number("ceilingBrightness", "Ceiling lights", [0, .25, .5, .75, 1, 1.5, 2], percent),
     number(
       "exposure",
       "Garage exposure",
