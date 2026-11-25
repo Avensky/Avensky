@@ -145,11 +145,16 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
     if (!active || document.hidden) return;
     const motion = runtime.motion;
     const now = performance.now();
+    const frameElapsed = Math.max(0, now - Math.max(previousFrame.current, motion.dragging ? motion.dragStarted ?? 0 : 0)) / 1000;
     const elapsed = Math.max(0, now - Math.max(previousFrame.current, motion.lastInput ?? 0)) / 1000;
     previousFrame.current = now;
     if (reducedMotion.matches || document.documentElement.dataset.reduceMotion === "true") {
       motion.yaw = 0; motion.pitch = 0;
-    } else if (!motion.dragging) {
+    } else if (motion.dragging) {
+      const blend = 1 - Math.exp(-16 * frameElapsed);
+      motion.yaw += ((motion.targetYaw ?? motion.yaw) - motion.yaw) * blend;
+      motion.pitch += ((motion.targetPitch ?? motion.pitch) - motion.pitch) * blend;
+    } else {
       const decay = Math.exp(-1.7 * elapsed);
       motion.yaw *= decay; motion.pitch *= decay;
       if (Math.abs(motion.yaw) < .00005) motion.yaw = 0;
@@ -163,7 +168,9 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
     camera.aspect = width / Math.max(1, height);
     camera.fov = portrait ? 70 : 59;
     camera.updateProjectionMatrix();
-    if (!motion.dragging && (motion.yaw !== 0 || motion.pitch !== 0)) invalidate();
+    const following = motion.dragging && (Math.abs((motion.targetYaw ?? motion.yaw) - motion.yaw) > .00005 ||
+      Math.abs((motion.targetPitch ?? motion.pitch) - motion.pitch) > .00005);
+    if (following || !motion.dragging && (motion.yaw !== 0 || motion.pitch !== 0)) invalidate();
   }, -1);
   return null;
 }
@@ -177,11 +184,12 @@ class GarageFailure extends Component<{ children: ReactNode; host: HTMLElement }
 
 function LiveGarage({ host }: { host: HTMLElement }) {
   const view = useSyncExternalStore(subscribe, () => runtime.preview);
+  const coarse = useMemo(() => matchMedia("(pointer: coarse)").matches, []);
   const camera = useMemo(() => new PerspectiveCamera(55, 1, .05, 150), []);
   const onCreated = (state: RootState) => { state.gl.setClearColor("#080808", 1); };
   return <GarageFailure host={host}>
     <Canvas className={view ? "garage-canvas" : undefined} camera={camera} onCreated={onCreated}
-      dpr={view?.dpr ?? [1, 1.5]} shadows={view?.shadows ?? false}
+      dpr={view?.dpr ?? (coarse ? 1 : [1, 1.5])} shadows={view?.shadows ?? false}
       frameloop={view && !view.demand ? "always" : "demand"}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} fallback={null}>
       <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view} /></Suspense></GarageFailure>

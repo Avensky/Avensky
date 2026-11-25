@@ -333,13 +333,15 @@ export function WelcomeScreen() {
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}
+      </section>
+      <aside className={screen === "welcome" ? "garage-notices" : "welcome-notices"} aria-label="Announcements and issues">
         {showStagingSignIn ? <p role="status" className="welcome-help">
           The game could not restore your session. <a href={STAGING_SIGN_IN_PATH}>Return to sign-in</a>.
         </p> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
           {working ? "Saving…" : restoring ? "Restoring your profile…" : "Connecting to the game server…"}
         </p>}
         {(error || restoreError) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
-      </section>
+      </aside>
       </div>
       </div>
     </main>
