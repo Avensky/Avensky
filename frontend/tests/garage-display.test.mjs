@@ -47,7 +47,7 @@ test('the display omits rotating corner lamps but retains every original counter
   assert.equal(display.root.getObjectByName('Cube024').visible, true);
   assert.equal(display.root.getObjectByName('1000').visible, true);
   const counterMaterial = display.root.getObjectByName('Cube024').material;
-  assert.ok(counterMaterial.emissiveIntensity >= 4, 'the native counter has a brighter green core');
+  assert.equal(counterMaterial.emissiveIntensity, 1.2, 'neon cores retain theme color below the previous washed-out emission');
   assert.equal(display.root.getObjectByName('Base_Light001').material, counterMaterial, 'rack bars share the same bright green source');
   assert.equal(display.root.getObjectByName('Cube024').geometry, geometry);
   assert.equal(display.root.getObjectByName('1000').children[0].geometry, geometry);

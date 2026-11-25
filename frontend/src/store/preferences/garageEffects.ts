@@ -11,6 +11,9 @@ export type GarageEffects = {
   bloomThreshold: number;
   accentBrightness: number;
   exposure: number;
+  rackBrightness: number;
+  workBrightness: number;
+  ceilingBrightness: number;
   environmentReflections: boolean;
   floorReflections: boolean;
   reflectionStrength: number;
@@ -26,6 +29,9 @@ export const DEFAULT_GARAGE_EFFECTS: GarageEffects = {
   bloomThreshold: 1,
   accentBrightness: 1,
   exposure: 0.8,
+  rackBrightness: 1,
+  workBrightness: 1,
+  ceilingBrightness: 1,
   environmentReflections: true,
   floorReflections: true,
   reflectionStrength: 1,
@@ -52,6 +58,9 @@ export function sanitizeGarageEffects(value: unknown): GarageEffects {
     bloomThreshold: number("bloomThreshold", 0, 3),
     accentBrightness: number("accentBrightness", 0, 3),
     exposure: number("exposure", 0.5, 1.5),
+    rackBrightness: number("rackBrightness", 0, 2),
+    workBrightness: number("workBrightness", 0, 2),
+    ceilingBrightness: number("ceilingBrightness", 0, 2),
     environmentReflections: flag("environmentReflections"),
     floorReflections: flag("floorReflections"),
     reflectionStrength: number("reflectionStrength", 0, 1),

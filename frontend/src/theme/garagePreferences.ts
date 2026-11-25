@@ -2,6 +2,10 @@ import { sanitizeGarageEffects, type GarageEffects } from "../store/preferences/
 
 export function applyGaragePreferences(root: HTMLElement, effects: GarageEffects, reducedMotion: boolean, contrast: boolean) {
   root.dataset.garageBrightness = String(effects.accentBrightness);
+  root.dataset.garageGlow = String(!contrast && effects.bloom ? effects.bloomStrength : 0);
+  root.dataset.garageRack = String(effects.rackBrightness);
+  root.dataset.garageWork = String(effects.workBrightness);
+  root.dataset.garageCeiling = String(effects.ceilingBrightness);
   root.dataset.garageEnvironment = String(effects.environmentReflections);
   root.dataset.garageFloor = effects.floorFinish;
   root.dataset.garageReflectivity = String(effects.floorReflections ? effects.reflectionStrength : 0);

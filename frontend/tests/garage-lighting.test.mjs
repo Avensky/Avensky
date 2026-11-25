@@ -38,7 +38,7 @@ test("garage themes recolor owned fixtures, preserve neutral surfaces and restor
     applyGarageLighting(display.root, theme, false);
     assert.equal("#" + bulb.emissive.getHexString(), color);
     assert.ok(
-      theme === "scarlet" ? bulb.emissiveIntensity === 6 : Math.abs(radiance(bulb) - 2.88) < 0.00001,
+      theme === "scarlet" ? bulb.emissiveIntensity === 1.7999999999999998 : Math.abs(radiance(bulb) - 0.864) < 0.00001,
       `${theme} retains the fixture's visible brightness`,
     );
     assert.equal(
@@ -48,15 +48,15 @@ test("garage themes recolor owned fixtures, preserve neutral surfaces and restor
   }
   applyGarageLighting(display.root, "hacker", true);
   assert.equal(bulb.emissive.getHexString(), "ffffff");
-  assert.equal(bulb.emissiveIntensity, 1.2);
+  assert.equal(bulb.emissiveIntensity, .36);
   applyGarageLighting(display.root, "hacker", true);
   assert.equal(
     bulb.emissiveIntensity,
-    1.2,
+    .36,
     "contrast cannot compound its dimming",
   );
   applyGarageLighting(display.root, "hacker", false);
-  assert.ok(Math.abs(radiance(bulb) - 2.88) < 0.00001);
+  assert.ok(Math.abs(radiance(bulb) - 0.864) < 0.00001);
   assert.equal(
     fixture.emissive.getHexString(),
     "000000",
@@ -97,7 +97,7 @@ test("the first reflection snapshot is already themed, owns its materials and ca
     );
     assert.notEqual(mesh.material, displayMaterial);
     assert.equal(mesh.geometry, geometry);
-    assert.ok(theme === "scarlet" ? mesh.material.emissiveIntensity === 6 : Math.abs(radiance(mesh.material) - 2.88) < 0.00001);
+    assert.ok(theme === "scarlet" ? mesh.material.emissiveIntensity === 1.7999999999999998 : Math.abs(radiance(mesh.material) - 0.864) < 0.00001);
     applyGarageLighting(display.root, "strawberry", false);
     assert.equal(
       "#" + mesh.material.emissive.getHexString(),

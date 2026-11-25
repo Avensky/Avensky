@@ -61,15 +61,15 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
     let lightingKey = "";
     const slab = display.root.getObjectByName("BASE_Full");
     const repaint = () => {
-      const { garageTheme, garageBrightness, highContrast, garageEnvironment, garageFloor, garageReflectivity } = root.dataset;
+      const { garageTheme, garageBrightness, highContrast, garageEnvironment, garageFloor, garageReflectivity, garageRack, garageWork, garageCeiling, garageGlow } = root.dataset;
       if (slab instanceof Mesh && Array.isArray(slab.material))
         setFloorFinish(slab.material[1], garageFloor === "metal", Number(garageReflectivity ?? 1));
-      const key = [garageTheme, garageBrightness, highContrast, garageEnvironment].join("|");
+      const key = [garageTheme, garageBrightness, highContrast, garageEnvironment, garageRack, garageWork, garageCeiling, garageGlow].join("|");
       if (lightingKey !== key) {
         lightingKey = key;
         applyGarageLighting(display.root, isUITheme(garageTheme) ? garageTheme : DEFAULT_GARAGE_THEME,
           highContrast === "true", Number(garageBrightness ?? 1) * .64);
-        display.fixtures.updateEmission();
+        display.fixtures.updateEmission({ rack: Number(garageRack ?? 1), work: Number(garageWork ?? 1), ceiling: Number(garageCeiling ?? 1), glow: Number(garageGlow ?? .5) });
         const next = garageEnvironment === "false" ? undefined : display.fixtures.capture(gl);
         world.environment = next?.texture ?? null;
         probe?.dispose();
@@ -79,7 +79,7 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
     };
     const changes = new MutationObserver(repaint);
     changes.observe(root, { attributes: true, attributeFilter: ["data-garage-theme", "data-garage-brightness", "data-high-contrast",
-      "data-garage-environment", "data-garage-floor", "data-garage-reflectivity"] });
+      "data-garage-environment", "data-garage-floor", "data-garage-reflectivity", "data-garage-rack", "data-garage-work", "data-garage-ceiling", "data-garage-glow"] });
     repaint();
     host.dataset.garageObject = display.root.uuid;
     return () => {
