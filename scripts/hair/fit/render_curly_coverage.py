@@ -30,7 +30,8 @@ def arguments():
     parser.add_argument("--framing-hair", help="Use this original baseline with the before object to keep the prior framing and lights")
     parser.add_argument("--framing-before", help="Optional original before object for exact reuse of the prior framing")
     parser.add_argument("--after-inserts", help="Separate source-curl insert mesh shown only after")
-    parser.add_argument("--shared-inserts", help="Previously reviewed source-curl insert mesh shown in both stages")
+    parser.add_argument("--shared-inserts", action="append", default=[],
+                        help="Previously reviewed insert mesh shown in both stages (repeatable)")
     parser.add_argument("--diffuse", type=Path, required=True)
     parser.add_argument("--opacity", type=Path, required=True)
     parser.add_argument("--normal", type=Path)
@@ -281,7 +282,9 @@ def main():
     diagnostic_head, triangles = mask_head(scene, head, weights)
     sources = [before, after]
     stage_indices = [[0], [1]]
-    for name, stage_ids in ((args.shared_inserts, (0, 1)), (args.after_inserts, (1,))):
+    insert_stages = [(name, (0, 1)) for name in args.shared_inserts]
+    insert_stages.append((args.after_inserts, (1,)))
+    for name, stage_ids in insert_stages:
         if not name:
             continue
         insert = bpy.context.scene.objects.get(name)

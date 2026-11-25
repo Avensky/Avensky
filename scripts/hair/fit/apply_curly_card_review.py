@@ -14,6 +14,7 @@ from export_curly_fit_probe import digest, groups_from_edges
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hair", default="AVFIT_CurlyMane_GLOBAL_PREVIEW")
+    parser.add_argument("--output-name", default="AVFIT_CurlyMane_LOCAL_REVIEW")
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--out-blend", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
@@ -23,9 +24,9 @@ def main():
     if not source.is_file() or out.exists() or report.exists() or out == report or out.suffix.lower() != ".blend":
         raise ValueError("Open a saved private scene and choose two new output paths")
     hair = bpy.context.scene.objects.get(a.hair)
-    name = "AVFIT_CurlyMane_LOCAL_REVIEW"
+    name = a.output_name
     if not hair or hair.type != "MESH" or hair.animation_data or bpy.data.objects.get(name):
-        raise ValueError("Use an undeformed static comparison object in a fresh private scene")
+        raise ValueError("Use a static comparison object and a new review object name")
     plan = json.loads(a.plan.read_text(encoding="utf-8"))
     if not isinstance(plan, list) or not plan:
         raise ValueError("Expected a nonempty private edit plan")
