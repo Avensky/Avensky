@@ -13,6 +13,8 @@ export interface WebSocketEnvironment {
 const LIVE_SOCKET = "wss://api.avensky.com/ws/";
 const LIVE_PAGE_HOST = "play.avensky.com";
 const LIVE_API_HOST = "api.avensky.com";
+export const STAGING_PORTAL_ORIGIN = "https://staging.avensky.com";
+export const STAGING_PORTAL_SOCKET = "wss://staging.avensky.com/ws/";
 
 export function resolveDeploymentEnvironment(mode: string, deployment?: string): DeploymentEnvironment {
   const selected = (deployment?.trim() || mode.trim()).toLowerCase();
@@ -64,5 +66,9 @@ export function resolveRustWebSocketUrl(options: WebSocketEnvironment): string {
     throw new Error("Production multiplayer requires wss://");
   if (page.protocol === "https:" && url.protocol !== "wss:")
     throw new Error("An HTTPS page requires a secure wss:// multiplayer connection");
+  // The invited staging session uses a host-only cookie. Start and reconnect
+  // on the same origin so a failed routing check cannot strand the session.
+  if (environment === "staging" && page.origin === STAGING_PORTAL_ORIGIN)
+    return STAGING_PORTAL_SOCKET;
   return url.href;
 }

@@ -37,9 +37,19 @@ test("staging and test must configure their own socket", () => {
     /VITE_RUST_WS_URL is required/);
   assert.equal(resolveRustWebSocketUrl({
     mode: "staging",
-    pageUrl: "https://staging.avensky.com/",
+    pageUrl: "https://preview.avensky.com/",
     configuredUrl: "wss://api-staging.avensky.com/ws/",
   }), "wss://api-staging.avensky.com/ws/");
+});
+
+test("the invite-only staging site connects on its own origin from the first attempt", () => {
+  const pageUrl = "https://staging.avensky.com/";
+  for (const configuredUrl of ["wss://api-staging.avensky.com/ws/", "wss://staging.avensky.com/ws/"]) {
+    assert.equal(resolveRustWebSocketUrl({ mode: "staging", pageUrl, configuredUrl }),
+      "wss://staging.avensky.com/ws/");
+  }
+  assert.throws(() => resolveRustWebSocketUrl({ mode: "staging", pageUrl, configuredUrl: "wss://api.avensky.com/ws/" }),
+    /cannot connect to the live multiplayer endpoint/);
 });
 
 test("testing, staging, and local dev cannot silently access production data", () => {

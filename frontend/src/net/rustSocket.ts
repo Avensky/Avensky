@@ -1,4 +1,4 @@
-import { resolveRustWebSocketUrl } from "./deploymentEnvironment";
+import { resolveRustWebSocketUrl, STAGING_PORTAL_ORIGIN, STAGING_PORTAL_SOCKET } from "./deploymentEnvironment";
 import { receiveHubActors, resetHub } from "../game/hub/hubStore";
 import { receiveHubResult, resetHubControls } from "../game/hub/hubControls";
 import {SnapshotDecoder} from './snapshotDecoder';
@@ -352,24 +352,11 @@ export function getInputSenderStats() {
   };
 }
 
-let useStagingGateway = false;
-
-export async function startRustConnection(signal: AbortSignal) {
-  if (import.meta.env.MODE === "staging" && window.location.origin === "https://staging.avensky.com") {
-    try {
-      const response = await fetch("/__alpha/game-connection", { cache: "no-store", signal: AbortSignal.timeout(2500) });
-      if (signal.aborted) return;
-      useStagingGateway = response.status === 204 && response.headers.get("X-Avensky-Game-Connection") === "same-origin";
-    } catch { /* Older staging releases still use the configured endpoint. */ }
-  }
-  if (!signal.aborted) connectRustServer();
-}
-
 function getRustWsUrl() {
   return resolveRustWebSocketUrl({
     mode: import.meta.env.MODE,
     deployment: import.meta.env.VITE_DEPLOY_ENV,
-    configuredUrl: useStagingGateway ? "wss://staging.avensky.com/ws/" : import.meta.env.VITE_RUST_WS_URL,
+    configuredUrl: import.meta.env.VITE_RUST_WS_URL,
     pageUrl: window.location.href,
   });
 }
@@ -469,6 +456,7 @@ export function connectRustServer(): WebSocket {
   let snapshotVersion=2;
   const decoder = new SnapshotDecoder();
   const url = getRustWsUrl();
+  const usesStagingPortal = url === STAGING_PORTAL_SOCKET && window.location.origin === STAGING_PORTAL_ORIGIN;
   const connection = new WebSocket(url);
   socket = connection;
   let pendingResult: unknown;
@@ -477,7 +465,7 @@ export function connectRustServer(): WebSocket {
 
   const handleLoss = () => {
     if (!isCurrent()) return;
-    if (useStagingGateway) {
+    if (usesStagingPortal) {
       void fetch("/__alpha/verify", { cache: "no-store" }).then(response => {
         if (response.status === 401 && reconnectEnabled && (!socket || socket.readyState !== WebSocket.OPEN))
           window.location.assign("/__alpha/sign-in");

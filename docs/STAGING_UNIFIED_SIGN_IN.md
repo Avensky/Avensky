@@ -20,7 +20,7 @@ flowchart LR
     GitHub -->|Staging game image| Game
 ```
 
-The portal renders sign-in and invitation pages on loopback port 9061. It calls an authenticated game account bridge on the staging Rust port, 9002. Rust keeps sole access to its player database. Caddy checks an HTTPS session cookie before serving the app and model requests. For the same-origin WebSocket, Caddy asks the internal verifier on loopback port 9062 for a short-lived signed admission. Rust validates it and binds that connection to the existing profile. Guest enrollment can upgrade the staging profile stored in the original browser.
+The portal renders sign-in and invitation pages on loopback port 9061. It calls an authenticated game account bridge on the staging Rust port, 9002. Rust keeps sole access to its player database. Caddy checks an HTTPS session cookie before serving the app and model requests. The staging app connects directly to `wss://staging.avensky.com/ws/` on startup and reconnect, so the browser can send that same cookie. Caddy asks the internal verifier on loopback port 9062 for a short-lived signed admission. Rust validates it and binds that connection to the existing profile. Guest enrollment can upgrade the staging profile stored in the original browser.
 
 With the staging gate enabled, Rust requires an admission for all game sockets, including the old API hostname. The deployment probe can still complete a loopback WebSocket upgrade. Without an admission that socket closes before registering a client. A device-only game token issued before cutover can be redeemed on an invite to preserve the guest's saves.
 
