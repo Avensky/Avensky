@@ -29,6 +29,7 @@ jobs:
           node-version: "24"
       - run: npm --prefix frontend ci
       - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
+      - run: node --test deploy/staging-access/portal.test.mjs
       # Vite test servers restart on wardrobe catalog updates. Run suite files sequentially
       # to avoid overlapping dependency scanners and intermittent CI-only failures.
       - run: node --test --test-concurrency=1 tests/player-onboarding.test.mjs tests/character-workshop.test.mjs tests/wardrobe-preview.test.mjs

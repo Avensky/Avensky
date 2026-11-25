@@ -30,6 +30,7 @@ jobs:
           node-version: "24"
       - run: npm --prefix frontend ci
       - run: node --test frontend/tests/cloud-assets.test.mjs frontend/tests/deployment-environment.test.mjs
+      - run: node --test deploy/staging-access/portal.test.mjs
       - run: npm --prefix frontend run build -- --mode staging
         env:
           VITE_DEPLOY_ENV: staging
