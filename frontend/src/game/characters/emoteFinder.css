@@ -1,0 +1,11 @@
+.emote-finder-shortcuts { display: grid; gap: 4px; min-width: 0; }
+.emote-finder-toggle { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.emote-finder-choices:not([hidden]) { display: flex; gap: 4px; overflow-x: auto; }
+.emote-finder-choices button { flex: 0 0 auto; }
+.emote-finder-shortcuts button { min-height: 36px; }
+.emote-finder-shortcuts button:is([aria-expanded="true"], [aria-pressed="true"]) {
+  border-color: var(--app-accent);
+}
+@media (pointer: coarse) {
+  .emote-finder-shortcuts button { min-height: 44px; }
+}
