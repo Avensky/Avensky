@@ -35,6 +35,8 @@ function PreviewFrameClock() {
 
 function RevealPreview() {
   const shown = useRef(false);
+  const canvas = useThree(s => s.gl.domElement);
+  useEffect(() => () => { delete canvas.dataset.previewReady; }, [canvas]);
   useFrame(({ gl }) => {
     if (shown.current) return;
     shown.current = true;
@@ -51,11 +53,13 @@ export function FullCanvas({
   preview = false,
   paused = false,
   covered = false,
+  roomReady = false,
 }: {
   children: ReactNode;
   preview?: boolean;
   paused?: boolean;
   covered?: boolean;
+  roomReady?: boolean;
 }) {
   const authoring = useUIStore(
     (s) => s.screen === "world_builder" || s.overlay === "world_builder",
@@ -92,7 +96,7 @@ export function FullCanvas({
           failIfMajorPerformanceCaveat: false,
         }}
       >
-        {preview && <RevealPreview />}
+        {preview && roomReady && <RevealPreview />}
         {compact && !covered && !paused && !authoring && !reducedMotion && <PreviewFrameClock />}
         <ScoreboardSceneCover />
         <PerformanceProbe />

@@ -1,5 +1,5 @@
 import { useUIStore, type MenuScreen } from "../../store/menus/uiStore";
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MathUtils, Matrix4, Quaternion, Spherical, Vector2, Vector3, type Group, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
 import { useFrame, useThree } from "@react-three/fiber";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
@@ -88,7 +88,8 @@ export function VehiclePreview({
   characterOnly = false,
   fittingRoom = false,
   stationary = false,
-}: { previewScreen?: MenuScreen; heroLayout?: boolean; awaitingHero?: boolean; characterDraft?: CharacterChoice | null; wardrobeOpen?: boolean; characterOnly?: boolean; fittingRoom?: boolean; stationary?: boolean } = {}) {
+  onRoomReadyChange,
+}: { previewScreen?: MenuScreen; heroLayout?: boolean; awaitingHero?: boolean; characterDraft?: CharacterChoice | null; wardrobeOpen?: boolean; characterOnly?: boolean; fittingRoom?: boolean; stationary?: boolean; onRoomReadyChange?: (ready: boolean) => void } = {}) {
   const screen = useUIStore(s => previewScreen ?? s.screen);
   const preferenceReducedMotion = usePreferencesStore(s => s.reducedMotion);
   const systemMotion = useSyncExternalStore(subscribeMotion, systemReducedMotion, () => false);
@@ -137,9 +138,17 @@ export function VehiclePreview({
   }, [vehicleEmotes, vehicleId]);
   const closeShot = insideCar || garageView === "Cockpit" || garageView === "Dashboard";
   const near = garageView === "Dashboard" ? .01 : closeShot ? (vehicleId && GARAGE_STATIONS[vehicleId].kind === "bridge" ? .003 : .04) : .1;
-  const [settledVehicle, setSettledVehicle] = useState<string>();
+  const [vehicleResult, setVehicleResult] = useState<{ id: string; available: boolean }>();
+  const settledVehicle = vehicleResult?.id;
+  const vehicleReady = useCallback((id: string) => setVehicleResult({ id, available: true }), []);
+  const vehicleMissing = useCallback((id: string) => setVehicleResult({ id, available: false }), []);
+  const showPlatform = Boolean(vehicleId && vehicleResult?.available && vehicleId === settledVehicle && !characterOnly);
   const [roomReady, setRoomReady] = useState(false);
-  const roomSettled = useCallback(() => setRoomReady(true), []);
+  useEffect(() => () => onRoomReadyChange?.(false), [onRoomReadyChange]);
+  const roomSettled = useCallback(() => {
+    setRoomReady(true);
+    onRoomReadyChange?.(true);
+  }, [onRoomReadyChange]);
   const waitingForCar = Boolean(vehicleId && vehicleId !== settledVehicle);
   const loadLabel = waitingForCar && !characterOnly ? "Summoning vehicle" : !roomReady ? "Preparing garage" : null;
   const { width, height } = useThree(s => s.size);
@@ -381,19 +390,19 @@ export function VehiclePreview({
     if (frameloop === "demand" && (!compact || stationary || reducedMotion) &&
       (reframing || camera.position.distanceToSquared(position) > .000001 || pivot.distanceToSquared(target) > .000001)) invalidate();
   }, -.25);
-  const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={setSettledVehicle} cockpit={insideCar} visible={!characterOnly} />;
+  const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={vehicleMissing} cockpit={insideCar} visible={!characterOnly} />;
   return (
     <>
       <GarageEnvironment turntable={turntable} onPlatformReady={setPlatform} selectionLighting={staging}
-        allowLoad={characterOnly || !waitingForCar} onSettled={roomSettled} floorCaptureRate={fittingRoom ? 12 : undefined} />
+        showPlatform={showPlatform} onSettled={roomSettled} floorCaptureRate={fittingRoom ? 12 : undefined} />
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
       <PerspectiveCamera ref={cameraRef} name="garage-preview-camera" makeDefault>
         {fittingOrbitEnabled && <FittingCameraOrbit onDrag={orbitCamera} />}
       </PerspectiveCamera>
 
-      <PreviewTurntable onReady={setTurntable} spin={!wardrobeOpen && !stationary && !reducedMotion && garageView === "Showroom"}
-        locked={characterOnly || stationActive && garageView !== "Showroom"} restoreAngle={wardrobeOpen}>
+      <PreviewTurntable onReady={setTurntable} spin={showPlatform && !wardrobeOpen && !stationary && !reducedMotion && garageView === "Showroom"}
+        locked={!vehicleId || characterOnly || stationActive && garageView !== "Showroom"} restoreAngle={wardrobeOpen}>
         <group rotation={[0, Math.PI / 2, 0]}>
           <group ref={motion}>
             {activeDriver && (characterOnly || driverPose) && <group ref={characterActor} matrixAutoUpdate={!characterOnly}
@@ -415,7 +424,7 @@ export function VehiclePreview({
               <Suspense fallback={null}>
                 <StagedVehiclePreviewModel browse={workshop && !garageOpen && !vehicleEmotes} unavailable={unavailable}
                   platform={platform} model={vehicleId} driver={vehicleEmotes ? driver : garageDriver} previewPacks={vehicleEmotes}
-                  motion={motion} onDriverFit={reportDriverFit} onSettled={setSettledVehicle} allowDriver={roomReady}
+                  motion={motion} onDriverFit={reportDriverFit} onSettled={vehicleReady} allowDriver={roomReady}
                   garageOpen={garageOpen} garageCameraAnchors={workshop} reducedMotion={reducedMotion} active={!characterOnly} diagnostics={!wardrobeOpen}
                   summon={Boolean(settledVehicle && waitingForCar && !stationary && !reducedMotion)} />
               </Suspense>

@@ -9,6 +9,13 @@ import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { navigateFormRows } from "../social/formRows";
 
 function attachController(form: HTMLElement) {
+  if (!form.querySelector("[data-controller-row]")) {
+    // The native verification and recovery forms also work before this module loads.
+    for (const field of form.querySelectorAll("input:not([type=hidden]),button,a[href]")) {
+      const row = field.closest(".password-control") ?? field.closest("label,nav") ?? field;
+      row.setAttribute("data-controller-row", "");
+    }
+  }
   const controls = document.createElement("div");
   controls.className = "garage-gamepad-controls";
   form.append(controls);
@@ -38,6 +45,8 @@ function attachController(form: HTMLElement) {
       }
       if (active instanceof HTMLInputElement) openFieldKeyboard(active);
       else if (active?.matches("button:enabled, a[href]")) active.click();
+    } else if (action === "back") {
+      form.querySelector<HTMLAnchorElement>("a.portal-back")?.click();
     } else if (action === "up" || action === "down" || action === "left" || action === "right") {
       navigateFormRows(form, active, action, remembered);
       if (document.activeElement instanceof HTMLElement)

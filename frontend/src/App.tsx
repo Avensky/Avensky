@@ -21,7 +21,7 @@ const GameUI = lazy(() => import("./game/GameUI").then(module => ({ default: mod
 export default function App() {
   const mobilePortrait = useMobilePortrait();
   const welcome = useUIStore((state) => state.screen === "welcome");
-  const showGarageBackdrop = useUIStore(state => state.screen === "welcome" || state.screen === "main" || state.screen === "queue");
+  const showGarageBackdrop = useUIStore(state => ["welcome","main","queue","heroes","hero_select","mode_select","sandbox_setup"].includes(state.screen));
   const signedIn = useSocialStore(s => s.stagingSignIn || Boolean(s.registeredProfile && s.view?.profile));
   const rotate = mobilePortrait && !welcome;
   useAppTheme();

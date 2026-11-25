@@ -96,6 +96,7 @@ export function GameUI() {
   // stage; only actual garage interaction shots need that environment.
   const vehicleEmote = characterEmoteNeedsGarage(characterTab, previewCamera, previewEmoteId, previewInsideCar);
   const [collapsed, setCollapsed] = useState(false);
+  const [roomReady, setRoomReady] = useState(false);
   const previewPaused = retainedPreview !== null;
 
   return (
@@ -109,12 +110,14 @@ export function GameUI() {
       {/* Requires Canvas */}
       {needsCanvas && (
         <FullCanvas
+          roomReady={roomReady}
           paused={previewPaused}
           covered={retainedPreview !== null}
           preview={previewScreen !== null}
         >
           {previewScreen !== null && (
             <VehiclePreview
+              onRoomReadyChange={setRoomReady}
               previewScreen={previewScreen}
               heroLayout={previewScreen !== "sandbox_setup"}
               awaitingHero={previewScreen === "hero_select" || previewScreen === "heroes"}

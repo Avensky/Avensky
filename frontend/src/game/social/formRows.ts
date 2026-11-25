@@ -9,17 +9,14 @@ export function navigateFormRows(
   remembered: WeakMap<HTMLElement, number>,
 ) {
   if (!root.hasAttribute("data-controller-rows")) return false;
+  const controls = "button,input:not([type=hidden]),select,textarea,a[href],summary,[data-controller-selector][tabindex]";
   const rows = Array.from(
     root.querySelectorAll<HTMLElement>("[data-controller-row]"),
   )
     .filter((row) => !row.hasAttribute("data-controller-tab-only"))
     .map((row) => ({
       row,
-      items: Array.from(
-        row.querySelectorAll<HTMLElement>(
-          "button,input,select,textarea,a[href],summary,[data-controller-selector][tabindex]",
-        ),
-      ).filter(
+      items: (row.matches("button, a[href], input:not([type=hidden])") ? [row] : Array.from(row.querySelectorAll<HTMLElement>(controls))).filter(
         (node) =>
           !node.matches(":disabled") &&
           !node.closest("[hidden],[inert]") &&

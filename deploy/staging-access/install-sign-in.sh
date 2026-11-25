@@ -14,7 +14,7 @@ lib=/usr/local/lib/avensky/staging-access
 if [[ ${1:-} == --ui-only ]]; then
   # Refresh an already installed portal from the same revision as its public assets.
   systemctl is-active --quiet avensky-alpha-access.service
-  for asset in sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+  for asset in garage-room.js garage-wall-finish.webp sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     [[ -s $web/images/$asset ]]
   done
   backup=$(mktemp -d /root/avensky-sign-in-ui-XXXXXXXX)
@@ -39,7 +39,7 @@ if [[ ${1:-} == --ui-only ]]; then
   url=http://127.0.0.1:9061
   curl --noproxy '*' --retry 8 --retry-all-errors --retry-delay 1 -fsS "$url/sign-in" -o "$backup/login.html"
   grep -q '/__alpha/entry/sign-in-input.js' "$backup/login.html"
-  for asset in sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+  for asset in garage-room.js garage-wall-finish.webp sign-in-input.js sign-in-controller.js sign-in-controller.css; do
     curl --noproxy '*' -fsS "$url/__alpha/entry/$asset" -o /dev/null
   done
   trap - ERR

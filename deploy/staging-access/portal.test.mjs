@@ -85,7 +85,8 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.match(signIn, /src="\/__alpha\/entry\/sign-in-input\.js"/);
   assert.equal((await get("entry/sign-in-input.js")).status, 200);
   assert.doesNotMatch(signIn, /garage-entry-sign/);
-  assert.match(signIn, /garage-entry-walls/);
+  assert.match(signIn, /<avensky-garage-room\b/);
+  assert.match(signIn, /type="module" src="\/__alpha\/entry\/garage-room\.js"/);
   const css = await get("entry/garage-entry.css");
   assert.equal(css.status, 200);
   const poster = signIn.match(/src="\/__alpha\/(entry\/garage-entry[^"]*\.webp)"/)[1];
