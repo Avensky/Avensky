@@ -293,6 +293,25 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert(find('.dressing-toolbar button[aria-label="Hide interface"]'));
     assert.equal(find('select[aria-label="Preview camera"]'), null);
     await openEmotes();
+    const searchMotions = value => act(async () => {
+      const input = find('[aria-label="Emote results"] input[type="search"]');
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await searchMotions('shy hello');
+    assert(find('[data-emote-id="033"]'), 'finds Half hidden greeting from the default Gestures page');
+    assert.equal(find('[data-emote-id="010"]'), null, 'all search terms must match');
+    await click('[data-emote-id="033"]');
+    assert.equal(preview.getState().emote.id, '033');
+    await click('.character-emote-back');
+    assert.equal(find('input[type="search"]').value, 'shy hello');
+    const browseButton = (region, label) => [...document.querySelectorAll(`[aria-label="${region}"] button`)]
+      .find(button => button.textContent === label);
+    await act(async () => browseButton('Browse motions', 'Objects').click());
+    await act(async () => browseButton('Objects', 'Phone').click());
+    assert(find('[data-emote-id="156"]'), 'finds Quick message by its phone prop');
+    await act(async () => browseButton('Objects', 'Phone').click());
+    assert.equal(find('input[type="search"]').value, '');
     await chooseEmoteGroup('All');
     assert.equal(find('[aria-label="Emote logic review"]'), null, 'fit review opens with the chosen emote');
     const emoteCount = document.querySelectorAll('.character-emotes [data-emote-id]').length;
@@ -305,11 +324,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('input[aria-label="Preview zoom"]').value, '1.1');
     assert.equal(fitKeys.fitReviewKeyCalls, fitKeyCalls, 'camera and zoom updates leave emote review rows alone');
     assert.equal(document.activeElement, firstEmote);
-    await act(async () => {
-      const input = find('[aria-label="Emote results"] input[type="search"]');
-      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, 'applause');
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-    });
+    await searchMotions('applause');
     assert(document.querySelectorAll('.character-emotes [data-emote-id]').length > 0);
     assert([...document.querySelectorAll('.character-emotes .emote-name')].every(n => n.textContent.toLowerCase().includes('applause')));
     const emoteName = find('.character-emotes [data-emote-id] .emote-name').textContent;
