@@ -1,0 +1,41 @@
+{
+  "schema_version": 1,
+  "style_id": "curly_mane",
+  "display_name": "Curly Mane",
+  "source_filename": "CURLY 01.FBX",
+  "source_object_hint": "Curly_Mane",
+  "character_profile": "../character_profiles/vesper.json",
+  "source_units": "UNVERIFIED",
+  "source_up_axis": "UNVERIFIED",
+  "source_landmarks": {
+    "forehead": null,
+    "crown": null,
+    "temple_left": null,
+    "temple_right": null,
+    "nape": null
+  },
+  "root_vertex_group": null,
+  "root_length_fraction": 0.2,
+  "fit": {
+    "mode": "uniform_similarity_then_root_only",
+    "max_landmark_rms_m": 0.015,
+    "max_root_displacement_m": 0.035,
+    "cap_offset_m": 0.0015,
+    "needs_author_confirmed_root_mask": true
+  },
+  "materials": {
+    "atlas_family": "Curls",
+    "cutout_alpha_threshold": 0.28
+  },
+  "headwear": {
+    "mode": "show",
+    "auto_equip_accessory": null
+  },
+  "lods": [
+    "hero-close",
+    "gameplay-mobile",
+    "npc-silhouette"
+  ],
+  "license": "VERIFY_BEFORE_DISTRIBUTION",
+  "status": "needs-landmarks"
+}
