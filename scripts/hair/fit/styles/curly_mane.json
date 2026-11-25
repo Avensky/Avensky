@@ -37,5 +37,27 @@
     "npc-silhouette"
   ],
   "license": "VERIFY_BEFORE_DISTRIBUTION",
-  "status": "needs-landmarks"
+  "status": "real-fbx-inspected-offline-pilot",
+  "source_fbx_metadata": {
+    "up_axis_metadata": "Y",
+    "raw_height_axis": "Z",
+    "fbx_unit_scale_factor": 2.54,
+    "source_node_prerotation_degrees": [
+      -90,
+      0,
+      0
+    ],
+    "observed_node_world_xyz_map": "(raw x, raw z, -raw y)",
+    "note": "Do not double-rotate meshes already imported with Blender's FBX node transforms; physical units still require verification."
+  },
+  "first_real_asset_pilot": {
+    "connected_curl_sections": 253,
+    "offline_sections_adjusted": 39,
+    "affected_vertices": 819,
+    "max_apparent_vertex_shift_cm": 2,
+    "remaining_curl_sections_to_classify": 214,
+    "original_opacity_atlas": "MISSING",
+    "blender_visual_qa": "NOT_RUN",
+    "game_readiness": "NOT_READY"
+  }
 }
