@@ -2,6 +2,7 @@ import type { Object3D } from "three";
 import { assetAvailable } from "../../assets/runtimeAssets";
 import { installedHairStyles, type CharacterLook } from "./characterCatalog";
 import { fitsHairRig } from "./fittedHair";
+import { tennisFittingBodyUrl } from "./fittedWardrobe/alphaAssets";
 import { getWardrobeActorBody, getWardrobeBodyDonor, isWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
 import { hasAuthoredLacedBodiceFit, hasBindableStandaloneCorset, rebuiltUnderbustPart } from "./standaloneCorset";
 import { corsetModelUrls, corsetRenderChoice, isRebuiltHighCollarUrl, isRebuiltLacedBodiceUrl, isRebuiltUnderbustUrl, wardrobeModelUrls } from "./wardrobe";
@@ -102,6 +103,9 @@ export function resolveWardrobePreview({
   });
 
   const compatibleBody = (source: Object3D | null | undefined) => skeleton ? getWardrobeBodyDonor(source, skeleton) : undefined;
+  const tennisBodyRequested = Boolean(scene && skeleton && requested.some(({ item, rejected }) =>
+    !rejected && (item.id === "local-wave-wedges" || item.id === "local-tennis-dress")));
+  const tennisBody = tennisBodyRequested ? compatibleBody(sourceFor(tennisFittingBodyUrl)) : undefined;
   // Replacements can expose skin cut from the stock Village outfit.
   const needsBody = Boolean(scene && (corsetUrl || requested.some(({ item, rejected }) => !rejected && (replacesVillagerBody(item.slot) || (item.slot === "shoes" && item.preserveSkin)))
     || look.removedClothing.some(removalNeedsVillagerBody)) && !compatibleBody(scene));
@@ -114,7 +118,7 @@ export function resolveWardrobePreview({
   const fittingBody = needsSeparateBody ? compatibleBody(fittingBodySource) : undefined;
   let bodyUrl: string = fittingBodySource !== undefined && !fittingBody
     ? legacyBodyUrl : fittingBodyUrl;
-  let garmentBody = bundledBody ?? (needsSeparateBody
+  let garmentBody = tennisBody ?? bundledBody ?? (needsSeparateBody
     ? (bodyUrl === fittingBodyUrl ? fittingBody : compatibleBody(sourceFor(bodyUrl))) : undefined);
   // A desktop-only install can have the complete High Collar outfit but neither common donor.
   if (needsSeparateBody && !garmentBody && corsetUrl && isRebuiltHighCollarUrl(corsetUrl)
@@ -129,7 +133,8 @@ export function resolveWardrobePreview({
     }
   }
   const urls = new Set([url, ...requested.map(item => item.url)]);
-  if (needsSeparateBody) urls.add(bodyUrl);
+  if (tennisBodyRequested) urls.add(tennisFittingBodyUrl);
+  if (needsSeparateBody && !tennisBody) urls.add(bodyUrl);
   if (corsetUrl) urls.add(corsetUrl);
   const assetUrls = [...urls];
   const pendingUrls = assetUrls.filter(asset => sourceFor(asset) === undefined);

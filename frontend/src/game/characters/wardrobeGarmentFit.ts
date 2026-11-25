@@ -233,7 +233,7 @@ function isTop02Armhole(point: Vector3) {
 const shirtOpenings = new Map<string, (point: Vector3) => boolean>([
   ["top-01", isTop01Opening], ["top-02", isTop02Armhole], ["top-03", isTop03Armhole],
   ["top-04", isTop04Armhole], ["top-05", isTop05SideOpening],
-  ["local-tennis-dress", p => (p.y > 1.271 && Math.abs(p.x) < .14) || (Math.abs(p.x) > .175 && p.y > 1.155 && p.y < 1.315)],
+  ["local-tennis-dress", p => p.y < .937 || (p.y > 1.271 && Math.abs(p.x) < .14) || (Math.abs(p.x) > .175 && p.y > 1.155 && p.y < 1.315)],
 ]);
 
 function isStrapOpening(point: Vector3) {
