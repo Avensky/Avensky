@@ -10,7 +10,7 @@ Asset catalogs are committed as URL, SHA-256 and size metadata; commercial GLBs 
 
 Until a dedicated on-host verifier/activator is configured, a newly introduced private asset still requires a one-time gateway manifest registration. **A successful workflow for code changes does not bypass that gate.** Track the remaining automation and asset activation work in issue #51. Existing sessions continue using the old verified release.
 
-Once verified by the read-only asset identity, the operator can install the candidate as `verified-<64-character-release-id>.json` in the same administrator-owned directory as the forced receiver's existing `--verified-manifest` path. The updated receiver accepts that exact ID only if the gateway already serves it with a valid HTTP 206 `glTF` range response. The legacy file remains unchanged for rollback; the gateway must be configured to retain the old release and serve the new one.
+Once verified by the read-only asset identity, the operator can install the candidate as `verified-<64-character-release-id>.json` in `/etc/avensky-assets/` (or alongside the forced receiver's existing `--verified-manifest` path). The updated receiver accepts that exact ID only if the gateway already serves it with a valid HTTP 206 `glTF` range response. The legacy file remains unchanged for rollback; the gateway must be configured to retain the old release and serve the new one.
 
 ## Live deployment
 
