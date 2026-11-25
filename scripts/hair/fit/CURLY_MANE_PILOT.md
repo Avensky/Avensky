@@ -1,6 +1,6 @@
 # Curly Mane → Vesper: first real root-fitting pilot
 
-**Status (2026-11-25): code committed and mathematical tests passed; no actual Curly Mane mesh has yet been fitted or exported.** The donor ZIP is visible in the user's Library, but its raw bytes were not accessible here. This pilot requires the original `CURLY 01.FBX` locally.
+**Status (2026-11-25): actual CURLY 01.FBX inspected; private geometry-only four-view overlay and offline conservative root-contact test created. No Blender-verified, textured, rigged, approved, or game-ready Curly Mane exists.** See [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md).
 
 **Scope:** Female Vesper only. No male hair/clothing, no production deploy or PR merge.
 
@@ -72,6 +72,6 @@ When no marked roots or safe scalp targets exist, or shifts exceed guarded limit
 
 ## What has NOT been automated yet
 
-The scripts implement deterministic coarse alignment and protected per-curl root motion, but donor roots/target scalp must still be annotated; automatic gap correction, full rig attachment, six-camera rendering, GLB LOD export, engine import and phone QA are not implemented. The fact that the math passes synthetic tests does **not** prove a real Curly Mane fit.
+An additional private offline test adjusted 39 high-confidence near-scalp curl roots (819 vertices, max 2 cm) using real FBX geometry and an approximate original Face BaseColor scalp mask. That is **not** a completed Blender fit, and 214 components require human classification. The scripts implement deterministic coarse alignment and protected per-curl root motion, but donor roots/target scalp must still be annotated; automatic gap correction, full rig attachment, six-camera rendering, GLB LOD export, engine import and phone QA are not implemented. The fact that the math passes synthetic tests does **not** prove a real Curly Mane fit.
 
 **Privacy:** commercial source ZIP/FBX/TGA, extracted vendor geometry and new private .blend files must NOT be committed to public GitHub until licensing is independently confirmed. PR #67 remains draft.
