@@ -1,5 +1,8 @@
-// Touch and hardware keyboards use the native form without loading the game UI.
+// Mount the shared game controls after the garage is ready.
 (() => {
+  const blockTab = event => { if (event.key === "Tab") event.preventDefault(); };
+  window.addEventListener("keydown", blockTab, true);
+  window.addEventListener("avensky:leave-portal-form", () => window.removeEventListener("keydown", blockTab, true), { once: true });
   const assets = document.currentScript.src;
   let loading = false;
   function load() {
@@ -15,6 +18,8 @@
     });
   }
   window.addEventListener("gamepadconnected", load);
+  window.addEventListener("avensky:garage-ready", load, { once: true });
+  if (document.documentElement.dataset.garageReady === "true") load();
   try {
     if (Array.from(navigator.getGamepads?.() ?? []).some(Boolean)) load();
   } catch { /* Native controls also work when the browser restricts gamepads. */ }

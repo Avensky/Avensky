@@ -11,21 +11,31 @@ import { isUITheme } from "../../theme/catalog";
 import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry";
 import { collectGarageFixtures } from "./garageFixtures";
 import { setFloorFinish } from "./mechanicsFloor";
+import { installGarageEntryInteraction, type EntryMotion } from "./garageEntryInteraction";
 import { restoreGaragePreferences } from "../../theme/garagePreferences";
 
 declare const __GARAGE_MODEL_URL__: string;
 const decoder = new DRACOLoader().setDecoderPath("/draco/");
 const configure = (loader: GLTFLoader) => { loader.setDRACOLoader(decoder); };
 type Preview = { contents: ReactNode; demand: boolean; dpr: number; shadows: boolean };
-let preview: Preview | null = null;
-const listeners = new Set<() => void>();
+type GarageRuntime = { preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
+const shared = globalThis as typeof globalThis & { __avenskyGarage?: GarageRuntime };
+const runtime = shared.__avenskyGarage ??= {
+  preview: null, listeners: new Set(), motion: { yaw: .055, pitch: 0, dragging: false },
+};
 function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => { listeners.delete(listener); };
+  runtime.listeners.add(listener);
+  return () => { runtime.listeners.delete(listener); };
 }
 export function setGaragePreview(next: Preview | null) {
-  preview = next;
-  for (const listener of listeners) listener();
+  runtime.preview = next;
+  for (const listener of runtime.listeners) listener();
+  if (runtime.legacy) void runtime.legacy.then(update => update(runtime.preview));
+}
+function revealGarage(host: HTMLElement) {
+  host.dataset.garageReady = "true";
+  document.documentElement.dataset.garageReady = "true";
+  window.dispatchEvent(new Event("avensky:garage-ready"));
 }
 
 function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: PerspectiveCamera; entry: boolean }) {
@@ -33,6 +43,13 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
   const invalidate = useThree(state => state.invalidate);
   const gl = useThree(state => state.gl);
   const world = useThree(state => state.scene);
+  const introduced = useRef(false);
+  useFrame(() => {
+    if (!introduced.current) {
+      introduced.current = true;
+      requestAnimationFrame(() => revealGarage(host));
+    }
+  }, -2);
   const display = useMemo(() => {
     const garage = prepareGarageDisplay(scene);
     garage.root.name = "garage-special-environment";
@@ -59,13 +76,18 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
     const root = document.documentElement;
     let probe: WebGLRenderTarget | undefined;
     let lightingKey = "";
+    let floorKey = "";
     const slab = display.root.getObjectByName("BASE_Full");
     const repaint = () => {
       const { garageTheme, garageBrightness, highContrast, garageEnvironment, garageFloor, garageReflectivity, garageRack, garageWork, garageCeiling, garageGlow } = root.dataset;
-      if (slab instanceof Mesh && Array.isArray(slab.material))
+      const nextFloorKey = [garageFloor, garageReflectivity].join("|");
+      const floorChanged = floorKey !== nextFloorKey;
+      if (floorChanged && slab instanceof Mesh && Array.isArray(slab.material))
         setFloorFinish(slab.material[1], garageFloor === "metal", Number(garageReflectivity ?? 1));
+      floorKey = nextFloorKey;
       const key = [garageTheme, garageBrightness, highContrast, garageEnvironment, garageRack, garageWork, garageCeiling, garageGlow].join("|");
-      if (lightingKey !== key) {
+      const lightingChanged = lightingKey !== key;
+      if (lightingChanged) {
         lightingKey = key;
         applyGarageLighting(display.root, isUITheme(garageTheme) ? garageTheme : DEFAULT_GARAGE_THEME,
           highContrast === "true", Number(garageBrightness ?? 1) * .64);
@@ -75,7 +97,7 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
         probe?.dispose();
         probe = next;
       }
-      invalidate();
+      if (lightingChanged || floorChanged) invalidate();
     };
     const changes = new MutationObserver(repaint);
     changes.observe(root, { attributes: true, attributeFilter: ["data-garage-theme", "data-garage-brightness", "data-high-contrast",
@@ -102,45 +124,46 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
 function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: boolean }) {
   const { width, height } = useThree(state => state.size);
   const invalidate = useThree(state => state.invalidate);
-  // Keep progress with the room through recovery, login, and camera ownership changes.
-  const elapsed = useRef(0);
-  const lastFrame = useRef<number | null>(null);
-  const settled = useRef(false);
-  const motion = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)"), []);
+  const previousFrame = useRef(performance.now());
+  const reducedMotion = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)"), []);
   useLayoutEffect(() => {
-    lastFrame.current = null;
     if (!active) return;
-    const changed = () => { lastFrame.current = null; settled.current = false; invalidate(); };
-    const prefs = new MutationObserver(changed);
-    prefs.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
-    motion.addEventListener("change", changed);
-    document.addEventListener("visibilitychange", changed);
-    changed();
+    runtime.motion.invalidate = invalidate;
+    previousFrame.current = performance.now();
+    const changed = () => invalidate();
+    const preferences = new MutationObserver(changed);
+    preferences.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
+    reducedMotion.addEventListener("change", changed);
+    invalidate();
     return () => {
-      prefs.disconnect();
-      motion.removeEventListener("change", changed);
-      document.removeEventListener("visibilitychange", changed);
+      runtime.motion.invalidate = undefined;
+      preferences.disconnect();
+      reducedMotion.removeEventListener("change", changed);
     };
-  }, [active, width, height, invalidate, motion]);
+  }, [active, width, height, invalidate, reducedMotion]);
   useFrame(() => {
-    if (!active || settled.current || document.hidden) { lastFrame.current = null; return; }
+    if (!active || document.hidden) return;
+    const motion = runtime.motion;
     const now = performance.now();
-    const duration = 6500;
-    const reduced = motion.matches || document.documentElement.dataset.reduceMotion === "true";
-    elapsed.current = reduced ? duration : Math.min(duration, elapsed.current + (lastFrame.current === null ? 0 : now - lastFrame.current));
-    lastFrame.current = now;
-    const t = elapsed.current / duration;
-    const blend = t * t * (3 - 2 * t);
+    const elapsed = Math.max(0, now - Math.max(previousFrame.current, motion.lastInput ?? 0)) / 1000;
+    previousFrame.current = now;
+    if (reducedMotion.matches || document.documentElement.dataset.reduceMotion === "true") {
+      motion.yaw = 0; motion.pitch = 0;
+    } else if (!motion.dragging) {
+      const decay = Math.exp(-1.7 * elapsed);
+      motion.yaw *= decay; motion.pitch *= decay;
+      if (Math.abs(motion.yaw) < .00005) motion.yaw = 0;
+      if (Math.abs(motion.pitch) < .00005) motion.pitch = 0;
+    }
     const portrait = width < height;
-    // From the neon-rack corner to the work-lamp corner, staying inside the authored bay.
     camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
-    camera.lookAt((portrait ? -4.1 : -5.8) + blend * (portrait ? 1.0 : 1.1),
-      portrait ? 2.22 : 1.95, -5.45 - blend * .1);
+    camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
+    camera.rotateY(motion.yaw);
+    camera.rotateX(motion.pitch);
     camera.aspect = width / Math.max(1, height);
     camera.fov = portrait ? 70 : 59;
     camera.updateProjectionMatrix();
-    settled.current = t === 1;
-    if (!settled.current) invalidate();
+    if (!motion.dragging && (motion.yaw !== 0 || motion.pitch !== 0)) invalidate();
   }, -1);
   return null;
 }
@@ -148,14 +171,14 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
 class GarageFailure extends Component<{ children: ReactNode; host: HTMLElement }, { failed: boolean }> {
   state = { failed: false };
   static getDerivedStateFromError() { return { failed: true }; }
-  componentDidCatch() { this.props.host.dataset.garageUnavailable = ""; }
+  componentDidCatch() { this.props.host.dataset.garageUnavailable = ""; revealGarage(this.props.host); }
   render() { return this.state.failed ? null : this.props.children; }
 }
 
 function LiveGarage({ host }: { host: HTMLElement }) {
-  const view = useSyncExternalStore(subscribe, () => preview);
+  const view = useSyncExternalStore(subscribe, () => runtime.preview);
   const camera = useMemo(() => new PerspectiveCamera(55, 1, .05, 150), []);
-  const onCreated = (state: RootState) => { state.gl.setClearColor("#201a16", 1); };
+  const onCreated = (state: RootState) => { state.gl.setClearColor("#080808", 1); };
   return <GarageFailure host={host}>
     <Canvas className={view ? "garage-canvas" : undefined} camera={camera} onCreated={onCreated}
       dpr={view?.dpr ?? [1, 1.5]} shadows={view?.shadows ?? false}
@@ -169,10 +192,20 @@ function LiveGarage({ host }: { host: HTMLElement }) {
 
 export function mountGarage(host: HTMLElement) {
   if (host.dataset.garageMounted !== undefined) {
-    // If a deployment landed during sign-in, bootstrap the protected document on its own release.
-    if (host.dataset.garageMounted !== import.meta.url) location.reload();
+    // Older releases used a module-local store. Bridge to their already-loaded
+    // module during sign-in handoff without replacing its room or renderer.
+    if (!runtime.owner && !runtime.legacy) {
+      runtime.legacy = import(/* @vite-ignore */ host.dataset.garageMounted)
+        .then(module => {
+          const update = module.setGaragePreview as (next: Preview | null) => void;
+          update(runtime.preview);
+          return update;
+        });
+    }
     return;
   }
+  runtime.owner = import.meta.url;
+  runtime.input ??= installGarageEntryInteraction(runtime.motion, () => runtime.preview !== null);
   restoreGaragePreferences(document.documentElement);
   host.dataset.garageMounted = import.meta.url;
   createRoot(host).render(<LiveGarage host={host} />);

@@ -64,6 +64,7 @@ export function applyGarageLighting(
       material.emissive.copy(fixtureColor);
       material.emissiveIntensity =
         Number(material.userData.garageAccentIntensity) * brightness * gain;
+      material.userData.garageThemedIntensity = material.emissiveIntensity;
       if (material.userData.garageAccentTintBase)
         material.color
           .copy(fixtureColor)

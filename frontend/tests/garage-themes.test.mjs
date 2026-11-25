@@ -93,13 +93,13 @@ test("the work lamp and neon use their real transformed faces and distinct light
   assert.ok(lamp.position.distanceTo(new Vector3(4,3,-2)) < .04);
   assert.ok(rack.position.distanceTo(new Vector3(-3,3,-2)) < .04);
   assert.equal(lamp.isPointLight, true);
-  assert.ok(lamp.intensity > 0 && lamp.color.r > lamp.color.b);
-  assert.ok(rack.intensity > 0 && rack.color.r > rack.color.b);
+  assert.equal(lamp.intensity, 0);
+  assert.equal(rack.intensity, 0);
   fixtures.updateEmission({rack:0});
   assert.equal(rack.intensity,0);
   applyGarageLighting(display.root, "forest", false);
   fixtures.updateEmission();
-  assert.ok(rack.intensity > 0 && rack.color.r > rack.color.b);
+  assert.ok(rack.intensity > 0 && rack.color.g > rack.color.r);
   assert.equal(face.emissive.getHex(), 0);
   fixtures.dispose(); display.dispose(); geometry.dispose(); face.dispose();
 });

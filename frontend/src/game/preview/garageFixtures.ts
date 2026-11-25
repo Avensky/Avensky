@@ -93,7 +93,8 @@ export function collectGarageFixtures(room: Object3D) {
   return {
     lights,
     updateEmission(levels: Record<string, number> = {}) {
-      for (const [face, { intensity, bank }] of bulbLevels) face.emissiveIntensity = intensity * (levels[bank] ?? 1);
+      for (const [face, { intensity, bank }] of bulbLevels)
+        face.emissiveIntensity = (face.userData.garageAccent ? Number(face.userData.garageThemedIntensity ?? face.emissiveIntensity) : intensity) * (levels[bank] ?? 1);
       for (const { light, face, output } of lamps) {
         light.color.copy(face.emissive);
         light.intensity = output * face.emissiveIntensity;

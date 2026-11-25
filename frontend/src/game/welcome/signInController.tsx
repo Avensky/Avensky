@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { GameButton } from "../../components/GameButton";
+import { GarageCredentialFields } from "./GarageCredentialFields";
 import { createRoot } from "react-dom/client";
 import { MenuShortcuts } from "../../components/controller/MenuShortcuts";
 import { MenuInputDeviceContext } from "../../components/controller/useMenuInputDevice";
@@ -9,9 +12,55 @@ import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { navigateFormRows } from "../social/formRows";
 
 function attachController(form: HTMLElement) {
-  if (!form.querySelector("[data-controller-row]")) {
-    // The native verification and recovery forms also work before this module loads.
-    for (const field of form.querySelectorAll("input:not([type=hidden]),button,a[href]")) {
+  const islands: ReturnType<typeof createRoot>[] = [];
+  const credentials = form.querySelector<HTMLFormElement>(".garage-credentials");
+  const login = credentials?.querySelector<HTMLInputElement>('input[name="email"]')?.value ?? "";
+  const password = credentials?.querySelector<HTMLInputElement>('input[name="password"]')?.value ?? "";
+  for (const native of form.querySelectorAll<HTMLElement>("button,a[href],[data-portal-href],[data-portal-submit],[data-portal-control]")) {
+    if (credentials?.contains(native)) continue;
+    const nativeForm = native instanceof HTMLButtonElement ? native.form : native.closest("form");
+    const control = native.getAttribute("aria-controls") ?? native.dataset.portalControl;
+    const href = native instanceof HTMLAnchorElement ? native.href : native.dataset.portalHref;
+    const submit = native instanceof HTMLButtonElement ? native.type === "submit" : native.dataset.portalSubmit === "true";
+    const mount = document.createElement("div");
+    mount.style.display = "contents";
+    native.replaceWith(mount);
+    function Action() {
+      const [label, setLabel] = useState(native.textContent);
+      return <GameButton variant="menu" className={native.className}
+        data-portal-href={href} data-portal-submit={submit ? "true" : undefined} data-portal-control={control}
+        aria-controls={control}
+        aria-label={native.getAttribute("aria-label") ?? undefined}
+        disabled={native instanceof HTMLButtonElement && native.disabled}
+        onPress={() => {
+          if (control) {
+            const field = document.getElementById(control);
+            if (field instanceof HTMLInputElement) {
+              field.type = field.type === "password" ? "text" : "password";
+              setLabel(field.type === "password" ? "Show password" : "Hide password");
+            }
+          } else if (href) {
+            window.dispatchEvent(new CustomEvent("avensky:portal-navigate", { detail: href }));
+          } else if (submit) nativeForm?.requestSubmit();
+          else { native.click(); setLabel(native.textContent); }
+        }}>{label}</GameButton>;
+    }
+    const island = createRoot(mount);
+    island.render(<Action />);
+    islands.push(island);
+    if (!mount.closest("[data-controller-row]")) mount.setAttribute("data-controller-row", "");
+  }
+  if (credentials) {
+    const island = createRoot(credentials);
+    island.render(<GarageCredentialFields portal login={login} password={password}
+      onReady={() => { form.dataset.controlsReady = "true"; }} />);
+    islands.push(island);
+  } else form.dataset.controlsReady = "true";
+
+  {
+    // Verification and recovery fields join the same directional row navigation.
+    for (const field of form.querySelectorAll('input:not([type=hidden]),button,a[href],[role="button"]')) {
+      if (field.closest("[data-controller-row]")) continue;
       const row = field.closest(".password-control") ?? field.closest("label,nav") ?? field;
       row.setAttribute("data-controller-row", "");
     }
@@ -33,6 +82,9 @@ function attachController(form: HTMLElement) {
   let frame = 0;
 
   function act(action: MenuAction) {
+    const wasIdle = document.documentElement.dataset.garageUiIdle === "true";
+    window.dispatchEvent(new Event("avensky:garage-activity"));
+    if (wasIdle) return;
     form.dataset.gamepad = "";
     if (useTextKeyboardStore.getState().session) {
       window.dispatchEvent(new CustomEvent("avenlab:keyboard-action", { detail: action }));
@@ -41,15 +93,19 @@ function attachController(form: HTMLElement) {
     let active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     if (action === "activate") {
       if (!active || !form.contains(active)) {
-        navigateFormRows(form, active, "down", remembered);
-        active = document.activeElement as HTMLElement | null;
+        active = form.querySelector<HTMLElement>(".garage-field[data-selected=true] input");
+        if (!active) {
+          navigateFormRows(form, active, "down", remembered);
+          active = document.activeElement as HTMLElement | null;
+        }
       }
       if (active instanceof HTMLInputElement) openFieldKeyboard(active);
-      else if (active?.matches("button:enabled, a[href]")) active.click();
+      else if (active?.matches('button:enabled, a[href], [role="button"]:not([aria-disabled="true"])')) active.click();
     } else if (action === "back") {
-      form.querySelector<HTMLAnchorElement>("a.portal-back")?.click();
+      form.querySelector<HTMLElement>(".portal-back")?.click();
     } else if (action === "up" || action === "down" || action === "left" || action === "right") {
-      navigateFormRows(form, active, action, remembered);
+      navigateFormRows(form, active && form.contains(active) ? active :
+        form.querySelector<HTMLElement>(".garage-field[data-selected=true] input"), action, remembered);
       if (document.activeElement instanceof HTMLElement)
         document.activeElement.scrollIntoView({ block: "nearest", inline: "nearest" });
     }
@@ -90,12 +146,29 @@ function attachController(form: HTMLElement) {
   }
   const scope = new AbortController();
   const options = { signal: scope.signal };
+  window.addEventListener("keydown", event => {
+    if (event.key === "Tab") { event.preventDefault(); event.stopImmediatePropagation(); return; }
+    if (useTextKeyboardStore.getState().session) return;
+    if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+      event.preventDefault(); event.stopImmediatePropagation();
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      navigateFormRows(form, active && form.contains(active) ? active :
+        form.querySelector<HTMLElement>(".garage-field[data-selected=true] input"),
+        event.key === "ArrowUp" ? "up" : "down", remembered);
+    } else if (event.key === "Enter" && !(document.activeElement?.matches('[role="button"]'))) {
+      event.preventDefault();
+      const field = document.activeElement instanceof HTMLInputElement ? document.activeElement :
+        form.querySelector<HTMLInputElement>(".garage-field[data-selected=true] input");
+      if (field === document.activeElement) navigateFormRows(form, field, "down", remembered);
+      else field?.focus({ preventScroll: true });
+    }
+  }, { ...options, capture: true });
   document.addEventListener("pointerdown", () => { delete form.dataset.gamepad; }, { ...options, capture: true });
   for (const event of ["gamepadconnected", "focus", "pageshow"]) window.addEventListener(event, start, options);
   for (const event of ["blur", "pagehide"]) window.addEventListener(event, stop, options);
   document.addEventListener("visibilitychange", () => document.hidden ? stop() : start(), options);
   window.addEventListener("avensky:leave-portal-form", () => {
-    scope.abort(); stop(); root.unmount(); controls.remove();
+    scope.abort(); stop(); root.unmount(); islands.forEach(island => island.unmount()); controls.remove();
   }, { ...options, once: true });
   start();
 }
