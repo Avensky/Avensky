@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { garageBackdrop, GARAGE_ENTRY_PORTRAIT, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } from "./src/theme/garageEntry.ts";
 import { build, defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
@@ -116,17 +117,34 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       release && {
         name: "staging-public-files",
+        transformIndexHtml: {
+          order: "post",
+          handler(html) {
+            if (!html.includes("<!-- staging garage -->")) return html;
+            // Choose the warmed portal URL only when that portal published this exact room.
+            return html.replace("<!-- staging garage -->", `<template id="startup-garage">${garageBackdrop("/images")}</template>
+              <script>(function(){
+                const template=document.getElementById("startup-garage");
+                const room=template.content.firstElementChild;
+                try { if (localStorage.getItem(${JSON.stringify(GARAGE_ENTRY_STORAGE_KEY)}) === ${JSON.stringify(GARAGE_ENTRY_POSTER)}) {
+                  room.dataset.finish=room.dataset.finish.replace("/images/","/__alpha/entry/");
+                  room.querySelector("source").srcset="/__alpha/entry/"+${JSON.stringify(GARAGE_ENTRY_PORTRAIT)};
+                  room.querySelector("img").src="/__alpha/entry/"+${JSON.stringify(GARAGE_ENTRY_POSTER)};
+                } } catch {}
+                template.replaceWith(room);
+              })();</script>`);
+          },
+        },
         async writeBundle(options) {
-          // The public portal loads this self-contained menu only for a gamepad.
-          // Its allowlist exposes two files without exposing authenticated game chunks.
-          await build({
+          // The portal serves only the small wall renderer and the optional controller menu.
+          for (const [name, entry] of [["sign-in-controller", "signInController.tsx"], ["garage-room", "garageRoomElement.ts"]]) await build({
             configFile: false, root: frontend, publicDir: false,
             define: { "process.env.NODE_ENV": JSON.stringify("production") },
             build: {
               outDir: resolve(frontend, options.dir ?? "dist-staging", "images"), emptyOutDir: false,
               lib: {
-                entry: resolve(frontend, "src/game/welcome/signInController.tsx"),
-                formats: ["es"], fileName: () => "sign-in-controller.js", cssFileName: "sign-in-controller",
+                entry: resolve(frontend, "src/game/welcome", entry),
+                formats: ["es"], fileName: () => name + ".js", cssFileName: name,
               },
               rollupOptions: { output: { inlineDynamicImports: true } },
             },

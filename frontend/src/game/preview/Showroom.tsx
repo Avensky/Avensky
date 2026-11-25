@@ -3,9 +3,9 @@ export function Showroom({ floor = true }: { floor?: boolean }) {
   return <>
     <color attach="background" args={["#080c16"]} />
     <fog attach="fog" args={["#080c16", 20, 55]} />
-    <hemisphereLight args={["#fffaf3", "#9da6b1", 1.12]} />
-    <directionalLight position={[-6, 8, -4]} color="#ecf1f6" intensity={0.56} />
-    <directionalLight position={[6, 5, 4]} color="#fffbf5" intensity={0.63} />
+    <hemisphereLight args={["#f2e9da", "#737c88", .78]} />
+    <directionalLight position={[-6, 8, -4]} color="#ecf1f6" intensity={0.45} />
+    <directionalLight position={[6, 5, 4]} color="#fffbf5" intensity={0.49} />
     {/* Broad light reads on paint and faces without hot reflections on the hood. */}
     <spotLight name="vehicle-key-spot" position={[3, 6.5, 4]} color="#fff1db" intensity={64} angle={0.59} penumbra={0.92} distance={18} decay={2} />
     <spotLight name="vehicle-rim-spot" position={[-4, 5.5, -3]} color="#b2cbff" intensity={30} angle={0.64} penumbra={0.92} distance={17} decay={2} />
@@ -18,9 +18,6 @@ export function ShowroomFloor() {
     <mesh name="showroom-floor" rotation={[-Math.PI / 2, 0, 0]}>
       <planeGeometry args={[180, 180]} />
       <meshStandardMaterial color="#172536" roughness={0.9} metalness={0.05} onBeforeCompile={addShowroomGrid} />
-    </mesh>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.001, 0]}>
-      <ringGeometry args={[5.8, 5.83, 80]} /><meshBasicMaterial color="#23526b" />
     </mesh>
   </>;
 }

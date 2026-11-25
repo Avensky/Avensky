@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { Group, Mesh, MeshStandardMaterial, PlaneGeometry, Texture } from "three";
+import { entryRoomGeometry } from "../src/game/welcome/entryRoomGeometry.ts";
 import { createGarageWalls } from "../src/game/preview/garageWalls.ts";
 import { prepareGarageDisplay } from "../src/game/preview/prepareGarageDisplay.ts";
 import { applyGarageLighting } from "../src/theme/garageLighting.ts";
@@ -37,6 +38,23 @@ test("all saved palettes repaint one set of inward-facing wall panels with the e
   dispose();
   assert.equal(textureDisposals, 0);
   texture.dispose();
+});
+
+test("the login renderer uses the Heroes wall positions and texture coordinates", () => {
+  const wall = createGarageWalls(new Texture());
+  const { geometry } = wall.mesh;
+  const { vertices, solidCount, glowCount } = entryRoomGeometry();
+  const position = geometry.getAttribute("position");
+  const uv = geometry.getAttribute("uv");
+  for (let i = 0; i < geometry.index.count; i++) {
+    const index = geometry.index.getX(i);
+    const start = i * 9;
+    assert.deepEqual(Array.from(vertices.subarray(start, start + 3)), [position.getX(index), position.getY(index), position.getZ(index)]);
+    assert.deepEqual(Array.from(vertices.subarray(start + 6, start + 8)), [uv.getX(index), uv.getY(index)]);
+  }
+  assert.ok(glowCount > 0);
+  assert.equal(vertices.length, 9 * (solidCount + glowCount));
+  wall.dispose();
 });
 
 test("the 0999 counter borrows the original zero segments across nested author transforms", () => {

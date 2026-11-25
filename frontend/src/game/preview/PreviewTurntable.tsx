@@ -84,7 +84,7 @@ export function PreviewTurntable({
   return (
     <group ref={attach} name="vehicle-turntable">
       {children}
-      <mesh
+      {!locked && <mesh
         name="vehicle-turntable-drag-surface"
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.065, 0]}
@@ -95,7 +95,7 @@ export function PreviewTurntable({
       >
         <planeGeometry args={[40, 40]} />
         <meshBasicMaterial visible={false} side={DoubleSide} />
-      </mesh>
+      </mesh>}
     </group>
   );
 }

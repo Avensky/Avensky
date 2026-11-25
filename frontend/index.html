@@ -11,6 +11,12 @@
       #startup-screen { position: fixed; inset: 0; z-index: 100000; display: grid; place-content: center; justify-items: center; gap: 8px; padding: 16px; background: #020617; color: #cffafe; font: 600 13px/1.3 system-ui, sans-serif; text-align: center; }
       #startup-screen img { width: 96px; height: 96px; object-fit: contain; }
       #startup-screen p { margin: 0; }
+      #startup-screen:has(> avensky-garage-room) { background: #312e29; padding: 0; }
+      #startup-screen:has(> avensky-garage-room) > :is(img,p) { display: none; }
+      #startup-screen avensky-garage-room, #startup-screen avensky-garage-room img {
+        position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+      }
+      @view-transition { navigation: auto; }
     </style>
 
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
@@ -63,6 +69,7 @@
   <body>
     <!-- Visible immediately, including while the JS bundle is downloading. -->
     <div id="startup-screen" role="status" aria-label="Starting Avensky">
+      <!-- staging garage -->
       <img src="/images/logo.svg" alt="Avensky" width="96" height="96" />
       <p>AVENSKY</p>
       <noscript><p>Enable JavaScript to open the game.</p></noscript>

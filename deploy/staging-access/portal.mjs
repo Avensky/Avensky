@@ -15,7 +15,7 @@ const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
 const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.meta.url);
 const themes = JSON.parse(readFileSync(existsSync(sourcePalettes) ? sourcePalettes : new URL("./palettes.json", import.meta.url), "utf8"));
 const sourceEntry = new URL("../../frontend/src/theme/garageEntry.ts", import.meta.url);
-const { garageBackdrop, garageBrandHeader, garageCredentials, DEFAULT_GARAGE_THEME, GARAGE_ENTRY_MASK, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
+const { garageBackdrop, garageBrandHeader, garageCredentials, DEFAULT_GARAGE_THEME, GARAGE_ENTRY_PORTRAIT, GARAGE_ENTRY_MASK, GARAGE_ENTRY_POSTER, GARAGE_ENTRY_STORAGE_KEY } = await import(existsSync(sourceEntry) ? sourceEntry.href : new URL("./garageEntry.ts", import.meta.url).href);
 const defaultColors = Object.entries(themes.navy)
   .filter(([key]) => key !== "label" && key !== "scheme")
   .map(([key, color]) => `--app-${key}:${key.startsWith("garage-") ? themes[DEFAULT_GARAGE_THEME][key] : color}`).join(";");
@@ -26,9 +26,10 @@ const entryImages = existsSync(sourceImages) ? sourceImages : new URL("file:///s
 // portal reads both the built module and the other assets from the published release.
 const controllerImages = existsSync(sourceImages) ? new URL("../../frontend/dist-staging/images/", import.meta.url) : entryImages;
 const entryAssets = new Map([
+  ["garage-room.js", "text/javascript"], ["garage-wall-finish.webp", "image/webp"],
   ["sign-in-input.js", "text/javascript"], ["sign-in-controller.js", "text/javascript"], ["sign-in-controller.css", "text/css"],
   ["logo.svg", "image/svg+xml"], ["entry-icons.svg", "image/svg+xml"],
-  [GARAGE_ENTRY_MASK, "image/webp"], [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
+  [GARAGE_ENTRY_PORTRAIT, "image/webp"], [GARAGE_ENTRY_MASK, "image/webp"], [GARAGE_ENTRY_POSTER, "image/webp"], ["garage-entry.css", "text/css"], ["angled-header.css", "text/css"],
 ]);
 function paletteScript() {
   return `(() => {
@@ -74,10 +75,11 @@ function page(title, contents, message = "", garage = false) {
     const signIn = garage === "login";
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${escape(title)} · Avensky</title><style>html{color-scheme:${themes.navy.scheme};${defaultColors}}</style>
+<script type="module" src="${base}/entry/garage-room.js"></script>
 <script src="${base}/theme.js"></script><link rel="stylesheet" href="${base}/entry/garage-entry.css">
 <script src="${base}/password.js" defer></script>
-${signIn ? `<script src="${base}/entry/sign-in-input.js" defer></script>` : ""}</head><body class="garage-entry">
-${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card"${signIn ? " data-controller-rows" : ""} aria-label="${escape(title)}">
+<script src="${base}/entry/sign-in-input.js" defer></script></head><body class="garage-entry">
+${garageBackdrop("/__alpha/entry")}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card" data-controller-rows aria-label="${escape(title)}">
 ${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}
 </section></main></body></html>`;
   }
@@ -260,11 +262,11 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         const name = path.slice((base + "/entry/").length);
         const type = entryAssets.get(name);
         if (!type) return send(404);
-        const file = new URL(name, name.startsWith("sign-in-controller.") ? controllerImages : entryImages);
+        const file = new URL(name, (name === "garage-room.js" || name.startsWith("sign-in-controller.")) ? controllerImages : entryImages);
         try {
           const info = await stat(file);
           const etag = `W/"${info.size}-${Math.trunc(info.mtimeMs)}"`;
-          const headers = { "Content-Type": type, "Cache-Control": (name === GARAGE_ENTRY_POSTER || name === GARAGE_ENTRY_MASK) ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
+          const headers = { "Content-Type": type, "Cache-Control": (name === GARAGE_ENTRY_POSTER || name === GARAGE_ENTRY_PORTRAIT || name === GARAGE_ENTRY_MASK) ? "public, max-age=31536000, immutable" : "public, max-age=300", ETag: etag };
           if (req.headers["if-none-match"] === etag) return send(304, "", headers);
           return send(200, await readFile(file), headers);
         } catch { return send(404); }

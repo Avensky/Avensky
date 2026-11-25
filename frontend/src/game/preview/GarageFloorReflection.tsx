@@ -65,7 +65,7 @@ const floorShader = {
       vec2 local = vec2(c * vFloor.x - s * vFloor.y, s * vFloor.x + c * vFloor.y);
       float edgeValue = length(local) - platformRadius;
       float edgeAA = max(fwidth(edgeValue), 0.015);
-      float platform = 1.0 - smoothstep(-edgeAA, edgeAA, edgeValue);
+      float platform = platformRadius > 0.0 ? 1.0 - smoothstep(-edgeAA, edgeAA, edgeValue) : 0.0;
       // Trilinear mip sampling softens the pad with one texture lookup.
       vec3 reflection = reflectionStrength > 0.001
         ? texture2D(tDiffuse, uv, platform * reflectionBlur * 2.0).rgb : vec3(0.0);
@@ -147,7 +147,6 @@ export function GarageFloorReflection({
     const texture = object.getRenderTarget().texture;
     texture.generateMipmaps = true;
     texture.minFilter = LinearMipmapLinearFilter;
-    material.uniforms.platformRadius.value = Math.max(width, depth) / 2;
     if (perimeter && !perimeter.isEmpty()) {
       material.uniforms.perimeterBounds.value.set(
         perimeter.min.x,
@@ -158,7 +157,7 @@ export function GarageFloorReflection({
       material.uniforms.showPerimeter.value = 1;
     }
     return object;
-  }, [width, depth, perimeter, compact]);
+  }, [perimeter, compact]);
   const captureInterval = 1 / (captureRate ?? (compact ? 15 : 24));
   useLayoutEffect(() => {
     // Change the capture cadence without replacing the existing reflection texture.
@@ -173,8 +172,10 @@ export function GarageFloorReflection({
   useFrame(() => {
     if (!active) return;
     const material = floorRef.current?.material as ShaderMaterial | undefined;
-    if (material)
+    if (material) {
+      material.uniforms.platformRadius.value = turntable ? Math.max(width, depth) / 2 : 0;
       material.uniforms.platformAngle.value = turntable?.rotation.y ?? 0;
+    }
   });
   useEffect(
     () => () => {
