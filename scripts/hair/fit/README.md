@@ -1,22 +1,26 @@
 # Universal Hairstyle Fitting — Avensky V2 (design and acceptance spec)
 
-Status: **original Face4 skull directly inspected; source-derived scalp extractor implemented; Blender sign-off pending**. The uploaded original Face4 FBX contains the crown, sides and back of the head, so Vesper's preferred approach is an annotated selection of those *existing triangles*, not the old bonnet sphere or the landmark loft. No fitted GLB has been exported or integrated. See [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) and [QUICKSTART.md](QUICKSTART.md).
+**Project scope:** Vesper / original female character hair ONLY. Male hair, male clothing and other characters are **paused indefinitely**. No time pressure or parallel male work.
 
-## Vesper FIRST: derive the scalp from Face4 (confirmed source)
+**Status (2026-11-25):** original Face4 skull and original `T_Villager_Lady_Face_BaseColor.tga` texture have been identified and visualized on the actual head. The original texture ALREADY includes a soft scalp/hair-root discoloration. **Preserve that original texture on Vesper; don't generate a substitute sphere, hard brown cap, or new scalp mesh by default.** V2 inspectors and optional diagnostic extraction are written, but actual Curly Mane root fitting, Blender QA and shippable GLBs remain unimplemented/unverified.
 
-The original `SK_Village_Lady_Face4.fbx` includes the full upper skull (6,330 vertices / 8,915 triangles for the Face4 mesh). A distinct `SK_Village_Lady_Hair20.fbx` contains 7,303 hair triangles, many of them open cards. **We should not create a second guessed spherical skull.**
+**Start by reading:** [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
 
-1. Import the original Face4 FBX into a PRIVATE neutral-pose Blender scene, inspect and identify its main `Face` skin surface and armature.
-2. Mark the actual upper skull once with the `AV_ScalpRegion` vertex group. Exclude face, ears, eyelids and visible bare forehead below the intended hairline. Create a candidate preview and visually refine its boundary; the first numerical proposal incorrectly shaded some ears and had jagged face edges.
-3. Use `extract_source_scalp.py` in DRY RUN. It requires the existing vertex group and source Face material, measures the coverage and preserves original UVs/rig attachment. `--write` makes a **new** prototype .blend, never changing the source.
-4. Review the thin dark-root covering, then fit the independent original Curly Mane root geometry and volume layers to the same physical skull. The cap is NOT a substitute for curls/clumps.
+## Vesper FIRST: original head + original scalp texture
 
-`build_scalp_cap.py` + `cap_geometry.py` from the earlier prototype remain **fallback tools only for characters whose source head genuinely lacks a complete skull**; do not use their constructed dome as Vesper's default.
+The original `SK_Village_Lady_Face4.fbx` includes the entire top/back of the skull (6,330 vertices / 8,915 triangles), while the original `T_Villager_Lady_Face_BaseColor.tga` supplies **actual skin tone and natural speckled gray-brown short-hair/root transition**. `SK_Village_Lady_Hair20.fbx` is a separate hair/braid mesh. The face ID and body ID masks are **not** the Face BaseColor.
+
+1. Import Face4 and map the original Face BaseColor to its actual UVs in a neutral rigged PRIVATE Blender scene. Record bone, model scale, texture hashes and fixed front/right/back/left/top/3/4 views.
+2. Preserve the visible original scalp markings. **Only if a style still exposes unintended coverage gaps** author a localized root material layer, wisps or under-clumps on a working copy. Never replace the original head with a debug cap as the routine first step.
+3. Import one original donor geometry/UV/atlas set, starting with Curly Mane. Match coarse landmarks and fit the *roots only* to Face4; protect curl bodies and tips.
+4. Run six-view, pose, material, phone and performance review; only then make a batch pipeline / GLB LOD releases.
+
+The existing `extract_source_scalp.py` creates a **plain-color debug extraction from real Face4 triangles**, not a reproduction of the original textured scalp. It is optional and **not the default path**. `build_scalp_cap.py` and `cap_geometry.py` are synthetic fallback tools solely for characters without a complete skull. Never use them as Vesper's ordinary baseline.
 
 ## Why V1 did not solve the gaps
 The existing `scripts/hair/blender_apply_batch.py` explicitly preserves the twelve fitted meshes' vertex positions, topology, skin, UVs and shape keys. It improves the material only. The donor texture archive contains three *separate* FBX meshes (`CURLY 01.FBX`, `CURLY 02.FBX`, `CURLY 03.FBX`) with their own geometry/UVs; the V1 material donor workflow does not fit those geometry meshes to Vesper. See `docs/assets/CURLY_SET_AUDIT.md`.
 
-**Principle:** Do not mistake an alpha texture, a shell, or duplicated flat cards for actual hair density. A head-derived cap covers the skull and provides roots; original clumps must provide volume and silhouette. Any extra interior clumps require author approval and QA.
+**Principle:** Do not mistake an alpha texture, an optional supplemental shell, or duplicated flat cards for actual hair density. **Face4 already supplies the skull and a naturally colored root foundation.** The original donor clumps/cards must supply the real hairstyle volume and silhouette; any extra interior clumps need approval and QA.
 
 ## Supported inputs / output contract
 - Inputs: character reference **in neutral pose**, evaluated head mesh, armature/head bone, explicit head coordinate frame + five or more author-placed landmark empties, source FBX/GLB/BLEND + vendor textures, license metadata, a per-style profile.
@@ -33,8 +37,8 @@ Validate source existence, file type, units, axis directions, mesh count, materi
 ### 1 — Canonical target landmarks
 Character profile must contain explicit names and normalized, consistently ordered coordinates for forehead hairline center, crown, left/right temple, left/right ear anchors, and nape. Measure scalp shape from the **evaluated** head mesh in its neutral bind pose. Exclude face, ears, eyelids and neck; use a tagged scalp-face selection/vertex group authored once per character instead of a spherical clip. Place target head frame at its rig head-bone pivot. Cache head-to-world and inverse matrices and never apply transforms to source.
 
-### 2 — Create a fitted scalp cap
-Duplicate just the tagged scalp region of the neutral evaluated head into a **new** mesh; remove unselected triangles, preserve surface continuity/UV when possible, position the cap 1–2 mm outwards in character-scale meters as a starting **tunable** offset (check real units). Extend only to approved hairline/temples/nape, stopping before forehead skin and ears. Weight rigid to head bone or use copied head skin weights if rotation/face deformation requires them. Give roots a darker, textured non-shiny material matching the source hair; optionally feather hairline with small wisps. Do not simply paint a skull-sized opaque helmet.
+### 2 — Preserve source Face4 scalp first; supplement only if needed
+Use the untouched original Face4 mesh and original Face BaseColor as the base. Inspect actual root coloring and any intentional visible part lines. **Do not create a second cap automatically.** If a real uncovered region remains, work non-destructively: a local root-pigment/wisp layer or optional Face4-selected extraction with original UVs and verified material. Exclude face, forehead skin, ears and eyes. A new mesh must not double-cover the original head, Z-fight or obscure the natural scalp transition.
 
 ### 3 — Align the hairstyle (coarse)
 Normalize units and orientation *without destructive source edits*. Fit translation + rigid rotation + **uniform** scale using 3+ corresponding source-target landmarks. Compute a Kabsch / Umeyama similarity solution and reject reflections, nonfinite values and high landmark residual. Do not use independent XYZ scaling of curled clumps as a first fix. Show transformed vs original overlays for review. If source landmarks are absent, pause for author annotation rather than guess.
@@ -65,26 +69,18 @@ Known from `docs/assets/CURLY_SET_AUDIT.md`: `CURLY 01.FBX` (FBX mesh name `Curl
 1. Import Vesper's neutral head/rig and original Curly Mane into a private new Blender working scene; set head bone and scalp-face group once.
 2. Mark source forehead/crown/temples/nape root landmarks and corresponding head-local target landmarks.
 3. Inspect similarity transform preview; manually correct root anchors if confidence is low.
-4. Generate fitted cap; root-conform in 3 passes, never using global shrinkwrap.
+4. Keep the real Face4 scalp and its color; conform Curly Mane root strips toward it in measured passes, never using full-style shrinkwrap. Make supplemental coverage only where the actual hair needs it.
 5. Evaluate front/back/side/top plus head turns and high-collar/bonnet poses.
 6. Only after one approved original-looking fit, generate LOD1/LOD2 and integrate catalog discovery. Use named styles, not `Hair_01` labels.
 
 Acceptance: no obviously exposed scalp holes outside intentional part, no rigid dark helmet, curl silhouette intact, no hair clipping through ears/forehead, valid motion, stable alpha, adequate frame cost on the actual phone.
 
-## Repository layout (proposed; not yet implemented)
-```
-scripts/hair/
-  README.md                    # old material-only batch (retain)
-  fit/README.md                # this plan
-  fit/character_profiles/vesper.json
-  fit/styles/curly_mane.json
-  fit/inspect_source.py        # dry-run Blender importer / analysis
-  fit/fit_hair.py              # author-confirmed alignment, cap and root fitting
-  fit/validate_fit.py          # numeric + GLB import checks
-  fit/render_qa.py             # camera matrix render receipt
-  fit/tests/                  # geometry, unit and transform fixtures
-```
-All commercial FBX, paid texture maps, generated vendor derivatives, and previews stay outside the public repository unless rights are independently confirmed. The public branch should only contain our original scripts/config/docs and test fixtures.
+## Repository layout / current boundaries
+- **Existing:** `inspect_character.py`, `inspect_source.py`, `extract_source_scalp.py` (optional debug), `cap_geometry.py` + `build_scalp_cap.py` (fallback only), `character_profiles/vesper.json`, `styles/curly_mane.json`, `test_cap_geometry.py`, documentation and dev/staging comparison switches.
+- **Not yet implemented:** `fit_hair.py` (root-only geometry fit), `validate_fit.py` (rig/UV/gap checks), `render_qa.py` (reproducible camera matrix), LOD/export integration.
+- **Out of scope:** any male character/garment fitting and production UI updates.
+
+Keep all original/purchased vendor FBX, source maps, new .blend working copies and redistributed derivatives private unless licensing establishes release rights. Never publish just because a technical test passes.
 
 ## Implemented Blender authoring commands
 
