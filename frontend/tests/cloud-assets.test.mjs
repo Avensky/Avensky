@@ -7,7 +7,7 @@ import { resolveAssetUrl } from "../src/assets/assetPaths.ts";
 import { collectApprovedPrivateAssets, sealRelease, validateRelease, stagingRelease } from "../scripts/staging-release.mjs";
 import { checkPrebuiltColliders } from "../scripts/prebuilt-colliders.mjs";
 import { assetGateway } from "../../deploy/staging-assets/gateway.mjs";
-import { checkDependencies, verifyObject, verifyStoredObject } from "../../deploy/staging-assets/verify-release.mjs";
+import { checkDependencies, reusableVerifiedObject, verifyObject, verifyStoredObject } from "../../deploy/staging-assets/verify-release.mjs";
 import { signedObjectReader, storageKey } from "../../deploy/staging-assets/object-store.mjs";
 
 const path = "/models/city/a, b.glb";
@@ -120,6 +120,19 @@ test("verification reuses the existing model-root keys and falls back only when 
   await assert.rejects(verifyStoredObject(corrupt, path, model, release.assets, {}), /SHA-256 or byte count/);
   assert.deepEqual(keys, [digestKey]);
   assert.throws(() => storageKey(texture, release.assets[texture].sha256, "models-root"), /Unsupported storage layout/);
+});
+
+test("unchanged private objects reuse trusted ETag proofs; changes need verification", () => {
+  const prior = {
+    assets: { [path]: entry(bytes) },
+    objects: { [path]: { layout: "models-root", etag } },
+  };
+  assert.deepEqual(reusableVerifiedObject(prior, path, entry(bytes)), { layout: "models-root", etag });
+  assert.equal(reusableVerifiedObject(prior, path, { ...entry(bytes), size: bytes.length + 1 }), null);
+  assert.equal(reusableVerifiedObject(prior, path, { ...entry(bytes), sha256: "f".repeat(64) }), null);
+  assert.equal(reusableVerifiedObject(prior, texture, entry(Buffer.from("other"))), null);
+  assert.equal(reusableVerifiedObject({ ...prior, objects: { [path]: { layout: "wrong", etag } } }, path, entry(bytes)), null);
+  assert.equal(reusableVerifiedObject({ ...prior, objects: { [path]: { layout: "models-root", etag: "invalid" } } }, path, entry(bytes)), null);
 });
 
 test("private object reader coalesces signing and pins the verified storage ETag", async () => {

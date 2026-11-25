@@ -66,10 +66,10 @@ For a future pack, commit a manifest containing only logical URLs, SHA-256 diges
      console.log("Proposed asset release", candidate.id, Object.keys(candidate.assets).length);'
    ~~~
 
-3. Verify **all** candidate assets from the trusted staging host using its read-only AWS identity. The verifier streams each model, validates hashes/lengths/GLB dependencies, and outputs an ETag-pinned manifest *only if every asset passes*:
+3. Verify the candidate from the trusted staging host using its read-only AWS identity. The verifier reuses trusted ETag proofs for unchanged assets in the existing verified release, and streams **all new or changed models** to validate hashes, byte lengths and dependencies. It writes an ETag-pinned manifest only if every needed check passes. The private gateway continues enforcing `If-Match` on each reused ETag:
 
    ~~~sh
-   node deploy/staging-assets/verify.mjs staging-candidate.json verified-staging-candidate.json --models-root
+   node deploy/staging-assets/verify.mjs staging-candidate.json verified-staging-candidate.json --models-root --reuse-verified /etc/avensky-assets/verified-tennis-alpha.json
    ~~~
 
 4. Install the new verified file outside the web root, and serve **both the current and candidate releases** from the staging gateway, preserving open sessions. Ensure the local staging gateway returns HTTP 206 and `glTF` for the candidate hair byte-range request. Do not remove either previous verified manifest.
