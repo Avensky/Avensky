@@ -78,14 +78,14 @@ function EntryCamera({ camera }: { camera: PerspectiveCamera }) {
   useLayoutEffect(() => {
     const portrait = size.width < size.height;
     if (portrait) {
-      camera.position.set(3.7, 1.55, 3.9);
-      camera.lookAt(-1.35, 2.4, -4.65);
+      camera.position.set(4.35, 1.65, 4.55);
+      camera.lookAt(-.25, 2.3, -5.4);
     } else {
       camera.position.set(5.7, 1.8, 4.9);
       camera.lookAt(-.6, 1.65, -5.3);
     }
     camera.aspect = size.width / Math.max(1, size.height);
-    camera.fov = portrait ? 65 : 55;
+    camera.fov = portrait ? 71 : 55;
     camera.updateProjectionMatrix();
     invalidate();
   }, [camera, size, invalidate]);
