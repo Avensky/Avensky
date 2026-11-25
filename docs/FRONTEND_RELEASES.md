@@ -4,7 +4,9 @@ Each push to `main` builds and publishes the staging frontend at **https://stagi
 
 **Actions → Deploy to live → Run workflow** publishes to **https://play.avensky.com** using the production environment. Select `main` and leave the commit field empty for its current tip, or enter the full SHA of an earlier staged commit on `main`. The production receiver requires a staging receipt and the approved production bundle for that exact SHA.
 
-Staging deploys the matching Rust game when its input files change, before activating the website. Live promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for server configuration and data migrations.
+Staging deploys the matching Rust game when its input files change, before activating the website. Live promotion publishes static files.
+
+For internal staging, new private S3 models are streamed from the catalog packaged in the installed frontend. There is no per-release asset verifier or manual approval gate; a missing asset fails that individual model request, not the site deployment. The one-time host upgrade is documented in [Rapid private staging updates](STAGING_AUTODEPLOY.md). Production remains manually approved. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for server configuration and data migrations.
 
 For account and game-master testing, set the repository variable `STAGING_PLAYER_ONBOARDING=1` and enable the matching staging backend. Set `AVENSKY_GAME_MASTER_ID` in the staging game environment to your registered staging player code. [Game master setup](PLAYER_ONBOARDING.md#game-master-and-shared-content)
 

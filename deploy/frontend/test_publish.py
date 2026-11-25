@@ -109,7 +109,7 @@ class ReleaseTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "different verified"):
                     publish.check_staging_assets(legacy, new_id)
 
-    def test_staging_archive_triggers_automatic_private_asset_activation(self):
+    def test_staging_deploy_skips_s3_release_approval(self):
         with tempfile.TemporaryDirectory() as temp:
             path = Path(temp)
             data = tar_bytes({
@@ -119,15 +119,14 @@ class ReleaseTest(unittest.TestCase):
             })
             with (
                 patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
-                patch.object(publish, "check_staging_assets"),
+                patch.object(publish, "check_staging_assets", side_effect=AssertionError("Unexpected release gate")),
                 patch.object(publish.subprocess, "run") as action,
             ):
                 publish.publish(SimpleNamespace(environment="staging", root=path,
                                 verified_manifest=path / "verified"), COMMIT)
-            self.assertEqual(action.call_args.args[0],
-                             ["sudo", "-n", "--", "/usr/local/lib/avensky/auto_activate.py"])
-            self.assertEqual(json.loads(action.call_args.kwargs["input"])["id"], ASSETS)
+            action.assert_not_called()
             self.assertEqual((path / "current/index.html").read_bytes(), b"staging")
+            self.assertTrue((path / "releases" / COMMIT / "asset-release.json").is_file())
 
     def test_asset_release_manifest_mismatch_never_installs_or_switches(self):
         with tempfile.TemporaryDirectory() as temp:
@@ -154,7 +153,7 @@ class ReleaseTest(unittest.TestCase):
             old = root / "old"
             old.mkdir()
             (root / "current").symlink_to(old)
-            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage"})
+            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage", "asset-release.json": json.dumps({"id": ASSETS}).encode()})
             args = SimpleNamespace(environment="staging", root=root, verified_manifest=root / "verified")
             with (
                 patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
@@ -177,12 +176,11 @@ class ReleaseTest(unittest.TestCase):
             stage, production, approved = (path / name for name in ("stage", "production", "approved"))
             for root in (stage, production, approved):
                 root.mkdir()
-            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage"})
-            with (
-                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
-                patch.object(publish, "check_staging_assets", side_effect=ValueError("Gateway offline")),
-            ):
-                with self.assertRaises(ValueError):
+            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage", "asset-release.json": json.dumps({"id": ASSETS}).encode()})
+            bad = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS),
+                             "web/index.html": b"stage", "asset-release.json": json.dumps({"id": "c" * 64}).encode()})
+            with patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(bad))):
+                with self.assertRaisesRegex(ValueError, "disagrees"):
                     publish.publish(SimpleNamespace(environment="staging", root=stage, verified_manifest=path / "verified"), COMMIT)
             self.assertFalse((stage / "current").exists())
             with (
