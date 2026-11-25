@@ -1,5 +1,4 @@
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { JSDOM } from "jsdom";
@@ -200,12 +199,12 @@ test("welcome picks a personality and gender before registration and lets return
   }
 });
 
-test("the Avensky icons, cache-versioned garage still and game loading media ship with the frontend", async () => {
+test("the Avensky icons, authored garage entry and game loading media ship with the frontend", async () => {
   const read=path=>readFile(new URL("../"+path,import.meta.url));
-  const { GARAGE_ENTRY_POSTER }=await import("../src/theme/garageEntry.ts");
+  const { garageBackdrop, GARAGE_MODEL_PATH }=await import("../src/theme/garageEntry.ts");
   const [html, svg, png, ico, garage, flare, loop]=await Promise.all([
     read("index.html"),read("public/images/logo.svg"),read("public/images/logo.png"),
-    read("public/favicon.ico"),read("public/images/" + GARAGE_ENTRY_POSTER),read("public/images/purple-sunflare.webp"),read("public/images/purple-sunflare-loop.mp4"),
+    read("public/favicon.ico"),read("public" + GARAGE_MODEL_PATH),read("public/images/purple-sunflare.webp"),read("public/images/purple-sunflare-loop.mp4"),
   ]);
   assert.match(html.toString(),/<title>Avensky<\/title>/);
   assert.match(html.toString(),/name="description" content="Avensky is a browser-based game engine/);
@@ -215,9 +214,9 @@ test("the Avensky icons, cache-versioned garage still and game loading media shi
   assert.equal(png.readUInt32BE(20),512);
   assert.equal(ico.readUInt16LE(2),1);
   assert.deepEqual([0,1,2,3].map(index=>ico[6+16*index]),[16,32,48,64]);
-  assert.equal(garage.toString("ascii",8,12),"WEBP");
-  assert.ok(garage.length < 80_000);
-  assert.equal(GARAGE_ENTRY_POSTER, "garage-entry." + createHash("sha256").update(garage).digest("hex").slice(0,12) + ".webp");
+  assert.match(garageBackdrop(), /data-live-garage/);
+  assert.doesNotMatch(garageBackdrop(), /picture|img|video|webp/);
+  assert.ok(garage.toString("ascii",0,4) === "glTF" || garage.toString("utf8",0,42).startsWith("version https://git-lfs"));
   assert.equal(flare.toString("ascii",8,12),"WEBP");
   assert.ok(flare.length < 15_000);
   assert.equal(loop.toString("ascii",4,8),"ftyp");

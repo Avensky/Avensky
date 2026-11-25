@@ -52,9 +52,10 @@ function garageTestServer() {
           useLayoutEffect(() => { ref.current = camera; return () => { ref.current = null; }; }, [ref]);
           return h('div', {'data-camera': true}, children);
         }
-        export function GarageEnvironment({onSettled, floorCaptureRate}) {
+        export const VehiclePlatform = () => h("i", {"data-vehicle-platform": true});
+        export function GarageEnvironment({onSettled}) {
           useLayoutEffect(() => { onSettled(); }, [onSettled]);
-          return h('div',{'data-garage':true,'data-floor-capture-rate':floorCaptureRate});
+          return h('div',{'data-garage':true});
         }
         export function PreviewTurntable({children, onReady}) {
           useLayoutEffect(() => { onReady(turntable); }, [onReady]);
@@ -65,7 +66,7 @@ function garageTestServer() {
           useLayoutEffect(() => { characterActor.matrixAutoUpdate = !upright; }, [upright]);
           return h('span', {'data-driver': choice.id, 'data-character-actor': previewPacks, 'data-upright': upright});
         }
-        export function StagedVehiclePreviewModel({model, garageOpen, allowDriver, onSettled, onDriverFit, summon, active, diagnostics}) {
+        export function StagedVehiclePreviewModel({children,model, garageOpen, allowDriver, onSettled, onDriverFit, summon, active, diagnostics}) {
           if (pending?.model === model) throw pending.promise;
           const materialized = useRef(summon);
           useLayoutEffect(() => {
@@ -82,7 +83,7 @@ function garageTestServer() {
             if (allowDriver) onDriverFit({model,position:[model === 'brz' ? 2 : 9,0,1],scale:1,yaw:0});
             return () => markers.forEach(marker => marker.removeFromParent());
           }, [model, allowDriver, onSettled, onDriverFit]);
-          return h('span',{'data-model':model,'data-garage-open':garageOpen,'data-materializes':materialized.current,'data-active':active,'data-diagnostics':diagnostics});
+          return h('span',{'data-model':model,'data-garage-open':garageOpen,'data-materializes':materialized.current,'data-active':active,'data-diagnostics':diagnostics},active && children);
         }
       `;}
     }]});
@@ -147,7 +148,7 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true})));
     stepCamera();
     const garage = document.querySelector('[data-garage]');
-    assert.equal(garage.dataset.floorCaptureRate, undefined);
+    assert.ok(document.querySelector('[data-vehicle-platform]'));
     assert.equal(camera.position.x,3);
     const position = camera.position.clone(), rotation = camera.quaternion.clone(), fov = camera.fov;
     const mountedCamera = document.querySelector('[data-camera]');
@@ -158,7 +159,7 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     setGarageMotion(Math.PI / 3, 1, 2);
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true,wardrobeOpen:true,characterOnly:true,fittingRoom:true})));
     stepCamera();
-    assert.equal(garage.dataset.floorCaptureRate, '12', 'the fitting room limits the decorative floor reflection');
+    assert.equal(document.querySelector('[data-vehicle-platform]'), null, 'the character stands on the workshop floor');
     assert.equal(document.querySelector('[data-model="brz"]'),vehicle,'the vehicle stays mounted');
     assert.equal(vehicle.dataset.active,'false','the fitting room suspends the vehicle');
     assert.equal(document.querySelector('[data-character-actor="true"][data-upright="true"]'),driver);
@@ -174,7 +175,7 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     setGarageMotion(0, 0, 0);
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true,wardrobeOpen:true})));
     stepCamera();
-    assert.equal(garage.dataset.floorCaptureRate, undefined, 'the Emotes tab keeps the normal reflection cadence');
+    assert.ok(document.querySelector('[data-vehicle-platform]'), 'vehicle emotes restore the car platform');
     assert.equal(vehicle.dataset.active,'true','the Emotes tab keeps its vehicle');
     assert.equal(useCharacterPreviewStore.getState().cockpitVehicle,'brz');
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true})));

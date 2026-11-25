@@ -17,7 +17,6 @@ import { useAlphaFlow } from "./alpha/useAlphaFlow";
 import "../theme/theme.css";
 import { FullCanvas } from "../FullCanvas";
 import { useUIStore } from "../store";
-import type { MenuScreen } from "../store/menus/uiStore";
 import { VehiclePreview } from "./preview";
 import { MainMenu } from "./menus/MainMenu";
 import { PauseMenu } from "./menus/PauseMenu";
@@ -79,11 +78,7 @@ export function GameUI() {
   }, [socialReady]);
   const menuPreview = screen === "heroes" || screen === "hero_select" || screen === "mode_select"
     || screen === "sandbox_setup";
-  // Main and the waiting line cover a previous preview without warming a new scene.
-  const [lastMenuPreview, setLastMenuPreview] = useState<MenuScreen | null>(null);
-  const retainedPreview = (screen === "main" || screen === "queue") && !isModeLoading ? lastMenuPreview : null;
-  const previewScreen = menuPreview ? screen : retainedPreview;
-  if (previewScreen !== lastMenuPreview) setLastMenuPreview(previewScreen);
+  const previewScreen = menuPreview ? screen : null;
   const needsCanvas = previewScreen !== null || screen === "sandbox"
     || screen === "world_builder";
   const heroOwner = useSocialStore(s=>s.view?.profile.id??s.profileOwner??"guest");
@@ -97,7 +92,6 @@ export function GameUI() {
   const vehicleEmote = characterEmoteNeedsGarage(characterTab, previewCamera, previewEmoteId, previewInsideCar);
   const [collapsed, setCollapsed] = useState(false);
   const [roomReady, setRoomReady] = useState(false);
-  const previewPaused = retainedPreview !== null;
 
   const worldCover = (screen === "sandbox" || screen === "world_builder") &&
     (isModeLoading || overlay === "team_lineup");
@@ -113,8 +107,7 @@ export function GameUI() {
       {needsCanvas && (
         <FullCanvas
           roomReady={roomReady}
-          paused={previewPaused}
-          covered={retainedPreview !== null || worldCover}
+          covered={worldCover}
           preview={previewScreen !== null}
         >
           {previewScreen !== null && (
@@ -127,7 +120,6 @@ export function GameUI() {
               wardrobeOpen={screen === "heroes" && characterTab !== null}
               characterOnly={screen === "heroes" && characterTab !== null && !vehicleEmote}
               fittingRoom={screen === "heroes" && characterTab === "appearance"}
-              stationary={previewPaused}
             />
           )}
           {screen === "world_builder" && (

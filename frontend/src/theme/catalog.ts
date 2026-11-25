@@ -17,6 +17,7 @@ export function applyUITheme(theme: UITheme, garage: UITheme = theme) {
   const palette = UI_THEMES[theme],
     root = document.documentElement;
   root.dataset.uiTheme = theme;
+  root.dataset.garageTheme = garage;
   root.dataset.uiScheme = palette.scheme;
   root.style.colorScheme = palette.scheme;
   for (const name of Object.keys(palette) as (keyof typeof palette)[]) {

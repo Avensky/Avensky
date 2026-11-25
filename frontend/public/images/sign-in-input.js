@@ -3,7 +3,7 @@
   const assets = document.currentScript.src;
   let loading = false;
   function load() {
-    if (loading) return;
+    if (loading || !document.querySelector(".garage-entry-card")) return;
     loading = true;
     const style = document.createElement("link");
     style.rel = "stylesheet";

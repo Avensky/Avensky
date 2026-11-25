@@ -66,6 +66,7 @@ function stageFixture() {
         export const GarageDriver = () => null, PerspectiveCamera = () => null;
         export const FittingMirrorDisplay = () => null, PreviewLoadingStatus = () => null;
         export const PreviewTurntable = ({ children, onReady }) => createElement('group', { ref: onReady }, children);
+        export const VehiclePlatform = () => null;
         export const GarageEnvironment = ({ onSettled }) => {
           useLayoutEffect(() => onSettled(), [onSettled]);
           return null;

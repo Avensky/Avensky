@@ -10,6 +10,7 @@ import "./theme.css";
 /** Mount once at the app/preview root. Accessibility follows the same persisted
  * owner on every screen; standalone previews do not invent their own palette. */
 export function useAppTheme() {
+  const brightness = usePreferencesStore(s => s.garageEffects.accentBrightness);
   const theme = usePreferencesStore((s) => s.theme),
     garage = usePreferencesStore(selectedGarageTheme),
     motion = usePreferencesStore((s) => s.reducedMotion),
@@ -25,9 +26,10 @@ export function useAppTheme() {
     const accent = chosen && chosen !== "factory" ? chosen : null;
     root.style.setProperty("--vehicle-accent", cosmetics.matchCockpit ? (accent && accent !== "theme" ? accent : "var(--app-accent)") : "#a13c3d");
     root.dataset.matchCockpit = String(cosmetics.matchCockpit);
+    root.dataset.garageBrightness = String(brightness);
     root.dataset.reduceMotion = String(motion);
     root.dataset.highContrast = String(contrast);
     root.style.setProperty("--menu-text-scale", String(scale));
-  }, [theme, garage, motion, contrast, scale, cosmetics, body, savedBody]);
+  }, [theme, garage, brightness, motion, contrast, scale, cosmetics, body, savedBody]);
   useMatchTeamTheme();
 }

@@ -15,6 +15,8 @@ Build and validation
 - Rust tests: cargo test --locked --manifest-path avenlab-server/Cargo.toml.
 - Record executed commands and outcomes. Separate passing code tests from visual verification and device performance.
 - For performance changes, supply a reproducible baseline, measurements, parity checks and environmental limits.
+Garage presentation
+- Sign-in, character selection, Play and Heroes share the authored garage_special.glb and LiveGarage scene. Make garage edits there for all four screens.
 Characters and appearance
 - Mara Vega and Rook Okafor are the original starter rigs. Preserve save IDs, rigs, existing working animation and network compatibility.
 - Repaired 12-style hairstyles have provisional approval only; final approval requires checking actual in-game hair color and opacity.

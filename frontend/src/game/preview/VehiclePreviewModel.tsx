@@ -69,8 +69,9 @@ function setLampEmission(material: MeshStandardMaterial, color: number | Color, 
 }
 
 // Shared material preparation retains the TSX fixes without runtime network poses.
-export function VehiclePreviewModel({platform,model,showroomPath,driver,previewPacks,onSettled,onDriverFit,motion,
+export function VehiclePreviewModel({children,platform,model,showroomPath,driver,previewPacks,onSettled,onDriverFit,motion,
   allowDriver = true,garageOpen = false,garageCameraAnchors = garageOpen,summon = false,reducedMotion = false,active = true,diagnostics = garageOpen}:{
+  children?: React.ReactNode;
   platform: readonly [number, number];
   model: VehicleModelId;
   showroomPath?: string;
@@ -414,6 +415,7 @@ export function VehiclePreviewModel({platform,model,showroomPath,driver,previewP
   }, [hasDriver, driverReady, onDriverFit, model, driverAcross, driverAlong, driverScale, staging.side, lean, mirrorFit, cockpit, panels, clearance]);
   return (
     <>
+      {active && vehiclePainted && !revealActive && children}
       <group ref={revealRoot} scale={revealActive ? .001 : 1} visible={active}>
         <PreviewContactShadow footprint={display.footprint} offset={display.shadowOffset} />
         <group position={display.position} scale={display.scale} name="selection-vehicle-glb">

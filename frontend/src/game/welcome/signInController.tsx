@@ -19,7 +19,8 @@ function attachController(form: HTMLElement) {
   const controls = document.createElement("div");
   controls.className = "garage-gamepad-controls";
   form.append(controls);
-  createRoot(controls).render(<MenuInputDeviceContext.Provider value="controller">
+  const root = createRoot(controls);
+  root.render(<MenuInputDeviceContext.Provider value="controller">
     <MenuShortcuts back={false} tabs={false} directions="both" selectLabel="Select" />
     <OnScreenKeyboard />
   </MenuInputDeviceContext.Provider>);
@@ -87,15 +88,21 @@ function attachController(form: HTMLElement) {
     lastButtons = [];
     delete form.dataset.gamepad;
   }
-  document.addEventListener("pointerdown", () => { delete form.dataset.gamepad; }, true);
-  window.addEventListener("gamepadconnected", start);
-  window.addEventListener("focus", start);
-  window.addEventListener("pageshow", start);
-  window.addEventListener("blur", stop);
-  window.addEventListener("pagehide", stop);
-  document.addEventListener("visibilitychange", () => document.hidden ? stop() : start());
+  const scope = new AbortController();
+  const options = { signal: scope.signal };
+  document.addEventListener("pointerdown", () => { delete form.dataset.gamepad; }, { ...options, capture: true });
+  for (const event of ["gamepadconnected", "focus", "pageshow"]) window.addEventListener(event, start, options);
+  for (const event of ["blur", "pagehide"]) window.addEventListener(event, stop, options);
+  document.addEventListener("visibilitychange", () => document.hidden ? stop() : start(), options);
+  window.addEventListener("avensky:leave-portal-form", () => {
+    scope.abort(); stop(); root.unmount(); controls.remove();
+  }, { ...options, once: true });
   start();
 }
 
-const card = document.querySelector<HTMLElement>(".garage-entry-card[data-controller-rows]");
-if (card) attachController(card);
+function attach() {
+  const card = document.querySelector<HTMLElement>(".garage-entry-card[data-controller-rows]");
+  if (card && !card.querySelector(".garage-gamepad-controls")) attachController(card);
+}
+window.addEventListener("avensky:portal-form", attach);
+attach();

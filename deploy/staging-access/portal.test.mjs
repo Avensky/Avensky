@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { copyFile, mkdtemp, rm } from "node:fs/promises";
+import { copyFile, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -47,6 +47,30 @@ test("the installed standalone sign-in uses the palette shipped with the app", a
   }
 });
 
+test("signed-out requests can load only the garage entry graph and its exact released GLB", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "garage-entry-"));
+  const garageManifest = join(dir, "garage-runtime.json");
+  const entry = "/assets/garageRoomElement-test.js";
+  const model = "/__staging-assets/" + "f".repeat(64) + "/models/world/garage_special.glb";
+  await writeFile(garageManifest, JSON.stringify({ entry, modules: [entry, "/assets/three-test.js"], model }));
+  const accounts = testerAccounts(":memory:", randomBytes(32));
+  const server = createPortal({ origin, accounts, garageManifest });
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+  t.after(async () => { await new Promise(resolve => server.close(resolve)); accounts.close(); await rm(dir, { recursive: true }); });
+  const base = "http://127.0.0.1:" + server.address().port + "/__alpha/";
+  const bootstrap = await fetch(base + "entry/garage-room.js", { redirect: "manual" });
+  assert.equal(bootstrap.headers.get("location"), entry);
+  for (const path of [entry, "/assets/three-test.js", model, "/draco/draco_decoder.wasm"]) {
+    const access = await fetch(base + "verify", { headers: { "x-forwarded-uri": path } });
+    assert.equal(access.status, 204, path);
+  }
+  for (const path of ["/assets/index-private.js", model.replace("garage_special", "hero"), model + "/other", "/ws/"]) {
+    const access = await fetch(base + "verify", { headers: { "x-forwarded-uri": path } });
+    assert.equal(access.status, 401, path);
+  }
+});
+
 test("invites grant access once and revocation invalidates existing cookies", async t => {
   const accounts = testerAccounts(":memory:", randomBytes(32));
   const delivered = [];
@@ -87,14 +111,12 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.match(signIn, /src="\/__alpha\/entry\/sign-in-input\.js"/);
   assert.equal((await get("entry/sign-in-input.js")).status, 200);
   assert.doesNotMatch(signIn, /garage-entry-sign/);
-  assert.match(signIn, /<avensky-garage-room\b/);
+  assert.match(signIn, /data-live-garage/);
   assert.match(signIn, /type="module" src="\/__alpha\/entry\/garage-room\.js"/);
   const css = await get("entry/garage-entry.css");
   assert.equal(css.status, 200);
-  const poster = signIn.match(/src="\/__alpha\/(entry\/garage-entry[^"]*\.webp)"/)[1];
-  const garage = await get(poster);
-  assert.equal(garage.headers.get("content-type"), "image/webp");
-  assert.equal((await get(poster, { "if-none-match": garage.headers.get("etag") })).status, 304);
+  assert.doesNotMatch(signIn, /<picture|garage-entry[^"]*\.webp/);
+  assert.equal((await get("entry/sign-in-navigation.js")).status, 200);
   assert.equal((await get("entry/game-bridge.mjs")).status, 404);
   const script = await get("password.js");
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
