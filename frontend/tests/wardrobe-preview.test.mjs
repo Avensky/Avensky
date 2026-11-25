@@ -9,7 +9,7 @@ function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
-      __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01"]),
+      __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),
       __STANDALONE_CORSET_LODS__: JSON.stringify({
         "gothic-05": { garage: true, mobile: false },
@@ -301,29 +301,33 @@ test("the wardrobe resolver requests donors and authored tiers in order", async 
   }
 });
 
-test("staging opens a dress with the shipped body donor on the first selection", async () => {
-  const dressUrl = "/models/characters/female/wardrobe/dress/medieval-04.garage.glb";
+test("staging opens a dress with the shipped body donor on desktop and mobile", async () => {
+  const desktopDress = "/models/characters/female/wardrobe/dress/medieval-04.garage.glb";
+  const mobileDress = "/models/characters/female/wardrobe/dress/medieval-04.mobile.glb";
   const donorUrl = "/models/characters/wardrobe/gothic-02.mobile.glb";
-  const vite = await wardrobePreviewServer({}, { id: "wardrobe-release", paths: { [dressUrl]: true, [donorUrl]: true } });
+  const vite = await wardrobePreviewServer({}, { id: "wardrobe-release",
+    paths: { [desktopDress]: true, [mobileDress]: true, [donorUrl]: true } });
   try {
     const { resolveWardrobePreview } = await vite.ssrLoadModule("/src/game/characters/wardrobePreviewAssets.ts");
     const { characterLook, DEFAULT_CHARACTER } = await vite.ssrLoadModule("/src/game/characters/characterCatalog.ts");
     const { makeAssetAvailable, makeVillageAvailable, makeGarmentAvailable } = await vite.ssrLoadModule("virtual:wardrobe-preview");
     const village = makeVillageAvailable("village", "cut");
-    const frame = { preferredUrl: "village", villageKind: "portrait", kind: "garage" };
-    const previous = resolveWardrobePreview({ ...frame, look: characterLook(DEFAULT_CHARACTER), sources: { village } }).preview;
-    const select = sources => resolveWardrobePreview({
-      ...frame, look: characterLook({ ...DEFAULT_CHARACTER, outfit: "medieval-04" }), previous, sources,
-    });
-    const loading = select({ village });
-    assert.deepEqual(loading.pendingUrls, [dressUrl, donorUrl], "request the dress and shipped donor together");
-    assert.equal(loading.preview, previous, "keep the last rendered outfit while the new dress loads");
-    const dress = makeGarmentAvailable(dressUrl), donor = makeAssetAvailable(donorUrl);
-    const loaded = select({ village, [dressUrl]: dress, [donorUrl]: donor });
-    assert.deepEqual(loaded.pendingUrls, []);
-    assert.equal(loaded.unavailable, false);
-    assert.equal(loaded.preview.garments[0].scene, dress);
-    assert.equal(loaded.preview.garmentBody, donor.getObjectByName("BODY_WARDROBE"));
+    for (const [kind, dressUrl] of [["garage", desktopDress], ["portrait", mobileDress]]) {
+      const frame = { preferredUrl: "village", villageKind: "portrait", kind };
+      const previous = resolveWardrobePreview({ ...frame, look: characterLook(DEFAULT_CHARACTER), sources: { village } }).preview;
+      const select = sources => resolveWardrobePreview({
+        ...frame, look: characterLook({ ...DEFAULT_CHARACTER, outfit: "medieval-04" }), previous, sources,
+      });
+      const loading = select({ village });
+      assert.deepEqual(loading.pendingUrls, [dressUrl, donorUrl], "request the dress and shipped donor together");
+      assert.equal(loading.preview, previous, "keep the last rendered outfit while the new dress loads");
+      const dress = makeGarmentAvailable(dressUrl), donor = makeAssetAvailable(donorUrl);
+      const loaded = select({ village, [dressUrl]: dress, [donorUrl]: donor });
+      assert.deepEqual(loaded.pendingUrls, []);
+      assert.equal(loaded.unavailable, false);
+      assert.equal(loaded.preview.garments[0].scene, dress);
+      assert.equal(loaded.preview.garmentBody, donor.getObjectByName("BODY_WARDROBE"));
+    }
   } finally {
     await vite.close();
   }

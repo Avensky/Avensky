@@ -463,7 +463,10 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit);
     await click(`[data-wardrobe-item=${missingOutfit}]`);
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit, 'missing outfits leave the current selection in place.');
-    await click('[aria-label="Sleepwear"] [data-wardrobe-item=linen-nightgown]');
+    const nightgown = '[aria-label="Sleepwear"] [data-wardrobe-item=linen-nightgown]';
+    assert.equal(find(nightgown).dataset.alphaStatus, 'provisional');
+    assert.match(find(nightgown).textContent, /Provisional pass/);
+    await click(nightgown);
     const sleepwear = changes.at(-1);
     assert.equal(sleepwear.outfit, 'linen-nightgown');
     assert.equal(sleepwear.garments, undefined, 'sleepwear uses the persisted complete-outfit selection');

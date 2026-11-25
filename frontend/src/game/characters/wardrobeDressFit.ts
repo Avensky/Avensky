@@ -2,6 +2,7 @@ import { BufferGeometry, Float32BufferAttribute, MathUtils, Triangle, Uint16Buff
 import { MeshBVH, type HitPointInfo } from "three-mesh-bvh";
 
 export const HOODED_GOWN = "medieval-05";
+export const LACED_LINEN_DRESS = "medieval-01";
 export const LINEN_NIGHTGOWN = "linen-nightgown";
 export const LINEN_NIGHTGOWN_BINDING = "CLOTH_LINEN_NIGHTGOWN_1_1";
 export const LINEN_NIGHTGOWN_FABRIC = "CLOTH_LINEN_NIGHTGOWN_2_0";

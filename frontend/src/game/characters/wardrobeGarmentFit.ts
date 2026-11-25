@@ -23,9 +23,10 @@ import { highCollarSkirtWaistband } from "./wardrobeSkirt";
 import { prepareWardrobeCoverage, wardrobeCoverageSurface as bodySurface } from "./wardrobeCoverage";
 import { insideBraNeckline, insideBriefs, prepareWardrobeUnderwear, type BraStyle, type BriefsStyle } from "./wardrobeUnderwear";
 import { getWardrobeActorBody, isWardrobeBodyDonor, sharesWardrobeRig } from "./wardrobeBody";
-import { HOODED_GOWN, LINEN_NIGHTGOWN, LINEN_NIGHTGOWN_BINDING, LINEN_NIGHTGOWN_FABRIC,
+import { HOODED_GOWN, LACED_LINEN_DRESS, LINEN_NIGHTGOWN, LINEN_NIGHTGOWN_BINDING, LINEN_NIGHTGOWN_FABRIC,
   needsCloseDressFit, prepareCloseDressFit, usesLongGownFit } from "./wardrobeDressFit";
 import { fitLinenNightgownHem } from "./linenNightgownHem";
+import { fitLacedLinenLayers, LACED_LINEN_OVERDRESS, LACED_LINEN_SHIRT, LACED_LINEN_UNDERSKIRT } from "./lacedLinenLayers";
 import { hoodedGownColors, prepareHoodedGown } from "./hoodedGown";
 import { prepareDressSleeves } from "./dressSleeves";
 import { ORIGINAL_DRESS_BELT_COLORS, restoreDressMaterial } from "./dressMaterials";
@@ -33,13 +34,13 @@ import { ORIGINAL_DRESS_BELT_COLORS, restoreDressMaterial } from "./dressMateria
 export type WardrobeGarmentSource = { item: NonNullable<ReturnType<typeof getWardrobeGarment>>; scene: Object3D; authoredFit?: boolean };
 
 const dressLayers = {
-  "medieval-01": { outer: "CLOTH_MEDIEVAL_01_1_1", inner: ["CLOTH_MEDIEVAL_01_0_0", "CLOTH_MEDIEVAL_01_2_0"] },
+  [LACED_LINEN_DRESS]: { outer: LACED_LINEN_OVERDRESS, inner: [LACED_LINEN_SHIRT, LACED_LINEN_UNDERSKIRT] },
   "medieval-07": { outer: "CLOTH_MEDIEVAL_07_2_1", inner: ["CLOTH_MEDIEVAL_07_1_0"] },
   "medieval-08": { outer: "CLOTH_MEDIEVAL_08_0_0", inner: ["CLOTH_MEDIEVAL_08_1_1"] },
 } as const;
 
 function fitDressUnderlayers(meshes: readonly SkinnedMesh[], id: keyof typeof dressLayers) {
-  const laced = id === "medieval-01";
+  const laced = id === LACED_LINEN_DRESS;
   const quiltedYoke = id === "medieval-07";
   const { outer: outerName, inner: innerNames } = dressLayers[id];
   const outer = meshes.find(mesh => mesh.name === outerName);
@@ -577,7 +578,7 @@ export function prepareWardrobeGarments(
     const fitSocks = sockBody && prepareShoelessSockFit(sockBody);
     const fitDress = isTailoredDress && full && !isHoodedGown
       ? prepareCloseDressFit(full, original.skeleton, item.id) : undefined;
-    if (fitDress && usesLongGownFit(item.id)) root.userData.longGown = true;
+    if (fitDress && (usesLongGownFit(item.id) || item.id === LACED_LINEN_DRESS)) root.userData.longGown = true;
     for (const { geometry } of skirtSurfaces) geometry.dispose();
     for (const mesh of garmentMeshes) {
       const lining = mesh.userData.wardrobeRole === "shorts";
@@ -588,7 +589,8 @@ export function prepareWardrobeGarments(
       // Fitting the fabric can take it closer to the body, while the fasteners
       // and belts need to retain the space given by the authored layers.
       let fitted = fit?.(source) ?? (lining ? undefined : fitDress?.fit(source, mesh.name, raisedDetail));
-      if (!lining && fitSleeves) fitted = fitSleeves(source, fitted, mesh.name === LINEN_NIGHTGOWN_BINDING);
+      if (!lining && fitSleeves) fitted = fitSleeves(source, fitted, mesh.name === LINEN_NIGHTGOWN_BINDING,
+        item.id === LACED_LINEN_DRESS && mesh.name === LACED_LINEN_SHIRT);
       if (fitted) {
         if (fitShortSkirt && mesh.userData.wardrobePart === "fabric") rebuildShortSkirtFabricNormals(mesh.geometry, fitted);
         mesh.geometry = fitted;
@@ -605,6 +607,7 @@ export function prepareWardrobeGarments(
       }
     }
     fitDress?.dispose();
+    if (item.id === LACED_LINEN_DRESS) fittedGarments.push(...fitLacedLinenLayers(garmentMeshes));
     if (linenNightgown) {
       const fabric = garmentMeshes.find(mesh => mesh.name === LINEN_NIGHTGOWN_FABRIC);
       const binding = garmentMeshes.find(mesh => mesh.name === LINEN_NIGHTGOWN_BINDING);

@@ -117,7 +117,8 @@
     "mobileUrl": "/models/characters/female/wardrobe/dress/linen-nightgown.mobile.glb",
     "outfit": {
       "description": "A soft, full-length linen gown with flared sleeves.",
-      "barefoot": true
+      "barefoot": true,
+      "alphaStatus": "provisional"
     }
   },
   {
