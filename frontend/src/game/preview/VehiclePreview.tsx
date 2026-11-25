@@ -17,7 +17,7 @@ import { PreviewTurntable } from "./PreviewTurntable";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
 import { useSocialStore } from "../../store/social/socialStore";
 import { usePlayerCharacter } from "../characters/localOutfits";
-import { clothingFrame, orbitFittingCamera } from "../characters/clothingFraming";
+import { clothingFrame, cutToFittingView, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
 import { FittingCameraOrbit } from "../characters/FittingCameraOrbit";
 import { FittingMirrorDisplay } from "../characters/FittingMirrorDisplay";
 import { GARAGE_LEAN_ID } from "../characters/garageLean";
@@ -76,7 +76,7 @@ function createPreviewAim() {
     anchors: new Map<string, Object3D>(), cameraMin: new Vector3(), cameraMax: new Vector3(),
     renderedVehicle: undefined as string | undefined, renderedView: "", drivingSetShot: undefined as string | undefined, inStation: false, held: false,
     heldPosition: new Vector3(), heldTarget: new Vector3(), heldOffset: new Vector2(), heldFov: 0, heldNear: 0,
-    initializedCamera: null as ThreePerspectiveCamera | null,
+    initializedCamera: null as ThreePerspectiveCamera | null, missingActorShot: false,
   };
 }
 
@@ -161,8 +161,10 @@ export function VehiclePreview({
   const orbitCamera = (x: number, y: number) => {
     const rotation = fittingOrbit.current!;
     const sensitivity = usePreferencesStore.getState().cameraSensitivity * .006;
-    rotation.yaw = MathUtils.euclideanModulo(rotation.yaw - x * sensitivity + Math.PI, Math.PI * 2) - Math.PI;
-    rotation.pitch -= y * sensitivity;
+    // The wardrobe background may orbit a little, but never put the camera
+    // outside the room. Rotate the character pivot for the full 360-degree view.
+    rotation.yaw = MathUtils.clamp(rotation.yaw - x * sensitivity, -Math.PI / 3, Math.PI / 3);
+    rotation.pitch = MathUtils.clamp(rotation.pitch - y * sensitivity, -.45, .45);
     cameraAim.current!.held = false;
     requestFrame();
   };
@@ -216,11 +218,12 @@ export function VehiclePreview({
     const area = !insideCar && !panelsHidden ? wardrobe?.viewport : null;
     const viewKey = wardrobe ? `wardrobe:${wardrobe.camera}:${wardrobe.focusRevision}:${insideCar}:${characterOnly}` : `garage:${garageView}`;
     const firstFrame = aim.initializedCamera !== camera;
-    if (fittingOrbitEnabled && (firstFrame || aim.renderedView !== viewKey)) {
+    const viewChanged = aim.renderedView !== viewKey;
+    if (fittingOrbitEnabled && (firstFrame || viewChanged)) {
       rotation.yaw = 0;
       rotation.pitch = 0;
     }
-    if (firstFrame || aim.renderedView !== viewKey || stationActive && !aim.inStation) aim.held = false;
+    if (firstFrame || viewChanged || stationActive && !aim.inStation) aim.held = false;
     else if (vehicleId && aim.renderedVehicle && vehicleId !== aim.renderedVehicle) {
       // Keep the rendered framing, including an in-progress orbit, until the
       // player changes the camera. A new car's mounts can be far apart.
@@ -239,6 +242,7 @@ export function VehiclePreview({
     target.set(0, driverStage ? 1.17 : 1.35, 0);
     let lensZoom = zoom;
     let drivingSetShot: string | undefined;
+    let missingActorShot = false;
     if (!aim.held && garageView !== "Showroom") {
       const occupiedShot = garageView === "Cockpit" && stationActive
         ? findPreviewAnchor(aim.anchors, turntable, "garage-cockpit-camera") : undefined;
@@ -255,6 +259,7 @@ export function VehiclePreview({
       const wide = !characterOnly && view.camera === "Whole car";
       const cockpit = insideCar ? findPreviewAnchor(aim.anchors, turntable, wide ? "character-cockpit-overview" : "character-cockpit-camera") : undefined;
       const anchor = cockpit || wide || insideCar ? undefined : findPreviewAnchor(aim.anchors, characterActor.current, "garage-driver");
+      missingActorShot = !wide && !insideCar && !anchor;
       if (wide && !cockpit) lensZoom = view.zoom;
       if (cockpit) {
         drivingSetShot = cockpit.userData.drivingSetShot;
@@ -290,7 +295,7 @@ export function VehiclePreview({
           anchor.parent!.parent!.localToWorld(target.copy(aim.itemCenter));
           radius = aim.itemDistance / MathUtils.clamp(view.zoom, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX);
           anchor.parent!.parent!.getWorldQuaternion(anchorRotation);
-          offset.set(0, radius * .06, radius).applyQuaternion(anchorRotation);
+          orientFittingCameraOffset(offset.set(0, radius * .06, radius), anchorRotation, characterOnly);
         } else if (view.camera === "Face") {
           const focus = findPreviewAnchor(aim.anchors, anchor, "villager-face-focus");
           const head = focus ?? findPreviewAnchor(aim.anchors, anchor, "head");
@@ -299,15 +304,26 @@ export function VehiclePreview({
             if (!focus) target.setY(target.y + .035 * scale);
           }
           (anchor.parent?.parent ?? anchor).getWorldQuaternion(anchorRotation);
-          offset.set(0, radius * .13, radius).applyQuaternion(anchorRotation);
+          orientFittingCameraOffset(offset.set(0, radius * .13, radius), anchorRotation, characterOnly);
         } else {
-          // The garage turntable can park the actor at any world yaw.
+          // In an open garage shot follow the vehicle, but in the dressing
+          // room keep the camera fixed while the actor pivots independently.
           (characterActor.current ?? anchor).getWorldQuaternion(anchorRotation);
-          offset.set(radius * .14, radius * .08, radius).applyQuaternion(anchorRotation);
+          orientFittingCameraOffset(offset.set(radius * .14, radius * .08, radius), anchorRotation, characterOnly);
         }
         position.copy(target).add(offset);
       }
     }
+    // Garments can temporarily remove their anchor while the replacement GLB
+    // loads. Preserve the last *visible* frame rather than jumping to the
+    // default camera behind the garage and blending back through its walls.
+    if (missingActorShot && !firstFrame) {
+      position.copy(camera.position);
+      target.copy(pivot);
+      lensZoom = camera.zoom;
+    }
+    const actorShotRestored = aim.missingActorShot && !missingActorShot;
+    aim.missingActorShot = missingActorShot;
     if (aim.held) {
       position.copy(aim.heldPosition);
       target.copy(aim.heldTarget);
@@ -336,7 +352,8 @@ export function VehiclePreview({
     aim.initializedCamera = camera;
     const drivingSetCut = drivingSetShot && drivingSetShot !== aim.drivingSetShot;
     aim.drivingSetShot = drivingSetShot;
-    const blend = firstFrame || reducedMotion || drivingSetCut ? 1 : 1 - Math.exp(-(closeShot ? 2.8 : 4.5) * Math.min(delta, .1));
+    const blend = firstFrame || reducedMotion || drivingSetCut || cutToFittingView(wardrobeOpen, viewChanged, actorShotRestored)
+      ? 1 : 1 - Math.exp(-(closeShot ? 2.8 : 4.5) * Math.min(delta, .1));
     if (blend === 1) {
       pivot.copy(target);
       camera.position.copy(position);

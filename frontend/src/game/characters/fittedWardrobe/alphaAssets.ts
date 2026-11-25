@@ -11,10 +11,12 @@ export const fittedTennisGarments = [
   { id: "local-wave-wedges", label: "Wave Wedge Sandals", section: "Shoes", category: "footwear", slot: "shoes", piece: "shoes", preserveSkin: true, url: `${folder}/wave-wedge-sandals.glb` },
 ] as const;
 const installedHair = typeof __FITTED_HAIR_URLS__ === "undefined" ? [] : __FITTED_HAIR_URLS__;
-// Staging can preview every fitted hair registered in the private catalog.
-// These mesh names are independent of wardrobe choice IDs.
-const installedExternalHair = typeof __FITTED_HAIR_STYLES__ === "undefined" ? [] : __FITTED_HAIR_STYLES__;
+// One catalog is the source of truth: adding a fitted-hair.json record and a
+// private staging asset automatically grows the selection menu at the next build.
+// The build injects this directly from the registered fitted-hair.json records,
+// filtering out unregistered S3 URLs. Do not maintain a second manual hair list.
+const stagedHair = typeof __FITTED_HAIR_STYLES__ === "undefined" ? [] : __FITTED_HAIR_STYLES__;
 export const fittedHairOptions = [
   ...fittedHairCatalog.filter(style => installedHair.includes(style.url)),
-  ...installedExternalHair,
+  ...stagedHair,
 ];

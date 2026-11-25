@@ -11,6 +11,8 @@ import { CombatHUD } from "../combat/CombatHUD";
 import { HeroLoadoutSync } from "./heroes/HeroLoadoutSync";
 import type { CharacterChoice } from "./characters/characterCatalog";
 import type { CharacterTab } from "./characters/CharacterPage";
+import { useCharacterPreviewStore } from "./characters/characterPreviewStore";
+import { characterEmoteNeedsGarage } from "./characters/characterPreviewStage";
 import { useAlphaFlow } from "./alpha/useAlphaFlow";
 import "../theme/theme.css";
 import { FullCanvas } from "../FullCanvas";
@@ -87,6 +89,12 @@ export function GameUI() {
   const heroOwner = useSocialStore(s=>s.view?.profile.id??s.profileOwner??"guest");
   const [characterTab, setCharacterTab] = useState<CharacterTab | null>(null);
   const [characterDraft, setCharacterDraft] = useState<CharacterChoice | null>(null);
+  const previewCamera = useCharacterPreviewStore(s => s.camera);
+  const previewEmoteId = useCharacterPreviewStore(s => s.emote?.id);
+  const previewInsideCar = useCharacterPreviewStore(s => s.insideCar);
+  // Opening the Emotes panel must not swap the model onto a moving vehicle
+  // stage; only actual garage interaction shots need that environment.
+  const vehicleEmote = characterEmoteNeedsGarage(characterTab, previewCamera, previewEmoteId, previewInsideCar);
   const [collapsed, setCollapsed] = useState(false);
   const previewPaused = previewScreen === "queue";
 
@@ -112,7 +120,7 @@ export function GameUI() {
               awaitingHero={previewScreen === "hero_select" || previewScreen === "heroes"}
               characterDraft={screen === "heroes" ? characterDraft : null}
               wardrobeOpen={screen === "heroes" && characterTab !== null}
-              characterOnly={screen === "heroes" && characterTab !== null && characterTab !== "emotes"}
+              characterOnly={screen === "heroes" && characterTab !== null && !vehicleEmote}
               fittingRoom={screen === "heroes" && characterTab === "appearance"}
               stationary={previewPaused}
             />

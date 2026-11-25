@@ -11,6 +11,7 @@ import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type Charact
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
 import { CharacterLoadingEffect } from "./CharacterLoadingEffect";
 import { SpaceBunsPreview } from "./fittedWardrobe/SpaceBunsPreview";
+import { previewStockBonnet, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
 import { DressContactMotion } from "./fittedWardrobe/DressContactMotion";
 import { WedgeSandalMotion } from "./fittedWardrobe/WedgeSandalMotion";
 import { applyVillagerLook, prepareVillager, villagerModelUrl } from "./villagerModel";
@@ -108,10 +109,22 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
+  const previewHair = useLocalHairstyle(s => s.id);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
+    if (previewPacks && look.character.id === VILLAGER_ID) {
+      // Stock is the authored long braid with bonnet, even if a saved appearance
+      // previously chose cropped/fitted hair. Imported previews take its place.
+      // Change only visibility, never the outfit's removal array or actor rig.
+      const stock = previewStockBonnet(true, true, previewHair);
+      if (model.hat) model.hat.visible = stock;
+      if (model.longHair) model.longHair.visible = stock;
+      if (model.fittedHair) model.fittedHair.visible = false;
+      if (model.crop) model.crop.visible = false;
+      if (stock) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
+    }
     invalidate();
-  }, [model, look, invalidate]);
+  }, [model, look, previewHair, previewPacks, invalidate]);
   useLayoutEffect(() => {
     if (model.trialGarments && useCharacterPreviewStore.getState().camera === "Selected item") {
       useCharacterPreviewStore.setState(state => ({ focusRevision: state.focusRevision + 1 }));

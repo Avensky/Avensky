@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
+
+const expectedHairStyles = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
 import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
@@ -9,10 +12,55 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
   const server = wardrobePreviewServer();
   try {
     const module = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/alphaAssets.ts");
-    assert.ok(module.fittedHairOptions.some(style => style.id === "hair-12"
-      && style.label === "Long with bangs"
-      && style.mesh === "Hair_12"
-      && style.url.endsWith("/Hair_12_espresso.glb")));
+    for (const entry of expectedHairStyles) {
+      assert.ok(module.fittedHairOptions.some(style => style.id === entry.id
+        && style.label === entry.label && style.url === entry.url && style.mesh === entry.mesh));
+    }
+    const hair = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/LocalHairFeatures.tsx");
+    assert.equal(hair.STOCK_HAIR_LABEL, "Long braid and bonnet");
+    assert.equal(hair.previewStockBonnet(true, true, hair.STOCK_HAIR_ID), true);
+    assert.equal(hair.previewStockBonnet(true, true, expectedHairStyles[0].id), false);
+    assert.equal(hair.previewStockBonnet(false, true, hair.STOCK_HAIR_ID), false);
+  } finally {
+    await server.close();
+  }
+});
+
+test("emote tab keeps the stable fitting stage unless a garage interaction needs a car", async () => {
+  const server = wardrobePreviewServer();
+  try {
+    const { characterEmoteNeedsGarage } = await server.ssrLoadModule("/src/game/characters/characterPreviewStage.ts");
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", undefined, false), false);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "makeup-check", false), false);
+    assert.equal(characterEmoteNeedsGarage("details", "Whole car", undefined, false), false);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Whole car", undefined, false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "pose-lean", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "interact-driver-door", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "mirror-makeup", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", undefined, true), true);
+  } finally {
+    await server.close();
+  }
+});
+
+test("fitting camera stays on the safe stage-facing side during character rotation", async () => {
+  const server = wardrobePreviewServer();
+  try {
+    const { orientFittingCameraOffset, cutToFittingView } = await server.ssrLoadModule("/src/game/characters/clothingFraming.ts");
+    const { Quaternion, Vector3 } = await import("three");
+    const axis = new Vector3(0, 1, 0);
+    const atRest = orientFittingCameraOffset(new Vector3(0, .25, 2), new Quaternion(), true);
+    for (const yaw of [0, Math.PI / 2, Math.PI, Math.PI * 1.8]) {
+      const actorRotation = new Quaternion().setFromAxisAngle(axis, yaw);
+      const camera = orientFittingCameraOffset(new Vector3(0, .25, 2), actorRotation, true);
+      assert.ok(camera.distanceTo(atRest) < 1e-6, "turning the model cannot turn the camera");
+    }
+    const moving = orientFittingCameraOffset(new Vector3(0, .25, 2),
+      new Quaternion().setFromAxisAngle(axis, Math.PI), false);
+    assert.ok(moving.distanceTo(atRest) > 1, "vehicle/cockpit cameras keep their normal pose");
+    assert.equal(cutToFittingView(true, true, false), true, "switching Body/Appearance is a safe camera cut");
+    assert.equal(cutToFittingView(true, false, true), true, "a loaded outfit returns without crossing the wall");
+    assert.equal(cutToFittingView(false, true, false), false, "the ordinary garage keeps its smooth camera");
   } finally {
     await server.close();
   }
@@ -21,8 +69,8 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
 function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
-      __FITTED_HAIR_IDS__: JSON.stringify(["hair-12"]),
-      __FITTED_HAIR_STYLES__: JSON.stringify([{ id: "hair-12", label: "Long with bangs", url: "/models/characters/female/hair/Hair_12_espresso.glb", mesh: "Hair_12" }]),
+      __FITTED_HAIR_IDS__: JSON.stringify(expectedHairStyles.map(({ id }) => id)),
+      __FITTED_HAIR_STYLES__: JSON.stringify(expectedHairStyles.map(({ id, label, url, mesh }) => ({ id, label, url, mesh }))),
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),

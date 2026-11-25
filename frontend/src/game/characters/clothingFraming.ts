@@ -18,6 +18,20 @@ export function clothingFrame(root: Object3D, piece: ClothingPiece, fov: number,
   return { center: bounds.getCenter(new Vector3()), distance: span * 1.25 / (2 * Math.tan(MathUtils.degToRad(fov) / 2)) + size.z * .5 };
 }
 
+
+// The fixed fitting stage is rotated 90 degrees relative to the actor import.
+// Turning the *character* must never rotate the *camera* through the garage walls.
+const STAGE_FITTING_FRONT = new Quaternion().setFromAxisAngle(new Vector3(0, 1, 0), Math.PI / 2);
+
+export function orientFittingCameraOffset(offset: Vector3, actorRotation: Quaternion, characterOnly: boolean) {
+  return offset.applyQuaternion(characterOnly ? STAGE_FITTING_FRONT : actorRotation);
+}
+
+/** Avoid interpolating the camera through walls when a tab/outfit cuts to a new shot. */
+export function cutToFittingView(wardrobeOpen: boolean, viewChanged: boolean, anchorReappeared: boolean) {
+  return wardrobeOpen && (viewChanged || anchorReappeared);
+}
+
 /** Orbit the current close-up at its existing distance, keeping the eye above the floor. */
 export function orbitFittingCamera(position: Vector3, target: Vector3, yaw: number, pitch: number, sphere: Spherical) {
   sphere.setFromVector3(position.sub(target));

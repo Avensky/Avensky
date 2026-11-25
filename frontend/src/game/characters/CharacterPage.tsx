@@ -1,7 +1,7 @@
 import { isMirrorMakeupEmote, MAKEUP_EMOTES } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
 import { FitReview } from "./FitReview";
-import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type FocusEvent, type Ref } from "react";
+import { useCallback, useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type FocusEvent, type Ref } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { readLocalCharacter, writeLocalCharacter } from "./localOutfits";
 import { ControllerAction } from "../../components/controller";
@@ -23,7 +23,6 @@ import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom } from "./DressingRoom";
 import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
-import { setWardrobeRemoval } from "./wardrobeGarments";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
@@ -121,9 +120,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const [loadedOutfit, setLoadedOutfit] = useState(false);
   const activeTrial = trial?.id === choice.id ? trial : undefined;
   const wardrobeChoice = activeTrial ?? choice;
-  const previewChoice = useMemo(() => fittedHair && wardrobeChoice.id === VILLAGER_ID
-    ? setWardrobeRemoval(wardrobeChoice, "hat", true)
-    : wardrobeChoice, [fittedHair, wardrobeChoice]);
+  // Preview hair must not change garment removal arrays, which forces the
+  // entire skinned actor to rebuild and produces black frames in the garage.
+  // Bonnet visibility is preview-only and updated on the existing model.
+  const previewChoice = wardrobeChoice;
   const [locked, setLocked] = useState(Boolean(initialChoice));
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "local" | "error">("idle");
   const [message, setMessage] = useState("");
@@ -608,7 +608,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const exitCockpit = insideCar && <PreviewToolButton label={exitLabel} disabled={exitDisabled} data-cockpit-toggle onClick={toggleCockpit}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M11 4H4v16h7m2-12 4 4-4 4m4-4H8" /></svg>
   </PreviewToolButton>;
-  const cameraTools = <FittingCameraToolbar key={tab} camera={fitting ? undefined : cameraSelect} splitCamera
+  const cameraTools = <FittingCameraToolbar camera={fitting ? undefined : cameraSelect} splitCamera
     visibility={<PreviewVisibilityToggle />} paused={playbackPaused} onPause={togglePose}
     vehicle={vehiclePreview} rotationDisabled={rotationDisabled} actions={fitting ? <><PreviewToolButton label="Look away" data-controller-row disabled={reducedMotion}
       onClick={() => playEmote(LOOK_AWAY_EMOTE)}><PreviewToolIcon icon="lookAway" /></PreviewToolButton>
