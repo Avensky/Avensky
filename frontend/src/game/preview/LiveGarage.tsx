@@ -134,7 +134,7 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
     const portrait = width < height;
     // From the neon-rack corner to the work-lamp corner, staying inside the authored bay.
     camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
-    camera.lookAt((portrait ? -4.1 : -5.8) + blend * (portrait ? 1.6 : 1.8),
+    camera.lookAt((portrait ? -4.1 : -5.8) + blend * (portrait ? 1.0 : 1.1),
       portrait ? 2.22 : 1.95, -5.45 - blend * .1);
     camera.aspect = width / Math.max(1, height);
     camera.fov = portrait ? 70 : 59;

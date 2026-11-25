@@ -25,8 +25,8 @@ export function prepareGarageDisplay(scene: Object3D) {
     material.envMapIntensity = 0.45;
     switch (material.name.trim()) {
       case "BLACK METAL":
-        material.emissive.setRGB(0.00373248, 0.95530061, 0.0041025);
-        material.emissiveIntensity = 2.4;
+        material.emissive.set(0);
+        material.emissiveIntensity = 0;
         break;
       case "LIGHT":
         material.emissive.setRGB(0.02350918, 0.95040749, 0.00495542);
@@ -120,6 +120,7 @@ export function prepareGarageDisplay(scene: Object3D) {
       if (!rackLight) {
         rackLight = object.material.clone();
         rackLight.emissiveIntensity *= 1.6;
+        rackLight.color.set("#34291b");
         rackLight.userData.garageAccentIntensity *= 1.6;
       }
       object.material = rackLight;
