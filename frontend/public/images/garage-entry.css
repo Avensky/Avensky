@@ -1,0 +1,113 @@
+@import url("./angled-header.css");
+
+.garage-entry {
+  margin: 0;
+  background: var(--app-background);
+  color: var(--app-text);
+  font: 500 1rem/1.4 system-ui, sans-serif;
+}
+.garage-entry-scene {
+  position: fixed; inset: 0; overflow: hidden; pointer-events: none;
+  background: var(--app-background);
+}
+.garage-entry-plate {
+  position: absolute; width: max(100%, 216.67svh); aspect-ratio: 19.5 / 9;
+  left: 50%; top: 50%; transform: translate(-50%,-50%);
+}
+.garage-entry-photo { display:block; width:100%; height:100%; }
+.garage-entry-scene::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent 30%, rgb(3 8 13 / .16) 70%, rgb(3 8 13 / .40));
+}
+.garage-entry-sign {
+  position: absolute; top: 31%; left: 45%; transform: skewY(-3deg);
+  max-width: 27%; padding: .15em .55em .27em; overflow: hidden; white-space: nowrap;
+  color: #d2c4af; background: #26282a; border-bottom: .15em solid #b65e25;
+  box-shadow: 0 .06em .13em #090a0c; text-transform: uppercase;
+  font: italic 750 clamp(16px, 2.3vw, 45px)/1.1 system-ui,sans-serif; letter-spacing: .075em;
+}
+.garage-entry-header {
+  position: relative; z-index: 1; display: flex; align-items: center;
+  padding-left: env(safe-area-inset-left); min-height: 44px;
+  background: color-mix(in srgb,var(--app-background) 90%,transparent);
+}
+.garage-entry-header::after { content: ""; flex: 1; height: 1px; background: var(--app-line); opacity: .68; }
+.garage-entry-brand {
+  position: relative; isolation: isolate; display: inline-flex; align-items: center; gap: .7rem;
+  min-height: var(--angled-header-height); padding: .3rem calc(1.1rem + var(--angled-title-cut)) .3rem clamp(1rem,3vw,3.5rem);
+  clip-path: var(--angled-title-shape); background: var(--app-line); color: var(--app-text);
+  font-size: clamp(15px, 2vw, 24px); font-weight: 650; letter-spacing: .21em; text-transform: uppercase;
+}
+.garage-entry-brand::before {
+  content: ""; position: absolute; z-index: -1; inset: 0 1px 1px 0;
+  clip-path: var(--angled-title-shape); background: var(--angled-tab-surface);
+}
+.garage-entry-brand img { width: clamp(28px,3.4vw,40px); height: auto; display: block; }
+.garage-entry-body {
+  position: relative; display: grid; justify-items: end; align-items: center;
+  min-height: calc(100svh - 54px); box-sizing: border-box;
+  padding: 1rem max(3vw,env(safe-area-inset-right)) max(1rem,env(safe-area-inset-bottom)) max(3vw,env(safe-area-inset-left));
+}
+.garage-entry-card {
+  box-sizing: border-box; position: relative; isolation: isolate; width: min(100%,clamp(290px,40vw,475px));
+  padding: clamp(17px,2.4vw,34px); --corner: 11px;
+  --card-cut: polygon(var(--corner) 0,calc(100% - var(--corner)) 0,100% var(--corner),100% calc(100% - var(--corner)),calc(100% - var(--corner)) 100%,var(--corner) 100%,0 calc(100% - var(--corner)),0 var(--corner));
+}
+.garage-entry-card::before,.garage-entry-card::after {
+  content: ""; position: absolute; z-index: -1; inset: 0; clip-path: var(--card-cut); background: var(--app-line);
+}
+.garage-entry-card::after { inset: 1px; background: color-mix(in srgb,var(--app-background) 78%,var(--app-panel)); }
+.garage-credentials { display: grid; gap: .67rem; margin: 0; }
+.garage-credentials fieldset { display: grid; gap: .67rem; min-width: 0; padding: 0; border: 0; margin: 0; }
+.garage-field { display: flex; align-items: center; position: relative; min-width: 0; }
+.garage-field-name {
+  position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
+}
+.garage-field input,.garage-credentials .garage-sign-in {
+  box-sizing: border-box; width: 100%; min-height: 46px; border: 1px solid var(--app-line);
+  border-radius: 3px; font: inherit; color: var(--app-text); background: var(--app-panel);
+}
+.garage-field input { min-width: 0; padding: .6rem .75rem .6rem 2.8rem; }
+.garage-field input::placeholder { color: var(--app-muted); opacity: 1; }
+.garage-password input { padding-right: 3.1rem; }
+.garage-field-icon { position:absolute; left:.9rem; width:1.15rem; height:1.15rem; pointer-events:none; background:var(--app-text); }
+.garage-field-icon,.garage-eye::after { mask: url("./entry-icons.svg") left center / 400% 100% no-repeat; }
+.garage-lock { mask-position: 33.333% center; }
+.garage-eye {
+  position: absolute; right: 1px; width: 44px; height: 44px; padding: 0;
+  background: transparent; color: var(--app-text); cursor: pointer; border: 0;
+  font-size: 0;
+}
+.garage-eye::after { content:""; display:block; margin:auto; width:1.3rem; height:1.3rem; background:currentColor; mask-position:66.667% center; }
+.garage-password:has(input[type="text"]) .garage-eye::after { mask-position:right center; }
+.garage-credentials .garage-sign-in { background:var(--app-accent); color:var(--app-background); border-color:var(--app-accent); font-weight:750; cursor:pointer; }
+.garage-entry-card :is(input,button,a,summary):focus-visible { outline:2px solid var(--app-accent); outline-offset:2px; }
+.garage-entry-card :disabled { opacity:.62; cursor:default; }
+.garage-recovery { text-align:center; margin:.35rem 0 0; }
+.garage-recovery :is(a,summary,button) { display:inline-flex; align-items:center; justify-content:center; min-height:44px; color:var(--app-accent); text-decoration:underline; background:transparent; border:0; cursor:pointer; font:inherit; }
+.garage-entry-card p { margin:.4rem 0; }
+.garage-entry-card [role="alert"] { border-inline-start:2px solid var(--app-accent); padding-inline-start:.7rem; }
+@media (max-width:600px) and (orientation:portrait) {
+  .garage-entry-body { align-items:end; justify-items:center; padding:1rem 1rem max(2rem,env(safe-area-inset-bottom)); }
+  .garage-entry-card { width:min(100%,390px); }
+  .garage-entry-sign { font-size:clamp(24px,4svh,40px); }
+}
+.garage-entry-card h1 { font-size:1.35rem; margin:0 0 .8rem; line-height:1.15; }
+.garage-entry-card form:not(.garage-credentials),
+.garage-entry-card form:not(.garage-credentials) label { display:grid; gap:.4rem; }
+.garage-entry-card form:not(.garage-credentials) { gap:.75rem; margin:.6rem 0; }
+.garage-entry-card form:not(.garage-credentials) :is(input,button) {
+  box-sizing:border-box; width:100%; min-width:0; min-height:44px; padding:.55rem .7rem; font:inherit;
+  color:var(--app-text); background:var(--app-panel); border:1px solid var(--app-line);
+}
+.garage-entry-card form:not(.garage-credentials) button:not([type="button"]) { background:var(--app-accent); color:var(--app-background); }
+.garage-entry-card label[hidden],.garage-entry-card button[hidden] { display:none; }
+.garage-entry-card .password-control { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.5rem; align-items:end; }
+.garage-entry-card nav { display:flex; flex-wrap:wrap; gap:.75rem; }
+.garage-entry-card a { color:var(--app-accent); }
+.garage-entry-card .portal-back { display:inline-grid; place-items:center; width:44px; height:44px; text-decoration:none; font-size:1.5rem; }
+
+/* Let the shared backdrop show through each menu that uses it. */
+.garage-menu-backdrop:not([hidden]) ~ .welcome-screen.garage-entry,
+.garage-menu-backdrop:not([hidden]) ~ .game-wrapper,
+html[data-ui-theme] .garage-menu-backdrop:not([hidden]) ~ .game-wrapper :is(.menu-home.main-menu,.alpha-queue) { background:transparent; }

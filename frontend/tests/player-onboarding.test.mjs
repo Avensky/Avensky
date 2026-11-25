@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { JSDOM } from "jsdom";
@@ -7,11 +8,6 @@ import { createServer } from "vite";
 
 test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true });
-  let playbackAttempts = 0;
-  dom.window.HTMLMediaElement.prototype.play = () => {
-    playbackAttempts++;
-    return Promise.reject(new Error("Autoplay needs a gesture"));
-  };
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis,key));
@@ -27,7 +23,6 @@ test("welcome picks a personality and gender before registration and lets return
     const { WelcomeScreen } = await vite.ssrLoadModule("/src/game/welcome/WelcomeScreen.tsx");
     const { useUIStore: ui } = await vite.ssrLoadModule("/src/store/menus/uiStore.ts");
     const { useSelectionStore: vehicles } = await vite.ssrLoadModule("/src/store/selection/selectionStore.ts");
-    const { usePreferencesStore: preferences } = await vite.ssrLoadModule("/src/store/preferences/preferencesStore.ts");
     const { useSocialStore: social, selectEquippedCharacter } = await vite.ssrLoadModule("/src/store/social/socialStore.ts");
     const { CHARACTER_STYLES, styleLook } = await vite.ssrLoadModule("/src/game/characters/characterStyles.ts");
     const { isEquippableOutfit } = await vite.ssrLoadModule("/src/game/characters/characterCatalog.ts");
@@ -57,29 +52,19 @@ test("welcome picks a personality and gender before registration and lets return
       ui.setState({screen:"welcome"});
       root.render(createElement(WelcomeScreen));
     });
-    const flare=document.querySelector(".menu-flare-background video");
-    assert.ok(flare.loop && flare.autoplay && flare.muted && flare.playsInline);
-    assert.ok(flare.defaultMuted);
-    assert.equal(flare.getAttribute("src"),"/images/purple-sunflare-loop.mp4");
-    assert.equal(flare.closest(".welcome-screen"), null, "the video stays behind the keyboard-sized welcome form");
-    assert.equal(flare.hasAttribute("data-playing"), false);
-    await act(async () => flare.dispatchEvent(new Event("playing")));
-    assert.equal(flare.hasAttribute("data-playing"), true);
-    assert.equal(document.querySelector('.welcome-art img').getAttribute("src"),"/images/logo.svg");
-    assert.equal(document.querySelector("h1"),null);
-    assert.deepEqual([...document.querySelectorAll(".welcome-entry-options button")].map(button=>button.textContent),["Sign in","Sign up"]);
+    const header=document.querySelector(".garage-entry-header");
+    assert.ok(header);
+    assert.equal(document.querySelector(".garage-entry-brand img").getAttribute("src"),"/images/logo.svg");
+    assert.equal(document.querySelector("video,canvas"),null);
+    assert.ok(button("Sign in"));
+    assert.equal(button("Play as guest"),undefined);
     assert.equal(button("Account"), undefined);
     await act(async () => social.setState({ profileStatus: "restoring" }));
     assert.equal(button("Sign in"), undefined);
     assert.equal(button("Sign up"), undefined);
     assert.match(document.querySelector('[role="status"]').textContent, /Restoring/);
     await act(async () => social.setState({ profileStatus: "idle" }));
-    const autoplay = playbackAttempts;
-    document.dispatchEvent(new Event("pointerup"));
-    assert.ok(playbackAttempts > autoplay,"a touch release offers another chance to play");
-    await act(async()=>preferences.setState({reducedMotion:true}));
-    assert.equal(document.querySelector(".menu-flare-background video"),null);
-    await act(async()=>preferences.setState({reducedMotion:false}));
+    assert.equal(document.querySelector(".garage-entry-header"), header);
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
     assert.equal(button("Continue").disabled,true);
@@ -89,9 +74,9 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>typeName("Track Fox"));
     assert.equal(button("Continue").disabled,false);
     await act(async()=>submit());
-    assert.equal(sent.length,0,"draft stays local until the player registers or chooses guest access");
-    assert.ok(button("Play as guest"));
-    await act(async()=>button("Create an account").click());
+    assert.equal(sent.length,0,"draft stays local until the player registers");
+    assert.equal(button("Play as guest"),undefined);
+    assert.equal(document.querySelector(".garage-entry-header"), header);
     const form=document.querySelector("form");
     form.elements.login.value="lightfoot@example.net";
     form.elements.password.value="a staging passphrase for test";
@@ -134,7 +119,6 @@ test("welcome picks a personality and gender before registration and lets return
       social.setState({view:null,profileStatus:"idle"});
       root.render(createElement(WelcomeScreen,{key:"returning"}));
     });
-    await act(async()=>button("Sign in").click());
     const loginForm=document.querySelector("form");
     loginForm.elements.login.value="lightfoot@example.net";
     loginForm.elements.password.value="a staging passphrase for test";
@@ -216,11 +200,12 @@ test("welcome picks a personality and gender before registration and lets return
   }
 });
 
-test("the Avensky icon formats and lightweight sunflare ship with the frontend", async () => {
+test("the Avensky icons, cache-versioned garage still and game loading media ship with the frontend", async () => {
   const read=path=>readFile(new URL("../"+path,import.meta.url));
-  const [html, svg, png, ico, flare, loop]=await Promise.all([
+  const { GARAGE_ENTRY_POSTER }=await import("../src/theme/garageEntry.ts");
+  const [html, svg, png, ico, garage, flare, loop]=await Promise.all([
     read("index.html"),read("public/images/logo.svg"),read("public/images/logo.png"),
-    read("public/favicon.ico"),read("public/images/purple-sunflare.webp"),read("public/images/purple-sunflare-loop.mp4"),
+    read("public/favicon.ico"),read("public/images/" + GARAGE_ENTRY_POSTER),read("public/images/purple-sunflare.webp"),read("public/images/purple-sunflare-loop.mp4"),
   ]);
   assert.match(html.toString(),/<title>Avensky<\/title>/);
   assert.match(html.toString(),/name="description" content="Avensky is a browser-based game engine/);
@@ -230,6 +215,9 @@ test("the Avensky icon formats and lightweight sunflare ship with the frontend",
   assert.equal(png.readUInt32BE(20),512);
   assert.equal(ico.readUInt16LE(2),1);
   assert.deepEqual([0,1,2,3].map(index=>ico[6+16*index]),[16,32,48,64]);
+  assert.equal(garage.toString("ascii",8,12),"WEBP");
+  assert.ok(garage.length < 80_000);
+  assert.equal(GARAGE_ENTRY_POSTER, "garage-entry." + createHash("sha256").update(garage).digest("hex").slice(0,12) + ".webp");
   assert.equal(flare.toString("ascii",8,12),"WEBP");
   assert.ok(flare.length < 15_000);
   assert.equal(loop.toString("ascii",4,8),"ftyp");

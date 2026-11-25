@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Keyboard } from "./controls/Keyboard";
 import { GameController } from "./controls/GameController";
 import { useMobilePortrait } from "./controls/useMobilePortrait";
@@ -7,15 +7,18 @@ import { connectRustServer } from "./net/rustSocket";
 import { startInputSender, stopInputSender } from "./net/inputSender";
 import { useInputStore } from "./store/input/inputStore";
 import "./App.css";
-import { GameUI } from "./game/GameUI";
 import { OnScreenKeyboard } from "./components/text/OnScreenKeyboard";
 import { useUIStore } from "./store/menus/uiStore";
+import { GarageMenuBackdrop } from "./game/welcome/GarageMenuBackdrop";
 import { WelcomeScreen } from "./game/welcome/WelcomeScreen";
 import { useAppTheme } from "./theme";
+
+const GameUI = lazy(() => import("./game/GameUI").then(module => ({ default: module.GameUI })));
 
 export default function App() {
   const mobilePortrait = useMobilePortrait();
   const welcome = useUIStore((state) => state.screen === "welcome");
+  const showGarageBackdrop = useUIStore(state => state.screen === "welcome" || state.screen === "main" || state.screen === "queue");
   const rotate = mobilePortrait && !welcome;
   useAppTheme();
 
@@ -40,18 +43,20 @@ export default function App() {
     connectRustServer();
   }, []);
 
-  // Start input sender loop on mount, stop on unmount
+  // Onboarding needs the social socket, but has no driving input to send.
   useEffect(() => {
+    if (welcome) return;
     startInputSender(60);
     return () => {
       stopInputSender();
     };
-  }, []);
+  }, [welcome]);
 
   return (
     <div className="canvas-container">
       <div className="game-viewport" inert={rotate}>
-        {welcome ? <WelcomeScreen /> : <GameUI />}
+        <GarageMenuBackdrop visible={showGarageBackdrop} />
+        {welcome ? <WelcomeScreen /> : <Suspense fallback={null}><GameUI /></Suspense>}
         {!rotate && <OnScreenKeyboard />}
       </div>
       {rotate ? (

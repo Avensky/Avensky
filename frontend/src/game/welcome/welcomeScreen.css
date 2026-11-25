@@ -8,17 +8,19 @@
   isolation: isolate;
   touch-action: pan-y;
 }
+.welcome-screen.garage-entry { display:flex; flex-direction:column; }
+.welcome-screen .garage-entry-body { min-height:100%; }
 .welcome-scroll {
   position: relative;
   z-index: 1;
-  height: 100%;
+  flex: 1; min-height: 0;
   overflow: auto;
   overscroll-behavior-y: contain;
   touch-action: pan-y;
 }
 .welcome-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   justify-items: center;
   min-height: 100%;
@@ -28,17 +30,12 @@
     max(.75rem, env(safe-area-inset-bottom))
     max(1rem, env(safe-area-inset-left));
 }
-.welcome-art { position: relative; z-index: 1; align-self: stretch; display: grid; place-items: center; }
-.welcome-art img {
-  width: min(68%, 20rem);
-  height: auto;
-  filter: drop-shadow(0 1rem 2.5rem #080413d9);
-}
 .welcome-panel {
   min-width: 0;
   width: min(100%, 28rem);
   padding: .75rem;
   box-sizing: border-box;
+  background:color-mix(in srgb,var(--app-panel) 94%,transparent);
 }
 .welcome-panel h1 { margin: 0 0 1rem; font-size: clamp(1.5rem, 4vw, 2.75rem); line-height: 1.08; }
 .welcome-panel :is(p, label) { line-height: 1.4; }
@@ -73,20 +70,16 @@
 .welcome-panel button[aria-pressed="true"] { border-color: var(--app-accent); background: var(--app-raised); box-shadow: inset 0 0 0 1px var(--app-accent); }
 @media (max-width: 680px) and (orientation: portrait) {
   .welcome-layout { grid-template-columns: minmax(0, 1fr); align-content: center; }
-  .welcome-art img { width: min(29vw, 13svh); }
-  .welcome-layout[data-step="welcome"] .welcome-art img { width: min(42vw, 21svh); }
   .welcome-panel { padding: .5rem .25rem .75rem; }
 }
 @media (max-height: 500px) and (orientation: landscape) {
   .welcome-panel { padding-block: .7rem; }
   .welcome-panel h1 { margin-bottom: .55rem; }
-  .welcome-art img { width: min(68%, 64svh); }
   .welcome-character .character-portrait { width: 4rem; }
 }
 
 /* Signed-in selection is the player's profile, not a second marketing prescreen. */
 .welcome-layout[data-step="characters"]{grid-template-columns:minmax(0,1fr);align-content:center}
-.welcome-layout[data-step="characters"] .welcome-art{display:none}
 .welcome-layout[data-step="characters"] .welcome-panel{width:min(92vw,860px)}
 .welcome-layout[data-step="characters"] .welcome-characters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:.75rem}
 .welcome-layout[data-step="characters"] .welcome-character{display:grid;grid-template-columns:minmax(100px,42%) minmax(0,1fr);align-items:center;justify-items:stretch;gap:clamp(10px,2vw,25px);text-align:left;padding:clamp(8px,1.5vw,18px);background:var(--app-panel);border:1px solid var(--app-line);min-height:150px}
@@ -99,9 +92,7 @@
 @media(max-height:500px) and (orientation:landscape){.welcome-layout[data-step="characters"] .welcome-character{min-height:100px;grid-template-columns:minmax(85px,28%) 1fr}.welcome-character-details strong{font-size:18px}}
 
 .welcome-layout[data-session-pending]{grid-template-columns:minmax(0,1fr);align-content:center}
-.welcome-layout[data-session-pending] .welcome-art{display:none}
 
 .welcome-layout[data-step="account"] { grid-template-columns: 1fr; }
-.welcome-layout[data-step="account"] .welcome-art { display: none; }
 .welcome-layout[data-step="account"] .welcome-panel { display: grid; gap: .6rem; width: min(100%, 36rem); }
 .welcome-panel .alpha-account-panel { position: static; width: 100%; overflow: visible; }

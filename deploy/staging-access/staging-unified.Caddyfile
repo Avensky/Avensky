@@ -6,15 +6,6 @@ staging.avensky.com {
 		respond 204
 	}
 
-	@alpha_flare path /__alpha/media/purple-sunflare-loop.mp4 /__alpha/media/purple-sunflare.webp
-	handle @alpha_flare {
-		route {
-			uri replace /__alpha/media/ /images/
-			root * /srv/avensky-staging/frontend/current
-			file_server
-		}
-	}
-
 	handle /__alpha/* {
 		reverse_proxy 127.0.0.1:9061 {
 			header_up X-Alpha-Client {remote_host}

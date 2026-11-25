@@ -1,7 +1,6 @@
 import { CharacterHeaderProfile } from "../characters/CharacterHeaderProfile";
 import { useConnectionView } from "../../store/session/networkViews";
 import { useCallback, useRef, useState } from "react";
-import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
 import { MenuShortcuts, ControllerAction } from "../../components/controller";
 import { MenuFooter, MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { useSocialStore } from "../../store/social/socialStore";
@@ -56,7 +55,6 @@ export function QueueScreen() {
       className="game-ui menu-surface alpha-queue"
       data-controller-form
     >
-      <MenuFlareBackground animated />
       <section className="alpha-queue-card" aria-label="Alpha waiting line">
         <small>AVENSKY · LIMITED ALPHA</small>
         <header className="menu-title-with-logo">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
-import { requestSocial, selectAccount, selectGuestProfile, signOutPlayerProfile } from "../../net/socialClient";
+import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { characterLook } from "../characters/characterCatalog";
@@ -9,10 +9,14 @@ import { AlphaAccountPanel } from "../characters/AlphaAccountPanel";
 import { CharacterPortrait, ProfilePortrait } from "../characters/CharacterPortrait";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
-import { MenuFlareBackground } from "../../components/menus/MenuFlareBackground";
+import { garageBrandHeader, garageCredentials } from "../../theme/garageEntry";
+import { entryAssets, stagingAccountPortal } from "./config";
 import "./welcomeScreen.css";
 
-type Step = "welcome" | "create" | "save" | "register" | "login" | "characters";
+const chrome = { __html: garageBrandHeader(entryAssets) };
+const credentialFields = { __html: garageCredentials(false) };
+
+type Step = "welcome" | "create" | "register" | "characters";
 type Draft = { name: string; body: CharacterBody; style: string };
 
 async function waitForProfile(owner: string) {
@@ -72,8 +76,7 @@ export function WelcomeScreen() {
   const sessionPending = screen === "welcome" && (!connected || restoring || stagingSignIn);
   const accountRoot = signedIn && (screen === "characters" || (screen === "create" && !slots?.length));
   const accountOpen = accountRoot && stagingSignIn && (showSettings || openedFromMenu);
-  const showStagingSignIn = connectionSlow && !connected && import.meta.env.MODE === "staging"
-    && window.location.hostname === "staging.avensky.com";
+  const showStagingSignIn = connectionSlow && !connected && stagingAccountPortal;
 
   function back() {
     if (pending.current || restoring) return;
@@ -86,8 +89,7 @@ export function WelcomeScreen() {
     // button is the only way to invalidate an active tester session.
     if (accountRoot) return;
     setError("");
-    if (step === "register" && newPlayer) { setStep("save"); return; }
-    if (step === "save") { setStep("create"); return; }
+    if (step === "register" && newPlayer) { setStep("create"); return; }
     if (screen === "create" && slots?.length) { setStep("characters"); return; }
     setConfirmedProfile(undefined);
     setStep("welcome");
@@ -162,7 +164,7 @@ export function WelcomeScreen() {
 
   function authenticate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if ((step !== "login" && step !== "register") || !connected || !accounts) return;
+    if ((step !== "welcome" && step !== "register") || !connected || !accounts) return;
     const form = new FormData(event.currentTarget);
     const login = String(form.get("login") ?? "");
     const password = String(form.get("password") ?? "");
@@ -213,26 +215,22 @@ export function WelcomeScreen() {
     {stagingSignIn && <button type="button" onClick={() => setShowSettings(true)} disabled={busy}>Account</button>}
   </> : <MenuBackButton label="Back" onClick={back} disabled={busy} />;
   const labels: Record<Step, string> = {
-    welcome: "Account access", create: "Create your character", save: "Save your character",
-    register: "Create an account", login: "Sign in", characters: "Saved characters",
+    welcome: "Sign in", create: "Create your character", register: "Create an account", characters: "Saved characters",
   };
   const label = labels[screen];
 
   return <>
-    <MenuFlareBackground animated />
-    <main className="welcome-screen" ref={root} data-controller-rows onKeyDown={event => {
+    <main className="welcome-screen garage-entry" ref={root} data-controller-rows onKeyDown={event => {
       if (event.key === "Escape") back();
       if (!isTypingTarget(event.target) && ["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)) {
         event.preventDefault();
         navigateFormRows(root.current!, event.target as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
+      <div className="welcome-chrome" dangerouslySetInnerHTML={chrome} />
       <div className="welcome-scroll">
-      <div className="welcome-layout" data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
-      <div className="welcome-art" aria-hidden="true">
-        <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
-      </div>
-      <section className="welcome-panel" aria-label={accountOpen ? "Account" : label}>
+      <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
+      <section className={screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Account" : label}>
         {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
         {accountOpen ? <>
           <div data-controller-row><MenuBackButton label="Back" onClick={back} /></div>
@@ -241,7 +239,7 @@ export function WelcomeScreen() {
             event.preventDefault();
             if (!draft || !connected || !accounts) return;
             if (player) void run(() => enter(player.id, "character_create", draft));
-            else if (newPlayer) setStep("save");
+            else if (newPlayer) setStep("register");
           }}>
             <label data-controller-row>Character name
               <input name="characterName" autoComplete="nickname" minLength={2} maxLength={24} disabled={busy} required
@@ -295,42 +293,42 @@ export function WelcomeScreen() {
                   setStep("create"); setName(""); setStyle(undefined); setError("");
                 }} disabled={busy}>New character</button>}
             </div>
-          </> : screen === "save" ? <>
-            <p className="welcome-help">Create an account to keep {draft?.name} across devices.</p>
-            <div className="welcome-entry-options" data-controller-row>
-              <button type="button" className="welcome-primary" disabled={busy || !connected}
-                onClick={() => { setError(""); setStep("register"); }}>Create an account</button>
-              <button type="button" disabled={!draft || busy || !connected} onClick={() => {
-                if (draft) void run(async () => finishDraft(await selectGuestProfile("Guest"), draft));
-              }}>Play as guest</button>
-              {navigation}
-            </div>
-        </> : screen === "login" || screen === "register" ? (
+          </> : screen === "register" ? (
           <form key={screen} method="post" onSubmit={authenticate}>
-              <label data-controller-row>{screen === "register" ? "Email" : "Email or account name"}
-                <input name="login" type={screen === "register" ? "email" : "text"}
-                  inputMode="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
+              <label data-controller-row>Email
+                <input name="login" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false}
                   minLength={3} maxLength={254} required />
               </label>
               <label data-controller-row>Password
-                <input name="password" type="password" autoComplete={screen === "register" ? "new-password" : "current-password"}
-                  minLength={screen === "register" ? 15 : undefined} maxLength={256} required />
+                <input name="password" type="password" autoComplete="new-password" minLength={15} maxLength={256} required />
               </label>
-              {screen === "register" && <p className="welcome-help">Use at least 15 characters.</p>}
+              <p className="welcome-help">Use at least 15 characters.</p>
             <div className="welcome-actions" data-controller-row>
               {navigation}
               <button type="submit" className="welcome-primary" disabled={busy || !connected || !accounts}>{label}</button>
             </div>
           </form>
         ) : sessionPending || signedIn ? null : <>
-          <div className="welcome-entry-options" data-controller-row>
-            <button type="button" className="welcome-primary" disabled={busy || !accounts}
-              onClick={() => { setError(""); setStep("login"); }}>Sign in</button>
-            <button type="button" disabled={busy || !accounts} onClick={() => {
+          <form className="garage-credentials" method="post" onSubmit={authenticate}
+            onClick={event => {
+              const toggle = (event.target as HTMLElement).closest<HTMLButtonElement>(".garage-eye");
+              const field = event.currentTarget.elements.namedItem("password") as HTMLInputElement | null;
+              if (toggle && field) {
+                const show = field.type === "password";
+                field.type = show ? "text" : "password";
+                toggle.textContent = show ? "Hide password" : "Show password";
+              }
+            }}>
+            <fieldset disabled={busy || !accounts} dangerouslySetInnerHTML={credentialFields} />
+          </form>
+          <div className="garage-recovery" data-controller-row>
+            {stagingAccountPortal ? <a href="/__alpha/forgot-password">Forgot password?</a>
+              : <details><summary>Forgot password?</summary><p>Contact your game server operator to recover this account.</p></details>}
+            {!stagingAccountPortal && accounts && <button type="button" disabled={busy} onClick={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
               else { setNewPlayer(true); setStep("create"); }
-            }}>Sign up</button>
+            }}>Sign up</button>}
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}
         </>}

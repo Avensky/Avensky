@@ -3,6 +3,8 @@
 ## UX and theme
 Authenticated staging testers should skip sign-in. The saved-character selector has an image-led layout with a large portrait and details alongside, without a redundant Choose your character title. It uses an explicit Log out instead of Back. The separate staging sign-in prescreen is for logged-out visitors only. The Character editor retains the existing angled tabs and one back icon, with Profile and Account sections after authentication.
 
+The signed-out page uses the game logo, angled header geometry, and a static still of the empty game garage. The shared wall sign is configured in `frontend/src/theme/branding.ts`. Portal entry assets are read from `/srv/avensky-staging/frontend/current/images/`.
+
 The React app and the standalone staging sign-in portal share frontend/src/theme/palettes.json as their single theme palette source. The game uses --app-* CSS variables. The login portal exposes the same tokens and reads the same local Avensky preference, defaulting to Navy. No independently maintained purple login palette.
 
 ## Secure accounts
@@ -18,3 +20,13 @@ The main-branch workflow publishes the SPA. The staging alpha-access Node portal
 4. Admin can invite testers; non-admin cannot access the invite endpoint.
 5. Password-confirmed email and deletion requests queue for review without mutating accounts/game data.
 6. Repeat on Navy, Hacker Green, Deep Purple, Strawberry and mobile landscape. Preserve production sign-in and release gates.
+
+## Garage background performance
+
+The entry screen previously referenced a 10,450-byte sunflare image and a 712,928-byte looping video. The garage WebP is 55,970 bytes. It decodes asynchronously while the sign-in controls are available. The browser caches the versioned URL. The React menu keeps the same image element through account, character selection, Main and the queue. A retained 3D preview has its frame loop stopped while the menu covers it.
+
+To reproduce the network check, open the signed-out portal in a fresh browser profile with the Network panel recording and caching enabled. Toggle password visibility, open Forgot password, then return to sign-in. Filter for WebP, MP4 and GLB. In Chromium at 844 × 390, the first page fetched the garage once and password recovery transferred zero additional garage bytes. Sign-in requested no video or 3D model. This measures network and scene behavior, rather than frame time on a physical phone.
+
+## Garage still credit
+
+The login background is a lit still of Avensky’s Garage Special scene with its vehicle and number display omitted. The source model is [Garage followers special! by Ahad4940](https://sketchfab.com/3d-models/garage-followers-special-71b1b4d569ec4c9788c76f4c3d56b461), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The credit is also embedded in the WebP metadata.

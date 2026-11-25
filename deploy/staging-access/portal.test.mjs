@@ -22,6 +22,9 @@ test("the installed standalone sign-in uses the palette shipped with the app", a
     await copyFile(new URL(name, import.meta.url), join(dir, name));
   }
   await copyFile(new URL("../../frontend/src/theme/palettes.json", import.meta.url), join(dir, "palettes.json"));
+  for (const name of ["garageEntry.ts", "branding.ts"]) {
+    await copyFile(new URL("../../frontend/src/theme/" + name, import.meta.url), join(dir, name));
+  }
   const installed = await import(pathToFileURL(join(dir, "portal.mjs")).href);
   const accounts = testerAccounts(":memory:", randomBytes(32));
   const server = installed.createPortal({ origin, accounts });
@@ -66,7 +69,16 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.match(signIn, /id="alpha-password" type="password" name="password"/);
   assert.match(signIn, /<button type="button"[^>]+aria-controls="alpha-password" hidden>Show password/);
   assert.match(signIn, /<script src="\/__alpha\/password\.js" defer><\/script>/);
-  assert.doesNotMatch(signIn, /name="code"/);
+  assert.doesNotMatch(signIn, /name="code"|<video|<canvas|flare\.js|Play as guest|Vehicle/);
+  assert.match(signIn, /garage-entry-brand/);
+  assert.match(signIn, /class="garage-entry-sign">Avensky</);
+  const css = await get("entry/garage-entry.css");
+  assert.equal(css.status, 200);
+  const poster = signIn.match(/src="\/__alpha\/(entry\/garage-entry[^"]*\.webp)"/)[1];
+  const garage = await get(poster);
+  assert.equal(garage.headers.get("content-type"), "image/webp");
+  assert.equal((await get(poster, { "if-none-match": garage.headers.get("etag") })).status, 304);
+  assert.equal((await get("entry/game-bridge.mjs")).status, 404);
   const script = await get("password.js");
   assert.match(script.headers.get("content-type"), /^text\/javascript/);
   const input = { type: "password", value: password };
@@ -308,7 +320,8 @@ test("one invitation form signs in by email and gates sockets and assets", async
   const enrollment = { email: admin.email, invite: admin.code };
   const enrollPage = await (await fetch(url + "enroll")).text();
   assert.doesNotMatch(enrollPage, /name="intent"|name="login"|Link an existing account/);
-  assert.match(enrollPage, /purple-sunflare-loop\.mp4/);
+  assert.match(enrollPage, /garage-entry-scene/);
+  assert.doesNotMatch(enrollPage, /<video|flare\.js/);
   assert.equal((await post("enroll", { ...enrollment, password: "a wrong game password" })).status, 400);
   const linked = await post("enroll", { ...enrollment, password });
   assert.equal(linked.status, 303);
