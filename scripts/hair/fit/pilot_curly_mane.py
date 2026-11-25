@@ -149,6 +149,8 @@ def output_path(args,scene):
 
 def main():
     a=parse_args()
+    if a.mode == 'conform':
+        raise ValueError('Legacy root conform is disabled: the earlier nearest-scalp UV-end selection could misclassify curl tips. Run auto_align_curly_mane.py and visually approve global placement before a new root-only fitter is enabled.')
     if not math.isfinite(a.meters_per_world_unit) or a.meters_per_world_unit<=0:
         raise ValueError('Confirm meters-per-world-unit before geometry fitting')
     if any(not math.isfinite(v) or v<=0 for v in (
