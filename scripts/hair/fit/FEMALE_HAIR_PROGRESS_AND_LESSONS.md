@@ -25,6 +25,12 @@ This file is the handoff/resume record. Read it **before starting any further ha
 - `styles/curly_mane.json`: proposal/config with **missing root landmarks, unverified source units, and unverified source rig attachment**; a JSON file alone does not fit a mesh.
 - **Not built:** automated donor root landmark mapping, similarity fit, protected root-only retarget, volume/gap repairs, camera matrix QA generation, LOD reduction, validated GLB exporter, physical-phone performance gate.
 
+## Later Curly Mane update — correct global placement before touching roots (2026-11-25)
+
+Actual CURLY 01.FBX and original vendor Curls diffuse/opacity were finally applied to real Face4 + original Face BaseColor in a private CPU software render. The unaligned hairstyle floated far above Vesper. Of 253 curl sections, 234 have their higher end at high UV-V, with 209 long sections usable as provisional *upper-root candidates*. Earlier choosing whichever card end was nearest the scalp risked pulling TIPS, not true roots. A bounded global uniform-scale + translation candidate (approx scale .92, Y shift -21.65 original source units, physical units NOT verified in Blender) improves candidate sampled-skin proximity; the curls now surround the head, but the crown/back remain exposed and some cards cross the face. **Preserve real scalp; do not fake a color cap.** The old local conform command has been disabled until post-global root review. [See full geometry evidence](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md).
+
+Correct order: import original textured head -> verify source axes/units -> identify upper UV root candidates -> calculate/global fit WHOLE style -> inspect with source diffuse+opacity from six angles -> classify true roots and holes -> local controlled root/underclump corrections -> rig/LOD/phone QA. No male wardrobe scope; no release or PR merge.
+
 ## Critical distinctions (never confuse again)
 
 | Layer | Definition | Vesper choice |
