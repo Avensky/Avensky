@@ -1,7 +1,7 @@
 import { Component, Suspense, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, useFrame, useLoader, useThree, type RootState } from "@react-three/fiber";
-import { Box3, Mesh, PerspectiveCamera, type WebGLRenderTarget } from "three";
+import { Box3, Mesh, PerspectiveCamera, Quaternion, type WebGLRenderTarget } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { prepareGarageDisplay } from "./prepareGarageDisplay";
@@ -123,54 +123,62 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
 
 function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: boolean }) {
   const { width, height } = useThree(state => state.size);
+  const dpr = useThree(state => state.viewport.dpr);
   const invalidate = useThree(state => state.invalidate);
   const previousFrame = useRef(performance.now());
-  const reducedMotion = useMemo(() => matchMedia("(prefers-reduced-motion: reduce)"), []);
+  const reducedMotion = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)"), []);
+  const restingOrientation = useMemo(() => new Quaternion(), []);
+  const settledAngleSquared = useRef(0);
   useLayoutEffect(() => {
     if (!active) return;
+    const portrait = width < height;
+    camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
+    camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
+    restingOrientation.copy(camera.quaternion);
+    camera.aspect = width / Math.max(1, height);
+    camera.fov = portrait ? 70 : 59;
+    camera.updateProjectionMatrix();
+    // A small rotation moves details fastest near the corners of a perspective image.
+    // Stop when even a corner would travel less than a quarter of a rendered pixel.
+    const projection = camera.projectionMatrix.elements;
+    const focalPixels = .5 * Math.max(1, height * dpr) * projection[5];
+    const cornerScale = 1 + (1 / projection[0]) ** 2 + (1 / projection[5]) ** 2;
+    settledAngleSquared.current = (.25 / (focalPixels * cornerScale)) ** 2;
     runtime.motion.invalidate = invalidate;
     previousFrame.current = performance.now();
     const changed = () => invalidate();
     const preferences = new MutationObserver(changed);
     preferences.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
-    reducedMotion.addEventListener("change", changed);
+    reducedMotion?.addEventListener("change", changed);
     invalidate();
     return () => {
       runtime.motion.invalidate = undefined;
       preferences.disconnect();
-      reducedMotion.removeEventListener("change", changed);
+      reducedMotion?.removeEventListener("change", changed);
     };
-  }, [active, width, height, invalidate, reducedMotion]);
+  }, [active, width, height, dpr, invalidate, reducedMotion, camera, restingOrientation]);
   useFrame(() => {
     if (!active || document.hidden) return;
     const motion = runtime.motion;
     const now = performance.now();
-    const frameElapsed = Math.max(0, now - Math.max(previousFrame.current, motion.dragging ? motion.dragStarted ?? 0 : 0)) / 1000;
-    const elapsed = Math.max(0, now - Math.max(previousFrame.current, motion.lastInput ?? 0)) / 1000;
+    const started = motion.dragging ? motion.dragStarted : motion.lastInput;
+    const elapsed = Math.max(0, now - Math.max(previousFrame.current, started ?? 0)) / 1000;
     previousFrame.current = now;
-    if (reducedMotion.matches || document.documentElement.dataset.reduceMotion === "true") {
-      motion.yaw = 0; motion.pitch = 0;
-    } else if (motion.dragging) {
-      const blend = 1 - Math.exp(-16 * frameElapsed);
-      motion.yaw += ((motion.targetYaw ?? motion.yaw) - motion.yaw) * blend;
-      motion.pitch += ((motion.targetPitch ?? motion.pitch) - motion.pitch) * blend;
-    } else {
-      const decay = Math.exp(-1.7 * elapsed);
-      motion.yaw *= decay; motion.pitch *= decay;
-      if (Math.abs(motion.yaw) < .00005) motion.yaw = 0;
-      if (Math.abs(motion.pitch) < .00005) motion.pitch = 0;
+    const yaw = motion.dragging ? motion.targetYaw ?? motion.yaw : 0;
+    const pitch = motion.dragging ? motion.targetPitch ?? motion.pitch : 0;
+    const immediate = reducedMotion?.matches || document.documentElement.dataset.reduceMotion === "true";
+    const blend = immediate ? 1 : -Math.expm1(-(motion.dragging ? 16 : 1.7) * elapsed);
+    motion.yaw += (yaw - motion.yaw) * blend;
+    motion.pitch += (pitch - motion.pitch) * blend;
+    const moving = (yaw - motion.yaw) ** 2 + (pitch - motion.pitch) ** 2 > settledAngleSquared.current;
+    if (!moving) {
+      motion.yaw = yaw;
+      motion.pitch = pitch;
     }
-    const portrait = width < height;
-    camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
-    camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
+    camera.quaternion.copy(restingOrientation);
     camera.rotateY(motion.yaw);
     camera.rotateX(motion.pitch);
-    camera.aspect = width / Math.max(1, height);
-    camera.fov = portrait ? 70 : 59;
-    camera.updateProjectionMatrix();
-    const following = motion.dragging && (Math.abs((motion.targetYaw ?? motion.yaw) - motion.yaw) > .00005 ||
-      Math.abs((motion.targetPitch ?? motion.pitch) - motion.pitch) > .00005);
-    if (following || !motion.dragging && (motion.yaw !== 0 || motion.pitch !== 0)) invalidate();
+    if (moving) invalidate();
   }, -1);
   return null;
 }
@@ -184,7 +192,7 @@ class GarageFailure extends Component<{ children: ReactNode; host: HTMLElement }
 
 function LiveGarage({ host }: { host: HTMLElement }) {
   const view = useSyncExternalStore(subscribe, () => runtime.preview);
-  const coarse = useMemo(() => matchMedia("(pointer: coarse)").matches, []);
+  const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)")?.matches, []);
   const camera = useMemo(() => new PerspectiveCamera(55, 1, .05, 150), []);
   const onCreated = (state: RootState) => { state.gl.setClearColor("#080808", 1); };
   return <GarageFailure host={host}>
@@ -215,6 +223,15 @@ export function mountGarage(host: HTMLElement) {
   runtime.owner = import.meta.url;
   runtime.input ??= installGarageEntryInteraction(runtime.motion, () => runtime.preview !== null);
   restoreGaragePreferences(document.documentElement);
+  if ((window.navigator as Navigator & { standalone?: boolean }).standalone || window.matchMedia?.("(display-mode: standalone)")?.matches) {
+    document.documentElement.dataset.garageStandalone = "true";
+    host.style.setProperty("--garage-screen-long-edge", `${Math.max(window.screen.width, window.screen.height)}px`);
+  }
   host.dataset.garageMounted = import.meta.url;
-  createRoot(host).render(<LiveGarage host={host} />);
+  if (typeof window.WebGL2RenderingContext === "undefined") {
+    host.dataset.garageUnavailable = "";
+    revealGarage(host);
+  } else {
+    createRoot(host).render(<LiveGarage host={host} />);
+  }
 }

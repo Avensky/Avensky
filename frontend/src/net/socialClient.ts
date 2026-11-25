@@ -1,4 +1,5 @@
-import { STAGING_SIGN_IN_PATH } from "./deploymentEnvironment";
+import { returnToStagingSignIn } from "./stagingAccount";
+import { stagingAccountPortal } from "../game/welcome/config";
 import { usePresenceStore } from "../store/chat/presenceStore";
 import { useSocialStore } from "../store/social/socialStore";
 import { useChatStore } from "../store/chat/chatStore";
@@ -175,12 +176,9 @@ export function selectAccount(credentials: AccountCredentials, name?: string) {
   return identifyProfile(name, "new-device", credentials);
 }
 export async function signOutPlayerProfile() {
-  if (useSocialStore.getState().stagingSignIn) {
-    const response = await fetch("/__alpha/sign-out", { method: "POST", body: new URLSearchParams(), redirect: "manual" });
-    if (response.type !== "opaqueredirect" && response.status !== 303 && response.status !== 403)
-      throw new Error("The staging account could not sign out. Try again.");
-    window.location.assign(STAGING_SIGN_IN_PATH);
-    return;
+  if (useSocialStore.getState().stagingSignIn || stagingAccountPortal) {
+    await returnToStagingSignIn(true);
+    return "portal";
   }
   const generation = connectionGeneration;
   const key = identityKey;

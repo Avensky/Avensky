@@ -1,4 +1,5 @@
 import { GarageCredentialFields } from "./GarageCredentialFields";
+import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
@@ -208,7 +209,7 @@ export function WelcomeScreen() {
   }
 
   async function logOut() {
-    await signOutPlayerProfile();
+    if (await signOutPlayerProfile() === "portal") return;
     setConfirmedProfile(undefined);
     setStep("welcome");
     setShowAccountEntry(true);
@@ -238,6 +239,7 @@ export function WelcomeScreen() {
       <div className="welcome-chrome" dangerouslySetInnerHTML={chrome} />
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
+      {!accountOpen && (screen === "create" || screen === "characters") && <GarageOrbitSurface />}
       <section className={screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Account" : label}>
         {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
         {accountOpen ? <>

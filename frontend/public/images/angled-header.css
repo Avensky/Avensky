@@ -7,6 +7,7 @@
   :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 35px; }
 }
 .angled-tab-header {
+  --angled-brand-padding: clamp(10px, 1.2vw, 18px);
   --angled-title-scale: 1.2;
   --angled-title-tracking: .08em;
   --angled-tab-cut: clamp(16px, 1.45vw, 22px);
@@ -88,7 +89,7 @@
 }
 .menu-frame-header.angled-tab-header.menu-frame-header--compact > div:first-child,
 .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
-  padding: 0 calc(var(--angled-title-cut) + 5px) 0 clamp(10px, 1.2vw, 18px);
+  padding: 0 calc(var(--angled-title-cut) + 5px) 0 var(--angled-brand-padding);
 }
 .menu-frame-header.menu-frame-header--compact > div:first-child > h1,
 .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child > span {

@@ -1,5 +1,6 @@
 import { Material, Mesh, MeshStandardMaterial, type Object3D } from "three";
 import { isGarageWorkLight } from "./garageFixtures.ts";
+import { prepareGaragePointLights } from "./garagePointLights.ts";
 import { fitMechanicsFloor } from "./mechanicsFloor.ts";
 import { tagGarageAccent } from "../../theme/garageLighting.ts";
 
@@ -157,6 +158,7 @@ export function prepareGarageDisplay(scene: Object3D) {
     leading.position.z += 1.13;
     root.add(leading);
   }
+  prepareGaragePointLights(root);
   // Geometry and textures still belong to useGLTF's cache. Only our material
   // copies are owned by this display, including on selection-screen remounts.
   return {

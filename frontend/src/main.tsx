@@ -1,5 +1,6 @@
 import { StrictMode, useEffect } from 'react'
-import { createRoot } from 'react-dom/client'
+import { createRoot, type Root } from 'react-dom/client'
+import { endPlayerSession } from './net/endPlayerSession'
 import './index.css'
 import App from './App.tsx'
 import { useGLTF } from '@react-three/drei'
@@ -17,10 +18,29 @@ function StagingLoadError() {
   </main>
 }
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    {stagingAssetsEnabled
-      ? <AssetBoundary fallback={<StagingLoadError />}><App /></AssetBoundary>
-      : <App />}
-  </StrictMode>,
-)
+let game: Root | undefined;
+function mountGame() {
+  if (game) return;
+  game = createRoot(document.getElementById('root')!);
+  game.render(
+    <StrictMode>
+      {stagingAssetsEnabled
+        ? <AssetBoundary fallback={<StagingLoadError />}><App /></AssetBoundary>
+        : <App />}
+    </StrictMode>,
+  );
+}
+
+window.addEventListener("avensky:leave-game", () => {
+  const root = document.getElementById("root");
+  game?.unmount();
+  game = undefined;
+  root?.remove();
+  endPlayerSession();
+});
+window.addEventListener("avensky:resume-game", event => {
+  // Module imports run once per document. Resume this build on later sign-ins.
+  event.preventDefault();
+  mountGame();
+});
+mountGame();

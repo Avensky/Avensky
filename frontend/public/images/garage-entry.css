@@ -13,6 +13,16 @@
   min-height: 100lvh;
   background: #080808;
 }
+@media (orientation: portrait) and (pointer: coarse) {
+  /* Let the installed sign-in page paint the room in the document layer;
+     WebKit can clip fixed layers at a smaller boundary. */
+  html[data-garage-standalone] body.garage-entry > .garage-entry-scene { position: absolute; }
+  html[data-garage-standalone] .garage-entry-scene {
+    /* Some Home Screen launches underreport even the large viewport by the
+       status-bar inset. Never extend past the physical display or by more than that inset. */
+    min-height: max(100lvh, min(var(--garage-screen-long-edge, 100lvh), calc(100lvh + env(safe-area-inset-top, 0px))));
+  }
+}
 [data-live-garage] { display:block; pointer-events:none; user-select:none; background:#080808; }
 [data-live-garage]:has(.garage-canvas) { pointer-events:auto; }
 [data-live-garage] canvas { display:block; }
@@ -29,7 +39,7 @@
 }
 @media (orientation: landscape) and (pointer: coarse) {
   .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
-    padding-left: calc(env(safe-area-inset-left, 0px) + 16px);
+    padding-left: calc(2 * var(--angled-brand-padding));
   }
 }
 .garage-entry-body {
@@ -120,8 +130,15 @@ html[data-high-contrast="true"] {
 .garage-entry-card [role="alert"] { border-inline-start:2px solid var(--app-accent); padding-inline-start:.7rem; }
 @media (max-width:600px) and (orientation:portrait) {
   .garage-entry-header.angled-tab-header { --angled-header-height: 32px; }
+  .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child::before { top: 1px; }
   .garage-entry-body { align-items:end; justify-items:center; padding:1rem 1rem max(2rem,env(safe-area-inset-bottom)); }
   .garage-entry-card { width:min(100%,390px); }
+}
+/* The fixed header and independent notices leave the whole viewport for sign-in. */
+.garage-entry-body:has(.garage-credentials) {
+  min-height: var(--welcome-height, 100dvh);
+  align-items: center;
+  padding-block: max(1rem, env(safe-area-inset-bottom, 0px));
 }
 .garage-entry-card h1 { font-size:1.35rem; margin:0 0 .8rem; line-height:1.15; }
 .garage-entry-card form:not(.garage-credentials),
@@ -215,6 +232,13 @@ html[data-high-contrast="true"] .garage-credentials {
 
 /* The room introduces the interface only after its first completed frame. */
 html:has(.garage-entry), body:has(.garage-entry), body.garage-entry { background:#080808; }
+/* The native shell can sample the document color beyond its drawable viewport. */
+@media (orientation: portrait) {
+  html[data-garage-standalone][data-garage-ready="true"]:has(body.garage-entry, .garage-menu-backdrop:not([hidden])),
+  html[data-garage-standalone][data-garage-ready="true"]:has(body.garage-entry, .garage-menu-backdrop:not([hidden])) > body {
+    background-color: color-mix(in srgb, var(--app-garage-panel, var(--app-panel, #080808)) 28%, #080808);
+  }
+}
 .garage-entry { user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
 .garage-entry :is([role="button"],a,summary,label) { -webkit-tap-highlight-color:transparent; touch-action:manipulation; }
 .garage-entry .garage-field input { user-select:text; -webkit-user-select:text; }
@@ -270,4 +294,11 @@ body.garage-entry .garage-entry-card:not(.garage-entry-account)::before { conten
 .garage-entry .garage-field input { font-size:max(16px,1rem); }
 @media (max-width:600px) and (orientation:portrait) {
   .garage-notices { top:calc(var(--menu-angled-header-height) + env(safe-area-inset-top) + 1rem); left:1rem; width:calc(100% - 2rem); max-height:25svh; }
+  /* Messages use the space above the centered form, even when they wrap. */
+  .garage-entry-body:has(.garage-credentials) { grid-template-rows: minmax(0,1fr) auto minmax(0,1fr); }
+  .garage-entry-body:has(.garage-credentials) > .garage-entry-card { grid-area: 2 / 1; }
+  .garage-entry-body:has(.garage-credentials) > .garage-notices {
+    grid-area: 1 / 1; inset: auto 0 .5rem; width: 100%;
+    max-height: max(1.5rem, calc(100% - var(--menu-angled-header-height) - env(safe-area-inset-top)));
+  }
 }

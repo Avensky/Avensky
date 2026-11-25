@@ -13,10 +13,6 @@ import {DRIVING_ACTIONS} from '../store/preferences/keyBindings';
 import {combatIntent} from '../combat/combatStore';
 import {cycleTankWeapon,toggleTankScope,setWeaponHeld,releaseWeaponSource} from '../combat/turretControls';
 import {
-  openWorldBuilder,
-  closeWorldBuilder,
-} from "../worldBuilder/state/builderActions";
-import {
   leaveInspection,
   enterInspection,
 } from "../store/presentation/inspectionActions";
@@ -151,30 +147,24 @@ export function Keyboard() {
         if(ui.overlay==='missions')ui.backToParentMenu();else ui.setOverlay('missions');
         return;
       }
-      if (event.code === "F9" && ui.screen === "world_builder") {
+      if (event.code === "F9" && (
+        ui.screen === "world_builder" ||
+        (ui.screen === "sandbox" && !ui.isModeLoading &&
+          !event.ctrlKey && !event.altKey && !event.metaKey && !event.shiftKey)
+      )) {
         event.preventDefault();
         release();
-        closeWorldBuilder();
-        return;
-      }
-      if (
-        event.code === "F9" &&
-        !event.ctrlKey &&
-        !event.altKey &&
-        !event.metaKey &&
-        !event.shiftKey &&
-        ui.screen === "sandbox" &&
-        !ui.isModeLoading
-      ) {
-        event.preventDefault();
-        release();
-        if (ui.overlay === "world_builder") closeWorldBuilder();
-        else if (
-          ui.overlay === null ||
-          ui.overlay === "pause" ||
-          ui.overlay === "debug_menu"
-        )
-          void openWorldBuilder();
+        const close = ui.screen === "world_builder" || ui.overlay === "world_builder";
+        if (close || ui.overlay === null || ui.overlay === "pause" || ui.overlay === "debug_menu") {
+          // Editor actions pull in collision meshes. Load them only for an editor command.
+          void import("../worldBuilder/state/builderActions").then(actions => {
+            const current = useUIStore.getState();
+            if (!focused || document.hidden || current.screen !== ui.screen || current.overlay !== ui.overlay ||
+                current.isModeLoading !== ui.isModeLoading) return;
+            if (close) actions.closeWorldBuilder();
+            else return actions.openWorldBuilder();
+          }).catch(error => console.error("Could not load world editor controls", error));
+        }
         return;
       }
       if (
@@ -514,6 +504,7 @@ export function Keyboard() {
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("focusin", onFocusIn);
     return () => {
+      focused = false;
       window.removeEventListener("keydown", blockTab, true);
       window.removeEventListener("keyup", releaseTab, true);
       window.removeEventListener("keydown", onKeyDown);

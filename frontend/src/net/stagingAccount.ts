@@ -29,3 +29,27 @@ export async function alphaAction(endpoint: "testers/invite" | "account/email-re
   if (!response.ok) throw new Error(value.error || "The account request could not be completed.");
   return value;
 }
+
+type PortalNavigation = { showSignIn(signOut: boolean): Promise<void> };
+let returning: { signOut: boolean; done: Promise<void> } | undefined;
+
+/** The server may close the game socket while its sign-out POST is in flight. */
+export function returnToStagingSignIn(signOut = false): Promise<void> {
+  if (returning) {
+    if (!signOut || returning.signOut) return returning.done;
+    // A passive session check must never consume a player's explicit revocation.
+    return returning.done.catch(() => {}).then(() => returnToStagingSignIn(true));
+  }
+  const done = (async () => {
+    const portal = window as Window & { avenskyPortalNavigation?: PortalNavigation };
+    if (!portal.avenskyPortalNavigation) {
+      const script = "/__alpha/entry/sign-in-navigation.js";
+      await import(/* @vite-ignore */ script);
+    }
+    const navigation = portal.avenskyPortalNavigation;
+    if (!navigation) throw new Error("The staging sign-in page is unavailable. Try again.");
+    await navigation.showSignIn(signOut);
+  })().finally(() => { returning = undefined; });
+  returning = { signOut, done };
+  return done;
+}

@@ -21,9 +21,7 @@ import { VehiclePreview } from "./preview";
 import { MainMenu } from "./menus/MainMenu";
 import { PauseMenu } from "./menus/PauseMenu";
 import { ModeLoadingScreen } from "./ModeLoadingScreen";
-import { Sandbox, SandboxSetup } from "./modes/sandbox/index";
-import { DebugMenu } from "../components/debugger/DebugMenu";
-import { DrivingOverlay } from "../ui/DrivingHUD";
+import { SandboxSetup } from "./modes/sandbox/SandboxSetup";
 import { CockpitPanel } from "../ui/Cockpit/CockpitPanel";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useSocialStore } from "../store/social/socialStore";
@@ -33,11 +31,9 @@ import { CareerMenu } from "./menus/CareerMenu";
 import { MissionsMenu } from "./menus/MissionsMenu";
 import { SessionMenu } from "./menus/SessionMenu";
 import { VehicleMenu } from "./menus/VehicleMenu";
-import { Cameras } from "../effects";
 import { PerformanceOverlay } from "../performance/PerformanceOverlay";
 import { useRenderSettingsStore } from "../store/presentation/renderSettingsStore";
 import { ModeSelection } from "./alpha/ModeSelection";
-import { useBuilderStore } from "../worldBuilder/state/builderStore";
 import { QueueScreen } from "./alpha/QueueScreen";
 
 const HeroWorkshop = lazy(() => import("./heroes/HeroWorkshop").then(module => ({ default: module.HeroWorkshop })));
@@ -53,19 +49,17 @@ const SocialPanel = lazy(() =>
     default: module.SocialPanel,
   })),
 );
-const WorldBuilderScene = lazy(
-  () => import("../worldBuilder/scene/WorldBuilderScene"),
-);
+const WorldContents = lazy(() => import("./modes/WorldContents"));
+const DebugMenu = lazy(() => import("../components/debugger/DebugMenu").then(module => ({ default: module.DebugMenu })));
+const DrivingOverlay = lazy(() => import("../ui/DrivingHUD").then(module => ({ default: module.DrivingOverlay })));
 
 
 export function GameUI() {
   useAlphaFlow();
-  const workspace = useBuilderStore((s) => s.workspace);
   const hud = useRenderSettingsStore((s) => s.hud);
   const screen = useUIStore((s) => s.screen);
   const overlay = useUIStore((s) => s.overlay);
   const isModeLoading = useUIStore((s) => s.isModeLoading);
-  const vehicleAuthoring = workspace === "vehicle" && overlay === "world_builder";
   const socialReady = useSocialStore((s) => Boolean(s.view));
   useEffect(() => {
     const url = new URL(window.location.href);
@@ -122,28 +116,18 @@ export function GameUI() {
               fittingRoom={screen === "heroes" && characterTab === "appearance"}
             />
           )}
-          {screen === "world_builder" && (
+          {(screen === "world_builder" || screen === "sandbox") && (
             <Suspense fallback={null}>
-              <WorldBuilderScene />
+              <WorldContents screen={screen} editorOpen={overlay === "world_builder"} />
             </Suspense>
           )}
-          {screen === "sandbox" && (
-            <>
-              {(overlay !== "world_builder" || vehicleAuthoring) && <Sandbox />}
-              {overlay === "world_builder" && !vehicleAuthoring && (
-                <Suspense fallback={null}>
-                  <WorldBuilderScene />
-                </Suspense>
-              )}
-            </>
-          )}
-
-          {screen === "sandbox" && (overlay !== "world_builder" || vehicleAuthoring) && <Cameras />}
         </FullCanvas>
       )}
 
       {/* UI Overlay */}
-      {screen === "sandbox" && !overlay && <DrivingOverlay hud={hud} />}
+      {screen === "sandbox" && !overlay && (
+        <Suspense fallback={null}><DrivingOverlay hud={hud} /></Suspense>
+      )}
       {screen === "sandbox" && <CombatHUD />}
       {screen === "sandbox" && !overlay && hud && <CtfMatchHUD />}
 
@@ -168,7 +152,9 @@ export function GameUI() {
       {/* Menus */}
       {screen === "main" && <MainMenu />}
       {screen === "sandbox" && overlay === "pause" && <PauseMenu />}
-      {overlay === "debug_menu" && <DebugMenu />}
+      {overlay === "debug_menu" && (
+        <Suspense fallback={null}><DebugMenu /></Suspense>
+      )}
       {(overlay === "settings" || (screen === "settings" && !overlay)) && (
         <SettingsMenu />
       )}
