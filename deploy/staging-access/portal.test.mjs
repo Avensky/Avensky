@@ -78,7 +78,12 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.match(signIn, /<button type="button"[^>]+aria-controls="alpha-password" hidden>Show password/);
   assert.match(signIn, /<script src="\/__alpha\/password\.js" defer><\/script>/);
   assert.doesNotMatch(signIn, /name="code"|<video|<canvas|flare\.js|Play as guest|Vehicle/);
-  assert.match(signIn, /garage-entry-brand/);
+  const brand = signIn.match(/<header\b[^>]*>([\s\S]*?)<\/header>/)[1];
+  assert.match(brand, /src="\/__alpha\/entry\/logo\.svg"/);
+  assert.equal(brand.replace(/<[^>]+>/g, "").trim(), "Avensky");
+  assert.doesNotMatch(brand, /<(?:input|button|a|nav)\b|tabindex/);
+  assert.match(signIn, /src="\/__alpha\/entry\/sign-in-input\.js"/);
+  assert.equal((await get("entry/sign-in-input.js")).status, 200);
   assert.doesNotMatch(signIn, /garage-entry-sign/);
   assert.match(signIn, /garage-entry-walls/);
   const css = await get("entry/garage-entry.css");
@@ -125,7 +130,10 @@ test("invites grant access once and revocation invalidates existing cookies", as
   assert.equal(theme.status, 200);
   const set = new Map();
   const root = { dataset: {}, style: { setProperty: (key, value) => set.set(key, value) } };
-  runInNewContext(await theme.text(), {
+  const paletteSource = await theme.text();
+  runInNewContext(paletteSource, { localStorage: { getItem: () => null }, document: { documentElement: root } });
+  assert.equal(set.get("--app-garage-panel"), "#716a60");
+  runInNewContext(paletteSource, {
     localStorage: { getItem: key => key === "avenlab-preferences-v1" ? JSON.stringify({ state: { theme: "deep-purple", garageEffects: { theme: "forest" } } }) : null },
     document: { documentElement: root },
   });

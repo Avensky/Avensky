@@ -3,7 +3,7 @@ import { execFile } from "node:child_process";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { cpSync, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
-import { defineConfig, loadEnv, type ViteDevServer } from "vite";
+import { build, defineConfig, loadEnv, type ViteDevServer } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
@@ -116,7 +116,21 @@ export default defineConfig(({ command, mode }) => {
     plugins: [
       release && {
         name: "staging-public-files",
-        writeBundle(options) {
+        async writeBundle(options) {
+          // The public portal loads this self-contained menu only for a gamepad.
+          // Its allowlist exposes two files without exposing authenticated game chunks.
+          await build({
+            configFile: false, root: frontend, publicDir: false,
+            define: { "process.env.NODE_ENV": JSON.stringify("production") },
+            build: {
+              outDir: resolve(frontend, options.dir ?? "dist-staging", "images"), emptyOutDir: false,
+              lib: {
+                entry: resolve(frontend, "src/game/welcome/signInController.tsx"),
+                formats: ["es"], fileName: () => "sign-in-controller.js", cssFileName: "sign-in-controller",
+              },
+              rollupOptions: { output: { inlineDynamicImports: true } },
+            },
+          });
           const source = fileURLToPath(publicRoot);
           cpSync(source, resolve(frontend, options.dir ?? "dist-staging"), {
             recursive: true,

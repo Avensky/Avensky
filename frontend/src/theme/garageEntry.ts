@@ -1,5 +1,6 @@
 import { APP_BRANDING } from "./branding.ts";
 
+export const DEFAULT_GARAGE_THEME = "pit-wall";
 export const GARAGE_ENTRY_STORAGE_KEY = "avensky-portal-backdrop";
 export const GARAGE_ENTRY_MASK = "garage-wall-mask.4688e14d5cc9.webp";
 export const GARAGE_ENTRY_POSTER = "garage-entry.37a6f46c5f6b.webp";
@@ -19,7 +20,7 @@ export function garageBackdrop(assets: "/images" | "/__alpha/entry") {
 
 export function garageBrandHeader(assets: "/images" | "/__alpha/entry") {
   return `<header class="garage-entry-header angled-tab-header">
-    <div class="garage-entry-brand"><img src="${assets}/logo.svg" width="40" height="40" alt="">
+    <div class="garage-entry-brand"><img src="${assets}/logo.svg" width="26" height="26" alt="" draggable="false">
     <span>${escapeText(APP_BRANDING.productName)}</span></div>
   </header>`;
 }

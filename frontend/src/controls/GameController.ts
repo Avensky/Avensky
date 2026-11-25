@@ -1,3 +1,4 @@
+import { createMenuDirections, menuNeutral } from "./menuDirections";
 import {barrageReady, requestTankBarrage} from "../combat/tankBarrage";
 import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove, turnHubCamera } from "../game/hub/hubControls";
 import {requestNearestRevive,isMechanicPlayer} from '../combat/reviveTargets';
@@ -37,14 +38,6 @@ import {
 function trigger(value = 0) {
   return Number.isFinite(value) && value > 0.05 ? Math.min(1, value) : 0;
 }
-function menuNeutral(pad: Gamepad) {
-  return (
-    pad.axes.slice(0, 4).every((value) => axis(value, 0.5) === 0) &&
-    [0, 1, 2, 4, 5, 6, 7, 8, 9, 12, 13, 14, 15].every(
-      (index) => !pad.buttons[index]?.pressed,
-    )
-  );
-}
 
 export function GameController() {
   useEffect(() => {
@@ -59,8 +52,7 @@ export function GameController() {
     let onFoot = false;
     let menuArmed = true;
     let resetTimer: number | null = null;
-    let lastVertical = -Infinity;
-    let lastHorizontal = -Infinity;
+    const menuDirections = createMenuDirections();
     let panelPressHeld = false;
     let heroMainHeld = false;
     const releaseHeroMain = (cancelled=true) => {
@@ -114,7 +106,7 @@ export function GameController() {
           (item) => item?.connected && `${item.index}:${item.id}` === padKey,
         ) ?? pads.find((item) => item?.connected);
       menuArmed = !pad || menuNeutral(pad);
-      lastVertical = lastHorizontal = -Infinity;
+      menuDirections.reset();
     };
     const releaseIfBlocked = (
       state: ReturnType<typeof useUIStore.getState>,
@@ -313,33 +305,9 @@ export function GameController() {
           }
           return;
         }
-        const now = performance.now();
-        const vertical =
-          Math.abs(axis(pad.axes[1], 0.5)) >= Math.abs(axis(pad.axes[3], 0.5))
-            ? axis(pad.axes[1], 0.5)
-            : axis(pad.axes[3], 0.5);
-        const horizontal =
-          Math.abs(axis(pad.axes[0], 0.5)) >= Math.abs(axis(pad.axes[2], 0.5))
-            ? axis(pad.axes[0], 0.5)
-            : axis(pad.axes[2], 0.5);
-        // At most one action per poll: navigation must commit before a later
-        // activation can target its row or a panel opened by that action.
-        if (edges[12] || edges[13]) {
-          routeMenuAction(edges[12] ? "up" : "down");
-          lastVertical = now;
-          return;
-        } else if (vertical !== 0 && now - lastVertical >= 220) {
-          routeMenuAction(vertical < 0 ? "up" : "down");
-          lastVertical = now;
-          return;
-        }
-        if (edges[14] || edges[15]) {
-          routeMenuAction(edges[14] ? "left" : "right");
-          lastHorizontal = now;
-          return;
-        } else if (horizontal !== 0 && now - lastHorizontal >= 220) {
-          routeMenuAction(horizontal < 0 ? "left" : "right");
-          lastHorizontal = now;
+        const direction = menuDirections.read(pad, edges, performance.now());
+        if (direction) {
+          routeMenuAction(direction);
           return;
         }
         if (edges[4] || edges[5]) {

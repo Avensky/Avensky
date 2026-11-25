@@ -154,7 +154,6 @@ function KeyboardDialog() {
                       ? `Type ${upper ? key : key.toLowerCase()}`
                       : key
                   }
-                  onPointerEnter={() => setPosition([r, c])}
                   onFocus={() => {
                     if (position[0] !== r || position[1] !== c)
                       setPosition([r, c]);

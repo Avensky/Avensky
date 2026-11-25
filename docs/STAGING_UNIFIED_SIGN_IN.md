@@ -49,6 +49,8 @@ bash "$script"
 rm -f "$script"
 ```
 
+For a sign-in UI update after cutover, run the same commands with `bash "$script" --ui-only`. This refreshes the portal and its theme files from the active release, restarts the portal, and checks its sign-in page and controller assets.
+
 If the journal reports `217/USER` for UID 10001, retry the normal installer from the published release. Before stopping the old portal, it provisions the host login-disabled service account `avensky-staging` with UID and GID 10001 on hosts that need it. It checks for identity conflicts and verifies that systemd can open the game database as the service user. Hosts already configured to run the portal as the game database owner retain their existing identity. A failure at systemd's USER step happens before the access migration runs.
 
 Use `bash "$script" --fresh` for a first cutover with an empty invitation list. Existing game accounts and saved characters survive either choice. A successful migration records its version inside the game database, so repeating the installer preserves subsequent invites and revocations. The old access file remains an offline backup. A legacy portal with its own password hashes requires fresh email invitations. The installer refuses to copy its password hashes.

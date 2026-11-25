@@ -1,3 +1,4 @@
+import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry.ts";
 import { isUITheme, type GarageTheme } from "../../theme/catalog.ts";
 
 /** Presentation for the selection garage only. Driving keeps its own renderer. */
@@ -16,7 +17,7 @@ export type GarageEffects = {
 };
 
 export const DEFAULT_GARAGE_EFFECTS: GarageEffects = {
-  theme: "auto",
+  theme: DEFAULT_GARAGE_THEME,
   bloom: true,
   bloomStrength: 0.5,
   bloomRadius: 0.25,
@@ -41,7 +42,7 @@ export function sanitizeGarageEffects(value: unknown): GarageEffects {
       ? (data[key] as boolean)
       : (DEFAULT_GARAGE_EFFECTS[key] as boolean);
   return {
-    theme: isUITheme(data.theme) ? data.theme : "auto",
+    theme: data.theme === "auto" || isUITheme(data.theme) ? data.theme : DEFAULT_GARAGE_EFFECTS.theme,
     bloom: flag("bloom"),
     bloomStrength: number("bloomStrength", 0, 1.5),
     bloomRadius: number("bloomRadius", 0, 1),

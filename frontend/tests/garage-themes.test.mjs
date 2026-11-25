@@ -7,10 +7,11 @@ import { applyGarageLighting } from "../src/theme/garageLighting.ts";
 import { selectedGarageTheme, UI_THEMES } from "../src/theme/catalog.ts";
 import { sanitizeGarageEffects } from "../src/store/preferences/garageEffects.ts";
 
-test("legacy and invalid room preferences follow the interface and a saved room can override it", () => {
-  for (const saved of [{}, { theme: "unknown" }, { theme: null }, { theme: "auto" }, { theme: "__proto__" }]) {
-    assert.equal(selectedGarageTheme({ theme: "forest", garageEffects: sanitizeGarageEffects(saved) }), "forest");
+test("new rooms use Pit Wall while saved room and follow-interface choices persist", () => {
+  for (const saved of [{}, { theme: "unknown" }, { theme: null }, { theme: "__proto__" }]) {
+    assert.equal(selectedGarageTheme({ theme: "forest", garageEffects: sanitizeGarageEffects(saved) }), "pit-wall");
   }
+  assert.equal(selectedGarageTheme({ theme: "forest", garageEffects: sanitizeGarageEffects({ theme: "auto" }) }), "forest");
   assert.equal(selectedGarageTheme({ theme: "white", garageEffects: sanitizeGarageEffects({ theme: "forest" }) }), "forest");
 });
 

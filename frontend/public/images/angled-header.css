@@ -1,6 +1,14 @@
-/* Geometry shared by the in-game tabs and the pre-game brand header. */
+/* Shared by the in-game menus and the standalone sign-in page. */
+:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 41px; }
+@media (max-width: 760px) {
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 39px; }
+}
+@media (max-height: 480px) and (min-width: 560px) {
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 35px; }
+}
 .angled-tab-header {
   --angled-title-scale: 1.2;
+  --angled-title-tracking: .08em;
   --angled-tab-cut: clamp(16px, 1.45vw, 22px);
   --angled-title-cut: calc(var(--angled-tab-cut) * var(--angled-title-scale));
   --angled-title-chamfer: 0px;
@@ -8,4 +16,97 @@
   --angled-tabs-height: calc(var(--angled-header-height) / var(--angled-title-scale));
   --angled-title-shape: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height), calc(100% - var(--angled-title-cut) - var(--angled-title-chamfer)) 100%, 0 100%);
   --angled-tab-surface: color-mix(in srgb, var(--app-background) 62%, var(--app-panel));
+}
+
+:is(.menu-frame-header, .garage-entry-header).angled-tab-header {
+  position: relative;
+  top: 0;
+  margin-block-start: 0;
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0;
+  min-height: var(--angled-header-height);
+  padding: 0;
+  background: transparent !important;
+  border: 0;
+  overflow: visible;
+  font-style: italic;
+}
+:is(.menu-frame-header, .garage-entry-header).angled-tab-header > div:first-child {
+  position: relative;
+  z-index: 3;
+  isolation: isolate;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: start;
+  box-sizing: border-box;
+  height: var(--angled-header-height);
+  gap: clamp(9px, 1.1vw, 16px);
+  min-width: 0;
+  padding: 1px calc(var(--angled-title-cut) + 9px) 1px 12px;
+  color: var(--app-text);
+  background: var(--app-accent);
+  clip-path: var(--angled-title-shape);
+  filter: drop-shadow(0 0 1px var(--app-accent));
+}
+:is(.menu-frame-header, .garage-entry-header).angled-tab-header > div:first-child::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 1px 1px;
+  pointer-events: none;
+  background: color-mix(in srgb, var(--app-panel) 92%, var(--app-raised));
+  clip-path: var(--angled-title-shape);
+}
+.menu-frame-header.angled-tab-header > div:first-child > h1,
+.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child > span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--app-text);
+  font-size: clamp(17px, 2vw, 26px);
+  font-style: italic;
+  letter-spacing: var(--angled-title-tracking);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .angled-tab-header { --angled-tab-cut: 13px; --angled-title-tracking: .04em; }
+}
+@media (max-width: 520px) {
+  .angled-tab-header { --angled-tab-cut: 10px; --angled-title-tracking: .015em; }
+}
+
+.menu-frame-header.menu-frame-header--compact > div:first-child,
+.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-inline-end: auto;
+}
+.menu-frame-header.angled-tab-header.menu-frame-header--compact > div:first-child,
+.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
+  padding: 0 calc(var(--angled-title-cut) + 5px) 0 clamp(10px, 1.2vw, 18px);
+}
+.menu-frame-header.menu-frame-header--compact > div:first-child > h1,
+.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child > span {
+  font-size: calc(clamp(14px, 1.6vw, 20px) * var(--menu-text-scale, 1));
+}
+
+img.menu-logo--header,
+.garage-entry-brand > img {
+  display: block;
+  width: clamp(17px, 2.4vw, 26px);
+  height: clamp(17px, 2.4vw, 26px);
+  flex: none;
+  object-fit: contain;
+  filter: none;
+}
+.menu-frame-header h1, .garage-entry-brand > span {
+  font-style: italic;
+  font-weight: 850;
+  line-height: 1.1;
+  text-transform: uppercase;
 }
