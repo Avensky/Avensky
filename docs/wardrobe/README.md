@@ -1,0 +1,47 @@
+# Avensky wardrobe foundation
+
+**Status:** Architecture specification, version 1.3, drafted 2026-11-25. Not yet implemented or validated as a complete pipeline.
+**Scope:** Game wardrobe and reusable character/clothing authoring. Do not move private vehicle-research, soft-body solvers or licensed source archives into the public game repository.
+
+This is the **single entry point** for human contributors and AI coding agents. Do not copy the same rules into component READMEs. Link to the source of truth below.
+
+| Source of truth | Owns |
+| --- | --- |
+| [RULES.md](RULES.md) | Deterministic body-region layering, compatibility, fit modes, protection masks and proposed geometric tolerances |
+| [PIPELINE.md](PIPELINE.md) | Intake, measurements, fitting, texture grading, output artifacts and release gates |
+| [TESTING.md](TESTING.md) | Regression matrices, required fixtures, reporting and acceptance requirements |
+| [DECISIONS.md](DECISIONS.md) | Dated decisions, verified baseline, assumptions, exceptions and remaining unknowns |
+| [COMMAND_QUEUE.md](COMMAND_QUEUE.md) | Small, dependency-ordered prompts for future implementation sessions |
+
+## Current architecture; not the intended future behavior
+
+- Shared catalog: `packages/wardrobe-catalog/`, including curated `character-garments.json` and generated `discovered-wardrobe-garments.json`.
+- Runtime choices/replacements: `frontend/src/game/characters/wardrobeGarments.ts`; visible piece logic: `clothingPieces.ts`.
+- Dressing-room categories: `frontend/src/game/characters/DressingRoom.tsx`.
+- Existing fit utilities: `wardrobeBody.ts`, `wardrobeGarmentFit.ts`, `gothicSkirtFit.ts`, `gothicCorsetTuck.ts`, `wardrobeTopFit.ts`, `wardrobeDressFit.ts` and `wardrobeFitCache.ts`.
+- Existing material behavior: `dressMaterials.ts`, `corsetDye.ts` and `shortSkirtFabric.ts`.
+
+Current code often uses **replacement** semantics; the future system must distinguish **equipped**, **active** and **visible** without silently deleting saved underlayers. Do not represent this specification as an implemented feature.
+
+## Working contract for implementation agents
+
+1. Read this index and the relevant linked specification, then inspect code/tests at the current commit. Do not rely on historical chat summaries as current code.
+2. Record the starting behavior, target invariant and known fixture availability in [DECISIONS.md](DECISIONS.md).
+3. Work in a focused review branch. Keep original assets, user saves, authored colors and stable garment IDs unchanged unless an explicit migration is approved.
+4. Implement the **smallest** vertical slice: pure resolver and manifest validation before UI, geometry or batch asset updates.
+5. Test ordinary, conflict, migration and missing-asset cases. An asset-dependent skipped test is **not** a verified geometry pass.
+6. Capture source hashes, changed files, measurements, before/after images when applicable, tests and unresolved cases; write a concise dated decision note.
+7. Update only the owning specification when rules change. Elsewhere, leave a link, not duplicate prose. Deprecate obsolete logic deliberately with migration tests.
+8. Never merge, release assets, or deploy live automatically. Technical fit, artist approval and legal/distribution clearance are separate gates.
+
+Words: **MUST** = implementation invariant; **SHOULD** = default unless documented exception; **PROPOSED** = calibration required; **VERIFIED** = demonstrated by evidence at a pinned revision.
+
+## High-level goal
+
+Import GLB/FBX/Blender assets and texture collections privately; discover and classify; fit against measured character bodies; resolve garment-to-garment layering by region; test animations and textures; rank for Hero/NPC/rework; export preview/LOD artifacts; and publish only approved, rights-cleared selections. Dress, top, corset, skirt, pants, shoes and coat behavior must be consistent with their saved outfit IDs.
+
+## Boundary and cross-links
+
+For schema/catalog editing, use [wardrobe catalog README](../../packages/wardrobe-catalog/README.md). For existing in-game fitting and camera behavior, use [character README](../../frontend/src/game/characters/README.md). For commercial source files and distribution restrictions, use [asset clearance](../ASSET_CLEARANCE.md).
+
+**No changes to runtime outfit semantics are authorized by merely merging these documentation files.**

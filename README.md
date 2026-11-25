@@ -18,6 +18,10 @@ Open **http://localhost:5174**. Choose **Player profile → Continue as guest**.
 
 If you received the transfer bundle, follow its **START-HERE.md** before installing dependencies. Preparing models on first launch takes longer than subsequent launches.
 
+## Wardrobe authoring foundation
+
+The planned deterministic layering, controlled garment fitting, material selection, testing and AI-agent implementation commands are documented in [Wardrobe foundation](docs/wardrobe/README.md). This is a **design specification**, not yet implemented runtime behavior.
+
 ## Project boundary
 
 | Part | What belongs here |

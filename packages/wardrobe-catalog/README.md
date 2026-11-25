@@ -1,6 +1,6 @@
 # Wardrobe catalog
 
-`@avenlab/wardrobe-catalog` is a private package in the AvenLab repository.
+`@avenlab/wardrobe-catalog` is the shared wardrobe data package in the Avensky game repository.
 The frontend uses its JSON files for selection and preview. Rust embeds the
 same data to validate and save player outfits. Garment GLBs, fitting code,
 and profile persistence live in their respective frontend and server paths.
@@ -34,10 +34,7 @@ texture averages. Explicit outfit dyes and per-piece colors take precedence.
 Keep these values aligned with future authored asset changes and the shared
 `frontend/tests/fixtures/driver-appearance.json` browser/Rust fixture.
 
-The [readiness grid](../../docs/readiness/README.md) tracks the remaining uniform
-color tool, per-asset color-group coverage, better palette combinations, and
-package extraction requirements. Existing `extraDyeFields` support is partial;
-do not expose unsupported controls or treat it as a finished shared color editor.
+See the [wardrobe foundation](../../docs/wardrobe/README.md) for planned layer compatibility, fitting, material QA and the implementation queue. The wardrobe rules are proposed and do not yet change runtime selection behavior. Existing `extraDyeFields` support is partial; do not expose unsupported controls or treat it as a finished shared color editor.
 
 Edit curated entries in the relevant source JSON. Keep `slot` and `piece`
 aligned with the garment the model replaces. Paths in the garment catalog

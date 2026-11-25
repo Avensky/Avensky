@@ -1,0 +1,83 @@
+# Wardrobe testing and verification
+
+**Status:** Acceptance specification; new tests are not yet implemented. Never claim a proposed threshold has passed without actual fixture evidence.
+
+## Test layers and failure classification
+
+1. **Pure schema/resolver:** deterministic outputs, stable identities, explicit conflict reasons, no mutation, consistent body-region graph, cycle detection, unsupported mode and unknown item behavior.
+2. **Legacy regression:** old saves, retired garment IDs, special Gothic waist/corset modes, bra-after-top-removal, skirt/petticoat dependencies, color/dye persistence and outfit selection semantics.
+3. **Geometry:** signed penetrations, exposed surface coverage, self-contact, extreme deformation, edge/UV continuity, protected details, rig/skin weights and floor contact.
+4. **Motion:** idle/A pose, walk, run/turn, arms up, crossed arms, reach, sit/drive, clutch/brake/gas, twist, selected emotes. Sample across animation phases, not only endpoints.
+5. **Render/material:** front/back/side, exposed underlayers when open, opaque coverage when closed, transparency, shadows and mobile/garage LOD parity.
+6. **Performance and rights:** outfit cold/warm prepare time, texture budget, phone GPU/frame time and evidence that distribution is approved independently.
+
+## Mandatory compatibility scenarios
+
+| Scenario | Expected invariant |
+| --- | --- |
+| Shirt + corset + coat | All IDs preserved; requires fit evidence; coat outermost torso/sleeve, corset over shirt |
+| Coat open -> closed -> open | Same shirt/corset, colors and saved data; visibility switches only |
+| Remove coat | Underlayers reappear without refit or data loss when a cached valid fit exists |
+| Gown + short coat | Gown remains outermost below coat hem; sleeves/collar clear coat |
+| Tunic + trousers | Explicit over-pants profile; no automatic clearing of pants |
+| Full gown + trousers, no profile | Block or request review; do not silently discard either |
+| Corset tucked vs over skirt | Invert only waist relation; check each separately |
+| Top sleeve + coat sleeve | No raised-arm/cuff collisions and no uncovered black gaps |
+| Belt under vs over coat | Distinct approved modes; don't cinch wrong host |
+| Glove under vs over cuff | Exclusive regional mode and motion clearance |
+| Pants tucked into boots | Boot shaft outside pants at ankle; maintain left/right and pedal/floor contact |
+| Pants outside boots | Wide cuff outside shaft; slim pants/bulky boots fail without fitted profile |
+| Stockings + socks + shoes | Preserve three IDs, foot pose and sole placement |
+| Open/transparent/split garments | Coverage doesn't incorrectly hide visible body or underlayers |
+| Missing GLB/incorrect rig | Explicit blocked/review result, no false pass |
+| Same outfit in different selection order | Same resolved regions, statuses and reason codes |
+| Saved legacy outfit -> load -> save | IDs/dyes untouched unless explicit versioned migration |
+
+## Proposed numeric QA thresholds
+
+Refer to [RULES.md](RULES.md#5-geometry-policy-moderate--controlled) for movement and desired clearances. Initial candidates:
+- Strict visible seam/skin edge: **>1 mm** exterior exposure fails, preserving existing stricter skirt regression semantics.
+- Isolated other visible exposure up to **2 mm**: reviewer-required, **not** automatic Hero pass.
+- Persistent visible **>2 mm**: failed fit; any visible **>5 mm**, inverted triangles, broken rig or irreparable split: critical.
+- Planted foot sole contact target **0–2 mm** from reference floor, subject to actual foot rig/physics validation.
+- No blanket minimum body separation for loose gown drapes; compare intended cloth layer surfaces and exposure.
+- Protected detail shapes and local stretch limits defined in RULES.
+
+Thresholds apply only after unit normalization. Existing authored deformations can be grandfathered as **documented versioned exceptions**; do not change reference fixtures without review.
+
+## Existing executable commands (when dependencies and GLBs installed)
+
+From repo root:
+
+```sh
+npm run wardrobe:catalog:check
+npm --prefix frontend run typecheck
+cd frontend
+AVENLAB_WARDROBE_REQUIRE_ASSETS=1 node --test \
+  tests/tucked-skirt-pairings.test.mjs \
+  tests/tucked-skirt-outfits.test.mjs \
+  tests/wardrobe-hand-clearance.test.mjs \
+  tests/gothic-skirt-layers.test.mjs \
+  tests/top03-armhole.test.mjs \
+  tests/top05-fit.test.mjs \
+  tests/wardrobe-fit-cache.test.mjs
+```
+
+For PowerShell, set `$env:AVENLAB_WARDROBE_REQUIRE_ASSETS='1'` before calling `node --test`. If any path is renamed at implementation time, update these example commands against the actual test tree. Run additional wardrobe, dressing room, discovery, coverage and save regression suites.
+
+Do **not** treat exit code zero with skipped asset-dependent tests as a geometry success. Record passed/failed/skipped counts, fixture hashes, machine, software version and timing.
+
+## Pilot acceptance (first vertical slice)
+
+1. Capture baseline for Vesper + Gothic Skirt 02 + Laced Bodice, both tucked/over, mobile/garage, with input/source hashes.
+2. Verify pure resolver keeps shirt/corset/coat IDs without changing legacy behavior before activation.
+3. Check waistband/underbust visibility, waist continuity, protected laces, material preservation and no increased self-intersections.
+4. Exercise idle, full walking cycle, selected arms-up and seated pose phases. Report max penetration, affected triangles and visibility.
+5. Verify original GLBs untouched; compare screenshots and signed numeric contact against baseline; document warnings.
+6. Require human review before marking any new layered combination Hero/NPC approved.
+
+## Reporting template
+
+`testId; commitSha; sourceSha256; bodyProfileId; garmentIds; modes; tier; pose/phase; measuredRegion; maxVisiblePenetrationMm; exposedTriangles; maxVertexShiftMm; localStretchPct; notes; status; skippedReason`.
+
+Automation must return descriptive reason codes and diagnostics, not arbitrary auto-fixes. Screenshot-only pass is insufficient; numeric-only pass without in-app material/skin check is also insufficient.
