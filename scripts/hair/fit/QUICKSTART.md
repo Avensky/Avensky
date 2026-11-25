@@ -2,6 +2,30 @@
 
 **Status:** authoring-only implementation. Pure geometry tests pass locally; Blender and game visual QA have **not** been run against the private Vesper source. Do not merge, auto-install, or deploy resulting geometry.
 
+## UPDATE: use the ORIGINAL full skull, not a generated dome
+
+After inspecting the six original uploaded `SK_Village_Lady*.fbx` source files, we confirmed that `SK_Village_Lady_Face4.fbx` already includes the **entire skull surface**. Its main Face material extends across the crown and back of head. Therefore the primary Vesper pipeline is to **extract a thin dark-root region from the source head mesh** with the existing UVs and rig, not to approximate the skull with a sphere. See [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md).
+
+**First Blender action:** import `SK_Village_Lady_Face4.fbx` into a **private** neutral-pose Blender .blend, locate the object `Face4`, and paint an `AV_ScalpRegion` vertex group over the upper skull including crown/sides/back but excluding ears, forehead, face, and eyelids. Save a new private working scene (e.g. `vesper-face4-scalp-guides.blend`). Use 1.0 weight on approved regions and 0 outside. This is a one-time per-character guide, not one group per hairstyle.
+
+Then inspect the candidate region without writing any source file. These example axis/unit values MUST be verified from the imported Blender scene:
+
+```powershell
+blender -b "C:\AvenskyPrivate\vesper-face4-scalp-guides.blend" --python scripts/hair/fit/extract_source_scalp.py -- --head-object Face4 --region-group AV_ScalpRegion --face-material Face --meters-per-world-unit 1.0 --report "C:\AvenskyPrivate\fit\source-scalp-preflight.json"
+```
+
+After inspecting the counts, Blender face group and screenshot angles, save a **NEW** authoring-only blend:
+
+```powershell
+blender -b "C:\AvenskyPrivate\vesper-face4-scalp-guides.blend" --python scripts/hair/fit/extract_source_scalp.py -- --head-object Face4 --region-group AV_ScalpRegion --face-material Face --meters-per-world-unit 1.0 --report "C:\AvenskyPrivate\fit\source-scalp-authoring.json" --write --output-blend "C:\AvenskyPrivate\vesper-source-scalp-v2.blend"
+```
+
+The extracted scalp is a **matte color-only prototype**. Test root color, UVs, scalp penetration, jaw/forehead/ear exclusion, head animations and shape-key effects; add root wisps/density separately. Do not export or publish a fitted GLB until those checks pass. It deliberately refuses to act if the author-approved `AV_ScalpRegion` group is missing.
+
+**Do not mistake the FBX source units for Blender units:** the original FBX says Y-up and UnitScaleFactor=1 (conventionally centimeters) and is about 166 units tall. Confirm whether Blender imported into meters/centimeters before selecting the `--meters-per-world-unit` argument. The example 1.0 means **one meter per Blender world unit**, which may be WRONG if the import retains original centimeter units.
+
+The source-derived path replaces Steps 2 and 3 below for Vesper. The manually traced loop plus spherical loft below is only a contingency for a future character whose original head geometry is genuinely incomplete.
+
 ## Why the old cap must remain separate
 The runtime `villager-scalp-cap` is a bonnet/hood fallback constructed from hard-coded spherical coordinates in `villagerModel.ts`. It is **not** a measurement-derived universal scalp. Keep it for its existing headwear use. The new `AVSK_ScalpFoundation_V2` is a separate Blender-authored, head-specific foundation to evaluate for imported hairstyles.
 
