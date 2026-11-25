@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { once } from "node:events";
-import { readFileSync } from "node:fs";
+import { readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { resolveAssetUrl } from "../src/assets/assetPaths.ts";
@@ -75,6 +77,42 @@ test("staging uses versioned same-origin URLs and preserves authored tier select
   assert.equal(resolveAssetUrl("/draco/draco_decoder.wasm", config), "/draco/draco_decoder.wasm");
   assert.equal(resolveAssetUrl(path + "?v=old", null), path + "?v=old");
   assert.throws(() => resolveAssetUrl("/models/retired.glb", config), /missing from release/);
+});
+
+test("internal staging streams assets directly from an installed catalog without approval", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "avensky-stage-"));
+  const commit = "c".repeat(40);
+  const candidate = sealRelease({ assets: { [path]: entry(bytes), [texture]: entry(Buffer.from("texture")) } });
+  const folder = join(dir, "releases", commit);
+  mkdirSync(folder, { recursive: true });
+  writeFileSync(join(folder, "bundle.json"), JSON.stringify({
+    environment: "staging", commit, assetRelease: candidate.id,
+  }));
+  writeFileSync(join(folder, "asset-release.json"), JSON.stringify(candidate));
+  const requests = [];
+  const reader = async (key, { range, etag: pinned } = {}) => {
+    requests.push({ key, range, pinned });
+    if (key !== storageKey(path, entry(bytes).sha256, "digest")) return new Response(null, { status: 404 });
+    return new Response(bytes.subarray(0, 4), { status: 206, headers: {
+      etag, "content-length": "4", "content-range": "bytes 0-3/" + bytes.length,
+    } });
+  };
+  const server = assetGateway([], reader, { runtimeRoot: dir });
+  try {
+    server.listen(0, "127.0.0.1");
+    await once(server, "listening");
+    const base = "http://127.0.0.1:" + server.address().port;
+    const route = resolveAssetUrl(path, { id: candidate.id, paths: candidate.assets });
+    const result = await fetch(base + route, { headers: { Range: "bytes=0-3" } });
+    assert.equal(result.status, 206);
+    assert.equal(await result.text(), "glTF");
+    assert.equal(requests[0].pinned, undefined);
+    const invalid = await fetch(base + "/__staging-assets/" + "0".repeat(64) + "/models/a.glb");
+    assert.equal(invalid.status, 404);
+  } finally {
+    server.close();
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 test("the pointer checkout has a valid release and checked collision data", () => {

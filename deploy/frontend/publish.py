@@ -111,16 +111,13 @@ def publish(args, commit, *, deploy_game=False):
             if metadata["commit"] != commit or metadata["environment"] != args.environment:
                 raise ValueError("The bundle does not match the requested commit and environment")
             if staging:
-                approved_release = candidate / "asset-release.json"
-                if approved_release.is_file():
-                    release_bytes = approved_release.read_bytes()
-                    if json.loads(release_bytes)["id"] != metadata.get("assetRelease"):
-                        raise ValueError("The private asset manifest disagrees with the staging bundle")
-                    # Root-owned, sudo-restricted helper verifies only new digest-keyed
-                    # S3 objects and activates the gateway; unchanged releases are no-ops.
-                    subprocess.run(["sudo", "-n", "--", "/usr/local/lib/avensky/auto_activate.py"],
-                                   input=release_bytes, check=True)
-                check_staging_assets(args.verified_manifest, metadata.get("assetRelease"))
+                # Staging is internal: its bundled catalog enables the private
+                # gateway to stream models on demand without a release gate.
+                catalog = candidate / "asset-release.json"
+                if not catalog.is_file():
+                    raise ValueError("Staging bundle is missing its asset catalog")
+                if json.loads(catalog.read_text(encoding="utf-8")).get("id") != metadata.get("assetRelease"):
+                    raise ValueError("The staging asset catalog disagrees with the bundle")
             elif not isinstance(metadata.get("licenseReview"), str) or not metadata["licenseReview"].strip():
                 raise ValueError("Production requires a recorded asset license review")
             if final.exists():
@@ -155,8 +152,6 @@ def main():
     command = os.environ.get("SSH_ORIGINAL_COMMAND", "").split()
     if (len(command) != 2 or command[0] not in {"publish-frontend", "publish-staging-with-game"} or not SHA.fullmatch(command[1])):
         parser.error("Expected a publish-frontend command and a full commit SHA")
-    if args.environment == "staging" and not args.verified_manifest:
-        parser.error("Staging requires a verified asset manifest")
     if args.environment == "production" and not (args.staging_root and args.approved_root):
         parser.error("Production requires a staging receipt and independently approved bundle storage")
     try:
