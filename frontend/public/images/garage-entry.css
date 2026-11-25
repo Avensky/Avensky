@@ -27,7 +27,7 @@
 .garage-entry-panels { background-color: var(--app-garage-panel); }
 .garage-entry-stripe { mask-position: center; background-color: var(--app-garage-stripe); }
 .garage-entry-walls { mask-position: right; background-color: var(--app-garage-wall); }
-avensky-garage-room.garage-entry-scene { display: block; user-select: none; background: #312e29; }
+avensky-garage-room.garage-entry-scene { display: block; user-select: none; background: var(--app-background, #201a16); }
 avensky-garage-room.garage-entry-scene::after { content: none; }
 avensky-garage-room .garage-entry-photo, avensky-garage-room > canvas {
   position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover;
@@ -125,3 +125,11 @@ avensky-garage-room[data-ready] .garage-entry-photo { visibility: hidden; }
 .garage-menu-backdrop:not([hidden]) ~ .welcome-screen.garage-entry,
 .garage-menu-backdrop:not([hidden]) ~ .game-wrapper,
 html[data-ui-theme] .garage-menu-backdrop:not([hidden]) ~ .game-wrapper :is(.menu-home.main-menu,.alpha-queue) { background:transparent; }
+
+.garage-entry-account { max-height: 76dvh; width: min(100%, 34rem); overflow: auto; }
+.garage-entry-account :is(ul,code) { overflow-wrap: anywhere; }
+.garage-entry-account li { margin-block: .6em; }
+
+html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hidden]) ~ .game-wrapper .menu-frame[role=dialog] {
+  background: color-mix(in srgb, var(--app-background) 76%, transparent);
+}

@@ -31,21 +31,23 @@ void main() {
     float pilasterShadow=.76+.24*smoothstep(1.,11.,bayDistance);
     float topShadow=1.-.28*smoothstep(67.,83.,world.y);
     float ambient=(.34+.17*smoothstep(0.,43.,world.y)-.10*pow(joints,3.))*pilasterShadow*topShadow;
-    if(kind>1.5) base=mix(vec3(dot(base,vec3(.30,.58,.12))),base,.52);
+    if(kind>1.5) base=mix(vec3(dot(base,vec3(.30,.58,.12))),base,.83);
     float grout=seam((across+5.)/25.,.007)*seam((world.y-1.)/15.,.012);
     float tie=length((fract(vec2((across+3.)/12.5,(world.y-2.)/15.))-.5)*vec2(12.5,15.));
     float formwork=mix(.79,1.,grout)*mix(.70,1.,smoothstep(.14,.32,tie));
     float variation = .73+.30*concrete;
-    float signWash = exp(-length((world.xy-vec2(-28.,50.))/vec2(33.,13.))*1.8);
+    float signWash = exp(-length((world.xy-vec2(-68.,50.))/vec2(33.,13.))*1.8);
     float sideLight = .035*smoothstep(-35.,67.,world.y);
     color = base*(ambient+sideLight)*variation*formwork;
+    float sideBay = exp(-pow((mod(world.z + 48., 50.) - 25.) / 19., 2.));
+    color += amber * .19 * exp(-abs(world.x + 106.) * .05) * ceilingWash * sideBay;
     color += amber*backWall*(.29*ceilingWash*lampBay+.105*signWash);
     color *= .87+.13*smoothstep(.8,5.,world.y);
   } else if(kind<3.5) {
     vec2 tile=world.xz/12.;
     float joints=seam(tile.x,.012)*seam(tile.y,.012);
     float grain=texture2D(finish,fract(world.xz/45.)).r;
-    color=vec3(.115,.113,.11)*(.80+.27*grain)*mix(.62,1.,joints);
+    color=vec3(.145,.121,.101)*(.80+.27*grain)*mix(.62,1.,joints);
     float spill=exp(-abs(world.z+98.)*.023);
     color+=amber*.14*spill*(.22+.78*lampBay);
     // Soft reflected ceiling light on the stationary concrete floor.

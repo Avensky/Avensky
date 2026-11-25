@@ -146,7 +146,7 @@ test("organized feature APIs, pause braking, shared themes and bounded display u
             UI_THEMES[theme].panel,
           );
         }
-        assert.equal(sanitizePreferences({ theme: "__proto__" }).theme, "navy");
+        assert.equal(sanitizePreferences({ theme: "__proto__" }).theme, "pit-wall");
         prefs.getState().update({ theme: "navy" });
         applyUITheme("navy");
       },

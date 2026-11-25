@@ -115,8 +115,8 @@ export default defineConfig(({ command, mode }) => {
     },
     resolve: { dedupe: ["react", "react-dom", "three"] },
     plugins: [
-      release && {
-        name: "staging-public-files",
+      {
+        name: "startup-garage",
         transformIndexHtml: {
           order: "post",
           handler(html) {
@@ -135,6 +135,9 @@ export default defineConfig(({ command, mode }) => {
               })();</script>`);
           },
         },
+      },
+      release && {
+        name: "staging-public-files",
         async writeBundle(options) {
           // The portal serves only the small wall renderer and the optional controller menu.
           for (const [name, entry] of [["sign-in-controller", "signInController.tsx"], ["garage-room", "garageRoomElement.ts"]]) await build({

@@ -1,3 +1,4 @@
+import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry.ts";
 import { DEFAULT_VEHICLE_COSMETICS, sanitizeVehicleCosmetics, type VehicleCosmetics } from "../../vehicles/cosmetics/catalog";
 /** Persisted device/accessibility preferences. Requests and vehicle physics live
  * elsewhere; this store owns only what the user sees and how input is mapped. */
@@ -94,7 +95,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   radioHudStyle: "no-tabs",
   healthBars: "all",
   notificationChannels:DEFAULT_NOTICE_CHANNELS,
-  theme: "navy",
+  theme: DEFAULT_GARAGE_THEME,
   menuHeaderStyle: "angled",
   inputDevice: "browser",
   vehicleCosmetics: {matchCockpit:DEFAULT_VEHICLE_COSMETICS.matchCockpit},
@@ -178,7 +179,7 @@ export function sanitizePreferences(value: unknown): Preferences {
       data.radioHudStyle === "streamlined" || data.radioHudStyle === "classic"
         ? data.radioHudStyle
         : "no-tabs",
-    theme: isUITheme(data.theme) ? data.theme : "navy",
+    theme: isUITheme(data.theme) ? data.theme : DEFAULT_GARAGE_THEME,
     menuHeaderStyle: data.menuHeaderStyle === "classic" ? "classic" : "angled",
     inputDevice: typeof data.inputDevice === "string" && Object.hasOwn(MENU_INPUT_LABELS, data.inputDevice)
       ? data.inputDevice

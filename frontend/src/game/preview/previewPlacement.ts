@@ -1,8 +1,9 @@
 import { Box3, Mesh, Raycaster, Vector3, type Object3D } from "three";
 import { vehicleSystems } from "../../vehicles/vehicleSystems.ts";
 
-// Native fallback stage while the authored garage pad is loading (long X, short Z).
-export const DEFAULT_PREVIEW_PLATFORM: [number, number] = [8, 8];
+// Measured from the authored Plane_PISTE mesh at garage display scale.
+const padDiameter = 132.165 * .06 * .98;
+export const DEFAULT_PREVIEW_PLATFORM: [number, number] = [padDiameter, padDiameter];
 // Current Tank's Hull mesh, excluding the cannon, in its authored orientation.
 // Keep one shared scale without downloading the Tank just to size another car.
 // Re-measure this reference when replacing the tank asset.

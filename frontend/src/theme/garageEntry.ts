@@ -3,8 +3,8 @@ import { APP_BRANDING } from "./branding.ts";
 export const DEFAULT_GARAGE_THEME = "pit-wall";
 export const GARAGE_ENTRY_STORAGE_KEY = "avensky-portal-backdrop";
 export const GARAGE_ENTRY_MASK = "garage-wall-mask.4688e14d5cc9.webp";
-export const GARAGE_ENTRY_PORTRAIT = "garage-entry-portrait.8e33c31eb57a.webp";
-export const GARAGE_ENTRY_POSTER = "garage-entry.4213efa65877.webp";
+export const GARAGE_ENTRY_PORTRAIT = "garage-entry-portrait.0044873c6652.webp";
+export const GARAGE_ENTRY_POSTER = "garage-entry.35a14b2cd219.webp";
 
 // This markup is also rendered by the standalone Node portal before React loads.
 // All interpolation here is from app configuration. Form values stay in native inputs.

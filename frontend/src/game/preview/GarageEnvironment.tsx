@@ -1,71 +1,23 @@
-import { Suspense, useEffect, useLayoutEffect, useMemo } from "react";
-import { Environment, Html, Lightformer, useTexture } from "@react-three/drei";
-import { useAssetGLTF } from "../../assets/useAssetGLTF";
+import { useEffect, useLayoutEffect, useMemo } from "react";
+import { Environment, Lightformer } from "@react-three/drei";
 import { createPortal, useThree } from "@react-three/fiber";
 import { Box3, BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Mesh, MeshStandardMaterial, Object3D, TorusGeometry, Vector3, type BufferGeometry } from "three";
-import { AssetBoundary } from "../../components/debugger/AssetBoundary";
-import { Showroom, ShowroomFloor } from "./Showroom";
-import { GARAGE_MODEL_PATH } from "./garageModel";
 import { selectedGarageTheme } from "../../theme/catalog";
-import { createGarageWalls } from "./garageWalls";
-import { entryAssets } from "../welcome/config";
-import { garagePlacement } from "./garagePlacement";
-import { prepareGarageDisplay } from "./prepareGarageDisplay";
-import { GarageGlow } from "./GarageGlow";
-import { GarageFloorReflection } from "./GarageFloorReflection";
-import { completeGarageStructure } from "./completeGarageStructure";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { applyGarageLighting, SELECTION_CRIMSON, tagGarageAccent } from "../../theme/garageLighting";
-import { createGarageReflectionSnapshot } from "./garageReflectionSnapshot";
-import { usePreviewPaint } from "./usePreviewPaint";
+import { GarageFloorReflection } from "./GarageFloorReflection";
+import { GarageGlow } from "./GarageGlow";
+import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
+import { wallCorners, wallCourses, wallHeight } from "./garageWallLayout";
+import { ShowroomLights } from "./Showroom";
 import { isCompactPreview } from "./previewBudget";
 
-const GARAGE_DISPLAY_SCALE = 0.06;
-type GarageProps = {
-  turntable: Group | null;
-  showPlatform: boolean;
-  selectionLighting?: boolean;
-  onPlatformReady?: (footprint: [number, number]) => void;
-  onSettled?: () => void;
-  reflectFloor?: boolean;
-  floorCaptureRate?: number;
-};
-
-function GarageUnavailable({ onSettled }: Pick<GarageProps, "onSettled">) {
-  useLayoutEffect(() => { onSettled?.(); }, [onSettled]);
-  return <>
-    <ShowroomFloor />
-    <Html fullscreen style={{ pointerEvents: "none" }}>
-      <p className="absolute left-2 top-14 text-[10px] text-amber-200">GARAGE UNAVAILABLE — USING SHOWROOM</p>
-    </Html>
-  </>;
-}
-
-export function GarageEnvironment({ turntable, showPlatform, onPlatformReady, onSettled, selectionLighting = false, allowLoad = true, reflectFloor = true, floorCaptureRate }: GarageProps & {
-  allowLoad?: boolean;
-}) {
-  const loadRoom = usePreviewPaint(allowLoad);
-  const floor = <ShowroomFloor />;
-  return (
-    <>
-      <Showroom floor={false} />
-      <GarageGlow />
-      <AssetBoundary fallback={<GarageUnavailable onSettled={onSettled} />}>
-        <Suspense fallback={floor}>
-          {loadRoom ? <GarageModel
-            turntable={turntable}
-            showPlatform={showPlatform}
-            onPlatformReady={onPlatformReady}
-            onSettled={onSettled}
-            selectionLighting={selectionLighting}
-            reflectFloor={reflectFloor}
-            floorCaptureRate={floorCaptureRate}
-          /> : floor}
-        </Suspense>
-      </AssetBoundary>
-    </>
-  );
-}
+const origin = new Vector3();
+const scale = .06;
+const cameraBounds = new Box3(
+  new Vector3(wallCorners[0][0] * scale, 0, wallCorners[0][1] * scale),
+  new Vector3(wallCorners[2][0] * scale, wallHeight * wallCourses[2].top * scale, wallCorners[2][1] * scale),
+);
 
 function createDisplayPlatform(center: Vector3, floorY: number, radius: number) {
   const platform = new Group();
@@ -74,7 +26,7 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
   const stageGeometries: BufferGeometry[] = [];
   const diskGeometry = new CylinderGeometry(radius, radius, 0.06, 72);
   const diskMaterial = new MeshStandardMaterial({
-    color: "#121922", metalness: 0.72, roughness: 0.28,
+    color: "#332c26", metalness: 0.72, roughness: 0.28,
     envMapIntensity: 0.85,
   });
   stageGeometries.push(diskGeometry);
@@ -87,7 +39,7 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
   const addRing = (ringRadius: number, tube: number, color: string, emissiveIntensity: number, themed = false) => {
     const geometry = new TorusGeometry(ringRadius, tube, 8, 96);
     const material = new MeshStandardMaterial({
-      color: themed ? "#07121a" : color,
+      color: themed ? "#211b16" : color,
       emissive: themed ? "#ffffff" : color,
       emissiveIntensity,
       metalness: 0.24,
@@ -102,14 +54,14 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
     mesh.name = themed ? "garage-platform-theme-light" : "garage-platform-mixed-light";
     platform.add(mesh);
   };
-  addRing(radius * 0.94, 0.035, "#26dff0", 0.55, true);
+  addRing(radius * 0.94, 0.035, "#e9b579", 0.55, true);
   addRing(radius * 0.84, 0.018, "#ffad43", 0.28);
-  addRing(radius * 0.99, 0.009, "#52636d", 0.18);
+  addRing(radius * 0.99, 0.009, "#6a635b", 0.18);
 
   // Machined dark outer lip with spaced, low-output marker lights instead of
   // a continuous bright halo. Instancing keeps the extra stage detail cheap.
   const rimGeometry = new TorusGeometry(radius * 0.976, 0.038, 8, 96);
-  const rimMaterial = new MeshStandardMaterial({ color: "#27323b", metalness: 0.88, roughness: 0.24 });
+  const rimMaterial = new MeshStandardMaterial({ color: "#38302b", metalness: 0.88, roughness: 0.24 });
   stageGeometries.push(rimGeometry);
   stageMaterials.push(rimMaterial);
   const rim = new Mesh(rimGeometry, rimMaterial);
@@ -120,7 +72,7 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
 
   const markerGeometry = new BoxGeometry(0.09, 0.014, 0.026);
   const markerMaterial = new MeshStandardMaterial({
-    color: "#43dce5", emissive: "#17484d", emissiveIntensity: 0.5,
+    color: "#f1d7af", emissive: "#775537", emissiveIntensity: 0.5,
     metalness: 0.35, roughness: 0.28,
   });
   const markers = new InstancedMesh(markerGeometry, markerMaterial, 48);
@@ -136,7 +88,7 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
     marker.rotation.set(0, -angle, 0);
     marker.updateMatrix();
     markers.setMatrixAt(index, marker.matrix);
-    markers.setColorAt(index, new Color(index % 8 === 0 ? "#d98d3b" : "#63dfe5"));
+    markers.setColorAt(index, new Color(index % 8 === 0 ? "#d98d3b" : "#e8d1af"));
   }
   markers.instanceMatrix.needsUpdate = true;
   if (markers.instanceColor) markers.instanceColor.needsUpdate = true;
@@ -151,166 +103,44 @@ function createDisplayPlatform(center: Vector3, floorY: number, radius: number) 
   } };
 }
 
-function GarageModel({ turntable, showPlatform, onPlatformReady, onSettled, selectionLighting = false, reflectFloor = true, floorCaptureRate }: GarageProps) {
-  const compact = useThree(s => isCompactPreview(s.size.width));
-  const invalidate = useThree(s => s.invalidate);
-  const theme = usePreferencesStore(selectedGarageTheme),
-    contrast = usePreferencesStore((s) => s.highContrast);
-  const accentOverride = selectionLighting && theme === "scarlet" ? SELECTION_CRIMSON : null;
-  const brightness = usePreferencesStore(
-    (s) => s.garageEffects.accentBrightness * .64,
-  );
-  const environmentReflections = usePreferencesStore(
-    (s) => s.garageEffects.environmentReflections,
-  );
-  const { scene } = useAssetGLTF(GARAGE_MODEL_PATH, "/draco/");
-  const finish = useTexture(entryAssets + "/garage-wall-finish.webp");
-  const prepared = useMemo(() => {
-    const display = prepareGarageDisplay(scene);
-    display.root.scale.multiplyScalar(GARAGE_DISPLAY_SCALE);
-    display.root.position.add(
-      new Vector3(...garagePlacement(display.root, "Plane_PISTE")),
-    );
-    display.root.updateWorldMatrix(true, true);
-    const pad = display.root.getObjectByName("Plane_PISTE");
-    const padBounds = pad ? new Box3().setFromObject(pad, true) : null;
-    const footprint = padBounds ? padBounds.getSize(new Vector3()) : null;
-    const center = padBounds ? padBounds.getCenter(new Vector3()) : new Vector3();
-    const floorY = padBounds ? padBounds.max.y : 0;
-    const diameter = Math.max(4, Math.max(footprint?.x ?? 8, footprint?.z ?? 8) * 0.98);
-    // Hide the authored rectangular pad and warning stripe rails. A procedural
-    // circle keeps a clean, consistent stage without editing the source GLB.
-    for (const name of ["Plane_PISTE", "RB_Tour", "RB_Tour001", "RB_Tour.001"]) {
-      const part = display.root.getObjectByName(name);
-      if (part) part.visible = false;
-    }
-    // The reflective tile shader already draws this surface. Keep the full
-    // grid in the exported asset, but avoid drawing 47k covered triangles here.
-    if (display.root.userData.avenlabGarageComplete === true) {
-      const coveredTiles = display.root.getObjectByName("Sol_CUBE");
-      if (coveredTiles) coveredTiles.visible = false;
-    }
-
-    const completed = completeGarageStructure(display.root);
-    const walls = createGarageWalls(finish);
-    display.root.add(walls.mesh);
-    // The full-plane tile overlay covers the original grey floor edging.
-    // Follow the authored wall frame when restoring that perimeter finish.
-    const wallFrame = display.root.getObjectByName("SEMI_Murs");
-    const perimeter = wallFrame
-      ? new Box3().setFromObject(wallFrame, true)
-      : null;
-    const cameraBounds = new Box3().setFromObject(walls.mesh);
-    const ceiling = display.root.getObjectByName("FOND_01");
-    const ceilingBounds = ceiling ? new Box3().setFromObject(ceiling, true) : null;
-    cameraBounds.min.y = floorY;
-    if (ceilingBounds && !ceilingBounds.isEmpty()) cameraBounds.max.y = ceilingBounds.min.y;
-    return {
-      ...display,
-      cameraBounds,
-      center, floorY,
-      footprint,
-      platformDiameter: diameter,
-      perimeter,
-      structure: completed.structure,
-      dispose: () => {
-        walls.dispose();
-        completed.dispose();
-        display.dispose();
-      },
-    };
-  }, [scene, finish]);
-  useEffect(() => () => prepared.dispose(), [prepared]);
-  const stage = useMemo(() => showPlatform
-    ? createDisplayPlatform(prepared.center, prepared.floorY, prepared.platformDiameter / 2) : null,
-    [showPlatform, prepared]);
+// Only interactive objects are drawn on this canvas. The shared garage stays visible underneath.
+export function GarageEnvironment({ turntable, showPlatform, onSettled, selectionLighting, floorCaptureRate }: {
+  turntable: Group | null;
+  showPlatform: boolean;
+  onSettled: () => void;
+  selectionLighting: boolean;
+  floorCaptureRate?: number;
+}) {
+  const compact = useThree(state => isCompactPreview(state.size.width));
+  const invalidate = useThree(state => state.invalidate);
+  const theme = usePreferencesStore(selectedGarageTheme);
+  const contrast = usePreferencesStore(state => state.highContrast);
+  const brightness = usePreferencesStore(state => state.garageEffects.accentBrightness);
+  const reflections = usePreferencesStore(state => state.garageEffects.environmentReflections);
+  const floorReflection = usePreferencesStore(state => state.garageEffects.floorReflections && state.garageEffects.reflectionStrength > 0);
+  const radius = DEFAULT_PREVIEW_PLATFORM[0] / 2;
+  const stage = useMemo(() => showPlatform ? createDisplayPlatform(origin, 0, radius) : null, [showPlatform, radius]);
   useEffect(() => () => stage?.dispose(), [stage]);
   useLayoutEffect(() => {
-    for (const root of [prepared.root, prepared.structure, ...(stage ? [stage.platform] : [])])
-      applyGarageLighting(root, theme, contrast, brightness, accentOverride);
+    if (stage) applyGarageLighting(stage.platform, theme, contrast, brightness * .64,
+      selectionLighting && theme === "scarlet" ? SELECTION_CRIMSON : null);
     invalidate();
-  }, [prepared, stage, theme, contrast, brightness, accentOverride, invalidate]);
-  const probeReady = usePreviewPaint();
-  const probe = useMemo(
-    () =>
-      environmentReflections && probeReady && !compact
-        ? createGarageReflectionSnapshot(
-            [prepared.root, prepared.structure],
-            theme,
-            contrast,
-            brightness,
-            accentOverride,
-          )
-        : null,
-    [prepared, theme, contrast, brightness, environmentReflections, accentOverride, probeReady, compact],
-  );
-  useEffect(() => () => probe?.dispose(), [probe]);
-  // Stable JSX prevents a hero hover or unrelated menu render from triggering
-  // another six-face capture in Environment's children-dependent layout effect.
-  const reflectionEnvironment = useMemo(
-    () =>
-      environmentReflections && probeReady && (
-      <Environment resolution={compact ? 64 : 128} frames={1}>
-          {probe && <group position={[0, -2.2, 0]}>
-            <primitive object={probe.root} dispose={null} />
-            <hemisphereLight args={["#e2e6ed", "#242936", 0.65]} />
-            <directionalLight
-              position={[-6, 8, -4]}
-              color="#f0f4ff"
-              intensity={1}
-            />
-          </group>}
-          <Lightformer
-            form="rect"
-            intensity={0.66}
-            position={[0, 6, 0]}
-            rotation={[Math.PI / 2, 0, 0]}
-            scale={[3, 8, 1]}
-          />
-          <Lightformer
-            form="rect"
-            color="#d8e2f0"
-            intensity={0.35}
-            position={[0, 3, -6]}
-            scale={[8, 0.1, 1]}
-          />
-          <Lightformer
-            form="rect"
-            color="#e9eef5"
-            intensity={0.65}
-            position={[-6, 3, 0]}
-            rotation={[0, Math.PI / 2, 0]}
-            scale={[8, 0.2, 1]}
-          />
-        </Environment>
-      ),
-    [probe, compact, environmentReflections, probeReady],
-  );
-  const footprint = prepared.footprint;
-  useEffect(() => {
-    if (prepared.platformDiameter) onPlatformReady?.([prepared.platformDiameter, prepared.platformDiameter]);
-    onSettled?.();
-  }, [prepared.platformDiameter, onPlatformReady, onSettled]);
-  return (
-    <>
-      <group name="garage-special-environment">
-        <primitive object={prepared.root} dispose={null} />
-        <primitive object={prepared.structure} dispose={null} />
-      </group>
-      {turntable && stage && createPortal(<primitive object={stage.platform} dispose={null} />, turntable)}
-      {prepared.cameraBounds && <object3D name="garage-camera-envelope" userData={{ bounds: prepared.cameraBounds }} />}
-      {footprint && (
-        <GarageFloorReflection
-          width={prepared.platformDiameter}
-          depth={prepared.platformDiameter}
-          turntable={showPlatform ? turntable : null}
-          perimeter={prepared.perimeter}
-          active={reflectFloor}
-          captureRate={floorCaptureRate}
-        />
-      )}
-      {/* One small, generated reflection map. No HDRI fetch or per-frame cube capture. */}
-      {reflectionEnvironment}
-    </>
-  );
+  }, [stage, theme, contrast, brightness, selectionLighting, invalidate]);
+  useLayoutEffect(onSettled, [onSettled]);
+  // Capture softboxes once. Opening another menu never loads a second room model or HDR image.
+  const softboxes = useMemo(() => reflections && (
+    <Environment resolution={compact ? 32 : 64} frames={1} background={false}>
+      <Lightformer color="#fff1dd" intensity={1.2} position={[0, 6, 0]} rotation={[Math.PI / 2, 0, 0]} scale={[4, 8, 1]} />
+      <Lightformer color="#fff7eb" intensity={.8} position={[-6, 3, 0]} rotation={[0, Math.PI / 2, 0]} scale={[8, .6, 1]} />
+      <Lightformer color="#f0c79a" intensity={.5} position={[0, 3, -6]} scale={[8, .5, 1]} />
+    </Environment>
+  ), [compact, reflections]);
+  return <>
+    <ShowroomLights />
+    <GarageGlow />
+    <object3D name="garage-camera-envelope" userData={{ bounds: cameraBounds }} />
+    {softboxes}
+    {turntable && stage && createPortal(<primitive object={stage.platform} dispose={null} />, turntable)}
+    {turntable && stage && floorReflection && <GarageFloorReflection radius={radius} turntable={turntable} captureRate={floorCaptureRate} />}
+  </>;
 }

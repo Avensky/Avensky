@@ -15,7 +15,7 @@ body,
 
   overscroll-behavior: none;
   touch-action: none;
-  background: #020617;
+  background: var(--app-background, #201a16);
 
   -webkit-user-select: none;
   user-select: none;

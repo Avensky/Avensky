@@ -1,6 +1,6 @@
 # Vehicle-selection garage
 
-VehiclePreview.tsx owns the showroom camera/turntable; GarageEnvironment.tsx loads garage_special.glb. prepareGarageDisplay.ts and garagePlacement.ts define display transforms. VehiclePreviewModel.tsx normalizes lineup presentation.
+The login and pre-game menus share one garage in GarageMenuBackdrop. VehiclePreview.tsx owns the interactive camera and turntable. GarageEnvironment.tsx lights the actors on a transparent canvas above the cached room. VehiclePreviewModel.tsx normalizes lineup presentation.
 
 ## How to edit
 

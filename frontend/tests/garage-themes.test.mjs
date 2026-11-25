@@ -40,18 +40,22 @@ test("all saved palettes repaint one set of inward-facing wall panels with the e
   texture.dispose();
 });
 
-test("the login renderer uses the Heroes wall positions and texture coordinates", () => {
+test("the shared room draws only the adjoining back and left walls from the authored garage", () => {
   const wall = createGarageWalls(new Texture());
   const { geometry } = wall.mesh;
   const { vertices, solidCount, glowCount } = entryRoomGeometry();
   const position = geometry.getAttribute("position");
   const uv = geometry.getAttribute("uv");
+  let start = 0;
   for (let i = 0; i < geometry.index.count; i++) {
+    const side = Math.floor(i / 6) % 4;
+    if (side !== 0 && side !== 3) continue;
     const index = geometry.index.getX(i);
-    const start = i * 9;
     assert.deepEqual(Array.from(vertices.subarray(start, start + 3)), [position.getX(index), position.getY(index), position.getZ(index)]);
     assert.deepEqual(Array.from(vertices.subarray(start + 6, start + 8)), [uv.getX(index), uv.getY(index)]);
+    start += 9;
   }
+  assert.equal(vertices[start + 8], 3, "the floor follows exactly six wall panels");
   assert.ok(glowCount > 0);
   assert.equal(vertices.length, 9 * (solidCount + glowCount));
   wall.dispose();

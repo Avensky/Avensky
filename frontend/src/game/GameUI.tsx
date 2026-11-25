@@ -112,7 +112,7 @@ export function GameUI() {
         <FullCanvas
           roomReady={roomReady}
           paused={previewPaused}
-          covered={retainedPreview !== null}
+          covered={retainedPreview !== null || ((isModeLoading || overlay === "team_lineup") && !menuPreview)}
           preview={previewScreen !== null}
         >
           {previewScreen !== null && (

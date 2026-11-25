@@ -102,7 +102,7 @@ test('compact prematch views share a frame and keep opposing picks mysterious un
    await act(async()=>{social.setState({view:ready});network.setState({snapshot:snapshot(true,'old-round')});});
    assert.equal(document.querySelector('.team-lineup'),null,'a snapshot from another round cannot open the lineup');
    await act(async()=>network.setState({snapshot:snapshot(true)}));
-   assert(document.querySelector('.team-lineup .menu-flare-background'));
+   assert.equal(document.querySelector('.team-lineup .menu-flare-background'), null, 'the shared garage stays behind the lineup');
    assert.equal(document.querySelector('.team-lineup video'),null);
    assert.equal(document.querySelectorAll('.team-lineup-card').length,3);
    assert.match(document.querySelector('.team-lineup-card[data-self=true]').textContent,/dpsLevel 12BRZLocal Driver/);
