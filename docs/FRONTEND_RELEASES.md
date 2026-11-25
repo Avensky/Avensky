@@ -4,7 +4,7 @@ Each push to `main` builds and publishes the staging frontend at **https://stagi
 
 **Actions → Deploy to live → Run workflow** publishes to **https://play.avensky.com** using the production environment. Select `main` and leave the commit field empty for its current tip, or enter the full SHA of an earlier staged commit on `main`. The production receiver requires a staging receipt and the approved production bundle for that exact SHA.
 
-Staging can deploy the Rust game before activating the website. Live promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for server configuration and data migrations.
+Staging deploys the matching Rust game when its input files change, before activating the website. Live promotion publishes static files. See the [backend runbook](DEPLOYMENT_ENVIRONMENTS.md) for server configuration and data migrations.
 
 For account and game-master testing, set the repository variable `STAGING_PLAYER_ONBOARDING=1` and enable the matching staging backend. Set `AVENSKY_GAME_MASTER_ID` in the staging game environment to your registered staging player code. [Game master setup](PLAYER_ONBOARDING.md#game-master-and-shared-content)
 
@@ -43,7 +43,7 @@ In `visudo`, grant the existing staging release user the single installed helper
 avensky_stage ALL=(root) NOPASSWD: /usr/local/lib/avensky/staging_game.py *
 ```
 
-Set the GitHub repository variable `STAGING_GAME_DEPLOY_ENABLED=true` to include the staging game in the release. The first enabled deploy builds a baseline and briefly disconnects staging players. After the **publish-staging** job succeeds, refresh the page on your phone. An open game continues using the JavaScript it loaded until refreshed.
+The `main` staging workflow **always checks the matching Rust game server** when it publishes its staging archive. No GitHub staging game deploy variable is needed. The first deploy using this mode builds a baseline and briefly disconnects staging players; later frontend-only updates skip game restarts. After the **publish-staging** job succeeds, refresh the page on your phone. An open game continues using the JavaScript it loaded until refreshed.
 
 On each release the host fetches the exact main commit. It compares the Docker context inputs (`avenlab-server/`, `packages/wardrobe-catalog/`, and `.dockerignore`) with the running image label. A frontend-only change after the baseline skips the rebuild and restart. When the inputs change, Docker builds while the old game serves players. The helper then stops the staging writer, copies the complete staging data volume, recreates the staging service and checks a WebSocket handshake. The frontend switches after that check succeeds. Allow disk space for the build and a cold copy of the volume.
 
