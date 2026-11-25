@@ -51,6 +51,7 @@ test("invites grant access once and revocation invalidates existing cookies", as
   runInNewContext(await script.text(), {
     document: {
       querySelector: selector => selector === ".password-toggle" && toggle,
+      querySelectorAll: selector => selector === ".password-toggle" ? [toggle] : [],
       getElementById: id => id === "alpha-password" && input,
     },
     window: { addEventListener: (event, callback) => { handlers[event] = callback; } },

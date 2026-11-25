@@ -33,10 +33,9 @@ const escape = value => String(value ?? "").replace(/[&<>"']/g, char => ({
 const form = (action, contents, label) =>
   `<form method="post" action="${base}/${action}">${contents}<button>${label}</button></form>`;
 const emailField = '<label>Email<input type="email" name="email" autocomplete="username" maxlength="254" required></label>';
-const passwordField = (newPassword = false) =>
-  `<div class="password-control"><label>Password<input id="alpha-password" type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>
-  <button type="button" class="password-toggle" aria-controls="alpha-password" hidden>Show password</button></div>
-  <script src="${base}/password.js" defer></script>`;
+const passwordField = (newPassword = false, id = "alpha-password") =>
+  `<div class="password-control"><label>Password<input id="${id}" type="password" name="password" autocomplete="${newPassword ? "new-password" : "current-password"}" maxlength="128" ${newPassword ? 'minlength="15"' : ""} required></label>
+  <button type="button" class="password-toggle" aria-controls="${id}" hidden>Show password</button></div>`;
 const codeField = (required = false) => `<label>Authenticator or recovery code<input name="code" autocomplete="one-time-code" autocapitalize="none" spellcheck="false" maxlength="32"${required ? " required" : ""}></label>`;
 const linkField = (name, label) => `<label>${label}<input id="link-code" name="${name}" minlength="64" maxlength="64" required></label>`;
 const readLinkFragment = `<script src="${base}/invite.js"></script>`;
@@ -62,18 +61,18 @@ button{color:var(--app-text,#e6efff);background:var(--app-raised,#142b46);font-w
 .password-toggle{background:var(--app-panel,#0b1729);color:inherit;font-size:.875rem}
 ul{padding:0;list-style:none}li{border-top:1px solid #716084;padding:.5rem 0;overflow-wrap:anywhere}li form{display:inline}li button{min-height:2.5rem;padding:.35rem .55rem}
 code{overflow-wrap:anywhere}nav{display:flex;flex-wrap:wrap;gap:.9rem}
-</style><script src="${base}/theme.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
+</style><script src="${base}/theme.js" defer></script><script src="${base}/password.js" defer></script>${background}<main><h1>${escape(title)}</h1>${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}</main></html>`;
 }
 
 function securityPage(viewer) {
   return `<nav><a href="/">Continue to game</a>${viewer.admin ? `<a href="${base}/testers">Alpha testers</a>` : ""}</nav>
 <p>Signed in as ${escape(viewer.email)}</p>
 <h2>Email</h2><p>Request a change to your account email. Your current address remains active until verified.</p>
-${form("account/email-request", '<label>New email<input type="email" name="newEmail" autocomplete="email" maxlength="254" required></label>' + passwordField(), "Request email change")}
+${form("account/email-request", '<label>New email<input type="email" name="newEmail" autocomplete="email" maxlength="254" required></label>' + passwordField(false, "alpha-password-email"), "Request email change")}
 <h2>Profile deletion</h2><p>Request deletion for operator review. Your game profile is not deleted by this action.</p>
-${form("account/delete-request", '<label>Confirm your current email<input type="email" name="confirmEmail" maxlength="254" required></label>' + passwordField(), "Request profile deletion")}
+${form("account/delete-request", '<label>Confirm your current email<input type="email" name="confirmEmail" maxlength="254" required></label>' + passwordField(false, "alpha-password-delete"), "Request profile deletion")}
 ${viewer.has_mfa ? "<p>Two-factor authentication is enabled.</p>"
-    : `<h2>Two-factor authentication</h2>${form("mfa/start", passwordField(), "Set up authenticator")}`}
+    : `<h2>Two-factor authentication</h2>${form("mfa/start", passwordField(false, "alpha-password-mfa"), "Set up authenticator")}`}
 ${form("sign-out", "", "Log out")}`;
 }
 
@@ -216,9 +215,9 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         return send(200, setup, { "Content-Type": "text/javascript; charset=utf-8" });
       }
       if (path === base + "/password.js") return send(200, `
-        const toggle = document.querySelector(".password-toggle");
-        const password = toggle && document.getElementById(toggle.getAttribute("aria-controls"));
-        if (password) {
+        for (const toggle of document.querySelectorAll(".password-toggle")) {
+          const password = document.getElementById(toggle.getAttribute("aria-controls"));
+          if (!password) continue;
           toggle.hidden = false;
           const setVisible = visible => {
             password.type = visible ? "text" : "password";
