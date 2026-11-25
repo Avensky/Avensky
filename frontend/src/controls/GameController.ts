@@ -83,12 +83,15 @@ export function GameController() {
     };
     const onFocus = () => {
       focused = true;
+      startPolling();
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
         releasePanelPress();
         menuArmed = false;
         release();
+      } else {
+        startPolling();
       }
     };
     const onFocusIn = (event: FocusEvent) => {
@@ -131,8 +134,12 @@ export function GameController() {
       },
     );
 
-    const poll = () => {
-      frameId = requestAnimationFrame(poll);
+    function startPolling() {
+      if (!frameId && !document.hidden) frameId = requestAnimationFrame(poll);
+    }
+    function poll() {
+      frameId = 0;
+      if (document.hidden) return;
       // A connected controller can occupy any slot. Keep the selected one
       // until it disconnects, then release only its device's intent.
       const pads = Array.from(navigator.getGamepads?.() ?? []);
@@ -147,6 +154,8 @@ export function GameController() {
         previousButtons = [];
         return;
       }
+      // Touch-only menus sleep until a controller connects or the window returns.
+      startPolling();
       const buttons = pad.buttons.map((button) => button.pressed);
       const nextKey = `${pad.index}:${pad.id}`;
       if (nextKey !== padKey) {
@@ -435,14 +444,16 @@ export function GameController() {
             .setHeldPlayerFlag("gamepad", PlayerFlags.RESET, false);
         }, 100);
       }
-    };
+    }
+    window.addEventListener("gamepadconnected", startPolling);
     window.addEventListener("blur", onBlur);
     window.addEventListener("focus", onFocus);
     document.addEventListener("visibilitychange", onVisibility);
     document.addEventListener("focusin", onFocusIn);
-    frameId = requestAnimationFrame(poll);
+    startPolling();
     return () => {
       cancelAnimationFrame(frameId);
+      window.removeEventListener("gamepadconnected", startPolling);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);
       document.removeEventListener("visibilitychange", onVisibility);

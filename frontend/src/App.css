@@ -65,3 +65,8 @@ canvas {
 
 /* Put the shared canvas at the interactive stage’s pointer depth. */
 .garage-preview-slot { position:fixed; inset:0; z-index:0; }
+
+/* Only exposed garage space captures drags. Touches on menu controls can still scroll. */
+.garage-orbit-surface { position:absolute; inset:0; z-index:-1; touch-action:none; }
+.main-menu .menu-home-content { pointer-events:none; }
+.main-menu .menu-action-list { pointer-events:auto; }

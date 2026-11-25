@@ -76,7 +76,7 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
     setBusy(true);
     setMessage("");
     try {
-      await signOutPlayerProfile();
+      if (await signOutPlayerProfile() === "portal") return;
       useUIStore.getState().setScreen("welcome");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not log out.");

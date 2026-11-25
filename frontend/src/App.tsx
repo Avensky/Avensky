@@ -17,10 +17,11 @@ const GameUI = lazy(() => import("./game/GameUI").then(module => ({ default: mod
 
 export default function App() {
   const mobilePortrait = useMobilePortrait();
-  const welcome = useUIStore((state) => state.screen === "welcome");
+  const screen = useUIStore(state => state.screen);
+  const welcome = screen === "welcome";
   const showGarageBackdrop = useUIStore(state =>
     state.isModeLoading || state.overlay === "team_lineup" || (state.screen !== "sandbox" && state.screen !== "world_builder"));
-  const rotate = mobilePortrait && !welcome;
+  const rotate = mobilePortrait && !welcome && screen !== "main";
   useAppTheme();
 
   useEffect(() => {

@@ -60,6 +60,30 @@ test("social requests, world transitions and assisted text have independent owne
       "store/social/socialStore.ts",
     );
     const client = await load("net/socialClient.ts");
+    await t.test("an explicit sign-out survives a concurrent check for an expired cookie", async () => {
+      const { returnToStagingSignIn } = await load("net/stagingAccount.ts");
+      const passive = Promise.withResolvers();
+      const explicit = Promise.withResolvers();
+      const calls = [];
+      window.avenskyPortalNavigation = { showSignIn(revoke) {
+        calls.push(revoke);
+        return revoke ? explicit.promise : passive.promise;
+      } };
+      try {
+        const checking = returnToStagingSignIn();
+        const loggingOut = returnToStagingSignIn(true);
+        passive.reject(new Error("The session is still active."));
+        await assert.rejects(checking);
+        explicit.resolve();
+        await loggingOut;
+        assert.deepEqual(calls, [false, true]);
+        calls.length = 0;
+        await Promise.all([returnToStagingSignIn(true), returnToStagingSignIn(), returnToStagingSignIn(true)]);
+        assert.deepEqual(calls, [true]);
+      } finally {
+        delete window.avenskyPortalNavigation;
+      }
+    });
     const by = (label) => {
       const node = document.querySelector(`[aria-label="${label}"]`);
       assert.ok(node, label);
@@ -488,6 +512,22 @@ test("social requests, world transitions and assisted text have independent owne
         assert.equal(calls[0][1].password, "");
       },
     );
+    await t.test("logout clears the account's cached UI and closes pending game requests", async () => {
+      const { endPlayerSession } = await load("net/endPlayerSession.ts");
+      const { useHeroLoadouts: loadouts } = await load("vehicles/cosmetics/heroLoadouts.ts");
+      const { useChatStore: chat } = await load("store/chat/chatStore.ts");
+      await act(async () => {
+        social.setState({ profileOwner: "previous", entryCode: "private-invite" });
+        loadouts.getState().adopt("previous");
+        chat.getState().notify("Previous player's private world");
+        endPlayerSession();
+      });
+      assert.equal(social.getState().profileOwner, null);
+      assert.equal(social.getState().entryCode, "");
+      assert.equal(loadouts.getState().ownerId, null);
+      assert.deepEqual(chat.getState().notices, []);
+      await assert.rejects(client.requestSocial("identify"), /Connect to the game server/);
+    });
   } finally {
     await act(async () => root.unmount());
     await server.close();

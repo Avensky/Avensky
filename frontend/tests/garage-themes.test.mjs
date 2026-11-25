@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { BufferGeometry, Float32BufferAttribute, Group, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3 } from "three";
+import { BufferGeometry, Float32BufferAttribute, Group, Matrix4, Mesh, MeshStandardMaterial, PlaneGeometry, Vector3 } from "three";
 import { prepareGarageDisplay } from "../src/game/preview/prepareGarageDisplay.ts";
 import { applyGarageLighting } from "../src/theme/garageLighting.ts";
 import { selectedGarageTheme, UI_THEMES } from "../src/theme/catalog.ts";
@@ -131,7 +131,20 @@ test("a merged bulb mesh produces one local source per connected bulb and indepe
   const bulbs = fixtures.lights.children.filter(n => n.isPointLight);
   assert.equal(bulbs.length, 18);
   assert.equal(new Set(bulbs.map(n => n.position.toArray().join(","))).size, 18);
-  assert.equal(fixtures.lights.children.filter(n => n.isSprite).length, 18);
+  const glow = fixtures.lights.getObjectByName("garage-neon-rack-glow");
+  assert.equal(glow.isInstancedMesh, true);
+  assert.equal(glow.count, 18);
+  const matrix = new Matrix4(), center = new Vector3();
+  for (const [index, bulb] of bulbs.entries()) {
+    glow.getMatrixAt(index, matrix);
+    assert.ok(center.setFromMatrixPosition(matrix).distanceTo(bulb.position) < 1e-5);
+  }
+  const originalOpacity = glow.material.opacity;
+  fixtures.updateEmission({glow:0});
+  assert.equal(glow.visible, false);
+  fixtures.updateEmission();
+  assert.equal(glow.visible, true);
+  assert.equal(glow.material.opacity, originalOpacity);
   const intensity = bulbs[0].intensity;
   fixtures.updateEmission({rack:.5});
   assert.equal(bulbs[0].intensity, intensity / 2);

@@ -1,4 +1,5 @@
-import { resolveRustWebSocketUrl, STAGING_PORTAL_ORIGIN, STAGING_PORTAL_SOCKET, STAGING_SIGN_IN_PATH } from "./deploymentEnvironment";
+import { resolveRustWebSocketUrl, STAGING_PORTAL_ORIGIN, STAGING_PORTAL_SOCKET } from "./deploymentEnvironment";
+import { returnToStagingSignIn } from "./stagingAccount";
 import { receiveHubActors, resetHub } from "../game/hub/hubStore";
 import { receiveHubResult, resetHubControls } from "../game/hub/hubControls";
 import {SnapshotDecoder} from './snapshotDecoder';
@@ -468,7 +469,7 @@ export function connectRustServer(): WebSocket {
     if (usesStagingPortal) {
       void fetch("/__alpha/verify", { cache: "no-store" }).then(response => {
         if (response.status === 401 && reconnectEnabled && (!socket || socket.readyState !== WebSocket.OPEN))
-          window.location.assign(STAGING_SIGN_IN_PATH);
+          return returnToStagingSignIn();
       }).catch(() => { /* The normal reconnect flow handles network loss. */ });
     }
     resetHub();

@@ -1,6 +1,6 @@
 import {
-  Box3, Color, DoubleSide, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial,
-  PMREMGenerator, Scene, SpotLight, PointLight, Sprite, SpriteMaterial, DataTexture, RGBAFormat, AdditiveBlending, Vector3, type BufferGeometry, type Object3D, type WebGLRenderer,
+  Box3, Color, DoubleSide, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial, MeshStandardMaterial,
+  PlaneGeometry, PMREMGenerator, Scene, SpotLight, PointLight, DataTexture, RGBAFormat, AdditiveBlending, Vector3, type BufferGeometry, type Object3D, type WebGLRenderer,
 } from "three";
 import { emitterBounds } from "./garageEmitters.ts";
 
@@ -19,7 +19,8 @@ export function collectGarageFixtures(room: Object3D) {
   const surfaces = new Map<MeshStandardMaterial, MeshBasicMaterial>();
   const lamps: { light: SpotLight | PointLight; face: MeshStandardMaterial; output: number }[] = [];
   const bulbLevels = new Map<MeshStandardMaterial, { intensity: number; bank: string }>();
-  const halos: { material: SpriteMaterial; face: MeshStandardMaterial }[] = [];
+  const halos: { face: MeshStandardMaterial; mesh: InstancedMesh<PlaneGeometry, MeshBasicMaterial> }[] = [];
+  const quad = new PlaneGeometry();
   const pixels = new Uint8Array(32 * 32 * 4);
   for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
     const i = (y * 32 + x) * 4;
@@ -56,6 +57,25 @@ export function collectGarageFixtures(room: Object3D) {
     if (!sign && !bulbLevels.has(face)) bulbLevels.set(face, { intensity: face.emissiveIntensity, bank });
     const name = ceiling ? "garage-ceiling-" + owner : workLamp ? "garage-work-light-3x4" : rack ? "garage-neon-rack" : "garage-sign";
     const bulbs = ceiling ? [new Box3().setFromObject(node, true)] : emitterBounds(node);
+    // The glow quads of one bank share their color and opacity. Submit that
+    // bank once, while keeping each bulb's position, dimensions and light.
+    let halo: InstancedMesh<PlaneGeometry, MeshBasicMaterial> | undefined;
+    if (!ceiling && bulbs.length) {
+      const material = new MeshBasicMaterial({
+        map: glow, transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false,
+      });
+      material.onBeforeCompile = shader => {
+        shader.vertexShader = shader.vertexShader.replace("#include <project_vertex>", `
+          vec4 mvPosition = modelViewMatrix * instanceMatrix[3];
+          mvPosition.xy += position.xy * vec2(instanceMatrix[0].x, instanceMatrix[1].y);
+          gl_Position = projectionMatrix * mvPosition;
+        `);
+      };
+      halo = new InstancedMesh(quad, material, bulbs.length);
+      halo.name = name + "-glow";
+      lights.add(halo);
+      halos.push({ face, mesh: halo });
+    }
     bulbs.forEach((bounds, index) => {
       const light = ceiling ? new SpotLight() : new PointLight();
       light.name = name + (ceiling ? "" : "-" + index);
@@ -74,19 +94,12 @@ export function collectGarageFixtures(room: Object3D) {
       }
       lamps.push({ light, face, output: ceiling ? 7 : sign ? .16 : rack ? .13 : .2 });
       lights.add(light);
-      if (!ceiling) {
-        const material = new SpriteMaterial({
-          map: glow, transparent: true, blending: AdditiveBlending, depthWrite: false, toneMapped: false,
-        });
-        const halo = new Sprite(material);
-        halo.name = light.name + "-glow";
-        halo.position.copy(light.position);
+      if (halo) {
         const size = bounds.getSize(new Vector3());
         // Long rack tubes need narrow halos following the tube, while work bulbs
         // keep round halos. A large circular sprite makes the source appear behind the rack.
-        halo.scale.set(Math.max(.13, Math.hypot(size.x, size.z) + .06), Math.max(.13, size.y + .06), 1);
-        lights.add(halo);
-        halos.push({ material, face });
+        const transform = new Matrix4().makeScale(Math.max(.13, Math.hypot(size.x, size.z) + .06), Math.max(.13, size.y + .06), 1);
+        halo.setMatrixAt(index, transform.setPosition(light.position));
       }
     });
   });
@@ -99,9 +112,11 @@ export function collectGarageFixtures(room: Object3D) {
         light.color.copy(face.emissive);
         light.intensity = output * face.emissiveIntensity;
       }
-      for (const { material, face } of halos) {
+      for (const { face, mesh } of halos) {
+        const { material } = mesh;
         material.color.copy(face.emissive);
         material.opacity = Math.min(.28, face.emissiveIntensity * .025) * (levels.glow ?? .5) * 2;
+        mesh.visible = material.opacity > 0;
       }
       for (const [face, mirror] of surfaces) mirror.color.copy(face.emissive).multiplyScalar(face.emissiveIntensity);
     },
@@ -110,6 +125,11 @@ export function collectGarageFixtures(room: Object3D) {
       try { return pmrem.fromScene(reflectors, 0, .05, 32, { size: 64, position: new Vector3(0, 1, 0) }); }
       finally { pmrem.dispose(); }
     },
-    dispose() { surfaces.forEach(material => material.dispose()); halos.forEach(({ material }) => material.dispose()); glow.dispose(); },
+    dispose() {
+      surfaces.forEach(material => material.dispose());
+      halos.forEach(({ mesh }) => { mesh.material.dispose(); mesh.dispose(); });
+      quad.dispose();
+      glow.dispose();
+    },
   };
 }

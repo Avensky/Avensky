@@ -3,36 +3,49 @@ export type EntryMotion = {
   invalidate?: () => void;
 };
 
+const IDLE_MS = 18000;
+const MAX_YAW = .24;
+const MAX_PITCH = .09;
+
 /** Input lives with the room, so grabbing during GLB loading cancels the entrance offset too. */
 export function installGarageEntryInteraction(motion: EntryMotion, interactivePreview: () => boolean) {
   let pointer: { id: number; x: number; y: number } | null = null;
   let idleTimer = 0;
-  let swallowPointer = false;
+  let lastActivity = 0;
+  let wakePointer: number | undefined;
   let swallowClickUntil = 0;
   const root = document.documentElement;
   const isLogin = () => !!document.querySelector(".garage-credentials") && !interactivePreview();
-  const wake = () => {
-    delete root.dataset.garageUiIdle;
-    window.clearTimeout(idleTimer);
-    if (isLogin()) idleTimer = window.setTimeout(() => {
-      if (isLogin() && !document.activeElement?.matches("input,textarea") && !document.querySelector(".text-keyboard")) {
-        root.dataset.garageUiIdle = "true";
-      }
-    }, 18000);
+  const checkIdle = () => {
+    idleTimer = 0;
+    if (!isLogin()) return;
+    const remaining = lastActivity + IDLE_MS - performance.now();
+    if (remaining > 0) idleTimer = window.setTimeout(checkIdle, remaining);
+    else if (!pointer && !document.activeElement?.matches("input,textarea") && !document.querySelector(".text-keyboard")) {
+      root.dataset.garageUiIdle = "true";
+    }
   };
-  const scope = new AbortController();
+  const wake = () => {
+    lastActivity = performance.now();
+    if (root.dataset.garageUiIdle) delete root.dataset.garageUiIdle;
+    if (!idleTimer && isLogin()) idleTimer = window.setTimeout(checkIdle, IDLE_MS);
+  };
+  const scope = new window.AbortController();
   const capture = { signal: scope.signal, capture: true };
   document.addEventListener("pointerdown", event => {
-    if (!isLogin()) return;
-    if (root.dataset.garageUiIdle === "true") {
+    const login = isLogin();
+    if (login && root.dataset.garageUiIdle === "true") {
       wake();
-      swallowPointer = true;
+      wakePointer = event.pointerId;
       swallowClickUntil = performance.now() + 600;
       event.preventDefault(); event.stopImmediatePropagation();
       return;
     }
-    wake();
-    if (event.button !== 0 || (event.target as Element).closest(".garage-entry-card,.garage-entry-header,.garage-notices,.text-keyboard")) return;
+    if (login) wake();
+    if (event.button !== 0 || !event.isPrimary || pointer || interactivePreview()) return;
+    const target = event.target as Element;
+    if (login ? target.closest(".garage-entry-card,.garage-entry-header,.garage-notices,.text-keyboard-overlay")
+        : !target.closest(".garage-orbit-surface")) return;
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
     motion.dragging = true;
     motion.dragStarted = performance.now();
@@ -46,21 +59,23 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     event.preventDefault();
   }, capture);
   document.addEventListener("pointermove", event => {
-    if (isLogin()) wake();
+    if (root.dataset.garageUiIdle === "true") wake();
+    else if (idleTimer) lastActivity = performance.now();
     if (!pointer || pointer.id !== event.pointerId) return;
-    motion.targetYaw = Math.max(-.12, Math.min(.12, (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * .0007));
-    motion.targetPitch = Math.max(-.045, Math.min(.045, (motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * .00045));
-    motion.lastInput = performance.now();
+    const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * .0014));
+    const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, (motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * .0009));
     pointer.x = event.clientX; pointer.y = event.clientY;
+    if (yaw === motion.targetYaw && pitch === motion.targetPitch) return;
+    motion.targetYaw = yaw; motion.targetPitch = pitch;
     motion.invalidate?.();
   }, capture);
   const release = (event: PointerEvent) => {
-    if (swallowPointer) {
-      swallowPointer = false;
+    if (wakePointer !== undefined && wakePointer === event.pointerId) {
+      wakePointer = undefined;
       swallowClickUntil = performance.now() + 600;
       event.preventDefault(); event.stopImmediatePropagation();
     }
-    if (pointer?.id !== event.pointerId) return;
+    if (!pointer || pointer.id !== event.pointerId) return;
     pointer = null; motion.dragging = false;
     motion.targetYaw = undefined; motion.targetPitch = undefined;
     motion.lastInput = performance.now();
@@ -70,6 +85,9 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
   };
   document.addEventListener("pointerup", release, capture);
   document.addEventListener("pointercancel", release, capture);
+  root.addEventListener("lostpointercapture", event => {
+    if (event.target === root && pointer?.id === event.pointerId) release(event);
+  }, capture);
   document.addEventListener("click", event => {
     if (performance.now() < swallowClickUntil) { event.preventDefault(); event.stopImmediatePropagation(); }
   }, capture);
@@ -89,9 +107,15 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     wake();
   }, { signal: scope.signal });
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) { pointer = null; motion.dragging = false;
-    motion.targetYaw = undefined; motion.targetPitch = undefined; }
-    else { motion.lastInput = performance.now(); wake(); motion.invalidate?.(); }
+    if (document.hidden) {
+      pointer = null; motion.dragging = false; wakePointer = undefined;
+      motion.targetYaw = undefined; motion.targetPitch = undefined;
+    } else {
+      motion.lastInput = performance.now();
+      wake();
+      if (motion.yaw || motion.pitch) motion.invalidate?.();
+    }
   }, { signal: scope.signal });
+  scope.signal.addEventListener("abort", () => window.clearTimeout(idleTimer), { once: true });
   return scope;
 }

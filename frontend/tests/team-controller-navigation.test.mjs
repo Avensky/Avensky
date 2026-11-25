@@ -19,6 +19,15 @@ test('team filters and Heroes respect controller ownership',async t=>{
   await t.test('B closes composition even with a trigger held and cannot engage the e-brake',async()=>{
    await press(6,true);await press(1,true);assert.equal(board.getState().pinned,false);assert.equal(input.getState().input.handbrake,0);assert.equal(input.getState().input.throttle,0);await press(1,false);await press(6,false);await poll();
   });
+  await t.test('a disconnected controller sleeps and resumes when connected', async () => {
+    pad.connected = false;
+    await poll();
+    assert.equal(frames.size, 0);
+    pad.connected = true;
+    window.dispatchEvent(new window.Event('gamepadconnected'));
+    await poll();
+    assert.equal(frames.size, 1);
+  });
   await t.test('Stats preserves the driving triggers because it has no team filter',async()=>{
    await act(async()=>board.setState({pinned:true,view:'table'}));await poll();await press(7,true);assert.equal(input.getState().input.throttle,1);await press(7,false);await act(async()=>board.getState().close());
   });

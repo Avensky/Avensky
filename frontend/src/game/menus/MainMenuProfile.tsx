@@ -84,7 +84,7 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
     setSigningOut(true);
     setError("");
     try {
-      await signOutPlayerProfile();
+      if (await signOutPlayerProfile() === "portal") return;
       useUIStore.getState().setScreen("welcome");
       disconnectRustServer();
       connectRustServer();

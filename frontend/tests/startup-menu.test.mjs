@@ -67,7 +67,10 @@ test("real App removes the startup cover and opens the latest main menu without 
     await act(async () => {
       root.render(h(StrictMode, null, h(App)));
     });
-    await act(async () => new Promise((resolve) => setTimeout(resolve, 80)));
+    await act(async () => {
+      await server.ssrLoadModule("/src/game/GameUI.tsx");
+      await new Promise(resolve => window.requestAnimationFrame(resolve));
+    });
     assert.equal(
       document.getElementById("startup-screen"),
       null,
@@ -150,6 +153,10 @@ test("real App removes the startup cover and opens the latest main menu without 
     assert.equal(document.querySelector('[role="tab"][aria-selected="true"]').textContent, "Appearance");
     await act(async () => document.querySelector(".controller-shortcut-back").click());
     assert.equal(ui.getState().screen, "main");
+
+    await rotate(true);
+    assert.equal(document.querySelector(".mobile-rotate-screen"), null);
+    assert.ok(document.querySelector(".main-menu .garage-orbit-surface"));
 
     const { ModeLoadingScreen } = await server.ssrLoadModule(
       "/src/game/ModeLoadingScreen.tsx",
