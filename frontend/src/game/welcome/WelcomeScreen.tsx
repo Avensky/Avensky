@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
-import { requestSocial, selectAccount, selectGuestProfile } from "../../net/socialClient";
+import { requestSocial, selectAccount, selectGuestProfile, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { characterLook } from "../characters/characterCatalog";
@@ -69,10 +69,9 @@ export function WelcomeScreen() {
 
   function back() {
     if (pending.current || restoring) return;
-    if (stagingSignIn && (step === "welcome" || screen === "characters" || !slots?.length)) {
-      window.location.assign("/__alpha/account");
-      return;
-    }
+    // Never log out via Escape or controller Back. The explicit Log out
+    // button is the only way to invalidate an active tester session.
+    if (screen === "characters" && (stagingSignIn || registered)) return;
     setError("");
     if (step === "register" && newPlayer) { setStep("save"); return; }
     if (step === "save") { setStep("create"); return; }
@@ -186,9 +185,15 @@ export function WelcomeScreen() {
     return enter(owner, "character_create", newCharacter);
   }
 
+  async function logOut() {
+    await signOutPlayerProfile();
+    setConfirmedProfile(undefined);
+    setStep("welcome");
+    setShowAccountEntry(true);
+  }
   const labels: Record<Step, string> = {
     welcome: "Account access", create: "Create your character", save: "Save your character",
-    register: "Create an account", login: "Log in", characters: "Choose your character",
+    register: "Create an account", login: "Sign in", characters: "Saved characters",
   };
   const label = labels[screen];
 
@@ -207,7 +212,7 @@ export function WelcomeScreen() {
         <img src="/images/logo.svg" width={256} height={256} alt="" fetchPriority="high" />
       </div>
       <section className="welcome-panel" aria-label={label}>
-        {screen !== "welcome" && <h1>{label}</h1>}
+        {screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
         {screen === "create" ? <form key="new-character" onSubmit={event => {
             event.preventDefault();
             if (!draft || !connected || !accounts) return;
@@ -250,13 +255,19 @@ export function WelcomeScreen() {
               {slots.map(slot => <button type="button" key={slot.id} className="welcome-character"
                 disabled={busy || !connected || !slot.appearance}
                 onClick={() => { if (player) void run(() => enter(player.id, "character_select", { character_id: slot.id })); }}>
-                <CharacterPortrait choice={slot.appearance ?? undefined}
+                <CharacterPortrait choice={slot.appearance ?? undefined} label={slot.name}
                   welcomePreview={player?.active_character_id === slot.id ? "selected" : "candidate"} />
-                <strong>{slot.name}</strong><span>{styleName(slot.style)} · Level {slot.level}</span>
+                <div className="welcome-character-details"><strong>{slot.name}</strong>
+                  <span>{styleName(slot.style)}</span><small>Level {slot.level}</small>
+                  {player?.active_character_id === slot.id && <small>Current character</small>}
+                </div>
               </button>)}
             </div>}
             <div className="welcome-actions" data-controller-row>
-              <button type="button" onClick={back} disabled={busy}>Back</button>
+              {(registered || stagingSignIn)
+                ? <button type="button" onClick={() => void run(logOut)} disabled={busy}>Log out</button>
+                : <button type="button" onClick={back} disabled={busy}>Back</button>}
+              {stagingSignIn && <button type="button" onClick={() => window.location.assign("/__alpha/account")} disabled={busy}>Account</button>}
               {registered && slots && slots.length < 4 &&
                 <button type="button" onClick={() => {
                   if (player) setConfirmedProfile(player.id);
@@ -293,7 +304,7 @@ export function WelcomeScreen() {
         ) : stagingSignIn ? null : <>
           <div className="welcome-entry-options" data-controller-row>
             <button type="button" className="welcome-primary" disabled={busy || !accounts}
-              onClick={() => { setError(""); setStep("login"); }}>Log in</button>
+              onClick={() => { setError(""); setStep("login"); }}>Sign in</button>
             <button type="button" disabled={busy || !accounts} onClick={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
