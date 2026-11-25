@@ -176,3 +176,36 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 .garage-credentials .garage-sign-in {
   clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 8px 100%, 0 calc(100% - 8px));
 }
+
+
+/* Keep each menu bar independent of the room behind it. */
+.main-menu-actions .menu-action-list::before { content: none; }
+.garage-credentials {
+  --login-bar-fill: color-mix(in srgb, #383638 96%, transparent);
+  --login-bar-border: #b7aaa080;
+}
+.garage-credentials .garage-field { background: var(--login-bar-border); }
+.garage-credentials .garage-field input {
+  background: var(--login-bar-fill);
+  color: var(--garage-menu-ink);
+  caret-color: var(--garage-menu-ink);
+}
+.garage-credentials .garage-field input:is(:autofill, :-webkit-autofill) {
+  -webkit-text-fill-color: var(--garage-menu-ink);
+  caret-color: var(--garage-menu-ink);
+  box-shadow: inset 0 0 0 1000px #383638;
+}
+.garage-credentials .garage-sign-in {
+  position: relative; isolation: isolate;
+  background: var(--login-bar-border); border: 0;
+}
+.garage-credentials .garage-sign-in::before {
+  content: ""; position: absolute; inset: 1px; z-index: -1;
+  background: var(--login-bar-fill);
+  clip-path: polygon(0 0, 100% 0, 100% calc(100% - 7px), calc(100% - 7px) 100%, 7px 100%, 0 calc(100% - 7px));
+}
+.garage-credentials .garage-sign-in:is(:hover,:focus-visible) {
+  background: var(--garage-menu-accent);
+  --login-bar-fill: #4a4542;
+}
+html[data-high-contrast="true"] .garage-credentials { --login-bar-fill: #141414; --login-bar-border: #e9e9e9; }

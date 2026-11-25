@@ -105,6 +105,7 @@ export function prepareGarageDisplay(scene: Object3D) {
     return material;
   };
   let workLight: MeshStandardMaterial | undefined;
+  let rackLight: MeshStandardMaterial | undefined;
   root.traverse((object) => {
     // The authored four-corner fixture stays in the GLB; the rotating display
     // and its reflection probe omit it. Never hide or edit the cached source.
@@ -114,6 +115,15 @@ export function prepareGarageDisplay(scene: Object3D) {
     object.material = Array.isArray(object.material)
       ? object.material.map(prepare)
       : prepare(object.material);
+    if ((object.parent?.userData.name ?? object.parent?.name) === "Base_Light.001" &&
+        object.material instanceof MeshStandardMaterial && object.material.name.trim() === "LIGHT") {
+      if (!rackLight) {
+        rackLight = object.material.clone();
+        rackLight.emissiveIntensity *= 1.6;
+        rackLight.userData.garageAccentIntensity *= 1.6;
+      }
+      object.material = rackLight;
+    }
     // The freestanding twelve-cell work light shares the neon material in the
     // export. Give its bulbs a warm white phosphor so the bay retains neutral task lighting.
     if (isGarageWorkLight(object)) {
@@ -144,6 +154,6 @@ export function prepareGarageDisplay(scene: Object3D) {
   // copies are owned by this display, including on selection-screen remounts.
   return {
     root,
-    dispose: () => { disposeFloor?.(); workLight?.dispose(); materials.forEach(material => material.dispose()); },
+    dispose: () => { disposeFloor?.(); workLight?.dispose(); rackLight?.dispose(); materials.forEach(material => material.dispose()); },
   };
 }
