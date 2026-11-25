@@ -30,6 +30,7 @@ def arguments():
     parser.add_argument("--framing-hair", help="Use this original baseline with the before object to keep the prior framing and lights")
     parser.add_argument("--framing-before", help="Optional original before object for exact reuse of the prior framing")
     parser.add_argument("--after-inserts", help="Separate source-curl insert mesh shown only after")
+    parser.add_argument("--shared-inserts", help="Previously reviewed source-curl insert mesh shown in both stages")
     parser.add_argument("--diffuse", type=Path, required=True)
     parser.add_argument("--opacity", type=Path, required=True)
     parser.add_argument("--normal", type=Path)
@@ -279,13 +280,20 @@ def main():
     head_materials(beauty_head, skin)
     diagnostic_head, triangles = mask_head(scene, head, weights)
     sources = [before, after]
-    if args.after_inserts:
-        insert = bpy.context.scene.objects.get(args.after_inserts)
-        if not insert or insert.type != "MESH" or insert in {head, before, after} or not insert.data.uv_layers.active:
-            raise ValueError("The after-only insert must be a separate mesh with the source opacity UV")
+    stage_indices = [[0], [1]]
+    for name, stage_ids in ((args.shared_inserts, (0, 1)), (args.after_inserts, (1,))):
+        if not name:
+            continue
+        insert = bpy.context.scene.objects.get(name)
+        if (not insert or insert.type != "MESH" or insert in [head, *sources]
+                or not insert.data.uv_layers.active):
+            raise ValueError("Each insert must be a separate mesh with the source opacity UV")
+        for stage_id in stage_ids:
+            stage_indices[stage_id].append(len(sources))
         sources.append(insert)
     donors = [mesh_copy(scene, obj) for obj in sources]
-    stages = (("before", donors[:1]), ("after", donors[1:]))
+    stages = [(label, [donors[index] for index in indices])
+              for label, indices in zip(("before", "after"), stage_indices)]
     hair_materials = []
     for obj in donors:
         uv = obj.data.uv_layers.active.name
@@ -305,7 +313,7 @@ def main():
         "scalp_status": head.get("avensky_scalp_status", "GROUP_STATUS_UNSPECIFIED"),
         "before_object": before.name, "after_object": after.name,
         "framing_hair": framing.name, "framing_before": framing_before.name,
-        "after_inserts": args.after_inserts,
+        "after_inserts": args.after_inserts, "shared_inserts": args.shared_inserts,
         "samples": args.samples, "seed": 29, "size": args.size,
         "beauty_denoised": True, "diagnostics_denoised": False, "views": {},
     }

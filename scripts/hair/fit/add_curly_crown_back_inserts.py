@@ -14,6 +14,7 @@ from export_curly_fit_probe import digest, groups_from_edges
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--template-hair", default="AVFIT_CurlyMane_GLOBAL_PREVIEW")
+    parser.add_argument("--insert-name", default="AVFIT_CurlyMane_CROWN_BACK_INSERT_REVIEW")
     parser.add_argument("--plan", type=Path, required=True)
     parser.add_argument("--out-blend", type=Path, required=True)
     parser.add_argument("--report", type=Path, required=True)
@@ -23,7 +24,7 @@ def main():
     if not source.is_file() or out.exists() or report.exists() or out == report or out.suffix.lower() != ".blend":
         raise ValueError("Open a private review scene and choose two new output paths")
     template = bpy.context.scene.objects.get(a.template_hair)
-    name = "AVFIT_CurlyMane_CROWN_BACK_INSERT_REVIEW"
+    name = a.insert_name
     if not template or template.type != "MESH" or bpy.data.objects.get(name):
         raise ValueError("Use the original source donor in a fresh review scene")
     mesh = template.data
