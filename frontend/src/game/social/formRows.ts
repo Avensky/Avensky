@@ -17,7 +17,7 @@ export function navigateFormRows(
       row,
       items: Array.from(
         row.querySelectorAll<HTMLElement>(
-          "button,input,select,textarea,[data-controller-selector][tabindex]",
+          "button,input,select,textarea,a[href],summary,[data-controller-selector][tabindex]",
         ),
       ).filter(
         (node) =>

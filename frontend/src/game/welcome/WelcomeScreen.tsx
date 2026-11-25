@@ -7,6 +7,7 @@ import { characterLook } from "../characters/characterCatalog";
 import { attitudeName, CHARACTER_STYLES, styleLook, styleName, type CharacterBody } from "../characters/characterStyles";
 import { AlphaAccountPanel } from "../characters/AlphaAccountPanel";
 import { CharacterPortrait, ProfilePortrait } from "../characters/CharacterPortrait";
+import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { garageBrandHeader, garageCredentials } from "../../theme/garageEntry";
@@ -143,7 +144,8 @@ export function WelcomeScreen() {
       if (!(active instanceof HTMLElement)) return;
       if (action === "back") back();
       else if (action === "activate" && root.current.contains(active)) {
-        if (active instanceof HTMLButtonElement) active.click();
+        if (active.matches("button:enabled, summary, a[href]")) active.click();
+        else if (active instanceof HTMLInputElement && active.closest(".garage-credentials")) openFieldKeyboard(active);
         else if (isTypingTarget(active)) active.focus();
       } else if (["up","down","left","right"].includes(action)) {
         navigateFormRows(root.current, active, action, remembered.current);

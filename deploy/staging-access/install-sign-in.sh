@@ -3,18 +3,54 @@
 set -euo pipefail
 umask 077
 [[ $EUID == 0 ]] || { echo "Run on the staging host as root." >&2; exit 1; }
-[[ $# == 0 || ( $# == 1 && $1 == --fresh ) ]] || { echo "Usage: install-sign-in.sh [--fresh]" >&2; exit 1; }
+[[ $# == 0 || ( $# == 1 && ( $1 == --fresh || $1 == --ui-only ) ) ]] || { echo "Usage: install-sign-in.sh [--fresh | --ui-only]" >&2; exit 1; }
 state=/var/lib/avensky-staging-deploy
 exec 9>"$state/deploy.lock"
 flock -x 9
 web=$(readlink -e /srv/avensky-staging/frontend/current)
 commit=$(basename "$(dirname "$web")")
 [[ $commit =~ ^[0-9a-f]{40}$ && -s $web/images/garage-entry.css ]]
+lib=/usr/local/lib/avensky/staging-access
+if [[ ${1:-} == --ui-only ]]; then
+  # Refresh an already installed portal from the same revision as its public assets.
+  systemctl is-active --quiet avensky-alpha-access.service
+  for asset in sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+    [[ -s $web/images/$asset ]]
+  done
+  backup=$(mktemp -d /root/avensky-sign-in-ui-XXXXXXXX)
+  mkdir "$backup/candidate"
+  files=(portal.mjs garageEntry.ts branding.ts palettes.json)
+  for name in "${files[@]}"; do
+    path=frontend/src/theme/$name
+    if [[ $name == portal.mjs ]]; then path=deploy/staging-access/$name; fi
+    cp -p "$lib/$name" "$backup/$name"
+    git --git-dir="$state/source.git" show "$commit:$path" > "$backup/candidate/$name"
+  done
+  node --check "$backup/candidate/portal.mjs"
+  rollback_ui() {
+    trap - ERR
+    echo "Restoring the previous sign-in UI from $backup" >&2
+    for name in "${files[@]}"; do cp -p "$backup/$name" "$lib/$name"; done
+    systemctl restart avensky-alpha-access.service
+  }
+  trap rollback_ui ERR
+  for name in "${files[@]}"; do install -m 0644 "$backup/candidate/$name" "$lib/$name"; done
+  systemctl restart avensky-alpha-access.service
+  url=http://127.0.0.1:9061
+  curl --noproxy '*' --retry 8 --retry-all-errors --retry-delay 1 -fsS "$url/sign-in" -o "$backup/login.html"
+  grep -q '/__alpha/entry/sign-in-input.js' "$backup/login.html"
+  for asset in sign-in-input.js sign-in-controller.js sign-in-controller.css; do
+    curl --noproxy '*' -fsS "$url/__alpha/entry/$asset" -o /dev/null
+  done
+  trap - ERR
+  echo "Sign-in UI updated to $commit. Previous files: $backup"
+  exit 0
+fi
+
 volume=$(docker volume inspect --format '{{.Mountpoint}}' avensky-staging_avensky_staging_data)
 [[ $volume == /var/lib/docker/volumes/avensky-staging_avensky_staging_data/_data ]]
 player_db="$volume/staging/social.sqlite3"
 [[ -s $player_db && $(stat -c %u "$player_db") == 10001 ]]
-lib=/usr/local/lib/avensky/staging-access
 unit=/etc/systemd/system/avensky-alpha-access.service
 config=/etc/caddy/Caddyfile
 helper=/usr/local/lib/avensky/staging_game.py
