@@ -36,7 +36,9 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
     motion.dragging = true;
     motion.lastInput = performance.now();
-    motion.yaw = 0; motion.pitch = 0;
+    if (root.dataset.garageReady !== "true") {
+      motion.yaw = 0; motion.pitch = 0;
+    }
     root.setPointerCapture(event.pointerId);
     motion.invalidate?.();
     event.preventDefault();
