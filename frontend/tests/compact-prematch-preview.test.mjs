@@ -77,7 +77,7 @@ test('compact prematch views share a frame and keep opposing picks mysterious un
    await render(h(PreMatchTeamPreview,{view,selectedHero:null}));
    assert.equal(document.querySelectorAll('.team-portrait-ellipsis').length,5);
   });
-  await t.test('the confirmed lineup opens over the sunflare once per round and enables swaps only at spawn',async()=>{
+  await t.test('the confirmed lineup opens over the garage once per round and enables swaps only at spawn',async()=>{
    const {TeamLineup}=await load('game/stats/TeamLineup.tsx');
    const {PauseMenu}=await load('game/menus/PauseMenu.tsx');
    const {routeMenuAction}=await load('controls/inputRouting.ts');

@@ -99,8 +99,10 @@ export function GameUI() {
   const [roomReady, setRoomReady] = useState(false);
   const previewPaused = retainedPreview !== null;
 
+  const worldCover = (screen === "sandbox" || screen === "world_builder") &&
+    (isModeLoading || overlay === "team_lineup");
   return (
-    <div className="relative game-wrapper" data-live-world={screen === "sandbox" || undefined}>
+    <div className="relative game-wrapper" data-live-world={screen === "sandbox" || undefined} data-world-cover={worldCover || undefined}>
       <HeroLoadoutSync />
       <MinimapSessionLifecycle />
       <CtfMissionLifecycle />
@@ -112,7 +114,7 @@ export function GameUI() {
         <FullCanvas
           roomReady={roomReady}
           paused={previewPaused}
-          covered={retainedPreview !== null || ((isModeLoading || overlay === "team_lineup") && !menuPreview)}
+          covered={retainedPreview !== null || worldCover}
           preview={previewScreen !== null}
         >
           {previewScreen !== null && (

@@ -69,6 +69,8 @@ html[data-reduce-motion="true"] .garage-canvas canvas {
   z-index: 100;
 }
 
+/* The world keeps warming underneath. Driving HUD elements appear when the player enters it. */
+.game-wrapper[data-world-cover] > :not(.garage-mode-loading, .team-lineup) { visibility: hidden; }
 .garage-mode-loading { color: var(--app-text); }
 .garage-loading-panel { background: color-mix(in srgb, var(--app-panel) 94%, transparent); border-color: var(--app-line); }
 .garage-loading-brand { color: var(--app-accent); }
