@@ -18,6 +18,19 @@
 
 An alpha fitting pass never implies distribution approval. A rights-cleared model can still be rejected on performance. Don't block code work because the beta rights audit is unfinished.
 
+### Solo-developer evaluation policy (November 2026)
+
+Avensky staging is an **experimental, password-protected internal review environment**. New third-party models and donor-derived experiments are **test candidates by default**. Their presence in staging means only *we are evaluating technical fit*, not that they work, are polished, have been purchased for commercial release, or have been cleared for distribution. Failed fit/LOD/material tests are expected and must not hold up unrelated code deploys.
+
+- Evaluate whether a hair, body donor, outfit, vehicle or environment model fits and performs on desktop/mobile **before deciding whether to buy a commercial license**. A prototype may be rejected or replaced without a purchase.
+- Keep master/source files and commercial store downloads out of the public repository. Private S3 and site passwords reduce access but **do not override the creator's terms**; a free or non-resale license may allow testing while restricting browser delivery, derivatives, use by invited testers, or redistribution. Check the specific asset's permissions before those activities.
+- License tiers sometimes depend on the purchaser's **company size, annual revenue, number of seats or funding**. Avensky currently has one developer; use any applicable individual/indie tier only when its actual terms qualify. Reassess if the company/team/business changes.
+- Treat unreviewed model families as **evaluation-only**, without making provenance forms, manual approval flags, or per-release S3 verification prerequisites for staging. Revisit source records and decide whether to purchase, attribute, replace or exclude an asset **only when choosing assets for external alpha/commercial beta**. Do not automatically promote unreviewed assets into public distribution.
+- Record the important source/license family notes when known, but keep receipts and license files private. Prototype availability is independent of production rights and independent of whether the model actually renders.
+
+This is an engineering workflow, **not a determination that a particular free, educational or solo-dev license allows distribution**; review the source terms before use.
+
+
 ## Private AWS Lightsail staging
 
 **Do not switch the bucket to public-read for this audit.** Keep purchased masters, imported downloads, and unresolved third-party sources in a **private bucket** under a distinct prefix such as `staging/source/`, and publish only cleared, optimized derivatives from a separate release location once the appropriate rights and technical checks pass.

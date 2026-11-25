@@ -4,7 +4,7 @@ Avensky keeps code, asset paths and SHA-256 release metadata in public GitHub. *
 
 The uploader replaces collection-specific upload scripts and supports both list-based URL/hash/size manifests (the fitted hair pack) and URL-to-hash/size mappings (existing fitted garments). New hairstyles, dresses, accessories, character donors, and textures can use the same uploader after their metadata is approved.
 
-It checks the hash and exact byte count, rejects incomplete GLBs and unsafe paths, and uploads only to immutable private S3 keys under staging/objects/ using AWS profile avensky-lightsail. Existing keys are not overwritten. The staging gateway must still independently verify the SHA-256 and ETag before serving a model.
+It checks each export's hash and exact byte count, rejects incomplete GLBs and unsafe paths, and uploads only to immutable private S3 keys under `staging/objects/` using AWS profile `avensky-lightsail`. Existing keys are not overwritten. **Staging deploys no longer require an independent approval/verification ceremony per release**; a missing asset can fail that preview while the site and other updates still deploy. Keep restricted source files private, and follow the original creator's terms for the permitted scope of evaluation.
 
 ## One-time dry run and upload
 
@@ -40,15 +40,15 @@ To remove it:
 Unregister-ScheduledTask -TaskName "Avensky Private Staging Asset Watcher" -Confirm:$false
 ~~~
 
-## Staging activation, rollback and remaining infrastructure task
+## No repeated asset release steps for internal staging
 
-1. Approve the private export and update the public metadata manifest (logical URL, exact size, SHA-256) on a feature branch. Add new catalog paths to `frontend/scripts/staging-private-asset-catalogs.json`. Do **not** merge until staging verification and gateway activation are complete.
-2. The Windows watcher automatically publishes matching models to private S3. An upload alone **does not activate** a release.
-3. The trusted staging operator generates a new asset release from the **same main commit**, runs deploy/staging-assets/verify.mjs with read-only AWS credentials, and installs the verified release in the staging gateway while retaining the old one for current sessions.
-4. The existing main-branch Deploy to staging workflow automatically builds the frontend. The receiver compares its asset-release ID to the gateway's verified release before activating the frontend; it fails closed on a mismatch.
-5. Staging Rust server updates must be deployed separately when models introduce new saved choice IDs. Production remains manual and isolated.
+Assets are experiments. A model may fail to load, clip, look unrealistic, or perform badly; this does **not** prevent an unrelated UI/game update from deploying. New assets follow the existing automatic uploader and checked-in catalog. On the fast staging server, **each main merge deploys the website and the matching game server**, with the gateway reading candidate asset paths from the installed catalog and streaming from private S3 on demand. No `STAGING_FITTED_HAIR` variable and no per-model verified release installation.
 
-**One-time infrastructure follow-up:** The Vultr staging receiver currently requires an operator to install verified asset manifests. Full end-to-end unattended activation needs a restricted staging-only verification and atomic activation command installed on the server and invoked by the deployment workflow *before* frontend publication. Do not bypass the verified-release check. Track this in issue #51; the new uploader is safe to use now.
+A one-time privileged staging-host update is documented in [Rapid staging deploy](../../docs/STAGING_AUTODEPLOY.md). It replaces the old receiver/gateway once; after that, new main merges do not need operator intervention. The protected staging domain and private S3 remain protected. **Production remains manual and requires a separate asset/license review.**
+
+A working Windows watcher has **not** been confirmed yet: its last reported Task Scheduler result was `2`. The original 12 hairstyles were uploaded successfully by the earlier manual uploader. Fix the watcher once rather than repeating uploads on every new pack.
+
+See [asset clearance](../../docs/ASSET_CLEARANCE.md): imported models are evaluation candidates, not guaranteed functional or commercially licensed. Individual/indie license terms depend on the creator and applicable business-size thresholds.
 
 ## Tests
 
