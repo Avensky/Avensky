@@ -14,17 +14,24 @@
 | Recover the real scalp/skin color | **Confirmed / reference produced** | `T_Villager_Lady_Face_BaseColor.tga` used on source Face4 UVs for front/right/back/top views; preserve this rather than synthesizing a solid-color cap |
 | Catalog and material-only batch | **Existing, partial** | Earlier twelve-style material processing can prepare materials; it does not add volume or alter geometric root fit |
 | Separate corrective scalp layer | **Optional prototype only** | `extract_source_scalp.py` writes a private debug-material working copy if manually annotated; **not default and not visually approved** |
-| Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original CURLY 01.FBX supplied and analyzed; correct FBX node axis transforms identified, but Blender import unit conversion and original Curls opacity/materials remain unverified |
+| Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original CURLY 01.FBX and genuine Curls diffuse/opacity were supplied and used in a CPU preview; Blender import unit conversion and final shader remain unverified |
 | Establish reusable Vesper head coordinates | **Not finalized** | Neutral actor + real source BaseColor + rig/bone/unit frame + reference cameras need a saved, approved private scene |
 | Automatically find/assign source hair roots | **Not implemented** | Need explicit or confirmed root zones per imported mesh/card; output confidence and manual fallback |
 | Coarse source→Vesper alignment | **Real-source offline candidate; Blender approval pending** | `coarse_scalp_alignment.py` + `auto_align_curly_mane.py` produce a bounded global scale/translation using upper UV roots and approved original scalp; the real source candidate improves measured clearance but is NOT final. |
 | Controlled root-only conformance | **Temporarily blocked for safety** | The old nearest-skin UV-end experiment may have selected tips. Its old conform command now refuses execution until post-global roots are identified and reviewed. |
+| Exact root-to-triangle clearance QA | **Algorithm locally tested; Blender probes still unverified** | 8 new synthetic tests and one real-source offline comparison; export and CSV reporter implemented; approval/unit verification pending |
 | Genuine density/volume correction | **Not implemented** | Need detected uncovered non-part areas and limited inner clump/wisp authoring; do not blindly duplicate cards |
 | Automated six-view/pose QA | **Not implemented** | Need reproducible front/back/left/right/top/three-quarter captures, cap isolation, head turns/collar/bonnet checks |
 | Mobile optimization and GLB export | **Not implemented for V2** | LOD generator, deterministic export, reimport, mesh/material validation and physical-phone GPU QA |
 | In-game discovery/integration | **Existing runtime catalog mechanism; V2 unintegrated** | Add approved private manifest entry to existing catalog only after real fit, not a new manual UI list |
 
 **The Vesper pilot isn't finished.** No success is claimed for a new fitted Curly Mane GLB, an authored original-texture root overlay, or a validated phone LOD.
+
+## Triangle-surface QA and chat-mode automation (2026-11-25)
+
+The project has moved beyond vertex-only contact checks. New `surface_fit_metrics.py` computes **true nearest scalp triangle** positions, `test_surface_fit_metrics.py` adds 8 local synthetic tests, `export_curly_fit_probe.py` prepares private Blender geometry NPZ, and `audit_fit_npz.py` produces deterministic JSON+CSV (without any mesh edit). With a **provisional** 295-triangle original-texture scalp mask and 209 plausible higher-UV-end donor candidates, median distance moved from 196.19 mm to 10.02 mm after global alignment, conditionally interpreting one source unit as one centimeter. 39 candidate root gaps exceed 20 mm and 45 show possible local negative-normal crossings. These are **not** validated visible gaps or true collisions. Artist approval of source scalp/root groups, imported units, Curls opacity-aware six-view coverage, rigging and physical-phone checks remain required.
+
+The [HAIR_AUTOMATION_EXECUTION.md](HAIR_AUTOMATION_EXECUTION.md) specifies commands and separate acceptance gates for **root contact vs alpha-visible coverage vs animated gameplay**.
 
 ## Global geometric alignment solved provisionally (2026-11-25)
 
