@@ -4,7 +4,16 @@
 
 **Status (2026-11-25):** original Face4 skull and original `T_Villager_Lady_Face_BaseColor.tga` texture have been identified and visualized on the actual head. The original texture ALREADY includes a soft scalp/hair-root discoloration. **Preserve that original texture on Vesper; don't generate a substitute sphere, hard brown cap, or new scalp mesh by default.** V2 inspectors and optional diagnostic extraction are written, but actual Curly Mane root fitting, Blender QA and shippable GLBs remain unimplemented/unverified.
 
-**Start by reading:** [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) → [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md) → [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
+**Start by reading:** [HAIR_AUTOMATION_EXECUTION.md](HAIR_AUTOMATION_EXECUTION.md) (exact commands + metrics) → [CURLY_VENDOR_REFERENCE_MATCH.md](CURLY_VENDOR_REFERENCE_MATCH.md) (original appearance) → [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md).
+
+## New exact surface QA milestone (read-only, offline; no Work required)
+
+- `surface_fit_metrics.py` computes exact nearest **Face4 scalp TRIANGLE** clearance for provisional/approved root candidates (rather than sampled vertex distances), with local signed-normal offsets explicitly treated as warning signals, NOT definitive inside/outside.
+- `export_curly_fit_probe.py` exports private scene geometry into per-state NPZ in Blender; `audit_fit_npz.py` compares baseline/after NPZ with normal Python and emits reproducible JSON/CSV. Eight synthetic triangle-math tests passed locally, and the current source analysis was executed against real original Face4+Curly donor coordinates.
+- **Preliminary numeric result only:** 209 upper-UV root candidates, 295 provisional source-texture-masked triangles; median nearest-triangle gap 196.19 mm before global fitting vs 10.02 mm after, conditional on 1 source coordinate unit = 1 cm. 39 candidates still exceed a 20 mm *review* threshold, and 45 show possible negative-normal crossings. None is a confirmed collision/visible-gap count.
+- **Not yet complete:** artist approval of mask + roots, Blender import axis/units, alpha-aware six-view coverage, retargeted rig, LOD/phone tests. Do NOT automatically ship or deform based on these provisional measurements.
+
+See the precise [Automation execution runbook](HAIR_AUTOMATION_EXECUTION.md) for commands, input/output fields, assumptions, gates and privacy.
 
 ## Original vendor image reference — now captured
 
