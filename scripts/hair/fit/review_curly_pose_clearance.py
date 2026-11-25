@@ -37,6 +37,8 @@ PREVIEWS = (
 def arguments():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--hero", required=True, type=Path)
+    parser.add_argument("--extra-hair", action="append", default=[], help="An extra private curl layer in the reviewed candidate")
+    parser.add_argument("--main-hair", default=HAIR[0], help="Name of the private base curl mesh under review")
     parser.add_argument("--collar", required=True, type=Path)
     parser.add_argument("--diffuse", required=True, type=Path)
     parser.add_argument("--opacity", required=True, type=Path)
@@ -186,6 +188,7 @@ class ContactAudit:
             "triangle_intersection_pairs":count,
             "pairs_with_opacity_at_least_half":sum(x>=.5 for x in maxima),
             "pairs_with_opacity_at_least_quarter":sum(x>=.25 for x in maxima),
+            "pairs_with_opacity_at_least_tenth":sum(x>=.1 for x in maxima),
             "distinct_half_opacity_hair_triangles":len(ids),
             "max_opacity":max(maxima,default=0.),
             "half_opacity_layers":sorted({self.layers[i] for i in ids}),
@@ -243,7 +246,7 @@ def main():
     head=bpy.data.objects["Face4"]
     skin=ensure_actual_texture(head)
     source_rig=head.find_armature()
-    donors=[bpy.data.objects[name] for name in HAIR]
+    donors=[bpy.data.objects[name] for name in (args.main_hair, *HAIR[1:], *args.extra_hair)]
     hero=import_glb(args.hero)
     collar=import_glb(args.collar)
     body=hero["BODY_OUTFIT_CUT"]
