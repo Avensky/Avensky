@@ -26,6 +26,23 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
   }
 });
 
+test("emote tab keeps the stable fitting stage unless a garage interaction needs a car", async () => {
+  const server = wardrobePreviewServer();
+  try {
+    const { characterEmoteNeedsGarage } = await server.ssrLoadModule("/src/game/characters/characterPreviewStage.ts");
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", undefined, false), false);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "makeup-check", false), false);
+    assert.equal(characterEmoteNeedsGarage("details", "Whole car", undefined, false), false);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Whole car", undefined, false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "pose-lean", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "interact-driver-door", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", "mirror-makeup", false), true);
+    assert.equal(characterEmoteNeedsGarage("emotes", "Full body", undefined, true), true);
+  } finally {
+    await server.close();
+  }
+});
+
 test("fitting camera stays on the safe stage-facing side during character rotation", async () => {
   const server = wardrobePreviewServer();
   try {
