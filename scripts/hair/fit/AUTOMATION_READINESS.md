@@ -6,6 +6,8 @@
 
 **We have the source evidence and a partial automation scaffold; a one-command end-to-end hair fitter does not yet exist.** Do not quote a completion percentage based on research, scripts being committed, or attractive reference renders. The **largest missing engineering step** is mapping a new hairstyle's root/card geometry onto Vesper's head without flattening the rest of the hairstyle.
 
+The [original-source Blender coverage review](CURLY_BLENDER_COVERAGE_REVIEW.md) is the latest static checkpoint. It records both FBX import scales, the provisional centimeter donor interpretation and scalp trace, matching exact contact probes, and six-view alpha exposure. The candidate still needs visual approval and targeted corrections.
+
 ### Evidence-based status
 
 | Capability | Current status | Evidence / next gate |
@@ -14,14 +16,14 @@
 | Recover the real scalp/skin color | **Confirmed / reference produced** | `T_Villager_Lady_Face_BaseColor.tga` used on source Face4 UVs for front/right/back/top views; preserve this rather than synthesizing a solid-color cap |
 | Catalog and material-only batch | **Existing, partial** | Earlier twelve-style material processing can prepare materials; it does not add volume or alter geometric root fit |
 | Separate corrective scalp layer | **Optional prototype only** | `extract_source_scalp.py` writes a private debug-material working copy if manually annotated; **not default and not visually approved** |
-| Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original CURLY 01.FBX and genuine Curls diffuse/opacity were supplied and used in a CPU preview; Blender import unit conversion and final shader remain unverified |
-| Establish reusable Vesper head coordinates | **Not finalized** | Neutral actor + real source BaseColor + rig/bone/unit frame + reference cameras need a saved, approved private scene |
-| Automatically find/assign source hair roots | **Not implemented** | Need explicit or confirmed root zones per imported mesh/card; output confidence and manual fallback |
-| Coarse source→Vesper alignment | **Real-source offline candidate; Blender approval pending** | `coarse_scalp_alignment.py` + `auto_align_curly_mane.py` produce a bounded global scale/translation using upper UV roots and approved original scalp; the real source candidate improves measured clearance but is NOT final. |
+| Donor source inventory | **Original Blender import measured** | Original CURLY 01.FBX and Curls maps used in Cycles. Blender applies 0.0254 m per donor unit versus 0.01 m per Face4 unit. The donor centimeter interpretation and game shading need approval |
+| Establish reusable Vesper head coordinates | **Static review scene established** | Original Face4 texture, metric frame and six cameras were reproduced. Approve the provisional scalp group and verify runtime rig, bind pose and game derivative |
+| Automatically find/assign source hair roots | **209 provisional candidates** | The higher-V centers matched the upper ends of eligible components. Author annotation and review of excluded or exterior cards remain open |
+| Coarse source→Vesper alignment | **Real-source Blender candidate** | Global placement improved measured contact with the provisional Face4 group. Scale reached the lower bound and the crown/back and face need review |
 | Controlled root-only conformance | **Temporarily blocked for safety** | The old nearest-skin UV-end experiment may have selected tips. Its old conform command now refuses execution until post-global roots are identified and reviewed. |
-| Exact root-to-triangle clearance QA | **Algorithm locally tested; Blender probes still unverified** | 8 new synthetic tests and one real-source offline comparison; export and CSV reporter implemented; approval/unit verification pending |
+| Exact root-to-triangle clearance QA | **Real-source Blender probes verified on provisional selection** | Matched 209 root IDs against 228 Face4 triangles. Median distance improved from 194.16 to 10.84 mm. Author-approved groups are pending |
 | Genuine density/volume correction | **Not implemented** | Need detected uncovered non-part areas and limited inner clump/wisp authoring; do not blindly duplicate cards |
-| Automated six-view/pose QA | **Not implemented** | Need reproducible front/back/left/right/top/three-quarter captures, cap isolation, head turns/collar/bonnet checks |
+| Automated six-view/pose QA | **Static six-view comparison reproduced** | Original textures and alpha maps rendered in Blender. Candidate exposes 56.4% of projected rear scalp and 17.5% from above. Head turns/collar/bonnet checks are pending |
 | Mobile optimization and GLB export | **Not implemented for V2** | LOD generator, deterministic export, reimport, mesh/material validation and physical-phone GPU QA |
 | In-game discovery/integration | **Existing runtime catalog mechanism; V2 unintegrated** | Add approved private manifest entry to existing catalog only after real fit, not a new manual UI list |
 

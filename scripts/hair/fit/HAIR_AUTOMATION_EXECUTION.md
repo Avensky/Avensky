@@ -2,6 +2,16 @@
 
 Checkpoint: November 25, 2026. Female Vesper and Curly Mane only. Draft PR #67. No merge, deployment, source replacement, or shipping GLB.
 
+**Latest checkpoint.** Blender 5.3.0 ran against all original inputs. The new [Blender coverage review](CURLY_BLENDER_COVERAGE_REVIEW.md) records the import discrepancy, provisional scalp trace, matching root measurements, six pairs of private PNGs and the remaining approval gate. The earlier offline numbers below remain historical with their original mask and assumptions.
+
+## Prepare the private source workbench
+
+~~~powershell
+$blender = "C:/Program Files/Blender Foundation/Blender 5.3/blender.exe"
+$private = "C:/AvenskyPrivate/curly"
+& $blender -b --factory-startup --python-exit-code 1 --python scripts/hair/fit/prepare_curly_mane_workbench.py -- --face-fbx "$private/SK_Village_Lady_Face4.fbx" --face-basecolor "$private/T_Villager_Lady_Face_BaseColor.tga" --hair-fbx "$private/CURLY SET/CURLY 01.FBX" --report "$private/workbench.json" --out-blend "$private/source.blend"
+~~~
+
 ## Confidence and boundaries
 
 - High confidence: original-source inspection, global-fit candidates, root/surface measurements, safe prototype adjustments, reproducible PNG comparison, scripted QA in normal ChatGPT.
@@ -65,7 +75,7 @@ $metersPerUnit = "1.0" # ONLY if the imported Blender world units really are met
 
 & $blender -b "C:\AvenskyPrivate\curly\vesper-curly-baseline.blend" --python scripts/hair/fit/export_curly_fit_probe.py -- --head Face4 --hair Curly_Mane --meters-per-unit $metersPerUnit --allow-heuristic-roots --out "C:\AvenskyPrivate\curly\baseline-probe.npz" --report "C:\AvenskyPrivate\curly\baseline-export.json"
 
-& $blender -b "C:\AvenskyPrivate\curly\vesper-curly-global-candidate.blend" --python scripts/hair/fit/export_curly_fit_probe.py -- --head Face4 --hair AVFIT_CurlyMane_GLOBAL_PREVIEW --meters-per-unit $metersPerUnit --allow-heuristic-roots --out "C:\AvenskyPrivate\curly\candidate-probe.npz" --report "C:\AvenskyPrivate\curly\candidate-export.json"
+& $blender -b "C:\AvenskyPrivate\curly\vesper-curly-global-candidate.blend" --python scripts/hair/fit/export_curly_fit_probe.py -- --head Face4 --hair AVFIT_CurlyMane_GLOBAL_PREVIEW --root-reference Curly_Mane --meters-per-unit $metersPerUnit --allow-heuristic-roots --out "C:\AvenskyPrivate\curly\candidate-probe.npz" --report "C:\AvenskyPrivate\curly\candidate-export.json"
 
 py -m pip install numpy scipy
 py scripts/hair/fit/audit_fit_npz.py --input "C:\AvenskyPrivate\curly\candidate-probe.npz" --baseline "C:\AvenskyPrivate\curly\baseline-probe.npz" --out-dir "C:\AvenskyPrivate\curly\contact-audit-v1"
@@ -88,6 +98,7 @@ If the Blender workbench already contains an empty AV_RootWeight group, the expl
 ## Next four gates for automation
 
 ### Gate A: calibrated source scene
+- [x] Measure both Blender import matrices and establish the static review frame. The donor centimeter authoring assumption awaits acceptance.
 - [x] Original Face4 skull, Face BaseColor, donor geometry, Curls opacity/diffuse and vendor appearance identified.
 - [x] Provisional global alignment performed; vendor look-reference compared.
 - [ ] Verify importer physical units, same-world head/bone coordinates and shape-key/rig compatibility.
@@ -96,14 +107,16 @@ If the Blender workbench already contains an empty AV_RootWeight group, the expl
 ### Gate B: measurable true-surface root fitting
 - [x] Exact triangle surface metric, private probe export, offline report and 8 synthetic unit tests.
 - [x] Initial real-source approximate-mask measurement recorded above.
-- [ ] Repeat on author-approved scalp/roots after true Blender import; compare with baseline.
+- [x] Repeat actual Blender import contact audit on matching provisional groups and the same 209 root IDs.
+- [ ] Repeat with artist-approved scalp and root annotations.
 - [ ] Build tangent-aware, smoothly tapered local root solver with max displacement and zero-weight-tip protection.
 - [ ] Review suspicious roots; keep outer curls voluminous.
 
 ### Gate C: visual coverage, not just contact
-- [ ] Freeze front, back, left, right, top, three-quarter PNG cameras with fixed lighting/exposure.
-- [ ] Use REAL original Face4 color and original donor Curls diffuse/opacity/normal atlases.
-- [ ] Build an alpha-aware visible-scalp coverage map by camera and distinguish intended parts from bald crown/back patches.
+- [x] Freeze front, back, left, right, top, three-quarter PNG cameras with fixed lighting/exposure.
+- [x] Use real original Face4 color and original donor Curls diffuse/opacity/normal maps in the Blender review.
+- [x] Build and reproduce an alpha-aware visible-scalp coverage map per camera.
+- [ ] Review intended part lines, open crown/back patches and face overlap with the user.
 - [ ] Position extra interior root clumps conservatively, preserving donor UVs and spiral shape.
 - [ ] No eye/nose/mouth-obscuring cards. Rounded, glossy vendor-like bob required.
 - [ ] Human approval of PNG before any GLB output; user cannot open GLB links.
@@ -118,4 +131,4 @@ If the Blender workbench already contains an empty AV_RootWeight group, the expl
 
 After calibrating Vesper once, a NEW female hairstyle should: inventory original FBX and atlas, suggest roots, propose a global transform, write immutable source checksums, produce exact root contact CSV and six source-textured PNGs, and stop for human approval if root identities, coverage or collisions are ambiguous.
 
-Do not promise full unattended fitting yet. Resume specifically at original scalp mask approval, root classification, and alpha-aware rear-crown coverage. Male hair/clothing remains deferred.
+Do not promise full unattended fitting yet. Resume at review of the six-view PNGs, original scalp mask approval, and root classification. Use the Blender coverage report to agree which areas need correction before moving cards. Male hair/clothing remains deferred.

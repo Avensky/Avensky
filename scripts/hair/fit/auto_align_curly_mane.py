@@ -19,6 +19,7 @@ import numpy as np
 from mathutils import Matrix, Vector
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from export_curly_fit_probe import ensure_actual_texture
 from fit_math import islands_from_edges
 from coarse_scalp_alignment import candidate_anchors, estimate_coarse_alignment
 
@@ -35,17 +36,6 @@ def parse_args():
     p.add_argument("--write", action="store_true")
     p.add_argument("--output-blend", type=Path)
     return p.parse_args(args)
-
-
-def ensure_original_skin(head):
-    for material in head.data.materials:
-        if material and material.use_nodes:
-            for node in material.node_tree.nodes:
-                if node.type == "TEX_IMAGE" and node.image:
-                    filename = Path(bpy.path.abspath(node.image.filepath)).name
-                    if filename == "T_Villager_Lady_Face_BaseColor.tga":
-                        return
-    raise ValueError("Original Face BaseColor is not mapped; do not fit using a synthetic cap")
 
 
 def approved_scalp_points(head, group_name):
@@ -108,7 +98,7 @@ def main():
     donor = bpy.data.objects.get(a.hair)
     if not head or head.type != "MESH" or not donor or donor.type != "MESH":
         raise ValueError("Missing original Face4 or Curly_Mane mesh")
-    ensure_original_skin(head)
+    ensure_actual_texture(head)
     scalp = approved_scalp_points(head, a.scalp_group)
     pts, uv, islands = donor_geometry(donor)
     up = tuple(float(value) for value in a.up.split(","))
@@ -149,6 +139,7 @@ def main():
         if bpy.data.objects.get("AVFIT_CurlyMane_GLOBAL_PREVIEW"):
             raise ValueError("Fit already present; use the original scene as input")
         fitted = donor.copy()
+        fitted.animation_data_clear()
         fitted.data = donor.data.copy()
         fitted.name = "AVFIT_CurlyMane_GLOBAL_PREVIEW"
         bpy.context.scene.collection.objects.link(fitted)

@@ -26,6 +26,7 @@ from pathlib import Path
 import sys
 import bpy
 import numpy as np
+from mathutils import Vector
 
 
 def args_parse():
@@ -35,6 +36,7 @@ def args_parse():
     p.add_argument('--hair',default='Curly_Mane')
     p.add_argument('--scalp-group',default='AV_ScalpRegion')
     p.add_argument('--root-group',default='AV_RootWeight')
+    p.add_argument('--root-reference', help='Same-scene unaligned source donor for stable before/after root IDs')
     p.add_argument('--allow-heuristic-roots',action='store_true')
     p.add_argument('--meters-per-unit',required=True,type=float)
     p.add_argument('--up',default='0,0,1',help='Verified world UP; Blender usually 0,0,1')
@@ -44,15 +46,23 @@ def args_parse():
 
 
 def ensure_actual_texture(obj):
-    for m in obj.data.materials:
-        if m and m.use_nodes:
-            for node in m.node_tree.nodes:
-                if node.type=='TEX_IMAGE' and node.image and Path(bpy.path.abspath(node.image.filepath)).name=='T_Villager_Lady_Face_BaseColor.tga':
-                    path=Path(bpy.path.abspath(node.image.filepath))
-                    if not path.is_file():
-                        raise FileNotFoundError('Original Face BaseColor not found on disk: '+str(path))
-                    return path
-    raise ValueError('Original Face_BaseColor texture not mapped on Face4; do not use a synthetic cap')
+    """Find the original texture feeding Face Base Color, ignoring stale FBX nodes."""
+    expected = 'T_Villager_Lady_Face_BaseColor.tga'
+    for material in obj.data.materials:
+        if not material or material.name.split('.')[0] != 'Face' or not material.node_tree:
+            continue
+        for node in material.node_tree.nodes:
+            if node.type != 'BSDF_PRINCIPLED':
+                continue
+            for link in node.inputs['Base Color'].links:
+                texture = link.from_node
+                if texture.type == 'TEX_IMAGE' and texture.image:
+                    path = Path(bpy.path.abspath(texture.image.filepath, library=texture.image.library))
+                    if path.name == expected:
+                        if not path.is_file():
+                            raise FileNotFoundError('Connected Face BaseColor is missing: ' + str(path))
+                        return path.resolve()
+    raise ValueError('Connect the original Face BaseColor directly to the Face material')
 
 
 def group_array(obj,name):
@@ -154,9 +164,29 @@ def main():
     dims=np.ptp(verts,axis=0)*args.meters_per_unit
     if min(dims)<.085 or max(dims)>.4:
         raise ValueError('Implausible Face4 physical bounds; check FBX import unit and rotation')
-    root_weights=group_array(hair,args.root_group)
-    roots,island_ids,total_islands,skipped=sample_roots(
-        hair,up,root_weights,args.allow_heuristic_roots,args.meters_per_unit)
+    reference = hair
+    if args.root_reference:
+        reference = bpy.data.objects.get(args.root_reference)
+        if not reference or reference.type != 'MESH' or reference == head:
+            raise ValueError('Missing the same-scene original donor for root correspondence')
+        for collection, property_name, width, dtype in (
+            ('vertices', 'co', 3, np.float32), ('edges', 'vertices', 2, np.int32)
+        ):
+            left, right = getattr(reference.data, collection), getattr(hair.data, collection)
+            if len(left) != len(right):
+                raise ValueError('Reference and candidate must be the same undeformed donor')
+            before = np.empty(len(left) * width, dtype=dtype)
+            after = np.empty_like(before)
+            left.foreach_get(property_name, before)
+            right.foreach_get(property_name, after)
+            if not np.array_equal(before, after):
+                raise ValueError('Reference and candidate must be the same undeformed donor')
+    root_weights = group_array(reference, args.root_group)
+    roots, island_ids, total_islands, skipped = sample_roots(
+        reference, up, root_weights, args.allow_heuristic_roots, args.meters_per_unit)
+    if reference != hair:
+        transform = hair.matrix_world @ reference.matrix_world.inverted()
+        roots = np.array([tuple(transform @ Vector(root)) for root in roots])
     output=args.out.resolve()
     reportpath=args.report.resolve()
     if output.suffix.lower()!='.npz' or output.exists() or reportpath.exists():
@@ -173,7 +203,7 @@ def main():
         'scalp_triangles':int(len(triangles)),
         'total_curl_islands':total_islands,'root_candidates':len(roots),
         'root_selection':'REVIEW_ONLY_UPPER_UV_HEURISTIC' if args.allow_heuristic_roots else 'PAINTED_ROOT_GROUP_REQUIRES_AUTHOR_APPROVAL',
-        'skipped_roots':skipped,'meters_per_unit':args.meters_per_unit,
+        'root_reference_object': reference.name, 'skipped_roots':skipped,'meters_per_unit':args.meters_per_unit,
         'head_bounds_m':dims.tolist(),'original_assets_changed':False,
         'not_visual_coverage':True,'source_texture_preserved':True,'accepted_for_release':False}
     reportpath.parent.mkdir(parents=True,exist_ok=True)
