@@ -47,7 +47,7 @@ export function collectGarageFixtures(room: Object3D) {
     light.angle = ceiling ? 1.43 : rack ? 1.4 : .82;
     light.penumbra = ceiling ? .7 : .88;
     light.distance = 20;
-    lamps.push({ light, face, output: ceiling ? 9 : workLamp ? 12.75 : 3.375 });
+    lamps.push({ light, face, output: ceiling ? 9 : workLamp ? 12.75 : 4.5 });
     lights.add(light, light.target);
   });
   return {
