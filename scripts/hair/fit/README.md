@@ -6,6 +6,12 @@
 
 **Start by reading:** [CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md](CURLY_GLOBAL_ALIGNMENT_GEOMETRY.md) → [FEMALE_HAIR_PROGRESS_AND_LESSONS.md](FEMALE_HAIR_PROGRESS_AND_LESSONS.md) → [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md) → [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md) → [AUTOMATION_READINESS.md](AUTOMATION_READINESS.md) → [ORIGINAL_SOURCE_AUDIT.md](ORIGINAL_SOURCE_AUDIT.md) → [QUICKSTART.md](QUICKSTART.md).
 
+## Original vendor image reference — now captured
+
+The user's original **CURLY MANE (55,800 tris)** two-angle image supplies the desired dense round crown, cheek-framing spiral clumps, irregular chin/neck length, and dark chocolate with warm highlights. We compared it against the actual 55,836-triangle donor FBX on Vesper's real Face4. See [CURLY_VENDOR_REFERENCE_MATCH.md](CURLY_VENDOR_REFERENCE_MATCH.md).
+
+An unapproved **private** geometry experiment tested small root clearance lifts on 90 cards, rigidly rebalanced six face-obscuring cards toward the back, and tapered longer tips (no new triangles; original source unchanged), plus a chocolate-tone software shader. **Crown/back gaps and face wisps remain; do not merge/ship this as a finished hairstyle.** `reference_shape_ops.py` and tests are pure guarded math and do not automatically infer root targets from a photo. The user requires PNG review, not GLB links.
+
 ## Vesper FIRST: original head + original scalp texture
 
 The original `SK_Village_Lady_Face4.fbx` includes the entire top/back of the skull (6,330 vertices / 8,915 triangles), while the original `T_Villager_Lady_Face_BaseColor.tga` supplies **actual skin tone and natural speckled gray-brown short-hair/root transition**. `SK_Village_Lady_Hair20.fbx` is a separate hair/braid mesh. The face ID and body ID masks are **not** the Face BaseColor.
