@@ -14,7 +14,7 @@
 | Recover the real scalp/skin color | **Confirmed / reference produced** | `T_Villager_Lady_Face_BaseColor.tga` used on source Face4 UVs for front/right/back/top views; preserve this rather than synthesizing a solid-color cap |
 | Catalog and material-only batch | **Existing, partial** | Earlier twelve-style material processing can prepare materials; it does not add volume or alter geometric root fit |
 | Separate corrective scalp layer | **Optional prototype only** | `extract_source_scalp.py` writes a private debug-material working copy if manually annotated; **not default and not visually approved** |
-| Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original audit records Curly Mane topology; its vendor ZIP was located in the Library but raw-byte materialization was not authorized, so a local CURLY 01.FBX is required for actual fitting |
+| Donor source inventory | **Scripted / direct mesh unavailable this turn** | Original CURLY 01.FBX supplied and analyzed; correct FBX node axis transforms identified, but Blender import unit conversion and original Curls opacity/materials remain unverified |
 | Establish reusable Vesper head coordinates | **Not finalized** | Neutral actor + real source BaseColor + rig/bone/unit frame + reference cameras need a saved, approved private scene |
 | Automatically find/assign source hair roots | **Not implemented** | Need explicit or confirmed root zones per imported mesh/card; output confidence and manual fallback |
 | Coarse source→Vesper alignment | **Math + guarded Blender pilot implemented; real donor untested** | `fit_math.py` uses reflection-free Kabsch/Umeyama similarity; `pilot_curly_mane.py` requires five paired source/target markers and real Face BaseColor |
@@ -25,6 +25,10 @@
 | In-game discovery/integration | **Existing runtime catalog mechanism; V2 unintegrated** | Add approved private manifest entry to existing catalog only after real fit, not a new manual UI list |
 
 **The Vesper pilot isn't finished.** No success is claimed for a new fitted Curly Mane GLB, an authored original-texture root overlay, or a validated phone LOD.
+
+## Curly Mane actual-source update (2026-11-25)
+
+Real CURLY 01.FBX is now available and has been inspected: **253 separate curl components**. A static Vesper comparison and conservative offline UV-root trial adjusted **39 sections / 819 vertices**, maximum 2 cm; 214 sections remain unchanged. The genuine Curls color/opacity maps and Blender, animation, mobile and GLB output validation remain outstanding. See [CURLY_01_REAL_MESH_AUDIT.md](CURLY_01_REAL_MESH_AUDIT.md). A separate [root_suggestions.py](root_suggestions.py) proposes roots without modifying meshes; 6 new synthetic tests pass alongside the prior 8 math tests.
 
 ## Current Curly Mane pilot code
 
@@ -45,7 +49,7 @@ See [CURLY_MANE_PILOT.md](CURLY_MANE_PILOT.md). `prepare_curly_mane_workbench.py
 **Definition of done:** reimporting the source produces the same head and original scalp color without manual shader reconstruction; complete reproducibility report includes hash, Blender version, material names, and all viewpoints.
 
 ### Gate B — one Curly Mane geometry fit
-- [ ] Inventory original `CURLY 01.FBX` units, normals, mesh components, root end, matching diffuse/opacity and UV atlas.
+- [x] Inspect original CURLY 01.FBX topology, UVs and node transforms; [ ] confirm Blender import units and provide its matching Curls diffuse/opacity maps.
 - [ ] Mark root strips or confirmed root vertex weights on a **working copy**, never vendor originals.
 - [x] Implement/test reflection-free similarity alignment (synthetic tests passed); [ ] measure and confirm 5 real source↔Vesper marker pairs in Blender.
 - [x] Write root-only connected-clump projection with a safety bound against the source Face4 scalp (synthetic tests passed); [ ] run and visually validate it on real Curly Mane FBX.
