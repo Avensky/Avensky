@@ -161,9 +161,10 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   };
 
   useLayoutEffect(() => {
-    const { camera, zoom, selectedPiece } = useCharacterPreviewStore.getState();
-    focusView("Full body");
-    return () => useCharacterPreviewStore.setState({ camera, zoom, selectedPiece });
+    // Entering/leaving the Appearance tab should preserve the chosen face/body
+    // shot. Only retire the vehicle-only view when entering the dressing room.
+    // Restoring a stale camera on unmount previously sent the eye behind walls.
+    if (useCharacterPreviewStore.getState().camera === "Whole car") focusView("Full body");
   }, []);
   useLayoutEffect(() => {
     if (!focusLayer.current) return;

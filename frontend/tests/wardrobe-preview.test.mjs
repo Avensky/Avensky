@@ -18,6 +18,29 @@ test("catalog hair styles appear in the preview menu with their GLB mesh names",
   }
 });
 
+test("fitting camera stays on the safe stage-facing side during character rotation", async () => {
+  const server = wardrobePreviewServer();
+  try {
+    const { orientFittingCameraOffset, cutToFittingView } = await server.ssrLoadModule("/src/game/characters/clothingFraming.ts");
+    const { Quaternion, Vector3 } = await import("three");
+    const axis = new Vector3(0, 1, 0);
+    const atRest = orientFittingCameraOffset(new Vector3(0, .25, 2), new Quaternion(), true);
+    for (const yaw of [0, Math.PI / 2, Math.PI, Math.PI * 1.8]) {
+      const actorRotation = new Quaternion().setFromAxisAngle(axis, yaw);
+      const camera = orientFittingCameraOffset(new Vector3(0, .25, 2), actorRotation, true);
+      assert.ok(camera.distanceTo(atRest) < 1e-6, "turning the model cannot turn the camera");
+    }
+    const moving = orientFittingCameraOffset(new Vector3(0, .25, 2),
+      new Quaternion().setFromAxisAngle(axis, Math.PI), false);
+    assert.ok(moving.distanceTo(atRest) > 1, "vehicle/cockpit cameras keep their normal pose");
+    assert.equal(cutToFittingView(true, true, false), true, "switching Body/Appearance is a safe camera cut");
+    assert.equal(cutToFittingView(true, false, true), true, "a loaded outfit returns without crossing the wall");
+    assert.equal(cutToFittingView(false, true, false), false, "the ordinary garage keeps its smooth camera");
+  } finally {
+    await server.close();
+  }
+});
+
 function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {

@@ -608,7 +608,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const exitCockpit = insideCar && <PreviewToolButton label={exitLabel} disabled={exitDisabled} data-cockpit-toggle onClick={toggleCockpit}>
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M11 4H4v16h7m2-12 4 4-4 4m4-4H8" /></svg>
   </PreviewToolButton>;
-  const cameraTools = <FittingCameraToolbar key={tab} camera={fitting ? undefined : cameraSelect} splitCamera
+  const cameraTools = <FittingCameraToolbar camera={fitting ? undefined : cameraSelect} splitCamera
     visibility={<PreviewVisibilityToggle />} paused={playbackPaused} onPause={togglePose}
     vehicle={vehiclePreview} rotationDisabled={rotationDisabled} actions={fitting ? <><PreviewToolButton label="Look away" data-controller-row disabled={reducedMotion}
       onClick={() => playEmote(LOOK_AWAY_EMOTE)}><PreviewToolIcon icon="lookAway" /></PreviewToolButton>
