@@ -1,0 +1,365 @@
+{
+  "schemaVersion": 1,
+  "status": "proposed-fit-recipe-contract; no new mesh fitting implementation or verified fit",
+  "canonicalPolicy": "docs/wardrobe/RULES.md#5-geometry-policy-moderate--controlled",
+  "target": {
+    "actorId": "vesper",
+    "requiredRigJointCount": 88,
+    "bodyDonor": "/models/characters/female/wardrobe/vesper-body.glb",
+    "bodyMeshName": "BODY_WARDROBE",
+    "requireRealAsset": true,
+    "coordinateRules": [
+      "read FBX axis, centimeters and transforms explicitly",
+      "convert to actor bind-space meters",
+      "verify named body landmarks and reciprocal left/right limbs",
+      "never infer scale from raw bounding box alone"
+    ],
+    "lodTiers": [
+      "garage",
+      "mobile"
+    ]
+  },
+  "stageOrder": [
+    "intake",
+    "normalize-coordinate-space",
+    "verify-donor",
+    "semantic-part-labels",
+    "transfer-skin-weights",
+    "rigid-landmark-align",
+    "fit-by-region",
+    "test-layer-stacks",
+    "pose-collision-qa",
+    "material-variant-preview",
+    "lod-bake",
+    "human-acceptance"
+  ],
+  "stages": {
+    "intake": {
+      "mustValidate": [
+        "sha256",
+        "sourceUnits",
+        "triangleAndMaterialCounts",
+        "assetLicenseStatus"
+      ],
+      "blocksPublication": true
+    },
+    "normalize-coordinate-space": {
+      "mustValidate": [
+        "sourceUpAxis",
+        "modelToActorMatrix",
+        "scale",
+        "mirrorParity"
+      ],
+      "rejectWhenMissing": true
+    },
+    "verify-donor": {
+      "mustValidate": [
+        "realBodyMesh",
+        "realSkinning",
+        "jointCount",
+        "jointNamesAndBindMatrices"
+      ],
+      "rejectWhenMissing": true
+    },
+    "semantic-part-labels": {
+      "mustValidate": [
+        "clothZone",
+        "liningZone",
+        "protectedConstruction",
+        "rigidHardware",
+        "seamAndOpeningBoundaries"
+      ],
+      "rejectWhenUncertain": true
+    },
+    "transfer-skin-weights": {
+      "method": "surface-barycentric transfer from target bind pose, then normalize to avatar joint influences and preserve shoulder seam discontinuities",
+      "mustValidate": [
+        "completeJointWeights",
+        "matchingJointIndexOrder",
+        "validBindMatrices",
+        "noNegativeOrNaNWeights",
+        "leftRightDeformationInPoses"
+      ],
+      "noSkinningFallback": "block rather than infer rig success"
+    },
+    "rigid-landmark-align": {
+      "method": "regionally anchored rigid pose correction then small scale/pivot correction",
+      "anchors": [
+        "neckBase",
+        "leftShoulder",
+        "rightShoulder",
+        "frontCenter",
+        "backCenter",
+        "waist",
+        "leftCuff",
+        "rightCuff"
+      ],
+      "rejectWhenMissing": true
+    },
+    "fit-by-region": {
+      "method": "fit soft garment cage to body or active underlying composite shell using closest signed surface distances, local normal clearance and edge-strain penalties",
+      "mustValidate": [
+        "zeroInvertedFaces",
+        "validUV",
+        "maxDisplacement",
+        "maxEdgeStrain",
+        "protectedPartsNotStretched"
+      ],
+      "noGlobalShrinkwrap": true
+    },
+    "test-layer-stacks": {
+      "method": "resolve W-04 region order for exact body, underlayer meshes, garment revision, tier and mode",
+      "unknownPairStatus": "needs-fitting",
+      "savePolicy": "preserve every explicitly selected original item"
+    },
+    "pose-collision-qa": {
+      "poses": [
+        "idle",
+        "walk",
+        "arms-raised",
+        "arms-forward",
+        "mirror-check",
+        "reach-door-handle",
+        "sit",
+        "drive"
+      ],
+      "measure": [
+        "signedPenetration",
+        "contactDuration",
+        "skinExposure",
+        "selfIntersections",
+        "seamContinuity",
+        "weightDeformation"
+      ],
+      "missingPose": "not-tested-not-passed"
+    },
+    "material-variant-preview": {
+      "method": "keep original UVs and authored material groups; generate independently selected PBR swatches (baseColor, normal, roughness, metallic/ORM and alpha when provided)",
+      "mustValidate": [
+        "correctColorSpace",
+        "normalMapAsDataNotAlbedo",
+        "materialAndDyeGroupsRetained",
+        "dayNightAndGarageLighting"
+      ],
+      "changesGeometry": false
+    },
+    "lod-bake": {
+      "method": "simplify only after accepted bind/pose fit and preserve protected features, mobile silhouette and material slots as compatible",
+      "mustValidate": [
+        "garageGeometry",
+        "mobileGeometry",
+        "rigAndSkinWeights",
+        "UVAndTangents",
+        "poseQAForEachTier"
+      ],
+      "noRuntimeVertexRefit": true
+    },
+    "human-acceptance": {
+      "mustValidate": [
+        "frontSideBackPoseMontage",
+        "savedLookCompatibility",
+        "originalAssetProvenance",
+        "distributionRights",
+        "mobileDeviceReview"
+      ],
+      "noImplicitApproval": true
+    }
+  },
+  "garmentClasses": {
+    "top": {
+      "fittedAgainst": "bare body plus any approved underwear",
+      "deformable": [
+        "torsoFabric",
+        "sleeveFabric"
+      ],
+      "followParent": [
+        "trim",
+        "placket",
+        "seams"
+      ],
+      "locked": [
+        "buttons",
+        "metal"
+      ],
+      "caution": [
+        "armhole skin coverage",
+        "raised-arm shoulder root",
+        "neckline"
+      ]
+    },
+    "corset": {
+      "fittedAgainst": "body or explicit underlayer shell per body-fit mode",
+      "anchorProfiles": [
+        "bust",
+        "underbust",
+        "waist",
+        "hipTop",
+        "centerFront",
+        "centerBack"
+      ],
+      "deformable": [
+        "sideFabricPanels",
+        "gussets",
+        "softLining"
+      ],
+      "constrained": [
+        "cups",
+        "structuredFrontPanels",
+        "boningCasings"
+      ],
+      "followParent": [
+        "lacing",
+        "laceTrim",
+        "seams"
+      ],
+      "locked": [
+        "eyelets",
+        "rigidBoning",
+        "metalClosure"
+      ],
+      "priority": [
+        "protect silhouette, cup volume and bust seams before reducing surface gap",
+        "limit panel strain and compensate at side seams before scaling entire corset",
+        "preserve left/right symmetry except where authored asymmetry is documented"
+      ],
+      "caution": [
+        "armpit/strap deformation",
+        "cup collapse",
+        "waist over-expansion",
+        "lace/eyelet tearing",
+        "skirt overlap"
+      ]
+    },
+    "outerwear": {
+      "fittedAgainst": "full active underlayer shell: body plus top/corset/dress as resolved; NEVER body alone if those pieces are selected",
+      "deformable": [
+        "sleeves",
+        "sidePanels",
+        "backPanels",
+        "hemDrape"
+      ],
+      "constrained": [
+        "collar",
+        "lapels",
+        "shoulderCap",
+        "pocketPanels"
+      ],
+      "followParent": [
+        "topstitching",
+        "frontEdgeTrim",
+        "pocketFlaps"
+      ],
+      "locked": [
+        "zipperTeeth",
+        "buttons",
+        "snaps"
+      ],
+      "caution": [
+        "collar/hair",
+        "shoulderRootAndArmholes",
+        "cuffsOverInnerSleeves",
+        "openFrontUnderlayerVisibility",
+        "hemOverCorsetAndSkirt",
+        "seatedFold"
+      ]
+    }
+  },
+  "optimization": {
+    "objective": "minimize weighted surface penetration + edge strain + landmark deviation + left/right seam distortion + protected-detail deformation",
+    "hardStops": [
+      "invertedTriangles",
+      "badUVTopology",
+      "brokenRig",
+      "stretchedLockedHardware",
+      "failedPoseContact",
+      "missingBodyOrLayerMesh"
+    ],
+    "manualReview": [
+      "ambiguousPartLabels",
+      "highDisplacement",
+      "slippingCupsOrWaist",
+      "missingLining",
+      "nonRigidClosureRequiringNewAnimation"
+    ],
+    "recovery": "keep source and failed candidate separate; store rejected deltas and reasons; rerun with revised regional constraints rather than broad mesh scaling",
+    "reuseAcceptedCorrections": "versioned per-region deformation delta fields with source mesh hash and body bind/profile hash; never apply an accepted shape correction to unrelated topology"
+  },
+  "cacheContract": {
+    "fitKey": [
+      "sourceGeometrySHA256",
+      "sourceRigSHA256",
+      "bodyGeometrySHA256",
+      "bodyRigSHA256",
+      "underlayerGeometrySHA256",
+      "activeModeSignature",
+      "geometryTier",
+      "fitterVersion",
+      "thicknessProfileId",
+      "protectedMaskVersion"
+    ],
+    "materialKey": [
+      "sourceMaterialRevision",
+      "materialPresetId",
+      "dyeAndPaletteId",
+      "normalMapSHA256",
+      "roughnessOrOrmMapSHA256",
+      "lightRigId"
+    ],
+    "neverGeometryRefitFor": [
+      "colorChangeOnly",
+      "roughnessChangeOnly",
+      "normalTextureChangeOnly",
+      "metallicFactorChangeOnly",
+      "dyeGroupChangeOnly"
+    ],
+    "requiresNewGeometryEvaluation": [
+      "actualFabricThicknessChange",
+      "bodyMeshChange",
+      "skinWeightsChange",
+      "garmentTopologyChange",
+      "underlayerShellChange",
+      "closureGeometryChange",
+      "targetTierChange"
+    ],
+    "geometryCacheCompatibility": "Check existing wardrobeFitCache.README.md; new operation may depend on rig, materials with actual thickness, or skin and MUST extend cache key or use a separate bake cache",
+    "guarantee": "material updates do not mutate vertex positions, UV coordinates, skin indices or skin weights"
+  },
+  "candidateRecipes": {
+    "clo-coat-01": {
+      "class": "outerwear",
+      "firstFitStack": [
+        "body",
+        "thin-top",
+        "clo-coat-01"
+      ],
+      "closureGeometry": "open-authored-only",
+      "allowAutomatedRigging": false,
+      "allowPublish": false,
+      "reason": "Body rig transfer, source authorization and actual fit unverified"
+    },
+    "clo-jacket-01": {
+      "class": "outerwear",
+      "firstFitStack": [
+        "body",
+        "thin-top",
+        "clo-jacket-01"
+      ],
+      "closureGeometry": "open-authored-only",
+      "allowAutomatedRigging": false,
+      "allowPublish": false,
+      "reason": "Cropped hem and sleeve control need review"
+    },
+    "clo-jacket-02": {
+      "class": "outerwear",
+      "firstFitStack": [
+        "body",
+        "thin-top",
+        "clo-jacket-02"
+      ],
+      "closureGeometry": "single-button-authored-only",
+      "allowAutomatedRigging": false,
+      "allowPublish": false,
+      "reason": "Tailored lapels and structured waist need review"
+    }
+  }
+}
