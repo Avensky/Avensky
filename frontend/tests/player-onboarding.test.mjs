@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createServer } from "vite";
 
-test("the creator preserves an eight-step appearance through registration, name retry and roster selection", async () => {
+test("the creator preserves an eight-step appearance through registration, name retry and roster selection", async t => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true, runScripts:"outside-only" });
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
@@ -33,7 +33,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     const token="a".repeat(64);
     const socket={ url:"wss://api-staging.avensky.test/ws/", readyState:WebSocket.OPEN, send:body=>sent.push(JSON.parse(body)) };
     const view={profile:{id:"registered-player",name:"Lightfoot",active_character_id:null,characters:[],
-      progression:{character:null,cosmetics_revision:0}},
+      progression:{character:null,cosmetics_revision:0,tier:"BRONZE",level:1,prestige:0,xp:0,required_xp:400,credits:0}},
       limits:{max_active_worlds:2},players:[],teammates:[],requests:[],groups:[],worlds:[],world_invites:[],maps:[],current_world_id:null};
     const reply=(request,data,ok=true,message)=>client.receiveSocialResult({request_id:request.request_id,ok,data,message});
     const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>(button.getAttribute("aria-label") ?? button.textContent.trim()) === label);
@@ -67,6 +67,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(document.querySelector("video,canvas"),null);
     assert.ok(button("Sign in"));
     assert.equal(button("Play as guest"),undefined);
+    assert.equal(button("World Editor"), undefined, "the editor shortcut belongs to the signed-in roster");
     assert.equal(button("Profile"), undefined);
     assert.equal(document.querySelector(".garage-entry-header nav"),null);
     assert.equal(button("Log out"),undefined);
@@ -481,11 +482,71 @@ test("the creator preserves an eight-step appearance through registration, name 
     await act(async () => client.receiveSocialState({...view, profile:{...saved,
       characters:Array.from({length:4},(_,i)=>({...saved.characters[0], id:i===0?saved.active_character_id:"slot"+i}))}}));
     assert.equal(button("Create character"),undefined,"a full registered account has four real slots");
+    const fullRoster = [...document.querySelectorAll("[data-character-id]")];
+    assert.equal(fullRoster.length, 4);
+    await act(async () => fullRoster.at(-1).focus());
+    await controllerAction("down");
+    assert.equal(document.activeElement, button("World Editor"), "a full roster can still reach World Editor");
+    assert.equal(social.getState().view.profile.active_character_id, saved.active_character_id);
     await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
     assert.equal(document.querySelector('[name="characterName"]'),null);
     assert.equal(button("Enter world"),undefined);
     assert.equal(document.querySelector("[data-character-id]"),null);
     assert.ok(button("Create character"));
+    await t.test("World Editor and its test-drive setup return to the roster before joining a world", async () => {
+      const beforeEditor = sent.length;
+      const { WorldBuilderPanel } = await vite.ssrLoadModule("/src/worldBuilder/panels/WorldBuilderPanel.tsx");
+      const { ModeSelection } = await vite.ssrLoadModule("/src/game/alpha/ModeSelection.tsx");
+      function RosterEditorScreens() {
+        const screen = ui(state => state.screen);
+        if (screen === "world_builder") return createElement(WorldBuilderPanel, { planOnly: true });
+        if (screen === "mode_select") return createElement(ModeSelection);
+        return createElement(WelcomeScreen);
+      }
+      const map = "road_jump_lab";
+      const mapSource = await readFile(new URL("../../avenlab-server/src/assets/blocks/road_jump_lab_colliders.json", import.meta.url), "utf8");
+      const previousEditorFetch = globalThis.fetch;
+      const previousObserver = globalThis.IntersectionObserver;
+      try {
+        // This headless viewport never intersects the editor's 3D prefab thumbnails.
+        globalThis.IntersectionObserver = class { observe() {} disconnect() {} };
+        globalThis.fetch = async url => {
+          const path = new URL(url, dom.window.location.href).pathname;
+          if (path === "/world-builder/catalog.json") return Response.json({ maps: [{ map_id: map, file: map + "_colliders.json" }] });
+          if (path === "/world-builder/" + map + "_colliders.json") return new Response(mapSource);
+          throw Error("Unexpected editor request: " + path);
+        };
+        await act(async () => {
+          social.setState(state => ({ view: { ...state.view, maps: [map] } }));
+          root.render(createElement(RosterEditorScreens));
+        });
+        assert.equal(document.activeElement, button("Create character"), "an empty roster still starts on Create character");
+        await controllerAction("down");
+        assert.equal(document.activeElement, button("World Editor"));
+        assert.equal(ui.getState().screen, "welcome", "highlighting World Editor keeps the roster open");
+        await controllerAction("activate");
+        assert.equal(ui.getState().screen, "world_builder", "accounts can edit worlds before creating their first character");
+        assert.ok(document.querySelector('[aria-label="World layout editor"]'));
+        await act(async () => button("TOOLS").click());
+        await act(async () => button("SET UP TEST DRIVE").click());
+        assert.equal(ui.getState().screen, "mode_select");
+        const modes = document.querySelector('[aria-label="Game mode"]');
+        assert.equal(modes.querySelectorAll('[role="tab"]').length, 1);
+        assert.match(modes.querySelector('[aria-selected="true"]').textContent, /World Editor/i);
+        await controllerAction("next_tab");
+        assert.match(modes.querySelector('[aria-selected="true"]').textContent, /World Editor/i);
+        await controllerAction("back");
+        assert.equal(ui.getState().screen, "world_builder", "cancelling test setup keeps the draft open");
+        await act(async () => button("Close world layout editor").click());
+        assert.equal(ui.getState().screen, "welcome");
+        assert.equal(document.activeElement, button("World Editor"), "returning to the roster restores the launch tile");
+        assert.equal(sent.length, beforeEditor, "editing or inspecting test drive setup never selects a character or enters a room");
+      } finally {
+        globalThis.fetch = previousEditorFetch;
+        if (previousObserver) globalThis.IntersectionObserver = previousObserver;
+        else delete globalThis.IntersectionObserver;
+      }
+    });
     await act(async()=>button("Create character").click());
     assert.equal(activeStep(),"Gender");
     assert.equal(document.querySelector('[name="characterName"]'),null);

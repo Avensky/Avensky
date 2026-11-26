@@ -276,7 +276,9 @@ export async function openWorldBuilder() {
 }
 export async function loadStandaloneBuilder() {
   if (useBuilderStore.getState().loadingMap) return;
+  const token = request;
   await refreshInstalledWorlds();
+  if (token !== request || useUIStore.getState().screen !== "world_builder") return;
   const mapId =
     useSelectionStore.getState().getSelectedMap().id;
   if(!mapId){
@@ -285,16 +287,20 @@ export async function loadStandaloneBuilder() {
   }
   await switchBuilderWorld(mapId);
 }
-export function closeWorldBuilder() {
+export function finishBuilderEdits() {
   request++;
   rememberWorld();
   const layout = useLayoutStore.getState();
   if (layout.doc && layout.doc !== layout.saved) layout.save();
   useInputStore.getState().releaseControls();
+  useBuilderStore.setState({ workspace: "layout", presentation: "workspace", loadingMap: null });
+}
+export function closeWorldBuilder() {
+  finishBuilderEdits();
   const ui = useUIStore.getState();
-  if (ui.screen === "world_builder") ui.setScreen("main");
+  if (ui.screen === "world_builder" && ui.welcomeSection === "world_editor") ui.setScreen("welcome", "world_editor");
+  else if (ui.screen === "world_builder") ui.setScreen("main");
   else ui.setOverlay(ui.screen === "sandbox" ? "pause" : null);
-  useBuilderStore.setState({ workspace: "layout", loadingMap: null });
 }
 export function exportBuilderMap() {
   const doc = useBuilderStore.getState().doc;
