@@ -10,6 +10,7 @@ import { FittingCameraSelect, FittingWearableShortcuts } from "./FittingCameraSe
 import { getWardrobeGarment, importedWardrobeItems, setWardrobeGarment, setWardrobeRemoval, wardrobeGarmentModelUrl, villageWardrobeItems, wardrobeRemovalPieces, type WardrobeGarmentSlot, type WardrobeRemoval } from "./wardrobeGarments";
 import { SavedOutfits } from "./SavedOutfits";
 import { WardrobeLayerInspector } from "./WardrobeLayerInspector";
+import outerwearCandidates from "../../../../packages/wardrobe-catalog/outerwear-candidates.json";
 import "./dressingRoom.css";
 
 const CATEGORIES = [
@@ -72,7 +73,7 @@ const REMOVAL_CARDS: { category: Category; slot: WardrobeRemoval; label: string;
 ];
 type Item = {
   id: string; label: string; section: string; icon: Icon; description?: string;
-  selected?: boolean; detail?: string; unavailable?: "Pack not installed";
+  selected?: boolean; detail?: string; unavailable?: "Pack not installed" | "Requires fitting";
   color?: string; accent?: string; focus?: WardrobeFocus; choose?: () => void; remove?: () => void; clear?: (choice: CharacterChoice) => CharacterChoice; trial?: boolean;
   pieces?: "outfit" | readonly ClothingPiece[]; included?: boolean; set?: string; layer?: ClothingLayer;
   underwear?: UnderwearPiece; alphaStatus?: AlphaStatus;
@@ -299,7 +300,17 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       };
     }) : [],
     tops: [],
-    outerwear: [],
+    // Candidate cards are inventory/review notes, not equipped or renderable assets.
+    // No layer, remove or choose action: W-07 rig/geometry approvals are pending.
+    outerwear: female ? outerwearCandidates.candidates.map(candidate => ({
+      id: candidate.id, label: candidate.label, section: "Coat fitting candidates",
+      icon: "tops" as const, selected: false, detail: "Intake only",
+      unavailable: "Requires fitting" as const,
+      description: `Static CLO FBX received (${candidate.source.preferred.triangles.toLocaleString()} triangles).
+        Needs Vesper skin weights, mobile LOD, contact checks and distribution approval before try-on.
+        Planned outside tops; corset and gown combinations require separate evidence.`,
+      focus: "Full body" as const, pieces: ["coat"] as const,
+    })) : [],
     bottoms: [],
     footwear: female ? [] : [{ id: "outfit-shoes", label: "Outfit boots", section: "Shoes", icon: "footwear", selected: !removedClothing.includes("shoes"),
       pieces: ["shoes"], included: true, layer: "Overwear", focus: "shoes",
