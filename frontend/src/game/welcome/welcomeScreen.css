@@ -176,37 +176,36 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   position: absolute; inset: 0; pointer-events: none;
   color: var(--garage-menu-ink);
 }
-.character-roster .menu-control, .roster-tiles { pointer-events: auto; }
-.character-roster .menu-control {
-  text-transform: none; letter-spacing: normal; line-height: 1.2; margin: 0;
-  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
-  --menu-panel-edge: var(--garage-menu-line);
-  --menu-panel-fill: var(--garage-menu-row);
-  --menu-panel-cut: 7px;
-  --menu-panel-shape: polygon(var(--menu-panel-cut) 0,calc(100% - var(--menu-panel-cut)) 0,100% var(--menu-panel-cut),100% calc(100% - var(--menu-panel-cut)),calc(100% - var(--menu-panel-cut)) 100%,var(--menu-panel-cut) 100%,0 calc(100% - var(--menu-panel-cut)),0 var(--menu-panel-cut));
+.character-roster .chamfered-frame, .roster-tiles { pointer-events: auto; }
+.character-roster .chamfered-frame {
+  --roster-cut: 7px;
+  --frame-top-cut: var(--roster-cut);
+  --frame-bottom-cut: var(--roster-cut);
+  --frame-line-color: var(--garage-menu-line);
+  margin: 0; border: 0; outline: 0;
+  background: var(--garage-menu-row); color: var(--garage-menu-ink);
+  text-transform: none; letter-spacing: normal; line-height: 1.2;
 }
-/* Keep the middle of the outline open so the 65% tile surface shows the room. */
-.character-roster .menu-panel-frame::before {
-  clip-path: none;
-  background: linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) center top / calc(100% - 2 * var(--menu-panel-cut)) 1px,
-    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) center bottom / calc(100% - 2 * var(--menu-panel-cut)) 1px,
-    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) left center / 1px calc(100% - 2 * var(--menu-panel-cut)),
-    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) right center / 1px calc(100% - 2 * var(--menu-panel-cut)),
-    linear-gradient(135deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) top left / var(--menu-panel-cut) var(--menu-panel-cut),
-    linear-gradient(45deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) top right / var(--menu-panel-cut) var(--menu-panel-cut),
-    linear-gradient(45deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) bottom left / var(--menu-panel-cut) var(--menu-panel-cut),
-    linear-gradient(135deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) bottom right / var(--menu-panel-cut) var(--menu-panel-cut);
-  background-repeat: no-repeat;
+.character-roster .chamfered-frame[aria-pressed="true"] {
+  --frame-line-width: 2px; --frame-line-color: var(--garage-menu-accent);
+  background: color-mix(in srgb, var(--garage-menu-row) 88%, var(--garage-menu-accent));
 }
-.character-roster .menu-control:is([aria-pressed=true],:focus-visible) {
-  --menu-panel-edge: var(--garage-menu-accent); --menu-panel-fill: color-mix(in srgb, var(--garage-menu-row) 88%, var(--garage-menu-accent));
+.character-roster .chamfered-frame:focus-visible,
+.character-roster[data-input-device="controller"] .chamfered-frame:focus {
+  --frame-line-width: 2px; --frame-line-color: var(--garage-menu-accent);
+  background: color-mix(in srgb, var(--garage-menu-row) 76%, var(--garage-menu-accent));
 }
-.character-roster .menu-control:focus-visible { outline: 2px solid var(--garage-menu-accent); outline-offset: -3px; }
+@media (hover: hover) {
+  .character-roster .chamfered-frame:hover:not([aria-disabled="true"]) { --frame-line-color: var(--garage-menu-accent); }
+}
+@media (forced-colors: active) {
+  .character-roster { --garage-menu-line: ButtonText; --garage-menu-accent: Highlight; }
+}
 .roster-tools {
   position: absolute; right: var(--roster-end); top: var(--roster-top); display: flex; gap: 5px;
 }
 .character-roster .roster-tool {
-  --menu-panel-cut: 4px; width: 44px; min-height: 44px; justify-content: center; padding: 6px;
+  --roster-cut: 4px; display: grid; place-items: center; width: 44px; min-height: 44px; padding: 6px;
 }
 .roster-tool .menu-icon { width: 21px; height: 21px; }
 .roster-choices {
@@ -250,7 +249,6 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 }
 .character-roster[data-portrait] :is(.roster-choices,.roster-preview-tools) { position: static; width: 100%; }
 .character-roster[data-portrait] .roster-preview-tools { order: -1; justify-content: flex-end; }
-.character-roster[data-portrait]:not([data-input-device="controller"]) .roster-rotate { display: none; }
 .character-roster[data-portrait] .roster-caption { justify-content: space-between; }
 .character-roster[data-portrait] .roster-mobile-name { display: block; font-weight: 700; }
 .character-roster[data-portrait] .roster-tiles { display: flex; justify-content: center; gap: 6px; }

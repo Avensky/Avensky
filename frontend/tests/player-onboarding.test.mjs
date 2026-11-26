@@ -205,8 +205,10 @@ test("welcome picks a personality and gender before registration and lets return
       await act(async()=>document.body.dispatchEvent(touch));
       assert.equal(document.querySelector('.roster-tile [data-controller-key="A"]'),null);
       assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"touch");
+      assert.equal(document.querySelector(".roster-preview-tools"), null);
       await act(async()=>window.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowRight"})));
       assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"keyboard");
+      assert.equal(document.querySelector(".roster-preview-tools"), null);
     } finally { stopInput(); }
     const previewRequests=sent.length;
     const tap = (target, pointerType) => {

@@ -6,6 +6,21 @@
   let pending = false;
   let handoff;
   let finishLogout;
+  function usePublicLogo() {
+    const logo = "/__alpha/entry/logo.svg";
+    // Tabs opened against an earlier release can retain the protected image
+    // preload and favicon even after the game gives the document back to sign-in.
+    for (const link of document.head.querySelectorAll('link[rel="preload"][as="image"][href="/images/logo.svg"]')) link.href = logo;
+    let icon = document.head.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if (!icon) {
+      icon = document.createElement("link");
+      icon.rel = "icon";
+      icon.type = "image/svg+xml";
+      icon.href = logo;
+      document.head.append(icon);
+    } else if (icon.getAttribute("href") !== logo) icon.href = logo;
+  }
+  if (document.body.classList.contains("garage-entry")) usePublicLogo();
   function finishHandoff() {
     if (!handoff) return;
     clearTimeout(handoff.timer);
@@ -266,6 +281,7 @@
   // The protected game can also be opened directly with an existing cookie.
   // In either direction only the interface changes ownership. Keep the room.
   async function showSignIn(signOut, notice) {
+    usePublicLogo();
     // Rust can close this player's socket before the revocation response arrives.
     const reveal = signOut ? captureLogout() : undefined;
     const request = (path, options) => fetch(path, {
@@ -378,7 +394,7 @@
       // renderer retain their identity as the protected bundle starts.
       try {
         if (window.dispatchEvent(new Event("avensky:resume-game", { cancelable: true }))) {
-          for (const link of page.querySelectorAll('link[rel=stylesheet],link[rel=modulepreload],link[rel=icon]'))
+          for (const link of page.querySelectorAll('link[rel=stylesheet],link[rel=modulepreload]'))
             includeLink(link, next);
           for (const module of modules) await import(module.href);
         }
