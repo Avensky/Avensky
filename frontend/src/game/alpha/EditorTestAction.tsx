@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useSocialStore } from "../../store/social/socialStore";
 import { useBuilderStore } from "../../worldBuilder/state/builderStore";
 import { applyEditorDraft } from "./applyEditorDraft";
-import { closeWorldBuilder, loadSavedWorldDraft } from "../../worldBuilder/state/builderActions";
+import { closeWorldBuilder, finishBuilderEdits, loadSavedWorldDraft } from "../../worldBuilder/state/builderActions";
 import { useUIStore } from "../../store/menus/uiStore";
 import { useAlphaStore } from "../../store/alpha/alphaStore";
 import {
@@ -13,6 +13,7 @@ import { useWorldCatalog } from "../../store/selection/worldCatalog";
 /** Explicit apply, not pointer-move uploads. Rust validates/builds a complete
  * replacement before swapping only the editor runtime and resetting its car. */
 export function EditorTestAction() {
+  const inLiveWorld = useUIStore((s) => s.screen === "sandbox");
   const active = useSocialStore((s) => s.view?.alpha?.active),
     source = useBuilderStore((s) => s.doc),
     installed = useWorldCatalog((s)=>s.maps);
@@ -22,15 +23,16 @@ export function EditorTestAction() {
   const targets = worlds?.filter(w => w.can_edit && w.map === source?.map_id) ?? [];
   const [target, setTarget] = useState<number>();
   const chosen = targets.find(w => w.id === target);
+  const liveEditor = inLiveWorld && active?.mode === "editor";
   const pending = useRef(false);
   const test = async () => {
     if (pending.current) return;
-    if (active?.mode !== "editor") {
+    if (!liveEditor) {
       const map = useWorldCatalog.getState().maps.findIndex((m) => m.id === source?.map_id);
-      closeWorldBuilder();
+      finishBuilderEdits();
       if (map >= 0) useSelectionStore.setState({ mapIndex: map });
       useAlphaStore.getState().chooseMode("editor");
-      useUIStore.getState().setScreen("hero_select");
+      useUIStore.getState().setScreen("mode_select");
       return;
     }
     pending.current = true;
@@ -49,7 +51,7 @@ export function EditorTestAction() {
   };
   return (
     <div className="le-live-test">
-      {active?.mode === "editor" && targets.length > 0 && <>
+      {liveEditor && targets.length > 0 && <>
         <label>Save destination<select value={chosen?.id ?? ""} disabled={busy} onChange={e =>
           setTarget(e.target.value ? Number(e.target.value) : undefined)}>
           <option value="">Test session only</option>
@@ -73,9 +75,9 @@ export function EditorTestAction() {
       >
         {busy
           ? "BUILDING PHYSICS…"
-          : active?.mode === "editor"
+          : liveEditor
             ? (chosen ? "SAVE WORLD & TEST DRIVE" : "APPLY & TEST DRIVE")
-            : "RESERVE LIVE EDITOR"}
+            : "SET UP TEST DRIVE"}
       </button>
       {status && <span role="status">{status}</span>}
     </div>

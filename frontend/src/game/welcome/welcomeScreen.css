@@ -212,7 +212,7 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   position: absolute; inset: 0; pointer-events: none;
   color: var(--garage-menu-ink);
 }
-.character-roster .chamfered-frame, .roster-tiles { pointer-events: auto; }
+.character-roster .chamfered-frame, .roster-options { pointer-events: auto; }
 .character-roster .chamfered-frame {
   --roster-cut: 7px;
   --frame-top-cut: var(--roster-cut);
@@ -255,19 +255,20 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 }
 .roster-caption small { font-weight: 700; font-size: .82rem; font-variant-numeric: tabular-nums; }
 .roster-mobile-name { display: none; }
-.roster-tiles { display: grid; gap: var(--roster-gap); min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.roster-options, .roster-tiles { display: grid; gap: var(--roster-gap); }
+.roster-options { min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .character-roster .roster-tile {
   display: flex; align-items: center; justify-content: flex-start; gap: clamp(8px,1.2vw,18px);
   padding: clamp(4px, .8vh, 12px) clamp(7px,1vw,16px); text-align: left;
   font-size: clamp(.875rem,1.5vw,1.35rem); font-weight: 650; min-height: 48px;
 }
-.character-roster .roster-tile :is(.profile-portrait-frame,.roster-plus) {
+.character-roster .roster-tile :is(.profile-portrait-frame,.roster-action-icon) {
   display: grid; place-items: center; flex: none; width: clamp(40px,8.5vh,78px); height: clamp(40px,8.5vh,78px);
   overflow: hidden; border: 1px solid var(--garage-menu-line); background: color-mix(in srgb,var(--app-background) 62%,transparent);
   border-radius: 4px;
 }
 .character-roster .roster-tile .character-portrait { width: 100%; height: 100%; max-width: none; object-fit: cover; }
-.roster-plus .menu-icon { width: clamp(24px,3vw,34px); height: clamp(24px,3vw,34px); color: var(--garage-menu-ink); }
+.roster-action-icon .menu-icon { width: clamp(24px,3vw,34px); height: clamp(24px,3vw,34px); color: var(--garage-menu-ink); }
 .welcome-character-details { min-width: 0; display: grid; gap: 3px; }
 .welcome-character-details strong, .roster-mobile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .welcome-character-details strong { font-size: clamp(.95rem,1.6vw,1.35rem); }
@@ -292,7 +293,7 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   display: grid; grid-template-columns: minmax(0,1fr); justify-content: stretch; place-items: center;
   flex: 1 1 0; aspect-ratio: 1; padding: 4px; min-width: 0; max-width: min(22vw,10dvh,6rem);
 }
-.character-roster[data-portrait] .roster-tile :is(.profile-portrait-frame,.roster-plus) {
+.character-roster[data-portrait] .roster-tile :is(.profile-portrait-frame,.roster-action-icon) {
   width: 100%; height: 100%; border: 0; background: transparent;
 }
 .character-roster[data-portrait] .roster-tile > .controller-key { position: absolute; inset: auto 5px 5px auto; }
@@ -300,6 +301,10 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 .character-roster[data-portrait] .roster-create-label { display: none; }
 .character-roster[data-portrait] .roster-create:only-child { max-width: none; aspect-ratio: auto; grid-template-columns: auto auto; justify-content: center; }
 .character-roster[data-portrait] .roster-create:only-child .roster-create-label { display: inline; }
+.character-roster[data-portrait] .roster-editor {
+  display: flex; justify-content: center; max-width: none; aspect-ratio: auto;
+}
+.character-roster[data-portrait] .roster-editor .roster-action-icon { width: 24px; height: 24px; }
 .welcome-layout[data-step="characters"] .welcome-notices {
   position: absolute; top: max(52px,calc(env(safe-area-inset-top) + 44px)); left: max(12px,env(safe-area-inset-left));
   max-width: min(45%,28rem); pointer-events: none;

@@ -5,7 +5,7 @@ import { canOpenVehicleSelection } from "../alpha/matchHeroChange";
 import { PLAYER_ONBOARDING } from "../../game/welcome/config";
 
 import { createMenuActions } from "./menuActions";
-import { isDrivingScreen, type SignalMission, type UIState } from "./types";
+import { isDrivingScreen, type SignalMission, type UIState, type WelcomeSection } from "./types";
 export type * from "./types";
 export { isDrivingScreen } from "./types";
 export const useUIStore = create<UIState>()((set, get, api) => ({
@@ -27,10 +27,15 @@ export const useUIStore = create<UIState>()((set, get, api) => ({
   },
   screen: PLAYER_ONBOARDING ? "welcome" : "main",
   welcomeSection: null,
-  setScreen: (screen, section?: "account") => {
+  setScreen: (screen, section?: WelcomeSection) => {
+    const previous = get();
+    // Keep the roster return point through an optional isolated editor test drive.
+    const fromRoster = (screen === "world_builder" && previous.screen === "welcome") ||
+      (previous.screen !== "welcome" && previous.welcomeSection === "world_editor" &&
+        ["world_builder", "mode_select", "queue", "hero_select", "sandbox"].includes(screen));
     set({
       screen,
-      welcomeSection: screen === "welcome" ? section ?? null : null,
+      welcomeSection: fromRoster ? "world_editor" : screen === "welcome" ? section ?? null : null,
       overlay: null,
       vehicleSelectionParent: null,
       settingsParent: null,
