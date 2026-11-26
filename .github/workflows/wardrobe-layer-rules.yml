@@ -7,6 +7,11 @@ on:
       - "frontend/tests/wardrobe-layer-manifest.test.mjs"
       - "frontend/tests/wardrobe-layer-resolver.test.mjs"
       - "packages/wardrobe-catalog/resolve-wardrobe-layers.mjs"
+      - "packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs"
+      - "packages/wardrobe-catalog/wardrobe-layers-save.schema.json"
+      - "frontend/tests/wardrobe-layer-migration.test.mjs"
+      - "frontend/tests/fixtures/wardrobe-layer-save-v1.json"
+      - "package.json"
       - "docs/wardrobe/**"
       - ".github/workflows/wardrobe-layer-rules.yml"
   workflow_dispatch:

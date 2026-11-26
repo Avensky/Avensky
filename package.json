@@ -23,7 +23,8 @@
     "install:rust": "cargo fetch --manifest-path avenlab-server/Cargo.toml",
     "install:rust-tools": "cargo install cargo-watch",
     "build": "npm --prefix frontend run build",
-    "wardrobe:layers:check": "node packages/wardrobe-catalog/validate-layer-rules.mjs && node --test frontend/tests/wardrobe-layer-manifest.test.mjs frontend/tests/wardrobe-layer-resolver.test.mjs"
+    "wardrobe:layers:check": "node packages/wardrobe-catalog/validate-layer-rules.mjs && node --test frontend/tests/wardrobe-layer-manifest.test.mjs frontend/tests/wardrobe-layer-resolver.test.mjs && npm run wardrobe:legacy:check",
+    "wardrobe:legacy:check": "node --test frontend/tests/wardrobe-layer-migration.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
