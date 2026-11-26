@@ -34,7 +34,7 @@
 .creator-header.angled-tab-header > .creator-back:focus {
   --angled-title-fill: var(--app-accent); color: var(--app-background);
 }
-.creator-header.angled-tab-header > .creator-back:focus > span { color: inherit; }
+.welcome-creator .creator-header.angled-tab-header > .creator-back:focus > span { color: inherit; }
 .creator-header .creator-back:focus + .creator-tab-scroll .angled-header-tab[aria-selected="true"] {
   color: var(--app-text); background: var(--angled-tab-surface);
 }
