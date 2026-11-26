@@ -31,6 +31,10 @@ The [reversible migration adapter](migrate-legacy-wardrobe.mjs) and [v1 schema](
 
 The [pure layer preview model](wardrobe-layer-preview.mjs) bridges the W-05 saved selections to W-04 per-region ordering without claiming geometric approval. The client panel is [`WardrobeLayerInspector.tsx`](../../frontend/src/game/characters/WardrobeLayerInspector.tsx); rules live only in [the canonical specification](../../docs/wardrobe/RULES.md#9-w-06-read-only-layer-inspector-contract). Node contract: `npm run wardrobe:preview:check`.
 
+## W-07 private outerwear candidates (not in the active catalog)
+
+[outerwear-candidates.json](outerwear-candidates.json) contains only source hashes, stable candidate IDs and fit blockers for three uploaded CLO garments. It is **not** imported into the equip-ready `character-garments.json` or auto-discovery results; the Outerwear UI only displays disabled review cards. Use the [canonical intake process](../../docs/wardrobe/PIPELINE.md#w-07-uploaded-coatjacket-source-intake-implemented-no-fit-approval) and do not copy source assets into public git.
+
 ## Edit the catalog
 
 Keep IDs stable across relabeling, refits, and Garage or Mobile revisions.

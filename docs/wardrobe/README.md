@@ -29,6 +29,10 @@ See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON 
 
 [Preview projector](../../packages/wardrobe-catalog/wardrobe-layer-preview.mjs) and [inspector UI](../../frontend/src/game/characters/WardrobeLayerInspector.tsx) expose saved garment modes and provisional ordering behind an opt-in **Inspect outfit stack** control in the existing Layers tab. A small Outerwear tab is inspection-only until W-07 has a non-retired, reviewed coat. The feature does not equip, save, alter camera focus, hide meshes, or authenticate fitting evidence. [Focused CI](https://github.com/Avensky/Avensky/actions/runs/45762594236) verified 39 pure and 4 UI tests on the review branch; this does not prove real fit or phone rendering. See [W-06 rules](RULES.md#9-w-06-read-only-layer-inspector-contract) and [W-06 tests](TESTING.md#w-06-layer-inspector-acceptance).
 
+## W-07 uploaded outerwear candidate intake (not fitted)
+
+Three uploaded CLO outerwear designs have stable [candidate IDs/hashes](../../packages/wardrobe-catalog/outerwear-candidates.json), safe Outerwear inspection cards, and a [read-only Python asset inspector](../../scripts/wardrobe/inspect_outerwear_assets.py) requiring no Blender. The source FBX/project/texture files remain private. **No meshes are rigged, fitted, published or equippable.** Use the [canonical W-07 pipeline](PIPELINE.md#w-07-uploaded-coatjacket-source-intake-implemented-no-fit-approval) and [source QA rules](TESTING.md#w-07-private-outerwear-intake-acceptance).
+
 ## Current architecture; not the intended future behavior
 
 - Shared catalog: `packages/wardrobe-catalog/`, including curated `character-garments.json` and generated `discovered-wardrobe-garments.json`.

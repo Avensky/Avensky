@@ -1,12 +1,28 @@
 # Wardrobe authoring pipeline
 
-**Status:** Planned architecture v1.1; do not mistake listed commands/artifacts for implemented scripts. See [RULES](RULES.md) for constraints and [TESTING](TESTING.md) for acceptance.
+**Status:** Planned fit architecture v1.1; W-07 private FBX intake scanner and inspect-only candidates are implemented on a review branch. Body transfer, fitting, export and release are not implemented. See [RULES](RULES.md) and [TESTING](TESTING.md) for acceptance.
 
 ## Goal: prepare once, render cheaply
 
 `private source -> intake inventory -> classification -> body/rig profile -> layer resolution -> controlled fit -> geometry/pose QA -> material and LOD QA -> Hero/NPC/rework review -> rights-gated staging/release`.
 
 Prioritize **offline Blender/authoring fitting** and save fitted garage/mobile meshes. Avoid heavy mesh deformation on each outfit switch and especially every animation frame. Reuse current wardrobe fit cache where topology-preserving results match its documented key/output contract; do not cache arbitrary material changes under geometry-only keys.
+
+## W-07 uploaded coat/jacket source intake (implemented; no fit approval)
+
+The user provided **Coat 01**, **Jacket 01** and **Jacket 02**, each as `THICK`, `THIN UNWELD`, `THIN WELD` FBX, plus one 2048×2048 normal map, a source render, and a private CLO `.zprj` project. Stable non-conflicting candidate IDs and SHA-256s are in [outerwear-candidates.json](../../packages/wardrobe-catalog/outerwear-candidates.json); source bytes and derivative geometry are deliberately **not committed**. The existing retired catalog garment `coat-01` is unchanged.
+
+Use the **THIN WELD** exports for the first import. They retain all authored polygon faces and UVs but have no extra unreferenced origin vertices. The THICK/UNWELD variants contain hundreds/thousands of **unreferenced** zero control points, not extra rendered pieces; do not confuse raw all-vertex bounds with referenced bounds. The three welded source triangle counts are 166,620 / 124,942 / 175,554, so none is a mobile-ready LOD. All nine FBXs are static/unskinned: no Deformer nodes. The W-07 inspector reads FBX 7700 using Python's standard library and checks the preferred file hashes without Blender.
+
+From a private working directory with the uploaded files (Python 3.11+):
+
+```powershell
+py scripts/wardrobe/inspect_outerwear_assets.py --directory "C:\PrivateAssets\Outerwear" --expected packages/wardrobe-catalog/outerwear-candidates.json --json "C:\PrivateAssets\Outerwear\w07-intake-report.json"
+```
+
+Use `python` instead of `py` on systems without the Windows Python launcher. The generated report may be shared for review; do not upload the underlying commercial FBX, `.zprj`, or normal maps to GitHub, S3/public CDN or a public PR without independent rights verification. This metadata audit does **not** create, rig, fit or render a GLB; it only prepares reproducible source inventory.
+
+**Next actual fitting:** obtain the installed `vesper-body.glb` (full donor), verify cm→m and Y-up conversion against bind-pose landmarks, transfer exactly 88 joint weights and preserve UV/material/rig IDs, then perform posed collision and open-front layer tests for Coat 01 over a thin top. Optimize separately for garage/mobile only after pose fit. Jacket 01 is second; close-fitting Jacket 02 is third. Do not assume a buttoned/open silhouette has a working animated closure. Only a verified GLB can enter the existing scanner, and fitted variants must remain gated on release rights.
 
 ## Proposed stages
 

@@ -52,6 +52,27 @@ The last line runs the real React/Vite/JSDOM fitting-room tests using `frontend`
 
 The suite is maintained in [CI](../../.github/workflows/wardrobe-layer-inspector.yml). These checks are **not screenshot, GLB collider, rig, mobile FPS, pose, or legal/distribution certification**. For history and remaining issues see [DECISIONS.md](DECISIONS.md).
 
+## W-07 private outerwear intake acceptance
+
+**Source-level evidence (private uploads inspected 2026-11-25, America/Los_Angeles):** nine binary FBX 7700 meshes across Coat 01 and Jackets 01/02; each asset has 0 Deformer nodes and corresponding 2K normal atlas / CLO project. The `THIN WELD` versions have 0 unreferenced control points and preserve UV/material data. Expected SHA-256, triangle and source names live in the [candidate manifest](../../packages/wardrobe-catalog/outerwear-candidates.json). The full-fidelity thick files are more expensive, not approved game LODs. Actual source assets are not checked into public Git.
+
+Pure tests do **not** install Blender or original files:
+
+```sh
+python -m unittest discover -s scripts/wardrobe/tests -p 'test_outerwear_intake.py' -v
+node --test frontend/tests/wardrobe-outerwear-intake.test.mjs
+```
+
+The Python test creates a tiny synthetic FBX, checks reference-only bounds, missing rig, UVs, source hashes, bad input and byte immutability. The Node test guards stable ID and public-catalog isolation. The actual source-hash and 9-FBX audit run is separate and private:
+
+```sh
+python scripts/wardrobe/inspect_outerwear_assets.py --directory "<private-input-directory>" --expected packages/wardrobe-catalog/outerwear-candidates.json --json "<private-output-directory>/w07-intake-report.json"
+```
+
+The dressing-room UI test additionally asserts all three **Requires fitting** cards appear in Outerwear; tapping them must neither equip, save, move the camera nor change zoom. Any missing original assets in CI MUST be described as **not run**, never as a passed mesh/fit test. The new [W-07 CI gate](../../.github/workflows/wardrobe-outerwear-intake.yml) covers metadata/code only.
+
+**Unperformed fitting acceptance (must be measured before enabling):** source-to-Vesper bind space and 88 matching joints; garment sleeve/shoulder clearance in idle, walking, crossed/raised arms, reach, seated/driving poses; Jacket 01 crop vs corset/skirt hem; Coat 01 open-front visibility and false skin hiding; Jacket 02 lapels and waist over thin top/corset; geometry and material seams, hero/mobile LOD, actual phone screenshots/FPS, and source redistribution license. Coat over top first, then top+corset+coat and gown+coat. No source-level file scan can approve these.
+
 ## Test layers and failure classification
 
 1. **Pure schema/resolver:** deterministic outputs, stable identities, explicit conflict reasons, no mutation, consistent body-region graph, cycle detection, unsupported mode and unknown item behavior.

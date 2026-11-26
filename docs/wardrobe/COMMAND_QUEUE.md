@@ -15,7 +15,7 @@
 
 ## Garment compatibility / geometry
 
-- **W-07 — NEXT: Coats/jackets fitting.** Obtain one licensed and available non-retired coat candidate; measure Vesper rig and actual top+corset+coat/gown+coat fit, open/closed coverage, shoulder/sleeve cuff clearance, protected collar/hem detail, idle/walk/raised-arm/seated poses, and mobile/garage GLBs. This is an evidence task, not automatic approval. Do not enable coat equip until per-item reports and visual review pass.
+- **W-07 — In progress: source intake implemented, no fitted coat yet.** Three uploaded CLO families, nine FBXs and normal maps were inspected privately. [W-07 review branch](https://github.com/Avensky/Avensky/tree/feat/wardrobe-outerwear-intake-w07) records stable hashed candidate IDs and a no-Blender Python inspector, plus safe disabled Outerwear review cards. **NEXT:** obtain actual Vesper donor, normalize cm/Y-up, transfer full 88-joint rig and generate one private Coat 01 GLB candidate. Prove top+coat open and raised-arm collision, then corset/gown combinations, garage/mobile LODs and visual review; retain release-rights gate. No coat equip until proven.
 - **W-08 — Top + corset.** Introduce `over-top` and `direct` selections and explicit skirt `tucked` / `over` waist relation; preserve Laced Bodice, Underbust and High Collar regression fixtures.
 - **W-09 — Dress/gown + coat/tunic+pants.** Validated special layers, independent gown sleeve/hem and lining behavior; block unapproved full-gown/trousers pairings.
 - **W-10 — Pants fitting.** Add supported discovery, pelvis/crotch/knee/ankle profiles and seated/driving motion validation; preserve waistband, seams and pocket shapes.
@@ -35,7 +35,7 @@
 
 ## Next integration milestone: W-07 coat fitting, then W-06 editable controls
 
-The W-06 read-only inspector is now implemented on a review branch without changing live selections. First review its no-save/no-camera regressions and mobile layout. W-07 must obtain a non-retired, legal, rig-compatible coat candidate and check `top + corset + coat`, `gown + coat`, sleeve cuffs, collision/pose frames and open/closed coverage. Only then design W-06 phase 2 mode controls, versioned save actions and rollback. Do not replace old wardrobe deletion/equip logic until all legacy cases pass.
+The W-06 read-only inspector is implemented on a review branch, and W-07 intake registered three non-equippable candidate IDs. First review W-07 private hashes and its no-save/no-camera regressions, then obtain an installed donor and fit a real first coat. W-07 must check `top + corset + coat`, `gown + coat`, sleeve cuffs, collision/pose frames and open/closed coverage. Only then design W-06 phase 2 mode controls, versioned save actions and rollback. Do not replace old wardrobe deletion/equip logic until all legacy cases pass.
 
 ## Done means evidence, not words
 
