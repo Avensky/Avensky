@@ -27,12 +27,9 @@
 
 /* Composition cards reserve real space for the vehicle; identity sits alongside
    the portrait. Team filters are a separate, controller-secondary tab row. */
-.match-team-filter-tabs{display:flex;align-items:center;gap:0;flex:none;padding:0 12px 9px;color:var(--app-text);min-width:0}
-.match-team-filter-tabs>span{display:grid;place-items:center;padding:0 5px}
-.match-team-filter-tabs .controller-key{width:19px;height:19px;font-size:8px}
-.match-team-filter-tabs .menu-control{flex:0 1 120px;min-width:0;min-height:28px;padding:5px 10px;border:0;border-radius:0;background:color-mix(in srgb,var(--app-text) 5%,transparent);color:var(--app-muted);font:800 9px/1.2 system-ui;text-decoration:none!important;cursor:pointer}
-.match-team-filter-tabs .menu-control[aria-selected=true]{background:color-mix(in srgb,var(--app-accent) 19%,var(--app-panel));color:var(--app-text);box-shadow:inset 0 -2px var(--app-accent)}
-.match-team-filter-tabs .menu-control:is(:hover,:focus-visible){outline:0;background:color-mix(in srgb,var(--app-accent) 24%,var(--app-panel));box-shadow:inset 0 0 0 1px var(--app-accent)}
+.match-team-filter-tabs{flex:none;padding:0 12px 9px}
+.match-team-filter-tabs .menu-control{text-decoration:none!important}
+.match-team-filter-tabs .menu-control:is(:hover,:focus-visible){box-shadow:inset 0 0 0 1px var(--app-accent)}
 .match-composition-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:8px 0}
 .match-composition-seat:not(.match-composition-empty){display:grid;grid-template-columns:minmax(70px,44%) minmax(0,1fr);align-items:center;min-height:96px;padding:4px;text-align:left;gap:8px}
 .match-composition-art{min-width:0}.match-composition-art .hero-portrait-art{width:100%;height:88px;aspect-ratio:auto}

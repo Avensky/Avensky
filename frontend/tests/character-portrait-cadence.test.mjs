@@ -16,6 +16,7 @@ const serverOptions = {
     __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['linen-nightgown']),
     __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(['linen-nightgown']),
     __DRESSING_ROOM_REVISION_IDS__: '[]',
+    __FITTED_HAIR_IDS__: JSON.stringify(['hair-01']),
     __WARDROBE_SET_IDS__: '[]',
   },
   optimizeDeps: { noDiscovery: true, include: [] },
@@ -397,6 +398,19 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       assert.equal(response.image?.type, 'image/webp', response.error);
       assert.deepEqual(requests, expected);
     }
+
+    const fittedLook = { ...vega, appearance: { ...vega.appearance, hair: 'hair-01' } };
+    const styleJob = { look: fittedLook, modelUrl: 'http://localhost/full-driver.gltf' };
+    const hairUrl = '/models/characters/female/hair/Hair_01_espresso.glb';
+    const beforeHair = renderedModels.length;
+    await handler({ data: { ...styleJob, requireFittedHair: true } });
+    assert.match(response.error, /hairstyle preview is unavailable/);
+    assert.equal(renderedModels.length, beforeHair, 'a missing hairstyle never gets a duplicate stock preview');
+    await handler({ data: styleJob });
+    assert.equal(response.image?.type, 'image/webp', 'a roster portrait retains the stock fallback');
+    files.set(hairUrl, skinnedModel('Hair_01'));
+    await handler({ data: { ...styleJob, requireFittedHair: true } });
+    assert.equal(response.image?.type, 'image/webp', response.error);
 
     const dress = { url: 'http://localhost/dress.gltf', item: getWardrobeGarment('linen-nightgown') };
     for (const { label, actor, primary, fallback, donorRequests, fitted } of [

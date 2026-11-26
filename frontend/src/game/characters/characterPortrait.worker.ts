@@ -30,7 +30,7 @@ async function loadPortraitOutfit(
   if (body) return { garment: { item: dress.item, scene: garment }, body };
 }
 
-async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
+async function renderPortrait({ look, modelUrl, dress, requireFittedHair }: CharacterPortraitJob) {
   if (typeof OffscreenCanvas === "undefined") throw Error("Offscreen character portraits are unavailable.");
 
   const manager = new LoadingManager();
@@ -62,6 +62,8 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
       garmentBody: outfit?.body,
       removedClothing: outfit && look.removedClothing,
     });
+    // A hairstyle tile must never cache the stock haircut under a different style's name.
+    if (requireFittedHair && !model.fittedHair) throw Error("The hairstyle preview is unavailable.");
     applyVillagerLook(model, look);
     for (const name of ["CLOTH_BOTTOM_SKIRT", "CLOTH_FEET_SHOES", "CLOTH_UNDER_UNDERSKIRT", "CLOTH_BOTTOM_TROUSERS", "CLOTH_FEET_BOOTS"]) {
       const part = model.root.getObjectByName(name);

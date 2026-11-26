@@ -1,6 +1,6 @@
 import styles from "../../../../packages/wardrobe-catalog/character-styles.json";
 import { CHARACTER_PERSONALITIES, type CharacterPersonality } from "./characterPersonality";
-import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterAppearance, type CharacterChoice } from "./characterCatalog";
+import { ROOK_ID, VILLAGER_ID, availableHairStyles, characterAppearance, type CharacterChoice } from "./characterCatalog";
 
 export type CharacterBody = "female" | "male";
 
@@ -26,9 +26,11 @@ export function applyCreatorWardrobe(starter: CharacterChoice, previous?: Charac
   const kit = starter.appearance ?? characterAppearance(starter);
   if (!previous) return { ...starter, appearance: { ...kit, makeup: "rose" } };
   const previousLook = previous.appearance ?? characterAppearance(previous);
-  // The fitted hairstyles currently exist on the female rig. Both rigs support the stock cuts.
-  const stockHair = CHARACTER_APPEARANCE_OPTIONS.hair.some(option => option.id === previousLook.hair);
-  const hair = starter.id === previous.id || stockHair ? previousLook.hair : "natural";
+  // A wardrobe change on the same female rig also preserves a saved private
+  // hairstyle when its assets are temporarily unavailable on this device.
+  const keepSavedHair = previous.id === starter.id && starter.id === VILLAGER_ID;
+  const hair = keepSavedHair || availableHairStyles(starter.id).some(style => style.id === previousLook.hair)
+    ? previousLook.hair : "natural";
   return { ...starter, appearance: {
     ...previousLook, hair, color: kit.color, accent: kit.accent, headwear: kit.headwear,
     item_colors: kit.item_colors, bra_style: kit.bra_style, briefs_style: kit.briefs_style, personality: kit.personality,

@@ -4,6 +4,7 @@ import type { WardrobeGarment } from "./wardrobeGarments";
 export type CharacterPortraitJob = {
   look: CharacterLook;
   modelUrl: string;
+  requireFittedHair?: boolean;
   dress?: { item: WardrobeGarment; url: string };
 };
 

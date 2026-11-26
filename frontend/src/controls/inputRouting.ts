@@ -16,6 +16,24 @@ export type MenuAction =
   | "previous_option"
   | "next_option";
 
+// The welcome screen owns several independent menus. Registering the visible
+// creator lets the gamepad check stick ownership without a DOM query per frame.
+let creatorPanel: HTMLElement | null = null;
+export function bindCreatorPanel(panel: HTMLElement) {
+  creatorPanel = panel;
+  return () => { if (creatorPanel === panel) creatorPanel = null; };
+}
+
+export function creatorUsesMenuStick() {
+  return creatorPanel !== null;
+}
+
+export function hasSecondaryMenuControls(ui: ReturnType<typeof useUIStore.getState>) {
+  if (ui.overlay) return ui.overlay === "match_results";
+  if (ui.screen === "mode_select") return true;
+  return ui.screen === "welcome" && Boolean(creatorPanel?.querySelector("[data-creator-channel]"));
+}
+
 export function canDrive() {
   const ui = useUIStore.getState();
   return (
@@ -73,7 +91,7 @@ export function isTypingTarget(target: EventTarget | null) {
 export function routeMenuAction(action: MenuAction) {
   if (action === "previous_option" || action === "next_option") {
     const ui = useUIStore.getState();
-    if (!((ui.screen === "mode_select" && ui.overlay === null) || ui.overlay === "match_results") || useTextKeyboardStore.getState().session) return;
+    if (!hasSecondaryMenuControls(ui) || useTextKeyboardStore.getState().session) return;
   }
   if (useTextKeyboardStore.getState().session) {
     window.dispatchEvent(

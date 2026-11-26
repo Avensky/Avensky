@@ -8,15 +8,15 @@ Drag the character to turn them, or drag the exposed garage to move the camera. 
 
 ## Create a character
 
-The angled header opens **Gender**, **Looks**, **Skin tone**, **Hair color**, **Makeup**, and **Personality**. Tap a tab, use **LB/RB** on a controller, or press **Q/E** on a keyboard. Left and right move through the current step’s choices. Up and down leave the selection in place. The Avensky back tab returns to the roster.
+The angled header follows the game’s shared menu scale. Its steps are **Gender**, **Looks**, **Skin tone**, **Hairstyle**, **Hair color**, **Eyes**, **Makeup**, and **Personality**. Tap a tab, use **LB/RB**, or press **Q/E**. Within Hair color and Makeup, use **LT/RT** or **1/3** to switch between channels. The D-pad, left stick, arrow keys, and **WASD** move through the choices in the visible grid. The Avensky back tab returns to the roster.
 
-Gender and Looks show portraits of the available rigs. The garage camera eases into a close-up for skin, hair, and makeup, then widens for the outfit. Changing steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
+Gender and Looks show portraits of the available rigs. The garage camera eases into a close-up for skin, hair, eyes, and makeup, then widens for the outfit. Changing steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
 
-Hair color uses the fitting room’s dye presets and lets players adjust the base, roots, highlights, and tips on supported hairstyles. Makeup has separate lipstick, eyeshadow, and eyeliner choices. Each follows the character into the roster.
+Hairstyle shows the available cuts for the chosen rig as portrait tiles. Hair color uses the fitting room’s dye presets and lets players adjust the base, roots, highlights, and tips on supported cuts. Eyes changes the iris color independently of Makeup, which has separate lipstick, eyeshadow, and eyeliner channels. The character keeps these choices in the roster.
 
-The personality tiles choose a starting outfit and idle emotes. Neutral is available from the start. Players keep the hairstyle, hair colors, skin tone, and makeup they picked. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) supplies the outfits for each rig.
+The personality tiles choose a starting outfit and idle emotes. Neutral is available from the start. Mechanic pairs workshop clothing with inspection and tuning gestures. Players keep their chosen appearance when switching personalities. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) supplies the outfits for each rig.
 
-Players choose their own character name on the final step. With a controller, confirm the personality with **A** to open the name keyboard. **B** cancels the edit, and **Done** returns to character creation. A physical keyboard uses **Esc** to cancel. Confirm **Create character** to save. The game checks name availability across characters on the server, ignoring capitalization. If a name is taken, players can try another with their draft still open.
+Players choose their character name on the final step. Move from the personality tiles to the name field and activate it to type. **Exit**, **B**, or **Esc** leaves the editor and keeps the draft name. Confirm **Create character** to save. The game checks name availability across characters on the server, ignoring capitalization. If a name is taken, players can try another with their draft still open.
 
 ## How the save works
 

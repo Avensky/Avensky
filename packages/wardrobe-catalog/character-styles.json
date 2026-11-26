@@ -14,6 +14,13 @@
     "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4" }
   },
   {
+    "id": "service-bay",
+    "name": "Service bay",
+    "attitude": "mechanic",
+    "female": { "outfit": "shop-crew", "color": "#414850", "accent": "#dc8f54" },
+    "male": { "outfit": "race-crew", "color": "#414850", "accent": "#dc8f54" }
+  },
+  {
     "id": "workshop",
     "name": "Workshop",
     "attitude": "friendly",
