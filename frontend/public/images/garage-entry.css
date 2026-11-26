@@ -26,7 +26,7 @@
 [data-live-garage] { display:block; pointer-events:none; user-select:none; background:#080808; }
 [data-live-garage]:has(.garage-canvas) { pointer-events:auto; }
 [data-live-garage] canvas { display:block; }
-.garage-entry-header.angled-tab-header {
+header.garage-entry-header.angled-tab-header {
   position: fixed;
   top: env(safe-area-inset-top, 0px);
   left: 0;
@@ -38,7 +38,7 @@
   font-family: ui-sans-serif, system-ui, sans-serif;
 }
 @media (orientation: landscape) and (pointer: coarse) {
-  .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
+  header.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
     padding-left: calc(2 * var(--angled-brand-padding));
   }
 }

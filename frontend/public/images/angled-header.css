@@ -1,10 +1,10 @@
-/* Shared by the in-game menus and the standalone sign-in page. */
-:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 41px; }
+/* The outgoing sign-in layer keeps the same responsive tab geometry as the live form. */
+:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 41px; }
 @media (max-width: 760px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 39px; }
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 39px; }
 }
 @media (max-height: 480px) and (min-width: 560px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry) { --menu-angled-header-height: 35px; }
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 35px; }
 }
 .angled-tab-header {
   --angled-brand-padding: clamp(10px, 1.2vw, 18px);

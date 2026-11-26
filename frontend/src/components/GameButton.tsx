@@ -1,9 +1,9 @@
-import { forwardRef, type HTMLAttributes, type ReactNode } from "react";
+import { forwardRef, type HTMLAttributes, type ReactNode, type SyntheticEvent } from "react";
 import { getSelectionClasses } from "./menus/selectionStyles";
 
 type GameButtonProps = Omit<HTMLAttributes<HTMLDivElement>, "children" | "onFocus"> & {
   children: ReactNode;
-  onPress?: () => void;
+  onPress?: (event: SyntheticEvent<HTMLDivElement>) => void;
   onFocus?: () => void;
   disabled?: boolean;
   selected?: boolean;
@@ -63,7 +63,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
         onPointerDown={(e) => e.preventDefault()}
         onPointerUp={(e) => {
           e.preventDefault();
-          if (!disabled && (e.pointerType !== "mouse" || e.button === 0)) onPress?.();
+          if (!disabled && (e.pointerType !== "mouse" || e.button === 0)) onPress?.(e);
         }}
         onKeyDown={(e) => {
           if (disabled) return;
@@ -73,7 +73,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
             // The focused button owns activation; window listeners must not
             // also select another row or treat Space as braking.
             e.stopPropagation();
-            if (!e.repeat) onPress?.();
+            if (!e.repeat) onPress?.(e);
           }
         }}
         onClick={(event) => {
@@ -84,7 +84,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
           if (event.detail === 0 && !disabled) {
             event.preventDefault();
             event.stopPropagation();
-            onPress?.();
+            onPress?.(event);
           }
         }}
         onContextMenu={(e) => e.preventDefault()}
