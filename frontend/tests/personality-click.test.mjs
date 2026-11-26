@@ -128,14 +128,14 @@ test('character clicks play varied personality clips, resume held poses, and ign
       tick(1);
       assert(head.quaternion.angleTo(start) > .05, `${model}: returning to idle releases the hold`);
 
-      const { SELECTION_POSES, selectionEmote } = await vite.ssrLoadModule('/src/game/characters/selectionPoses.ts');
+      const { SELECTION_POSES, SELECTION_EMOTES } = await vite.ssrLoadModule('/src/game/characters/selectionPoses.ts');
       const { availableFinderEmotes, matchesEmote } = await vite.ssrLoadModule('/src/game/characters/emoteFinder.ts');
       const { findGaragePreviewEmote, garagePreviewCollection } = await vite.ssrLoadModule('/src/game/characters/garageEmotes.ts');
       const poses = new Map();
       const capture = () => ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'calf_r', 'head'].map(name => poseRig.getObjectByName(name).quaternion.clone());
       const difference = (a, b) => Math.max(...a.map((joint, index) => joint.clone().normalize().angleTo(b[index].clone().normalize())));
       for (const stance of SELECTION_POSES) {
-        const motion = selectionEmote(stance.id);
+        const motion = findGaragePreviewEmote(stance.emoteId, false);
         for (const bag of [false, true]) {
           const matches = availableFinderEmotes(bag).filter(item => item.id === motion.id);
           assert.equal(matches.length, 1, 'the motion has one gallery entry');
@@ -172,7 +172,7 @@ test('character clicks play varied personality clips, resume held poses, and ign
       let finished = 0;
       const onSelectionEnd = () => finished++;
       for (const [index, stance] of SELECTION_POSES.entries()) {
-        await render({ root: poseRig, previewPacks: false, selectionPose: stance.id, onSelectionEnd });
+        await render({ root: poseRig, previewPacks: false, rosterEmote: SELECTION_EMOTES[index], onSelectionEnd });
         const rest = capture();
         const before = fiber.invalidations;
         frameAfter(10000);
@@ -203,10 +203,30 @@ test('character clicks play varied personality clips, resume held poses, and ign
         assert.equal(fiber.invalidations, settled, 'the roster remains idle between authored emotes');
         assert.equal(finished, index + 1);
       }
-      await render({ root: poseRig, previewPacks: false, selectionPose: SELECTION_POSES[0].id, onSelectionEnd });
+      for (const id of ['010', '159']) {
+        const motion = findGaragePreviewEmote(id, false);
+        const completed = finished;
+        const rest = capture();
+        await render({ root: poseRig, previewPacks: false, rosterEmote: motion, onSelectionEnd });
+        frameAfter(6000);
+        frameAfter(1000 * motion.duration * .35);
+        const midway = capture();
+        assert(difference(rest, midway) > .1, 'the standing gesture uses the same rig');
+        if (motion.prop) assert(poseRig.getObjectByName('emote-prop-' + motion.prop)?.visible, 'the personality prop is shown on its authored key');
+        frameAfter(1000 * motion.duration * .22);
+        assert(difference(capture(), midway) > .01, 'a moving gesture keeps sampling through the middle');
+        assert.equal(timers.size, 0, 'an ordinary wave or phone gesture has no fabricated static hold');
+        frameAfter(1000 * motion.duration * .44);
+        assert.equal(finished, completed + 1, 'duration follows the authored clip');
+        assert(difference(capture(), rest) < .001);
+        const idleDraws = fiber.invalidations;
+        frameAfter(6500);
+        assert.equal(fiber.invalidations, idleDraws);
+      }
+      await render({ root: poseRig, previewPacks: false, rosterEmote: SELECTION_EMOTES[0], onSelectionEnd });
       frameAfter(6000); frameAfter(1300);
       assert.equal(timers.size, 1);
-      await render({ root: poseRig, previewPacks: false, selectionPose: SELECTION_POSES[1].id, onSelectionEnd });
+      await render({ root: poseRig, previewPacks: false, rosterEmote: SELECTION_EMOTES[1], onSelectionEnd });
       assert.equal(timers.size, 0, 'replacing a held request cancels its wake');
       setTimer.mock.restore(); clearTimer.mock.restore(); clock.mock.restore();
     }

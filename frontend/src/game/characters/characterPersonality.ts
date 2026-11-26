@@ -11,8 +11,11 @@ export const CHARACTER_PERSONALITIES = [
 export type CharacterPersonality = typeof CHARACTER_PERSONALITIES[number]["id"];
 export type AnimationFit = "auto" | "full" | "fitted";
 
+export function personalityEmoteIds(personality: CharacterPersonality = "friendly") {
+  return CHARACTER_PERSONALITIES.find(item => item.id === personality)?.emotes ?? CHARACTER_PERSONALITIES[0].emotes;
+}
+
 export function personalityEmote(personality: CharacterPersonality = "friendly", previous?: string, random = Math.random()) {
-  const pool = CHARACTER_PERSONALITIES.find(item => item.id === personality)?.emotes ?? CHARACTER_PERSONALITIES[0].emotes;
-  const options = pool.filter(id => id !== previous);
+  const options = personalityEmoteIds(personality).filter(id => id !== previous);
   return options[Math.min(options.length - 1, Math.floor(Math.max(0, random) * options.length))];
 }

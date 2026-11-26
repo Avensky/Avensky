@@ -2,7 +2,7 @@
 
 After staging sign-in, the roster opens in the same 3D garage and previews the last active character. Tap a portrait or focus its tile with the D-pad to preview another saved character. **Create character** opens an available slot and returns to the roster after saving. Registered accounts have four slots. Environments that support guest profiles offer one slot.
 
-Drag the character to turn them, or drag the exposed garage to move the camera. On a controller, use the left stick for the camera and the right stick for the character. The selected character automatically plays three standing emotes. To replay one, open **Heroes → Character → Emotes** and look in the **Garage** collection. **Enter world** confirms the character and opens the main menu, where the player can choose **Play** or **Heroes**. The upper-right tabs open **Profile** and **Log out**. Logging out returns to sign-in over the same garage.
+Drag the character to turn them, or drag the exposed garage to move the camera. On a controller, use the left stick for the camera and the right stick for the character. The selected character plays their regular garage and personality emotes, with a short rest between gestures. The three additional stances join that rotation when the character has free hands. Equipping the shop bag adds its carrying motions. The **Garage** and **Personality** collections in **Heroes → Character → Emotes** let you replay these gestures. **Enter world** confirms the character and opens the main menu, where the player can choose **Play** or **Heroes**. The upper-right tabs open **Profile** and **Log out**. Logging out returns to sign-in over the same garage.
 
 **Profile** opens beside the character in landscape and below the character in portrait. **Display name** edits the account name. Each roster slot keeps its own character name and progression. On staging, expand **Email** or **Sign-in & security** to manage the account. Staging admins can create tester invitations, and **Delete account** opens the existing deletion request form. Back closes the current row before leaving Profile.
 
@@ -30,7 +30,9 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 
 ## Branding and startup
 
-The welcome screen shows the transparent triangular A at `/images/logo.svg`. Sign-in, character selection, and the main menu share the live garage. The roster displays one full-size character and uses cached images for its tiles.
+The sign-in header uses the triangular A and game name. After a successful sign-in, the controls fade into the roster and the garage camera moves from its current angle toward the dressed character. Reduced motion switches directly to the settled view. A new account can use **Create character** while the camera stays on the room.
+
+Sign-in, character selection, and the main menu share one live garage. The roster tiles use cached portraits. Confirming a slot keeps that character on the garage floor while the main menu opens. **Play → Open World** remains the entry to the shared hub.
 
 ## Wardrobe follow-up
 

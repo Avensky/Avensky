@@ -1,10 +1,10 @@
 import { MIRROR_MAKEUP_EMOTES, makeupPreviewEmote, type MirrorCheckFit } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
-import { useContext, useEffect, useLayoutEffect, useRef } from "react";
+import { useContext, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { AnimationMixer, LoopOnce, MathUtils, type AnimationAction, type Group, type Object3D } from "three";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
-import { AUTOMATIC_GARAGE_EMOTE_IDS, buildEmoteClips, buildGarageEmotes, findGaragePreviewEmote, garageBreathing } from "./garageEmotes";
+import { GARAGE_REST_SECONDS, automaticGarageEmoteIds, buildEmoteClips, buildGarageEmotes, findGaragePreviewEmote, garageBreathing, type Emote } from "./garageEmotes";
 import { driverFaceTargets } from "./villagerFace";
 import { skipHiddenCharacterRaycasts } from "./characterPreviewRaycast";
 import { failCockpitPreview, useCharacterPreviewStore } from "./characterPreviewStore";
@@ -18,11 +18,11 @@ import type { CockpitPlayback, GarageCockpit } from "../preview/garageCockpit";
 import { BRZ_ENTRY_SECONDS, BRZ_EXIT_SECONDS, DRIVE_OUT_DURATION, GARAGE_ENTRY_DURATION, GARAGE_ENTRY_START_SECONDS,
   sampleBrzEntry, sampleBrzExit, sampleDriveOut } from "../preview/garageDriveMotion";
 import { useGarageDrive } from "../preview/garageDriveStore";
+import { prepareGaragePointLights } from "../preview/garagePointLights";
 
 import { personalityEmote, type CharacterPersonality } from "./characterPersonality";
 import type { PieceColors } from "./clothingPieces";
 import { keepHeldProp } from "./emotePropNotes";
-import { SELECTION_HOLD, selectionEmote, type SelectionPoseId } from "./selectionPoses";
 import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./posePack";
 import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
 import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_DRIVER, ENTER_PASSENGER, GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip,
@@ -61,8 +61,8 @@ function setBlinkWeight(targets: ReturnType<typeof driverFaceTargets>, weight: n
   for (const { mesh, index } of targets) mesh.morphTargetInfluences![index] = weight;
 }
 
-export function GarageEmotePlayer({ root, bag = false, previewPacks = false, leanFit, mirrorFit, victory, cockpit, personality = "friendly", bagColors, paused = false, selectionPose, onSelectionEnd }: {
-  root: Object3D; personality?: CharacterPersonality; bagColors?: PieceColors; bag?: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; paused?: boolean; selectionPose?: SelectionPoseId; onSelectionEnd?: () => void;
+export function GarageEmotePlayer({ root, bag = false, previewPacks = false, leanFit, mirrorFit, victory, cockpit, personality = "friendly", bagColors, paused = false, rosterEmote, onSelectionEnd }: {
+  root: Object3D; personality?: CharacterPersonality; bagColors?: PieceColors; bag?: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; paused?: boolean; rosterEmote?: Emote; onSelectionEnd?: () => void;
 }) {
   const invalidate = useThree(s => s.invalidate);
   const contextFit = useRef("");
@@ -86,11 +86,21 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   }, [previewPacks]);
   const baseClips = useRef<{ root: Object3D; bag: boolean; clips: ReturnType<typeof buildGarageEmotes> }>(null);
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
-  const rosterEmote = selectionPose ? selectionEmote(selectionPose) : undefined;
+  // Repeated identical authoring keys mark an actual stationary span. Moving
+  // gestures must keep sampling, including any phone, flag or other held prop.
+  const stillSpan = useMemo(() => {
+    if (!rosterEmote || rosterEmote.prop) return null;
+    const keys = rosterEmote.keys;
+    const end = keys.findIndex(([, pose], index) => index > 0 && keys[index - 1][1] === pose);
+    if (end < 1) return null;
+    const from = Math.max(FADE_SECONDS, keys[end - 1][0] * rosterEmote.duration);
+    const to = Math.min(rosterEmote.duration - FADE_SECONDS, keys[end][0] * rosterEmote.duration);
+    return to > from ? { from, to } : null;
+  }, [rosterEmote]);
   const selection = Boolean(rosterEmote);
   const held = useRef<{ wake: number; ready: boolean; until: number } | null>(null);
   const rosterFrameAt = useRef<number | null>(null);
-  const restSeconds = previewPacks ? 4.5 : 2.35;
+  const restSeconds = previewPacks ? 4.5 : GARAGE_REST_SECONDS;
   const player = useRef<CabinState & {
     mixer: AnimationMixer;
     actions: Map<string, AnimationAction>;
@@ -187,7 +197,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     if (previewPacks && useCharacterPreviewStore.getState().playbackPaused) mixer.update(0);
     const actions = new Map(clips.map(clip => [clip.name.split(" ")[0], mixer.clipAction(clip).setLoop(LoopOnce, 1)]));
     actions.set("001", mixer.clipAction(breathing.clone()).setLoop(LoopOnce, 1));
-    const automatic = [...AUTOMATIC_GARAGE_EMOTE_IDS, ...(bag ? ["bag-lift", "bag-check"] : [])]
+    const automatic = automaticGarageEmoteIds(bag)
       .flatMap(id => actions.get(id) ?? []);
     const blink = selection ? [] : driverFaceTargets(root, "blink");
     const active = celebration ? actions.get(celebration.id)!.reset().setEffectiveWeight(0).play() : null;
@@ -461,7 +471,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
           current.idle.reset().play();
           return;
         }
-        const emote = interaction ?? (created ? createdEmoteClip(created) : pose)
+        const emote = rosterEmote ?? interaction ?? (created ? createdEmoteClip(created) : pose)
           ?? (previewPacks ? makeupPreviewEmote(preview.id, mirrorFit) : undefined)
           ?? (preview.id === GARAGE_LEAN_ID && leanFit ? garageLeanPose(leanFit) : findGaragePreviewEmote(preview.id, bag));
         if (emote) {
@@ -470,6 +480,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
           current.idle.stop();
           if (emote.prop && !current.props.has(emote.prop)) {
             const prop = createEmoteProp(emote.prop);
+            if (selection) prepareGaragePointLights(prop.root, "subject");
             current.props.set(emote.prop, prop);
             root.add(prop.root);
             if (emote.prop === "flag") current.fitFlag = bindFlagPoleGrip(root, prop);
@@ -527,9 +538,9 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     current.fitFlag?.();
     if (rosterEmote && (current.active || current.preview !== rosterEmote)) {
       const active = current.active;
-      const until = rosterEmote.duration * SELECTION_HOLD.to;
-      if (!current.release && current.preview === rosterEmote && active
-        && active.time >= rosterEmote.duration * SELECTION_HOLD.from && active.time < until) {
+      if (stillSpan && !current.release && current.preview === rosterEmote && active
+        && active.time >= stillSpan.from && active.time < stillSpan.to) {
+        const until = stillSpan.to;
         // Both hold keys are identical. Camera redraws leave the rig alone.
         const wake = window.setTimeout(() => {
           if (held.current?.wake !== wake) return;

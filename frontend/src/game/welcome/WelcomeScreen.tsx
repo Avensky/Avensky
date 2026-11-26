@@ -1,7 +1,7 @@
 import { GarageCredentialFields } from "./GarageCredentialFields";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
-import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
@@ -9,7 +9,7 @@ import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "..
 import { characterLook } from "../characters/characterCatalog";
 import { attitudeName, CHARACTER_STYLES, styleLook, type CharacterBody } from "../characters/characterStyles";
 import { CharacterRoster } from "./CharacterRoster";
-import { RosterGaragePreview } from "../preview/RosterGaragePreview";
+import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
@@ -17,17 +17,20 @@ import { GarageEntryHeader } from "./GarageEntryHeader";
 import { retryEntryConnection } from "../../net/rustSocket";
 import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
 import { stagingAccountPortal } from "./config";
+import { prepareLocalEntryHandoff, beginLocalEntryHandoff } from "./localEntryHandoff";
 import "./welcomeScreen.css";
 
 type Step = "welcome" | "create" | "register" | "characters";
 const GarageProfilePanel = lazy(() => import("../characters/GarageProfilePanel").then(module => ({ default: module.GarageProfilePanel })));
 type Draft = { name: string; body: CharacterBody; style: string };
 
-async function waitForProfile(owner: string) {
-  if (useSocialStore.getState().view?.profile.id === owner) return;
+async function waitForProfile(owner: string, confirmedSnapshot = false) {
+  const ready = (state: ReturnType<typeof useSocialStore.getState>) =>
+    state.view?.profile.id === owner && (!confirmedSnapshot || state.profileStatus === "ready");
+  if (ready(useSocialStore.getState())) return;
   await new Promise<void>((resolve, reject) => {
     const unsubscribe = useSocialStore.subscribe(state => {
-      if (state.view?.profile.id === owner) {
+      if (ready(state)) {
         close();
         resolve();
       } else if (!state.available) {
@@ -43,7 +46,9 @@ async function waitForProfile(owner: string) {
   });
 }
 
-export function WelcomeScreen() {
+export function WelcomeScreen({ onGarageCharacter }: {
+  onGarageCharacter?: (selection?: GarageCharacterSelection | null) => void;
+} = {}) {
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const connected = useSocialStore(state => state.available);
   const accounts = useSocialStore(state => state.accountsAvailable);
@@ -54,6 +59,7 @@ export function WelcomeScreen() {
   const profile = useSocialStore(state => state.view?.profile);
   const registered = useSocialStore(state => state.registeredProfile);
   const [step, setStep] = useState<Step>("welcome");
+  const [localLogin, setLocalLogin] = useState(false);
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
   const [newPlayer, setNewPlayer] = useState(false);
   const openedFromMenu = useUIStore(state => state.welcomeSection === "account");
@@ -71,12 +77,12 @@ export function WelcomeScreen() {
   const root = useRef<HTMLElement>(null);
   const wasProfileOpen = useRef(false);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
-  const signedIn = Boolean(profile && (stagingSignIn || (!stagingAccountPortal && registered)));
+  const signedIn = !localLogin && Boolean(profile && (stagingSignIn || (!stagingAccountPortal && registered)));
   const rememberedPlayer = step === "welcome" && (signedIn || (!stagingAccountPortal && !showAccountEntry && profile?.characters?.length)) ? profile : undefined;
   const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const screen = entryIssue || (stagingAccountPortal && !profile) ? "welcome"
+  const screen = localLogin || entryIssue || (stagingAccountPortal && !profile) ? "welcome"
     : rememberedPlayer ? "characters" : step;
   const selectedSlot = (preview?.owner === player?.id && slots?.find(slot => slot.id === preview?.slotId))
     || slots?.find(slot => slot.id === (player?.active_character_id ?? player?.id)) || slots?.[0];
@@ -91,12 +97,33 @@ export function WelcomeScreen() {
   const previewChoice = screen === "create" ? draftLook : player && selectedSlot ? savedCharacterAppearance(player, selectedSlot) : undefined;
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
   const busy = working || restoring;
-  const sessionPending = screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
+  const sessionPending = !localLogin && screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
   const accountRoot = signedIn && screen === "characters";
   const accountOpen = accountRoot && (showSettings || openedFromMenu);
+  const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
+  useLayoutEffect(() => {
+    onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode } : null);
+  }, [onGarageCharacter, previewChoice, garageMode]);
+  // The parent takes ownership of the confirmed career when the roster closes.
+  useLayoutEffect(() => () => onGarageCharacter?.(undefined), [onGarageCharacter]);
   const unconfirmedSignIn = stagingAccountPortal && connected && !stagingSignIn;
   const signInReason = entryIssue?.kind === "session-replaced" || entryIssue?.kind === "session-expired" ? entryIssue.kind : undefined;
   const showRecovery = sessionPending && Boolean(entryIssue || connectionSlow || unconfirmedSignIn || restoreError);
+
+  const fromPortal = useRef(document.documentElement.hasAttribute("data-entry-handoff"));
+  useLayoutEffect(() => {
+    if (!fromPortal.current) return;
+    const next = sessionPending ? (showRecovery ? "recovery" : "pending")
+      : screen === "characters" && previewChoice && !accountOpen ? "roster" : "ready";
+    if (!sessionPending) {
+      // If the connection was slow, the portal has already faded into the
+      // recovery/status screen. Still introduce the roster when it finally arrives.
+      if (!document.documentElement.hasAttribute("data-entry-handoff"))
+        root.current?.querySelector(".character-roster")?.classList.add("garage-entry-incoming");
+      fromPortal.current = false;
+    }
+    window.dispatchEvent(new CustomEvent("avensky:entry-view", { detail: next }));
+  }, [sessionPending, showRecovery, screen, previewChoice, accountOpen]);
 
   function entryNotice() {
     if (signInReason) return sessionEndNotices[signInReason];
@@ -150,14 +177,20 @@ export function WelcomeScreen() {
   useEffect(() => {
     const returningFromProfile = wasProfileOpen.current && !accountOpen;
     wasProfileOpen.current = accountOpen;
-    if (screen === "welcome") return;
-    if (busy || (!returningFromProfile && root.current?.contains(document.activeElement))) return;
-    if (!accountOpen && screen === "characters") {
-      const initial = root.current?.querySelector<HTMLElement>('[data-character-id][aria-pressed=true], [data-roster-create]:only-child');
-      initial?.focus({ preventScroll: true });
-    } else if (!window.matchMedia?.("(pointer: coarse)")?.matches) {
-      root.current?.querySelector(".welcome-panel")?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled), [role=button]:not([aria-disabled=true])")?.focus({ preventScroll: true });
+    function focusEntry() {
+      if (root.current?.inert) return;
+      if (screen === "welcome") return;
+      if (busy || (!returningFromProfile && root.current?.contains(document.activeElement))) return;
+      if (!accountOpen && screen === "characters") {
+        const initial = root.current?.querySelector<HTMLElement>('[data-character-id][aria-pressed=true], [data-roster-create]:only-child');
+        initial?.focus({ preventScroll: true });
+      } else if (!window.matchMedia?.("(pointer: coarse)")?.matches) {
+        root.current?.querySelector(".welcome-panel")?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled), [role=button]:not([aria-disabled=true])")?.focus({ preventScroll: true });
+      }
     }
+    focusEntry();
+    window.addEventListener("avensky:entry-interactive", focusEntry);
+    return () => window.removeEventListener("avensky:entry-interactive", focusEntry);
   }, [screen, busy, connected, accountOpen]);
 
   useEffect(() => {
@@ -192,7 +225,7 @@ export function WelcomeScreen() {
 
   useEffect(() => {
     function navigate(event: Event) {
-      if (!root.current || (busy && !sessionPending)) return;
+      if (!root.current || root.current.inert || (busy && !sessionPending)) return;
       const action = (event as CustomEvent<MenuAction>).detail;
       const active = root.current.contains(document.activeElement) ? document.activeElement :
         root.current.querySelector(".garage-field[data-selected=true] input") ?? document.activeElement;
@@ -231,7 +264,26 @@ export function WelcomeScreen() {
     const form = new FormData(event.currentTarget);
     const login = String(form.get("login") ?? "");
     const password = String(form.get("password") ?? "");
+    const main = root.current;
     void run(async () => {
+      if (step === "welcome" && !stagingAccountPortal && main) {
+        // Keep the real form mounted through confirmation and the profile snapshot.
+        // A rejected sign-in leaves both fields available for correction.
+        setLocalLogin(true);
+        prepareLocalEntryHandoff();
+        try {
+          const owner = await selectAccount({ login, password });
+          await waitForProfile(owner, true);
+          if (root.current !== main) return;
+          beginLocalEntryHandoff(main);
+          fromPortal.current = true;
+          setConfirmedProfile(owner);
+          setStep("characters");
+        } finally {
+          setLocalLogin(false);
+        }
+        return;
+      }
       const accountName = draft?.name ?? profile?.name ?? login.trim().split("@")[0].slice(0, 24);
       const owner = await selectAccount({ login, password }, step === "register" ? accountName : undefined);
       if (step === "register" && newPlayer && draft) {
@@ -316,14 +368,13 @@ export function WelcomeScreen() {
         navigateFormRows(root.current!, (root.current!.contains(document.activeElement) ? document.activeElement : root.current!.querySelector(".garage-field[data-selected=true] input")) as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
-      <GarageEntryHeader account={accountRoot ? {
+      <GarageEntryHeader loginEntry={!signedIn && (screen === "register" || (screen === "welcome" && !sessionPending))} account={accountRoot ? {
         profileOpen: accountOpen, busy, onLogOut: () => void run(logOut),
         onProfile: () => { if (accountOpen) leaveProfile(); else setShowSettings(true); },
       } : undefined} />
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
       {(sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
-      {(screen === "create" || screen === "characters") && previewChoice && <RosterGaragePreview choice={previewChoice} mode={accountOpen ? "profile" : screen === "create" ? "create" : "roster"} />}
       {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
         {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
         {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
@@ -381,7 +432,8 @@ export function WelcomeScreen() {
             </div>
           </form>
         ) : <>
-          <form className="garage-credentials" method="post" onSubmit={authenticate}>
+          <form className="garage-credentials" method="post" onFocusCapture={prepareLocalEntryHandoff}
+            onPointerDownCapture={prepareLocalEntryHandoff} onSubmit={authenticate}>
             <GarageCredentialFields disabled={busy || !accounts} />
           </form>
           <div className="garage-recovery" data-controller-row>
@@ -405,7 +457,7 @@ export function WelcomeScreen() {
             <GameButton variant="menu" onPress={recoverEntry}>{signInReason ? "Return to sign-in" : "Reconnect"}</GameButton>
           </div>}
         </> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
-          {working ? "Saving…" : restoring ? "Loading your characters…" : "Waiting for the game server…"}
+          {working ? (localLogin ? "Signing in…" : "Saving…") : restoring ? "Loading your characters…" : "Waiting for the game server…"}
         </p>}
         {(error || (restoreError && !sessionPending)) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
       </aside>

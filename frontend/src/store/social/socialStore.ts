@@ -110,6 +110,14 @@ export function savedCharacterAppearance(profile: PlayerProfile, slot: Character
   return (active ? profile.progression?.character : null) ?? slot.appearance ?? null;
 }
 
+export function selectMainGarageCharacter(state: { view: SocialView | null; cachedCosmetics: Cosmetics | null; profileOwner: string | null }) {
+  const profile = state.view?.profile;
+  if (!profile) return state.profileOwner ? selectEquippedCharacter(state) ?? null : null;
+  if (!profile.characters) return profile.progression?.character ?? null; // Before career slots were introduced.
+  const active = profile.characters.find(slot => slot.id === (profile.active_character_id ?? profile.id));
+  return active ? savedCharacterAppearance(profile, active) : null;
+}
+
 function cosmeticsFrom({ character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision }: Cosmetics): Cosmetics {
   return { character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision };
 }

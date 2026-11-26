@@ -12,9 +12,10 @@ type AccountActions = {
   onLogOut: () => void;
 };
 
-export function GarageEntryHeader({ account }: { account?: AccountActions }) {
+export function GarageEntryHeader({ loginEntry, account }: { loginEntry: boolean; account?: AccountActions }) {
+  if (!loginEntry && !account) return null;
   return <header className="garage-entry-header angled-tab-header">
-    <div className="garage-entry-brand" dangerouslySetInnerHTML={brand} />
+    {loginEntry && <div className="garage-entry-brand" dangerouslySetInnerHTML={brand} />}
     {account && <nav className="garage-entry-actions" aria-label="Account actions" data-controller-row data-controller-header-action>
       <GameButton variant="custom" className="garage-entry-action garage-entry-action--logout" aria-label="Log out" title="Log out"
         onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Keyboard } from "./controls/Keyboard";
 import { GameController } from "./controls/GameController";
 import { useMobilePortrait } from "./controls/useMobilePortrait";
@@ -10,6 +10,8 @@ import "./App.css";
 import { OnScreenKeyboard } from "./components/text/OnScreenKeyboard";
 import { useUIStore } from "./store/menus/uiStore";
 import { GarageMenuBackdrop } from "./game/welcome/GarageMenuBackdrop";
+import { RosterGaragePreview, type GarageCharacterSelection } from "./game/preview/RosterGaragePreview";
+import { selectMainGarageCharacter, useSocialStore } from "./store/social/socialStore";
 import { WelcomeScreen } from "./game/welcome/WelcomeScreen";
 import { useAppTheme } from "./theme";
 
@@ -19,6 +21,13 @@ export default function App() {
   const mobilePortrait = useMobilePortrait();
   const screen = useUIStore(state => state.screen);
   const welcome = screen === "welcome";
+  const [welcomeCharacter, setWelcomeCharacter] = useState<GarageCharacterSelection | null>();
+  const equipped = useSocialStore(state => screen === "main" ||
+    (welcome && state.view && !state.entryIssue && (state.stagingSignIn || state.registeredProfile))
+    ? selectMainGarageCharacter(state) : null);
+  // A returning roster can keep the equipped rig until it publishes its own selection.
+  const garageCharacter: GarageCharacterSelection | null = welcome && welcomeCharacter !== undefined
+    ? welcomeCharacter : equipped && { choice: equipped, mode: welcome ? "roster" : "main" };
   const showGarageBackdrop = useUIStore(state =>
     state.isModeLoading || state.overlay === "team_lineup" || (state.screen !== "sandbox" && state.screen !== "world_builder"));
   const rotate = mobilePortrait && !welcome && screen !== "main";
@@ -57,7 +66,8 @@ export default function App() {
     <div className="canvas-container">
       <div className="game-viewport" inert={rotate}>
         <GarageMenuBackdrop visible={showGarageBackdrop} />
-        {welcome ? <WelcomeScreen /> : <Suspense fallback={null}><GameUI /></Suspense>}
+        {garageCharacter && <RosterGaragePreview {...garageCharacter} />}
+        {welcome ? <WelcomeScreen onGarageCharacter={setWelcomeCharacter} /> : <Suspense fallback={null}><GameUI /></Suspense>}
         {!rotate && <OnScreenKeyboard />}
       </div>
       {rotate ? (

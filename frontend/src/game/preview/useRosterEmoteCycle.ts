@@ -1,10 +1,10 @@
-import { useCallback, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useCallback, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { Object3D } from "three";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
-import { SELECTION_POSES } from "../characters/selectionPoses";
+import { GARAGE_REST_SECONDS, rosterGarageEmotes } from "../characters/garageEmotes";
+import type { CharacterPersonality } from "../characters/characterPersonality";
 
 const motionQuery = "(prefers-reduced-motion: reduce)";
-const NEUTRAL_REST_MS = 4000;
 
 function subscribePresentation(notify: () => void) {
   const media = window.matchMedia?.(motionQuery);
@@ -21,26 +21,27 @@ function presentationPaused() {
 }
 
 /** Begin the neutral rest only after the selected rig finishes an entire emote. */
-export function useRosterEmoteCycle(root: Object3D, paused: boolean) {
+export function useRosterEmoteCycle(root: Object3D, paused: boolean, personality: CharacterPersonality, bag: boolean) {
   const systemPaused = useSyncExternalStore(subscribePresentation, presentationPaused, () => true);
   const reduced = usePreferencesStore(s => s.reducedMotion);
   const still = paused || reduced || systemPaused;
   const rig = root.uuid;
-  const [cycle, setCycle] = useState({ rig, index: 0 });
-  const index = cycle.rig === rig ? cycle.index : 0;
+  const pool = useMemo(() => rosterGarageEmotes(personality, bag), [personality, bag]);
+  const [cycle, setCycle] = useState({ rig, pool, index: 0 });
+  const index = cycle.rig === rig && cycle.pool === pool ? cycle.index : 0;
   const timer = useRef<number | null>(null);
   useLayoutEffect(() => () => {
     if (timer.current !== null) window.clearTimeout(timer.current);
     timer.current = null;
-  }, [rig, still]);
+  }, [rig, pool, still]);
   const onSelectionEnd = useCallback(() => {
     if (still || timer.current !== null) return;
     timer.current = window.setTimeout(() => {
       timer.current = null;
       if (!presentationPaused() && !usePreferencesStore.getState().reducedMotion) {
-        setCycle({ rig, index: (index + 1) % SELECTION_POSES.length });
+        setCycle({ rig, pool, index: (index + 1) % pool.length });
       }
-    }, NEUTRAL_REST_MS);
-  }, [rig, index, still]);
-  return { pose: SELECTION_POSES[index].id, paused: still, onSelectionEnd };
+    }, GARAGE_REST_SECONDS * 1000);
+  }, [rig, pool, index, still]);
+  return { emote: pool[index], paused: still, onSelectionEnd };
 }

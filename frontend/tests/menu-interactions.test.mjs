@@ -210,6 +210,32 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       },
     );
     await t.test(
+      "Main keeps left-stick menu navigation while the right stick turns its garage character",
+      async () => {
+        await reset();
+        const { bindRosterSticks } = await load("game/preview/rosterStickControls.ts");
+        const samples = [];
+        const release = bindRosterSticks((x, y, turn) => samples.push([x, y, turn]));
+        const poll = () => act(async () => new Promise(resolve => setTimeout(resolve, 65)));
+        try {
+          // Let the intentional stick-repeat delay from the preceding D-pad press expire.
+          await act(async () => new Promise(resolve => setTimeout(resolve, 240)));
+          const selected = document.activeElement;
+          pad.axes = [0, 0, .9, 0];
+          await poll();
+          assert.equal(document.activeElement, selected, "turning the actor cannot open the player menu");
+          pad.axes = [0, .9, -.8, 0];
+          await poll();
+          assert.equal(ui.getState().getActiveMenuIndex(), 1);
+          assert.ok(samples.some(([x, y, turn]) => x === 0 && y === 0 && turn < -.5));
+        } finally {
+          pad.axes = [0, 0, 0, 0];
+          await poll();
+          release();
+        }
+      },
+    );
+    await t.test(
       "every main-menu entry has the same selected theme for mouse and controller",
       async () => {
         await reset();

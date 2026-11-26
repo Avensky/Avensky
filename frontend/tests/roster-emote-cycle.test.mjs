@@ -19,7 +19,7 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
   let serial = 0, view, rig = { uuid: "first" };
   const set = window.setTimeout.bind(window), clear = window.clearTimeout.bind(window);
   window.setTimeout = (fn, delay, ...args) => {
-    if (delay !== 4000) return set(fn, delay, ...args);
+    if (delay !== 2350) return set(fn, delay, ...args);
     timers.set(--serial, fn);
     return serial;
   };
@@ -30,7 +30,20 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
     vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", logLevel: "error" });
     const { useRosterEmoteCycle } = await vite.ssrLoadModule("/src/game/preview/useRosterEmoteCycle.ts");
     const { usePreferencesStore } = await vite.ssrLoadModule("/src/store/preferences/preferencesStore.ts");
-    function Sample({ rig, paused }) { view = useRosterEmoteCycle(rig, paused); return null; }
+    const { automaticGarageEmoteIds, rosterGarageEmotes } = await vite.ssrLoadModule("/src/game/characters/garageEmotes.ts");
+    const { CHARACTER_PERSONALITIES } = await vite.ssrLoadModule("/src/game/characters/characterPersonality.ts");
+    const { availableFinderEmotes } = await vite.ssrLoadModule("/src/game/characters/emoteFinder.ts");
+    for (const carrying of [false, true]) {
+      const available = new Set(availableFinderEmotes(carrying).map(item => item.id));
+      for (const style of CHARACTER_PERSONALITIES) {
+        const pool = rosterGarageEmotes(style.id, carrying);
+        const expected = new Set([...automaticGarageEmoteIds(carrying), ...style.emotes.filter(id => available.has(id))]);
+        assert.deepEqual(new Set(pool.map(item => item.id)), expected, `complete ${style.label} rotation with bag=${carrying}`);
+        assert.equal(pool.length, expected.size, "each emote occurs once per rotation");
+      }
+    }
+    let personality = "playful", bag = false;
+    function Sample({ rig, paused }) { view = useRosterEmoteCycle(rig, paused, personality, bag); return null; }
     const show = (paused = false) => act(async () => root.render(createElement(StrictMode, null, createElement(Sample, { rig, paused }))));
     const finish = () => { view.onSelectionEnd(); view.onSelectionEnd(); assert.equal(timers.size, 1); };
     const advance = async () => {
@@ -40,14 +53,31 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
     };
 
     await show();
-    assert.equal(view.pose, "pose-pocket-stance");
+    const rotation = rosterGarageEmotes(personality, bag).map(emote => emote.id);
+    assert.equal(view.emote.id, "021", "a playful character opens with their personality gesture");
+    assert.equal(new Set(rotation).size, rotation.length);
+    for (const id of [...automaticGarageEmoteIds(false), "023", "026", "robot-dance"]) assert(rotation.includes(id));
     assert.equal(timers.size, 0, "a slow-loading or still-playing rig can't skip ahead");
-    for (const next of ["pose-hand-on-hip", "pose-crossed-ankles", "pose-pocket-stance"]) {
+    for (const next of [...rotation.slice(1), rotation[0]]) {
       finish();
       await advance();
-      assert.equal(view.pose, next);
+      assert.equal(view.emote.id, next);
       assert.equal(timers.size, 0, "no interval or polling during the next clip");
     }
+    finish();
+    personality = "scientist";
+    await show();
+    assert.equal(timers.size, 0, "changing personality cancels a previous rest");
+    assert.equal(view.emote.id, "157", "the saved personality's own pool is selected");
+    const scientist = rosterGarageEmotes(personality, false);
+    assert(scientist.some(emote => emote.prop === "tablet"));
+    bag = true;
+    await show();
+    const carrying = rosterGarageEmotes(personality, true).map(emote => emote.id);
+    assert(automaticGarageEmoteIds(true).every(id => carrying.includes(id)));
+    assert(carrying.includes("bag-lift") && carrying.includes("bag-check"));
+    assert(!carrying.some(id => id.startsWith("stance-") || ["157", "158", "159", "160"].includes(id)),
+      "the pack's prop and carrying rules determine which automatic gestures fit");
     finish();
     rig = { uuid: "second" };
     await show();

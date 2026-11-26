@@ -16,9 +16,9 @@ export function createMenuDirections() {
   const strongest = (a = 0, b = 0) => axis(Math.abs(a) >= Math.abs(b) ? a : b, 0.5);
   return {
     reset() { lastVertical = lastHorizontal = -Infinity; },
-    read(pad: Gamepad, edges: boolean[], now: number, sticks = true) {
-      const vertical = sticks ? strongest(pad.axes[1], pad.axes[3]) : 0;
-      const horizontal = sticks ? strongest(pad.axes[0], pad.axes[2]) : 0;
+    read(pad: Gamepad, edges: boolean[], now: number, sticks: boolean | "left" = true) {
+      const vertical = sticks ? strongest(pad.axes[1], sticks === true ? pad.axes[3] : 0) : 0;
+      const horizontal = sticks ? strongest(pad.axes[0], sticks === true ? pad.axes[2] : 0) : 0;
       if (edges[12] || edges[13] || (vertical && now - lastVertical >= 220)) {
         lastVertical = now;
         return edges[12] || (!edges[13] && vertical < 0) ? "up" : "down";

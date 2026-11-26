@@ -1,7 +1,7 @@
 import { Component, Suspense, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, useFrame, useLoader, useThree, type RootState } from "@react-three/fiber";
-import { Box3, Mesh, PerspectiveCamera, Quaternion, type WebGLRenderTarget } from "three";
+import { Box3, Mesh, PerspectiveCamera, type WebGLRenderTarget } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { prepareGarageDisplay } from "./prepareGarageDisplay";
@@ -11,6 +11,7 @@ import { isUITheme } from "../../theme/catalog";
 import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry";
 import { collectGarageFixtures } from "./garageFixtures";
 import { setFloorFinish } from "./mechanicsFloor";
+import { GarageCameraTravel } from "./garageCameraTravel";
 import { installGarageEntryInteraction, type ActorInput, type EntryMotion } from "./garageEntryInteraction";
 import { restoreGaragePreferences } from "../../theme/garagePreferences";
 import { embeddedTextureImages } from "../../assets/embeddedTextureImages";
@@ -19,6 +20,7 @@ declare const __GARAGE_MODEL_URL__: string;
 const decoder = new DRACOLoader().setDecoderPath("/draco/");
 const configure = (loader: GLTFLoader) => { loader.setDRACOLoader(decoder).register(embeddedTextureImages); };
 export type GarageEntryShot = {
+  subject?: "loading" | "ready" | "unavailable";
   frame(camera: PerspectiveCamera, width: number, height: number): void;
   orbit(camera: PerspectiveCamera, yaw: number, pitch: number): void;
   actor?: ActorInput;
@@ -133,40 +135,32 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
   const invalidate = useThree(state => state.invalidate);
   const previousFrame = useRef(performance.now());
   const reducedMotion = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)"), []);
-  const restingOrientation = useMemo(() => new Quaternion(), []);
-  const settledAngleSquared = useRef(0);
+  const travel = useMemo(() => new GarageCameraTravel(), []);
   useLayoutEffect(() => {
     if (!active) return;
-    const portrait = width < height;
-    camera.clearViewOffset();
-    camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
-    camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
-    camera.aspect = width / Math.max(1, height);
-    camera.fov = portrait ? 70 : 59;
-    shot?.frame(camera, Math.max(1, width), Math.max(1, height));
-    restingOrientation.copy(camera.quaternion);
-    camera.updateProjectionMatrix();
-    // A small rotation moves details fastest near the corners of a perspective image.
-    // Stop when even a corner would travel less than a quarter of a rendered pixel.
-    const projection = camera.projectionMatrix.elements;
-    const focalPixels = .5 * Math.max(1, height * dpr) * projection[5];
-    const cornerScale = 1 + (1 / projection[0]) ** 2 + (1 / projection[5]) ** 2;
-    settledAngleSquared.current = (.25 / (focalPixels * cornerScale)) ** 2;
     runtime.motion.invalidate = invalidate;
     previousFrame.current = performance.now();
     const changed = () => invalidate();
+    const visibility = () => {
+      travel.resume();
+      if (!document.hidden) changed();
+    };
     const preferences = new MutationObserver(changed);
     preferences.observe(document.documentElement, { attributes: true, attributeFilter: ["data-reduce-motion"] });
     reducedMotion?.addEventListener("change", changed);
+    document.addEventListener("visibilitychange", visibility);
     invalidate();
     return () => {
       runtime.motion.invalidate = undefined;
       preferences.disconnect();
       reducedMotion?.removeEventListener("change", changed);
+      document.removeEventListener("visibilitychange", visibility);
+      delete document.documentElement.dataset.garageShot;
     };
-  }, [active, width, height, dpr, invalidate, reducedMotion, camera, restingOrientation, shot]);
+  }, [active, invalidate, reducedMotion, travel]);
+  useLayoutEffect(() => { if (active) invalidate(); }, [active, shot, width, height, dpr, invalidate]);
   useFrame(() => {
-    if (!active || document.hidden) return;
+    if (!active || document.hidden || !width || !height) return;
     const motion = runtime.motion;
     const now = performance.now();
     const started = motion.dragging ? motion.dragStarted : motion.lastInput;
@@ -179,18 +173,20 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
     const blend = immediate ? 1 : -Math.expm1(-(following ? 16 : 1.7) * elapsed);
     motion.yaw += (yaw - motion.yaw) * blend;
     motion.pitch += (pitch - motion.pitch) * blend;
-    const moving = (yaw - motion.yaw) ** 2 + (pitch - motion.pitch) ** 2 > settledAngleSquared.current;
+    const moving = (yaw - motion.yaw) ** 2 + (pitch - motion.pitch) ** 2 > travel.settledAngleSquared;
     if (!moving) {
       motion.yaw = yaw;
       motion.pitch = pitch;
     }
-    if (shot) shot.orbit(camera, motion.yaw, motion.pitch);
-    else {
-      camera.quaternion.copy(restingOrientation);
-      camera.rotateY(motion.yaw);
-      camera.rotateX(motion.pitch);
+    travel.frame(camera, shot, width, height, dpr, motion.yaw, motion.pitch, now, Boolean(immediate));
+    const page = document.documentElement.dataset;
+    if (page.garageShot !== travel.phase) {
+      if (travel.phase) {
+        page.garageShot = travel.phase;
+        if (travel.phase !== "waiting") window.dispatchEvent(new CustomEvent("avensky:roster-" + travel.phase, { detail: shot?.subject }));
+      } else delete page.garageShot;
     }
-    if (moving) invalidate();
+    if (moving || travel.moving) invalidate();
   }, -1);
   return null;
 }

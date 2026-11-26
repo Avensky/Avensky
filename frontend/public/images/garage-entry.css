@@ -42,6 +42,7 @@
     padding-left: calc(2 * var(--angled-brand-padding));
   }
 }
+body.garage-entry:has(.garage-entry-account) > .garage-entry-header { display: none; }
 .garage-entry-body {
   position: relative; display: grid; justify-items: end; align-items: center;
   min-height: calc(100svh - var(--menu-angled-header-height) - env(safe-area-inset-top)); box-sizing: border-box;
@@ -317,3 +318,46 @@ body.garage-entry .garage-entry-card:not(.garage-entry-account)::before { conten
     max-height: max(1.5rem, calc(100% - var(--menu-angled-header-height) - env(safe-area-inset-top)));
   }
 }
+
+/* Only the menu layers fade. The mounted room remains visible and interactive
+   when the incoming menu is ready, including during a slow character load. */
+:root { --garage-entry-crossfade-duration: 320ms; }
+@keyframes garage-entry-reveal { from { opacity: 0; } to { opacity: 1; } }
+@keyframes garage-entry-dismiss { from { opacity: 1; } to { opacity: 0; } }
+.garage-entry-incoming,
+html[data-entry-handoff="fading"] .welcome-screen > :is(.garage-entry-header,.welcome-scroll) {
+  animation: garage-entry-reveal var(--garage-entry-crossfade-duration) ease-out both;
+}
+.garage-entry-outgoing,
+html[data-entry-handoff="fading"] #garage-entry-handoff {
+  animation: garage-entry-dismiss var(--garage-entry-crossfade-duration) ease-in both;
+}
+#garage-entry-handoff {
+  position:fixed; inset:0; z-index:10; pointer-events:none; user-select:none;
+  color:var(--app-text); font:500 1rem/1.4 system-ui,sans-serif;
+}
+#garage-entry-handoff * { pointer-events:none; }
+#garage-entry-handoff .garage-entry-body { height:100%; }
+#garage-entry-handoff .garage-entry-card { padding:var(--garage-menu-pad); background:transparent; }
+.garage-handoff-value {
+  display:flex; align-items:center; box-sizing:border-box; width:100%; min-height:44px;
+  padding:.38rem .65rem .38rem 2.5rem; color:var(--garage-menu-muted);
+}
+#garage-entry-handoff .garage-recovery .garage-handoff-action {
+  display:inline-flex; align-items:center; justify-content:center; min-height:44px; color:var(--garage-menu-accent);
+}
+html[data-entry-handoff] #startup-screen { background:transparent; pointer-events:none; z-index:0; }
+html[data-entry-handoff="waiting"] .welcome-screen > :is(.garage-entry-header,.welcome-scroll) { opacity:0; }
+.garage-handoff-status {
+  position:fixed; z-index:11; left:max(3vw,env(safe-area-inset-left)); top:25%; padding:.5rem .75rem;
+  background:var(--garage-menu-row); color:var(--garage-menu-ink); pointer-events:none;
+  animation:garage-entry-reveal .15s .85s both;
+}
+@media (orientation:portrait) {
+  .garage-handoff-status { top:calc(env(safe-area-inset-top) + var(--menu-angled-header-height,41px) + 12px); }
+}
+@media (prefers-reduced-motion:reduce) {
+  .garage-entry-incoming,.garage-entry-outgoing,.garage-handoff-status,
+  html[data-entry-handoff="fading"] :is(#garage-entry-handoff,.welcome-screen > .garage-entry-header,.welcome-screen > .welcome-scroll) { animation-duration:0s; }
+}
+html[data-reduce-motion="true"] :is(.garage-entry-incoming,.garage-entry-outgoing,.garage-handoff-status,#garage-entry-handoff,.welcome-screen > .garage-entry-header,.welcome-screen > .welcome-scroll) { animation-duration:0s; }

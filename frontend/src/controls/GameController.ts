@@ -328,17 +328,20 @@ export function GameController() {
           return;
         }
         const now = performance.now();
-        let usingRosterSticks = false;
-        if (ui.screen === "welcome" && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
+        let navigationSticks: boolean | "left" = true;
+        if ((ui.screen === "welcome" || ui.screen === "main") && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
           const deadzone = usePreferencesStore.getState().controllerDeadzone;
-          usingRosterSticks = readRosterSticks(axis(pad.axes[0], deadzone), axis(pad.axes[1], deadzone), axis(pad.axes[2], deadzone), now);
+          const turn = axis(pad.axes[2], deadzone);
+          if (ui.screen === "welcome")
+            navigationSticks = !readRosterSticks(axis(pad.axes[0], deadzone), axis(pad.axes[1], deadzone), turn, now);
+          else if (readRosterSticks(0, 0, turn, now)) navigationSticks = "left";
         } else releaseRosterSticks();
         // A fresh press or deliberate stick tilt changes automatic hints. A held or
         // drifting stick must not immediately steal them back from touch or typing.
         const tilted = pad.axes.some(value => Math.abs(value) >= (stickActive ? .25 : .5));
         if ((tilted && !stickActive) || edges.some(Boolean)) reportMenuDevice("controller");
         stickActive = tilted;
-        const direction = menuDirections.read(pad, edges, now, !usingRosterSticks);
+        const direction = menuDirections.read(pad, edges, now, navigationSticks);
         if (direction) {
           routeMenuAction(direction);
           return;

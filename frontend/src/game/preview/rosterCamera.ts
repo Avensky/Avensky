@@ -3,7 +3,7 @@ import type { GarageEntryShot } from "./LiveGarage";
 
 // Both starter rigs face +Z, with their shoes at garage floor level.
 export const ROSTER_HEADING = .68;
-export type CharacterGarageView = "roster" | "create" | "profile";
+export type CharacterGarageView = "roster" | "create" | "profile" | "main";
 export type CharacterGarageShot = GarageEntryShot & { fitPortrait(eyeHeight: number, waistHeight: number): void };
 const landscape = { bodyFraction: .74, aimHeight: .87, centerY: .53 };
 const portraitFrames = {
@@ -31,6 +31,7 @@ export function rosterCamera(view: CharacterGarageView = "roster"): CharacterGar
     camera.lookAt(target);
   }
   return {
+    subject: "loading",
     fitPortrait(eyeHeight, waistHeight) {
       if (eyeHeight <= waistHeight) return;
       eye = eyeHeight;
@@ -44,7 +45,8 @@ export function rosterCamera(view: CharacterGarageView = "roster"): CharacterGar
       let centerY = portraitEyeLine;
       if (closeUp) framePortrait();
       else {
-        const frame = portrait && view !== "profile" ? portraitFrames[view] : landscape;
+        const frame = !portrait || view === "profile" ? landscape : view === "main"
+          ? mainPortraitFrame(height) : portraitFrames[view];
         target.y = frame.aimHeight;
         centerY = frame.centerY;
         distance = 1.74 / (frame.bodyFraction * viewSpan);
@@ -56,4 +58,10 @@ export function rosterCamera(view: CharacterGarageView = "roster"): CharacterGar
     },
     orbit,
   };
+}
+
+function mainPortraitFrame(height: number) {
+  // Short phones devote proportionally more room to the six menu actions.
+  const bodyFraction = Math.min(.50, Math.max(.30, .50 * height / 800));
+  return { bodyFraction, aimHeight: .87, centerY: .1 + bodyFraction / 2 };
 }
