@@ -126,6 +126,10 @@ Preserve edge lengths: proposed fabric soft 2% / hard 4%; structured corset soft
 
 Existing skirt fit algorithms contain different numbers (e.g. high-waist ceilings and hem extensions). New generic rules must not silently supersede accepted fixture behavior. See [DECISIONS.md](DECISIONS.md).
 
+## W-03 shared manifest representation
+
+The [machine-readable class defaults](../../packages/wardrobe-catalog/layer-rules.json), [schema](../../packages/wardrobe-catalog/layer-rules.schema.json), and [validator](../../packages/wardrobe-catalog/validate-layer-rules.mjs) implement structural checks, known modes, and conditional per-region order cycles. They do **not** implement runtime outfit resolution or imply a passed visual/physics fit. Class IDs are distinct from existing saved garment slots; mapping and evidence-gated item overrides belong to W-04/W-05.
+
 ## 6. Deterministic resolution contract
 
 Inputs: ordered set of **stable garment IDs plus mode selections**, body-profile version, asset revision hashes, target geometry tier, fitted-variant approvals. Output:

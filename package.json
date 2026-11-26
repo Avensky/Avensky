@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "check": "concurrently -n frontend,rust \"npm:check:frontend\" \"npm:check:rust\"",
-    "check:frontend": "npm --prefix frontend run lint && npm --prefix frontend run typecheck",
+    "check:frontend": "npm --prefix frontend run lint && npm --prefix frontend run typecheck && npm run wardrobe:layers:check",
     "check:cargo": "cargo --version && rustc --version",
     "check:rust": "cd avenlab-server && cargo check",
     "wardrobe:catalog": "node frontend/scripts/discover-wardrobe-garments.mts --write",
@@ -22,7 +22,8 @@
     "install:cargo:linux": "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y",
     "install:rust": "cargo fetch --manifest-path avenlab-server/Cargo.toml",
     "install:rust-tools": "cargo install cargo-watch",
-    "build": "npm --prefix frontend run build"
+    "build": "npm --prefix frontend run build",
+    "wardrobe:layers:check": "node packages/wardrobe-catalog/validate-layer-rules.mjs && node --test frontend/tests/wardrobe-layer-manifest.test.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.2.1",
