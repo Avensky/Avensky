@@ -1,0 +1,1158 @@
+{
+  "schemaVersion": 1,
+  "classes": {
+    "underwear": {
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "waistFront",
+        "waistBack",
+        "hips",
+        "crotch"
+      ],
+      "protectedFeatures": [
+        "seams"
+      ],
+      "modes": {}
+    },
+    "undershirt": {
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack"
+      ],
+      "protectedFeatures": [
+        "neckline",
+        "armholes",
+        "cuffs"
+      ],
+      "modes": {}
+    },
+    "top": {
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack"
+      ],
+      "protectedFeatures": [
+        "neckline",
+        "armholes",
+        "buttons",
+        "stitches",
+        "cuffs"
+      ],
+      "modes": {}
+    },
+    "corset": {
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack",
+        "hips"
+      ],
+      "protectedFeatures": [
+        "cups",
+        "boning",
+        "laces",
+        "eyelets",
+        "clasps",
+        "straps"
+      ],
+      "modes": {
+        "bodyFit": {
+          "choices": [
+            "direct",
+            "over-top",
+            "over-dress"
+          ],
+          "default": "direct"
+        },
+        "waist": {
+          "choices": [
+            "tucked",
+            "over"
+          ],
+          "default": "over"
+        }
+      }
+    },
+    "coat": {
+      "regions": [
+        "neck",
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh"
+      ],
+      "protectedFeatures": [
+        "lapels",
+        "collar",
+        "buttons",
+        "seams",
+        "cuffs"
+      ],
+      "modes": {
+        "closure": {
+          "choices": [
+            "open",
+            "closed"
+          ],
+          "default": "open"
+        }
+      }
+    },
+    "dress": {
+      "regions": [
+        "neck",
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "protectedFeatures": [
+        "neckline",
+        "waist-seam",
+        "lace",
+        "hem",
+        "lining",
+        "cuffs"
+      ],
+      "modes": {
+        "silhouette": {
+          "choices": [
+            "gown",
+            "tunic",
+            "pinafore"
+          ],
+          "default": "gown"
+        }
+      }
+    },
+    "skirt": {
+      "regions": [
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "protectedFeatures": [
+        "waist-seam",
+        "pleats",
+        "lace",
+        "ruffles",
+        "hem"
+      ],
+      "modes": {}
+    },
+    "petticoat": {
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "protectedFeatures": [
+        "waist-seam",
+        "hem",
+        "ruffles"
+      ],
+      "modes": {}
+    },
+    "pants": {
+      "regions": [
+        "waistFront",
+        "waistBack",
+        "hips",
+        "crotch",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "protectedFeatures": [
+        "fly",
+        "pockets",
+        "belt-loops",
+        "seams",
+        "cuffs"
+      ],
+      "modes": {}
+    },
+    "stockings": {
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "protectedFeatures": [
+        "tops",
+        "seams"
+      ],
+      "modes": {}
+    },
+    "socks": {
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "protectedFeatures": [
+        "cuffs",
+        "seams"
+      ],
+      "modes": {}
+    },
+    "shoe": {
+      "regions": [
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "protectedFeatures": [
+        "sole",
+        "heel",
+        "toe-cap",
+        "eyelets"
+      ],
+      "modes": {}
+    },
+    "boot": {
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "protectedFeatures": [
+        "sole",
+        "heel",
+        "toe-cap",
+        "eyelets",
+        "shaft"
+      ],
+      "modes": {
+        "cuff": {
+          "choices": [
+            "pants-tucked",
+            "pants-over"
+          ],
+          "default": "pants-over"
+        }
+      }
+    },
+    "belt": {
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "protectedFeatures": [
+        "buckle",
+        "loops",
+        "hardware"
+      ],
+      "modes": {
+        "placement": {
+          "choices": [
+            "under-coat",
+            "over-coat"
+          ],
+          "default": "under-coat"
+        }
+      }
+    },
+    "gloves": {
+      "regions": [
+        "leftHand",
+        "rightHand",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm"
+      ],
+      "protectedFeatures": [
+        "cuffs",
+        "stitches",
+        "hard-plates"
+      ],
+      "modes": {
+        "cuff": {
+          "choices": [
+            "under-sleeve",
+            "gauntlet-over-cuff"
+          ],
+          "default": "under-sleeve"
+        }
+      }
+    },
+    "scarf": {
+      "regions": [
+        "neck",
+        "torsoFront"
+      ],
+      "protectedFeatures": [
+        "end-trim",
+        "knots"
+      ],
+      "modes": {
+        "placement": {
+          "choices": [
+            "outside",
+            "tucked"
+          ],
+          "default": "outside"
+        }
+      }
+    },
+    "hood": {
+      "regions": [
+        "head",
+        "neck"
+      ],
+      "protectedFeatures": [
+        "edge",
+        "seams"
+      ],
+      "modes": {}
+    },
+    "hair": {
+      "regions": [
+        "head",
+        "neck"
+      ],
+      "protectedFeatures": [
+        "hairline"
+      ],
+      "modes": {}
+    },
+    "armor": {
+      "regions": [
+        "leftShoulder",
+        "rightShoulder",
+        "torsoFront",
+        "torsoBack",
+        "waistFront",
+        "waistBack"
+      ],
+      "protectedFeatures": [
+        "plates",
+        "rivets",
+        "hard-edges"
+      ],
+      "modes": {}
+    },
+    "harness": {
+      "regions": [
+        "leftShoulder",
+        "rightShoulder",
+        "torsoFront",
+        "torsoBack",
+        "waistFront",
+        "waistBack"
+      ],
+      "protectedFeatures": [
+        "buckles",
+        "rings",
+        "straps"
+      ],
+      "modes": {
+        "placement": {
+          "choices": [
+            "under-coat",
+            "over-coat"
+          ],
+          "default": "over-coat"
+        }
+      }
+    }
+  },
+  "relationships": [
+    {
+      "id": "underwear-under-top",
+      "inner": "underwear",
+      "outer": "top",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "underwear-under-corset",
+      "inner": "underwear",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "undershirt-under-top",
+      "inner": "undershirt",
+      "outer": "top",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "underwear-under-undershirt",
+      "inner": "underwear",
+      "outer": "undershirt",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "top-under-corset",
+      "inner": "top",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "over-top"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Corset over top needs fitted bust, armhole and lace clearance."
+    },
+    {
+      "id": "direct-corset-conflicts-top",
+      "inner": "top",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "direct"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Direct corset mode does not wrap a separately equipped top; select over-top."
+    },
+    {
+      "id": "over-dress-corset-conflicts-top",
+      "inner": "top",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "over-dress"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Corset over-dress mode cannot simultaneously wrap a separate top without an explicit item fit."
+    },
+    {
+      "id": "top-under-coat",
+      "inner": "top",
+      "outer": "coat",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Coat must fit the equipped shirt and sleeves; closure changes visibility only."
+    },
+    {
+      "id": "corset-under-coat",
+      "inner": "corset",
+      "outer": "coat",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Coat must clear cups, lacing, shoulder straps and the combined inner shell."
+    },
+    {
+      "id": "dress-under-coat",
+      "inner": "dress",
+      "outer": "coat",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack",
+        "leftThigh",
+        "rightThigh"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Coat sleeve/collar/hem must clear gown and preserve drape, including seated poses."
+    },
+    {
+      "id": "petticoat-under-skirt",
+      "inner": "petticoat",
+      "outer": "skirt",
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Petticoat stays under the skirt and must not deform the authored outer hem."
+    },
+    {
+      "id": "petticoat-under-gown",
+      "inner": "petticoat",
+      "outer": "dress",
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Petticoat remains an independent dependent layer inside compatible gowns."
+    },
+    {
+      "id": "corset-tucked-below-skirt",
+      "inner": "corset",
+      "outer": "skirt",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "corset": {
+          "waist": "tucked"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Tucked corset hem must be under skirt waist without exterior exposed lacing."
+    },
+    {
+      "id": "corset-over-skirt",
+      "inner": "skirt",
+      "outer": "corset",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "corset": {
+          "waist": "over"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Over mode must preserve skirt waistband and keep corset hem exterior."
+    },
+    {
+      "id": "dress-under-corset",
+      "inner": "dress",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "over-dress"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Corset over gown requires authored bodice-specific clearance and arm motion."
+    },
+    {
+      "id": "direct-corset-conflicts-dress",
+      "inner": "dress",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "direct"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Direct corset does not coexist over dress; use over-dress with verified fit."
+    },
+    {
+      "id": "over-top-corset-conflicts-dress",
+      "inner": "dress",
+      "outer": "corset",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "corset": {
+          "bodyFit": "over-top"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Corset over-top mode is not the over-dress geometry profile."
+    },
+    {
+      "id": "dress-over-pants-tunic",
+      "inner": "pants",
+      "outer": "dress",
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "tunic"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Tunic over pants requires explicit over-pants garment fit and animations."
+    },
+    {
+      "id": "gown-conflicts-pants",
+      "inner": "pants",
+      "outer": "dress",
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "gown"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "A full gown cannot automatically be paired with trousers without item override."
+    },
+    {
+      "id": "pinafore-conflicts-pants",
+      "inner": "pants",
+      "outer": "dress",
+      "regions": [
+        "hips"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "pinafore"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Pinafore does not automatically validate a pants outfit."
+    },
+    {
+      "id": "top-under-pinafore",
+      "inner": "top",
+      "outer": "dress",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "pinafore"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Pinafore over blouse requires authored openings and sleeve visibility."
+    },
+    {
+      "id": "top-conflicts-gown",
+      "inner": "top",
+      "outer": "dress",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "gown"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Full gown replaces torso coverage unless explicit underdress profile exists."
+    },
+    {
+      "id": "top-conflicts-tunic",
+      "inner": "top",
+      "outer": "dress",
+      "regions": [
+        "torsoFront",
+        "torsoBack"
+      ],
+      "when": {
+        "dress": {
+          "silhouette": "tunic"
+        }
+      },
+      "outcome": "blocked",
+      "reason": "Tunic over top requires an explicit item-specific underdress exception."
+    },
+    {
+      "id": "pants-under-skirt",
+      "inner": "pants",
+      "outer": "skirt",
+      "regions": [
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Pants under skirt require fit review; do not treat as approved by default."
+    },
+    {
+      "id": "skirt-under-coat",
+      "inner": "skirt",
+      "outer": "coat",
+      "regions": [
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Coat hem must fit skirt drape and waistband; no forced skirt shrink."
+    },
+    {
+      "id": "pants-under-coat",
+      "inner": "pants",
+      "outer": "coat",
+      "regions": [
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Coat may cover beltline and upper pants while preserving pant motion."
+    },
+    {
+      "id": "belt-under-coat",
+      "inner": "belt",
+      "outer": "coat",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "belt": {
+          "placement": "under-coat"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Under-coat belt stays anchored to its underlying host, not to the coat."
+    },
+    {
+      "id": "belt-over-coat",
+      "inner": "coat",
+      "outer": "belt",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "belt": {
+          "placement": "over-coat"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Outer belt cinching needs a coat-specific anchor and approved deformation."
+    },
+    {
+      "id": "belt-over-pants",
+      "inner": "pants",
+      "outer": "belt",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Belt follows a compatible pants waistband without widening other garments."
+    },
+    {
+      "id": "belt-over-skirt",
+      "inner": "skirt",
+      "outer": "belt",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Belt follows compatible skirt waist, not the complete skirt drape."
+    },
+    {
+      "id": "belt-over-corset",
+      "inner": "corset",
+      "outer": "belt",
+      "regions": [
+        "waistFront",
+        "waistBack"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Belt over corset requires clearance from boning, laces and hardware."
+    },
+    {
+      "id": "stockings-under-socks",
+      "inner": "stockings",
+      "outer": "socks",
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Socks cover stockings only where physically present; don't delete stockings."
+    },
+    {
+      "id": "socks-under-shoes",
+      "inner": "socks",
+      "outer": "shoe",
+      "regions": [
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "stockings-under-shoes",
+      "inner": "stockings",
+      "outer": "shoe",
+      "regions": [
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "socks-under-boots",
+      "inner": "socks",
+      "outer": "boot",
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "stockings-under-boots",
+      "inner": "stockings",
+      "outer": "boot",
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Requires an approved fitting profile for the selected garments."
+    },
+    {
+      "id": "pants-tucked-into-boots",
+      "inner": "pants",
+      "outer": "boot",
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "when": {
+        "boot": {
+          "cuff": "pants-tucked"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Boot shaft stays outside pants cuff on both sides; confirm driving clearance."
+    },
+    {
+      "id": "pants-over-boots",
+      "inner": "boot",
+      "outer": "pants",
+      "regions": [
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle"
+      ],
+      "when": {
+        "boot": {
+          "cuff": "pants-over"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Wide pants cuff stays outside the boot shaft; narrow fits require item review."
+    },
+    {
+      "id": "shoe-vs-boot",
+      "inner": "shoe",
+      "outer": "boot",
+      "regions": [
+        "leftFoot",
+        "rightFoot"
+      ],
+      "outcome": "blocked",
+      "reason": "Only one active footwear shell per foot; socks/stockings remain independent."
+    },
+    {
+      "id": "gloves-under-coat-cuff",
+      "inner": "gloves",
+      "outer": "coat",
+      "regions": [
+        "leftForearm",
+        "rightForearm"
+      ],
+      "when": {
+        "gloves": {
+          "cuff": "under-sleeve"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Glove cuff sits inside coat sleeve and must clear wrist/forearm animations."
+    },
+    {
+      "id": "gauntlet-over-coat-cuff",
+      "inner": "coat",
+      "outer": "gloves",
+      "regions": [
+        "leftForearm",
+        "rightForearm"
+      ],
+      "when": {
+        "gloves": {
+          "cuff": "gauntlet-over-cuff"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Gauntlet cuff wraps outside sleeve without crushing sewn cuff shape."
+    },
+    {
+      "id": "scarf-outside-coat",
+      "inner": "coat",
+      "outer": "scarf",
+      "regions": [
+        "neck",
+        "torsoFront"
+      ],
+      "when": {
+        "scarf": {
+          "placement": "outside"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Scarf sits outside coat collar/lapels and clears hair."
+    },
+    {
+      "id": "scarf-under-coat",
+      "inner": "scarf",
+      "outer": "coat",
+      "regions": [
+        "neck",
+        "torsoFront"
+      ],
+      "when": {
+        "scarf": {
+          "placement": "tucked"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Tucked scarf sits inside coat collar with no exposed fabric crossing."
+    },
+    {
+      "id": "hair-under-hood",
+      "inner": "hair",
+      "outer": "hood",
+      "regions": [
+        "head",
+        "neck"
+      ],
+      "outcome": "needs-fitting",
+      "reason": "Hood needs hairstyle-specific scalp and rear-collar clearance."
+    },
+    {
+      "id": "armor-conflicts-coat",
+      "inner": "armor",
+      "outer": "coat",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder"
+      ],
+      "outcome": "blocked",
+      "reason": "Rigid shoulder/chest armor needs a purpose-built compatible outerwear profile."
+    },
+    {
+      "id": "harness-under-coat",
+      "inner": "harness",
+      "outer": "coat",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "harness": {
+          "placement": "under-coat"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "Coat must clear harness straps, rings and attachments."
+    },
+    {
+      "id": "harness-over-coat",
+      "inner": "coat",
+      "outer": "harness",
+      "regions": [
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack"
+      ],
+      "when": {
+        "harness": {
+          "placement": "over-coat"
+        }
+      },
+      "outcome": "needs-fitting",
+      "reason": "External harness requires coat-compatible anchors and buckle clearance."
+    }
+  ],
+  "itemOverrides": []
+}

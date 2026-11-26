@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avensky.com/schema/wardrobe-layer-manifest-v1.json",
+  "title": "Avensky wardrobe layer manifest v1",
+  "description": "Proposed class-level relationships and item overrides; validation does not approve any garment fit.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "classes",
+    "relationships",
+    "itemOverrides"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "classes": {
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/classDefinition"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/relationship"
+      }
+    },
+    "itemOverrides": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/itemOverride"
+      }
+    }
+  },
+  "$defs": {
+    "region": {
+      "type": "string",
+      "enum": [
+        "head",
+        "neck",
+        "torsoFront",
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "leftHand",
+        "rightHand",
+        "waistFront",
+        "waistBack",
+        "hips",
+        "crotch",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf",
+        "leftAnkle",
+        "rightAnkle",
+        "leftFoot",
+        "rightFoot"
+      ]
+    },
+    "regionList": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/region"
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "featureList": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true
+    },
+    "modeGroup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "choices",
+        "default"
+      ],
+      "properties": {
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]*$"
+          },
+          "minItems": 2,
+          "uniqueItems": true
+        },
+        "default": {
+          "type": "string"
+        }
+      }
+    },
+    "modeSelection": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "condition": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "$ref": "#/$defs/modeSelection"
+      }
+    },
+    "classDefinition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "regions",
+        "protectedFeatures",
+        "modes"
+      ],
+      "properties": {
+        "regions": {
+          "$ref": "#/$defs/regionList"
+        },
+        "protectedFeatures": {
+          "$ref": "#/$defs/featureList"
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/modeGroup"
+          }
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "inner",
+        "outer",
+        "regions",
+        "outcome",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "inner": {
+          "type": "string"
+        },
+        "outer": {
+          "type": "string"
+        },
+        "regions": {
+          "$ref": "#/$defs/regionList"
+        },
+        "outcome": {
+          "enum": [
+            "needs-fitting",
+            "blocked"
+          ]
+        },
+        "when": {
+          "$ref": "#/$defs/condition"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
+        }
+      }
+    },
+    "pairPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "otherGarmentId",
+        "regions",
+        "position",
+        "outcome",
+        "reason"
+      ],
+      "properties": {
+        "otherGarmentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "regions": {
+          "$ref": "#/$defs/regionList"
+        },
+        "position": {
+          "enum": [
+            "inside",
+            "outside",
+            "none"
+          ]
+        },
+        "outcome": {
+          "enum": [
+            "needs-fitting",
+            "blocked"
+          ]
+        },
+        "when": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "self": {
+              "$ref": "#/$defs/modeSelection"
+            },
+            "other": {
+              "$ref": "#/$defs/modeSelection"
+            }
+          }
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
+        }
+      }
+    },
+    "itemOverride": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "garmentId",
+        "classId",
+        "reason"
+      ],
+      "properties": {
+        "garmentId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "classId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
+        },
+        "regions": {
+          "$ref": "#/$defs/regionList"
+        },
+        "modeDefaults": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "protectedFeatures": {
+          "$ref": "#/$defs/featureList"
+        },
+        "pairPolicies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/pairPolicy"
+          }
+        }
+      }
+    }
+  }
+}
