@@ -51,14 +51,22 @@
 - Created pure ESM layer resolver and catalog piece-to-class adapter. Inputs are normalized selection records, not legacy saved-look data; no existing live wardrobe functions changed.
 - Mode-dependent region ordering, block/review status, dependency disposition, unverified visibility defaults and stale fit/visibility evidence rejection are implementation targets for this branch.
 - No GLB fit, material appearance or mobile QA is claimed by these synthetic tests. Evidence must be sourced and reviewed before publication. W-05 still owns legacy-save migration.
-- CI status: pending validation at branch creation. Record actual run and corrections in a following note.
+- **CI verified:** [W-04 contract run](https://github.com/Avensky/Avensky/actions/runs/45743026433) on Node 24 reported **26 tests passed, 0 failed, 0 skipped**. Includes W-03 schema checks, region-order completeness, mode-specific three-layer outfits, exact-fit-evidence freshness, explicit/derived dependencies, item-override cycles, conflicting visibility evidence, catalog classification, and immutable input checks. These are synthetic unit tests, not GLB or mobile QA.
 
 ## 2026-11-25 — W-04 CI correction: region completeness
 
 - First W-04 contract run on PR #92 reported **21 pass, 2 fail**. Both failures concerned evidence approval for top + corset + coat; no actual asset tests were involved.
 - Cause: W-03 class relations left shared shoulder/hip regions unspecified, so the conservative W-04 resolver correctly returned `UNKNOWN_RELATION` even when all explicitly described regions had fit evidence.
 - Correction: expanded the intended class pair rules to cover every shared region where the same class relation applies, including shoulder/hips, and added a manifest regression test for region completeness. Unmodeled class pairings still fail closed as `UNKNOWN_RELATION`.
-- Rerun status: pending at time of this note; report the final CI results separately.
+- The corrected W-04 checks passed in [CI](https://github.com/Avensky/Avensky/actions/runs/45742931798) (**24/24**); two further fail-closed tests passed in the [final contract run](https://github.com/Avensky/Avensky/actions/runs/45743026433) (**26/26**).
+
+## 2026-11-25 — W-04 review outcome and next task
+
+- Implementation branch: `feat/wardrobe-layer-resolver-w04`; [draft PR #92](https://github.com/Avensky/Avensky/pull/92) targets W-03's review branch; neither layer feature nor its parent is merged to `main`.
+- Pure ESM resolver is review-ready for normalized IDs/classes, default/item modes, region-specific order graphs, candidate fit statuses, explicit/derived dependency disposition, and visibility intents. Catalog mapping intentionally returns `null` for unsupported classes (e.g. ordinary hats) rather than guessing.
+- An active/passed pure graph is **not** a verified rendered outfit. Approval evidence supplied to the resolver must be independently authenticated; user-visible fit, rig, materials, LOD, and distribution checks are outside W-04.
+- Next: **W-05** must inventory serialized legacy selections and server/browser validation, design a reversible versioned adapter, and prove load/save round trips before activating the new resolver in wardrobe UI. Then W-06/W-07 may integrate actual coat fitting and safe occlusion.
+- Required integration discipline: do not rewrite old outfit IDs; never treat provisional `needs-fitting` relations as approved, and never discard selections when blocked.
 
 ## Explicitly unresolved
 

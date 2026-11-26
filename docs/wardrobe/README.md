@@ -19,7 +19,7 @@ See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON 
 
 ## W-04 pure resolver candidate (not live)
 
-[W-04 resolver](../../packages/wardrobe-catalog/resolve-wardrobe-layers.mjs) now plans class relationships and per-region ordering without touching saved selections or Three.js geometry. **W-05** must migrate legacy profiles before the game uses this resolver. Read [W-04 contract](RULES.md#7-w-04-resolver-behavior-and-evidence-contract) and run `npm run wardrobe:layers:check`.
+[W-04 resolver](../../packages/wardrobe-catalog/resolve-wardrobe-layers.mjs) now plans class relationships and per-region ordering without touching saved selections or Three.js geometry. **W-05** must migrate legacy profiles before the game uses this resolver. The pure contract passed [26 focused tests](https://github.com/Avensky/Avensky/actions/runs/45743026433) on Node 24; these do not establish in-app geometry or device quality. Read [W-04 contract](RULES.md#7-w-04-resolver-behavior-and-evidence-contract) and run `npm run wardrobe:layers:check`.
 
 ## Current architecture; not the intended future behavior
 

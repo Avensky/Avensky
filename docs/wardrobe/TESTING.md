@@ -10,6 +10,8 @@ The `layer-rules.json` manifest is validated without installing character GLBs o
 
 Run `npm run wardrobe:layers:check` to validate the manifest and run both `wardrobe-layer-manifest.test.mjs` and `wardrobe-layer-resolver.test.mjs` on Node 24. This tests deterministic ordering, three-layer outfits, mode-specific waist/belt/boot reversals, invalid and unknown relationships, protected saved IDs, class mapping by actual `piece`, dependent layers, and fit/visibility evidence that must match the exact body/tier/pose/outfit as applicable. These **pure checks use test-only synthetic assets** and do not claim that an actual fitted garment has been visually verified. W-05 must add old-save round trips; W-07/W-15/W-13 require real posed GLBs and on-device evidence before approval.
 
+W-04 evidence: [2026-11-25 Node 24 contract run](https://github.com/Avensky/Avensky/actions/runs/45743026433) completed with **26 passed, 0 failed, 0 skipped** (manifest + pure resolver). Tests require no source GLB models and are **not** a garment geometry, rendering, saved-profile persistence, physical device, or asset-license approval. Full Cloud asset streaming/build CI is separate and should not be inferred from this green contract run.
+
 ## Test layers and failure classification
 
 1. **Pure schema/resolver:** deterministic outputs, stable identities, explicit conflict reasons, no mutation, consistent body-region graph, cycle detection, unsupported mode and unknown item behavior.
