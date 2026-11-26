@@ -101,7 +101,9 @@ def inspect_fbx(path):
     vmin=[min(v[d] for v in vertices) for d in range(3)]
     vmax=[max(v[d] for v in vertices) for d in range(3)]
     uvnode=g.first('LayerElementUV');uv=uvnode.first('UV') if uvnode else None
-    _,uv_count=array(uv) if uv else (iter(()),0)
+    _,uv_scalars=array(uv) if uv else (iter(()),0)
+    if uv_scalars%2:raise ValueError('Malformed UV coordinate pairs')
+    uv_count=uv_scalars//2
     matindices=matnode.first('Materials') if matnode else None
     material_index_count=array(matindices)[1] if matindices else 0
     names=[str(x.props[1]).split('\0')[0] if len(x.props)>1 else 'unnamed' for x in materials]
