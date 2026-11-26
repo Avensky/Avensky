@@ -60,10 +60,10 @@ Pure tests do **not** install Blender or original files:
 
 ```sh
 python -m unittest discover -s scripts/wardrobe/tests -p 'test_outerwear_intake.py' -v
-node --test frontend/tests/wardrobe-outerwear-intake.test.mjs
+node --test frontend/tests/wardrobe-outerwear-intake.test.mjs frontend/tests/wardrobe-fit-recipes.test.mjs
 ```
 
-The Python test creates a tiny synthetic FBX, checks reference-only bounds, missing rig, UVs, source hashes, bad input and byte immutability. The Node test guards stable ID and public-catalog isolation. The actual source-hash and 9-FBX audit run is separate and private:
+The Python test creates a tiny synthetic FBX, checks reference-only bounds, missing rig, UVs, source hashes, bad input and byte immutability. The Node tests guard stable ID/public-catalog isolation and conservative [fitting recipe](../../packages/wardrobe-catalog/garment-fit-recipes.v1.json) semantics (corset rigid panels, underlayer composite surfaces, pose blocks, material-only changes not forcing a fit). These are design contract checks, **not** actual fitted-mesh or pose tests. The actual source-hash and 9-FBX audit run is separate and private:
 
 ```sh
 python scripts/wardrobe/inspect_outerwear_assets.py --directory "<private-input-directory>" --expected packages/wardrobe-catalog/outerwear-candidates.json --json "<private-output-directory>/w07-intake-report.json"

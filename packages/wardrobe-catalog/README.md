@@ -31,6 +31,10 @@ The [reversible migration adapter](migrate-legacy-wardrobe.mjs) and [v1 schema](
 
 The [pure layer preview model](wardrobe-layer-preview.mjs) bridges the W-05 saved selections to W-04 per-region ordering without claiming geometric approval. The client panel is [`WardrobeLayerInspector.tsx`](../../frontend/src/game/characters/WardrobeLayerInspector.tsx); rules live only in [the canonical specification](../../docs/wardrobe/RULES.md#9-w-06-read-only-layer-inspector-contract). Node contract: `npm run wardrobe:preview:check`.
 
+## Proposed reusable fitting recipe contract (not an executable fitter)
+
+[garment-fit-recipes.v1.json](garment-fit-recipes.v1.json) describes body/rig requirements, corset and outerwear protected details, pose gates, fit-cache dependencies and separate material variants. Source-of-truth explanation is in [the W-07 pipeline](../../docs/wardrobe/PIPELINE.md#w-07-automated-fitting-recipe-v1--design-contract-not-yet-a-working-fitter). This is a specification; there is no approved auto-fitted GLB.
+
 ## W-07 private outerwear candidates (not in the active catalog)
 
 [outerwear-candidates.json](outerwear-candidates.json) contains only source hashes, stable candidate IDs and fit blockers for three uploaded CLO garments. It is **not** imported into the equip-ready `character-garments.json` or auto-discovery results; the Outerwear UI only displays disabled review cards. Use the [canonical intake process](../../docs/wardrobe/PIPELINE.md#w-07-uploaded-coatjacket-source-intake-implemented-no-fit-approval) and do not copy source assets into public git.
