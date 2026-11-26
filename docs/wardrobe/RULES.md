@@ -159,6 +159,35 @@ Fit evidence may upgrade a `needs-fitting` relation to `allowed` only when the t
 
 **Visibility is not inferred from the layer graph.** Without a matching reviewed pose/geometry coverage report, each region stays `unverified`. The resolver supplies only candidate intent (such as `expose-opening` for the front of an open coat, or `may-cover` when closed). A visibility report must match the complete normalized outfit signature including every layer mode/revision, pose, body, tier, and garment revision to avoid reusing a stale hidden-surface mask. Actual pose-aware triangle masking remains W-13.
 
-Derived underlayers may be marked `remove-derived-only` when their parent disappears. Explicitly selected underlayers are never deleted; they may become `inactive` pending an eligible parent. Multiple valid potential parents count; the decision is a **suggested lifecycle action**, not a mutation. Only W-05 may apply actions after compatibility and legacy save migration tests.
+Derived underlayers may be marked `remove-derived-only` when their parent disappears. Explicitly selected underlayers are never deleted; they may become `inactive` pending an eligible parent. Multiple valid potential parents count; the decision is a **suggested lifecycle action**, not a mutation. Only W-06 or a later reviewed integration may apply dependency actions after W-05 compatibility and legacy-save migration tests.
 
 Run `npm run wardrobe:layers:check` (Node 24, no source GLBs required). Tests cover order inversion, blocked modes, 3-layer outfits, evidence freshness, orphaned layers, immutable saves, and deterministic output. See [TESTING.md](TESTING.md) for artifact/pose verification still needed.
+
+## 8. W-05 versioned saved outfit adapter: normative contract
+
+The persisted `CharacterChoice` retains its existing `id`, `outfit`, `wardrobe`, `wardrobeTrial`, `wardrobeEase`, `garments`, `removedClothing`, `bra`, `appearance.item_colors`, hair, identity and all other validated fields. It MAY additionally have `wardrobeLayers` in the following **sidecar-only** v1 shape:
+
+```json
+{
+  "schemaVersion": 1,
+  "entries": [
+    {"source": "garments", "slot": "top", "id": "top-02", "modes": {}},
+    {"source": "wardrobeTrial", "slot": "corset", "id": "gothic-04",
+     "modes": {"waist": "over", "body-fit": "over-top"}}
+  ]
+}
+```
+
+**The sidecar cannot create, equip or remove an item.** Each `source:slot:id` entry MUST correspond to the exactly matching legacy selection in that saved `CharacterChoice`: `garments[slot]`, `wardrobe.set` or `wardrobeTrial.set`. `source` may be `garments`, `wardrobe` or `wardrobeTrial`. For corset entries the slot is always `corset`; `modes.waist` MUST agree with the existing corset waist. No implicit stretch, no guessed `body-fit`, and no automatic conversion from old `shirt: under/over` into an over-top fit.
+
+Mode choice names/values come from [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), not independently hard-coded allowlists. The saved metadata has a maximum of 32 unique source/slot entries. Unknown/retired accessories remain in original `garments`; if they lack a recognized class their sidecar entry can contain empty `modes` but cannot gain speculative fit modes. An unverified mode is a **design intent only**, never geometry/appearance clearance.
+
+- **Read:** Old saves without `wardrobeLayers` MUST continue to load unchanged. Neither device nor profile read should add a sidecar silently.
+- **Opt-in migrate:** `migrateLegacyOutfit` creates a cloned outfit with v1 sidecar and a class projection; it preserves all original fields and explicit removals. Old selections overridden in today's renderer are flagged `suspended`, not deleted.
+- **Mode edit:** `withLegacyLayerMode` may alter only a mode of a currently selected item, not its legacy ID or waistline. Actual fit requires later approved per-item geometry evidence.
+- **Revert:** `revertLayerMigration` removes only `wardrobeLayers`, restoring the exact original legacy fields from a valid v1 migration. The server already normalizes obsolete historical `wardrobe.shirt` values to `none` on Rust deserialization; this predates W-05 and must not be mistaken for sidecar-induced loss.
+- **Persist:** Rust's existing strict `CharacterChoice` validation now recognizes the optional versioned sidecar, cross-checking source/slot/IDs and mode choices. Invalid versions, unknown fields, stale IDs, duplicate source+slot, contradictory waist and invented modes are rejected. A fitted/look sidecar MUST NOT bypass `is_equippable` or current garment availability rules.
+- **Deploy order:** Server support for `wardrobeLayers` MUST ship before any client sends it. On a server version without W-05 support, the field is rejected; clients must keep sending legacy saves until both sides are ready. This review branch does not enable client-side automatic sidecar publishing.
+- **Rendering:** W-05 does not connect the new resolver to current `wardrobeGarments.ts`, `clothingPieces.ts`, `SavedOutfits.tsx` or the garage. That requires W-06 and fit evidence. Future coat support must still wait for a non-retired catalog asset and correct rig/LOD testing.
+
+Code: [migration adapter](../../packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs), [save schema](../../packages/wardrobe-catalog/wardrobe-layers-save.schema.json), [shared sample](../../frontend/tests/fixtures/wardrobe-layer-save-v1.json). Test steps belong in [TESTING.md](TESTING.md); this is the sole normative save contract.

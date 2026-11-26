@@ -68,13 +68,23 @@
 - Next: **W-05** must inventory serialized legacy selections and server/browser validation, design a reversible versioned adapter, and prove load/save round trips before activating the new resolver in wardrobe UI. Then W-06/W-07 may integrate actual coat fitting and safe occlusion.
 - Required integration discipline: do not rewrite old outfit IDs; never treat provisional `needs-fitting` relations as approved, and never discard selections when blocked.
 
+## 2026-11-25 — W-05 reversible outfit persistence (stacked review)
+
+- **Baseline verified:** Browser device saves use `avenlab-saved-outfits-v1` and `avenlab-local-character-v1`. Rust `CharacterChoice` has `deny_unknown_fields`; profile outfit saves deserialize and validate before persisting `progression.character_outfits`, with existing `wardrobe.shirt` normalization and separate `is_equippable` restrictions.
+- **Decision:** Add optional `wardrobeLayers` v1 **sidecar** on the same serialized `CharacterChoice`. Retain every old key and ID as the source of truth. Avoid auto-migration on read, mode guessing from historical `shirt`, and any implicit conversion of retired/unknown accessories.
+- **Implementation branch:** `feat/wardrobe-legacy-save-w05`, [draft PR #94](https://github.com/Avensky/Avensky/pull/94) based on the W-04 review branch. New pure migration adapter, JSON Schema, shared old/new fixture, Rust optional field with shared-manifest validation, TypeScript type, server persistence test and browser storage regression are review-only.
+- **Security / order:** Rust rejects wrong version, stale slot/ID, duplicate bindings, unsupported mode, contradictory corset waist and unknown entry fields. Explicit body-fit modes remain saved intent, not approved mesh fit. The new field is not emitted by live UI; upgrade server validation before client writes this metadata.
+- **Validated so far:** [Initial Node contract](https://github.com/Avensky/Avensky/actions/runs/45756697855) showed **26 W-03/W-04 + 7 W-05 pure tests passed**, 0 failed/0 skipped. Rust and browser integration checks for the complete branch are pending; see the final CI links when available.
+- **No live behavior changed:** `setWardrobeGarment`, `wornClothing`, `SavedOutfits` and Rust equip restrictions remain unchanged. Existing browser and server records are never rewritten en masse.
+- **Next:** W-06 should use W-05 projections read-only, then add explicit mode editing and exposure diagnostics with validated actual coat assets; never connect the resolver before staged regression review.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.
 2. Which currently installed corset/coat and gown/coat pairs actually pass mobile and garage pose checks.
 3. Initial class-specific soft/hard millimeter values, fabric stretch thresholds and actual phone budgets.
 4. Whether to support multiple coats/tops in a single selection slot; v1 proposes one selected item per functional slot.
-5. Backward-compatible serialized format for per-garment layer modes, with Rust validation and migration plan.
+5. **Designed in W-05:** optional v1 layer-mode sidecar and reversible adapter. Remaining: full cross-language CI, rollout/server-first deployment and old-save migration/renderer integration reviews.
 6. Presence/provenance and legal status of privately stored purchased texture/model collections.
 7. How to represent dress+pants and dress+top exceptional combinations safely in catalog schema.
 

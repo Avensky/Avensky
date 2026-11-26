@@ -23,6 +23,10 @@ The versioned [layer-rules.json](layer-rules.json) and [JSON Schema](layer-rules
 
 The pure [layer resolver](resolve-wardrobe-layers.mjs) accepts normalized equipped IDs/classes, explicit fit modes, and independently reviewed asset/visibility evidence. It produces per-body-region ordering, deterministic conflict codes, candidate visibility intents, dependency dispositions, and non-mutated saved selections. It **does not** alter the game renderer or certify geometry. No class-level rule is automatically approved. Run `npm run wardrobe:layers:check` for both schema and resolver tests. For usage and evidence-matching requirements, see [canonical resolver contract](../../docs/wardrobe/RULES.md#7-w-04-resolver-behavior-and-evidence-contract).
 
+## Optional saved wardrobe layer modes (W-05)
+
+The [reversible migration adapter](migrate-legacy-wardrobe.mjs) and [v1 schema](wardrobe-layers-save.schema.json) allow a saved `CharacterChoice` to include `wardrobeLayers` mode annotations while keeping its existing `garments`, `wardrobe`, dyes and removals unchanged. Runtime selection is still legacy-only. See [the canonical contract](../../docs/wardrobe/RULES.md#8-w-05-versioned-saved-outfit-adapter-normative-contract), not a duplicated policy here. Test with `npm run wardrobe:legacy:check` (Node 24). Browser/profile persistence and deployment require [W-05 verification](../../docs/wardrobe/TESTING.md#w-05-device-and-server-save-compatibility).
+
 ## Edit the catalog
 
 Keep IDs stable across relabeling, refits, and Garage or Mobile revisions.

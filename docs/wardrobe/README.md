@@ -21,6 +21,10 @@ See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON 
 
 [W-04 resolver](../../packages/wardrobe-catalog/resolve-wardrobe-layers.mjs) now plans class relationships and per-region ordering without touching saved selections or Three.js geometry. **W-05** must migrate legacy profiles before the game uses this resolver. The pure contract passed [26 focused tests](https://github.com/Avensky/Avensky/actions/runs/45743026433) on Node 24; these do not establish in-app geometry or device quality. Read [W-04 contract](RULES.md#7-w-04-resolver-behavior-and-evidence-contract) and run `npm run wardrobe:layers:check`.
 
+## W-05 reversible save adapter (review-only)
+
+[Migration adapter](../../packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs), [sidecar schema](../../packages/wardrobe-catalog/wardrobe-layers-save.schema.json), and [shared fixture](../../frontend/tests/fixtures/wardrobe-layer-save-v1.json) preserve historical saved outfits while optionally recording garment mode intent. Rust can deserialize and validate this field on the W-05 review branch; legacy records without it remain unchanged. **No automatic conversion or live-render changes.** Read [normative save rules](RULES.md#8-w-05-versioned-saved-outfit-adapter-normative-contract) and [cross-language tests](TESTING.md#w-05-device-and-server-save-compatibility).
+
 ## Current architecture; not the intended future behavior
 
 - Shared catalog: `packages/wardrobe-catalog/`, including curated `character-garments.json` and generated `discovered-wardrobe-garments.json`.

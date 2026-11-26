@@ -10,8 +10,8 @@
 - **W-02 — Consolidate docs.** Audit root, catalog and character READMEs, check all links, collapse duplicated wardrobe descriptions into canonical docs, mark superseded behavior, repair stale links; preserve component-specific setup commands.
 - **W-03 — Shared layer schema (implemented on review branch).** Versioned `layer-rules.json`, JSON Schema, pure semantic validator, 9 passing Node24 contract tests and CI gate. **Not merged or integrated with runtime**; treat class relationships as unapproved fitting candidates. [Draft PR #90](https://github.com/Avensky/Avensky/pull/90).
 - **W-04 — Pure deterministic resolver (implemented, awaiting review).** [Draft PR #92](https://github.com/Avensky/Avensky/pull/92) adds deterministic region DAGs, modes, conflict/fit evidence and dependent/visibility outputs. [CI](https://github.com/Avensky/Avensky/actions/runs/45743026433) passed **26 tests, 0 failed, 0 skipped**. **Unmerged; do not connect live selection before W-05.**
-- **W-05 — NEXT: Legacy-save migration.** Map legacy outfit/top/corset/dress replacement states to explicit layer modes without losing existing IDs/dyes; update Rust and browser validation; round-trip old fixtures before changing the UI.
-- **W-06 — Fitting-room layer UI.** Present actual resolved layers and conflicts, Outerwear section, coat modes and local user decisions without camera resets or updating saved outfits during browsing.
+- **W-05 — Review implementation:** Optional reversible `wardrobeLayers` v1 sidecar with old browser save preservation, Rust validation, shared old/layered fixture, explicit modes, and tests. [Draft PR #94](https://github.com/Avensky/Avensky/pull/94). Validate Node/browser/Rust CI before claiming done. Does **not** change live rendering or outfit-selection logic.
+- **W-06 — NEXT after W-05 review: Fitting-room layer UI.** Present actual resolved layers and conflicts, Outerwear section, coat modes and local user decisions without camera resets or updating saved outfits during browsing.
 
 ## Garment compatibility / geometry
 
@@ -33,9 +33,9 @@
 - **W-19 — Precompute/LOD/performance.** Bake repeatable garage/mobile fits and cheaper distant NPC tiers; benchmark cold/warm preparation and phone cost; reuse caching only when its input/output contract matches.
 - **W-20 — CI/staging/release gates.** Validate schema, pure resolver, historic saves, pose/fit/material tests, staged asset availability and rollback; deploy staging only when authorized; live manual and distribution rights-gated.
 
-## Next milestone pilot (first real coding pass)
+## Next integration milestone: W-06 and W-07
 
-After W-01 and W-03, implement W-04 for **top + corset + coat** without geometry changes. Assert that coat open/closed and coat removal preserve the original equipped top, corset, appearance/dye keys, and stable IDs. Then test `gown + coat` and `pants + boots` in the pure resolver. Only after pure resolver and migration tests pass should new mesh fitting or UI selection behavior be activated.
+After the stacked W-03/W-04/W-05 changes pass review, connect the saved sidecar and resolver to the fitting-room preview behind an explicit opt-in. Add in-app outfit persistence and old-save recovery tests. Do not replace legacy garment deletion logic globally until W-06 identifies and tests each old removal/corset exception. Validate top + corset + coat against a non-retired source asset in W-07 before claiming in-game layering.
 
 ## Done means evidence, not words
 
