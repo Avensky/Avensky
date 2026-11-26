@@ -48,7 +48,9 @@ npm --prefix frontend run typecheck
 
 The last line runs the real React/Vite/JSDOM fitting-room tests using `frontend` as working directory. The **changed-file lint** gate is deliberately scoped; the full `npm --prefix frontend run lint` currently fails on unrelated pre-existing combat/rendering modules (**75 problems: 69 errors, 6 warnings**) and is tracked separately. Do not report global lint as green. The inspector MUST be absent on initial load, appear only when the player activates **Inspect outfit stack** in Layers, never call `onChange` or `onTryOn`, and never alter camera focus/zoom while opening or closing the inspector. Outerwear browsing MUST NOT equip a retired coat or reset the current camera shot. Malformed sidecar metadata MUST display the raw legacy garment IDs with a warning instead of crashing or deleting selections.
 
-The suite is maintained in [CI](../../.github/workflows/wardrobe-layer-inspector.yml). These checks are **not screenshot, GLB collider, rig, mobile FPS, pose, or legal/distribution certification**. Record exact pass/fail/skip and any corrected test failures in [DECISIONS.md](DECISIONS.md).
+**Verified 2026-11-25 W-06 check:** [GitHub Actions run 45762594236](https://github.com/Avensky/Avensky/actions/runs/45762594236) on code revision `b0beb06` passed **39/39 pure contracts** (26 manifest/resolver + 7 migration + 6 preview) and **4/4 React/Vite dressing-room tests**, **0 failed, 0 skipped**. TypeScript and lint of the two changed React components passed; full repo ESLint is not green. The focused UI test includes a synthetic unapproved coat card click while retaining Face/zoom and preserved saved outfit data. Earlier suite failures were one unverified-fit label and two stale camera assertions, corrected without camera runtime changes.
+
+The suite is maintained in [CI](../../.github/workflows/wardrobe-layer-inspector.yml). These checks are **not screenshot, GLB collider, rig, mobile FPS, pose, or legal/distribution certification**. For history and remaining issues see [DECISIONS.md](DECISIONS.md).
 
 ## Test layers and failure classification
 

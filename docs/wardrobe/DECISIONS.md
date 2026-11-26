@@ -95,6 +95,14 @@
 - **Known limitations:** base outfits remain legacy bundles (not individually classified); the W-04 planner has no authenticated fit report in this UI; a proposed `body-fit: over-top` does NOT make today's renderer draw that top/corset combination. W-07 must provide reviewed coat asset evidence before any equip action.
 - **Next:** Review W-06 no-mutation and mobile layout tests, then W-07 actual coat fitting and W-06 phase 2 explicit mode editor with staging and rollback tests. Do not merge to main or deploy automatically.
 
+## 2026-11-25 — W-06 final focused CI verification (draft PR #97)
+
+- **Verified code revision:** `b0beb06` on `feat/wardrobe-layer-inspector-w06`. [W-06 GitHub Actions](https://github.com/Avensky/Avensky/actions/runs/45762594236) passed both jobs: **39/39 pure Node tests** (26 manifest/resolver, 7 legacy migration, 6 read-only layer projection) and **4/4 React/Vite/JSDOM UI tests** (3 historical dressing-room tests and 1 focused W-06 inspector test); **zero failures/skips**. Frontend TypeScript typecheck and ESLint on the two modified React components passed.
+- **Regression corrections:** W-04's singleton `allowed` graph status no longer appears as a verified fit in W-06. Two old dressing-room test expectations incorrectly assumed entering or leaving the dressing room resets the camera; the assertions now enforce preservation of the current camera and zoom. No camera implementation was changed.
+- **Additional safety coverage:** Test-only newly discovered, **unreviewed coat** card is present in Outerwear. Clicking it cannot equip, store or alter the outfit, and does not move the Face camera or zoom. No unreviewed coat can clear an existing garment, and the real `coat-01` remains retired.
+- **Independent limitations:** full repository ESLint still has 75 unrelated existing issues (69 errors, 6 warnings), so only focused lint is green. These CI checks use synthetic coats/DOM and **do not measure** GLB clipping, pose contact, mobile FPS, actual device layout, visual appearance or commercial asset permissions.
+- **Disposition:** W-06 phase 1 is implemented and CI-verified, **awaiting human review** on [draft PR #97](https://github.com/Avensky/Avensky/pull/97), stacked above W-05. No merge to `main`, staging deploy or production deploy performed. W-07 fitted coat/rig/pose review comes next, then W-06 phase 2 writable controls only with migration and rollback tests.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.
