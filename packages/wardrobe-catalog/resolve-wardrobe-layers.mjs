@@ -92,15 +92,16 @@ function regionVisibilityEvidenceMatches(record, entry, region, input) {
 }
 
 function regionOrder(nodes, edges) {
-  const inDegree = new Map(nodes.map(id => [id, 0]));
-  const outgoing = new Map(nodes.map(id => [id, new Set()]));
+  const uniqueNodes = sorted(new Set(nodes));
+  const inDegree = new Map(uniqueNodes.map(id => [id, 0]));
+  const outgoing = new Map(uniqueNodes.map(id => [id, new Set()]));
   for (const edge of edges) {
     if (!outgoing.get(edge.inner)?.has(edge.outer)) {
       outgoing.get(edge.inner)?.add(edge.outer);
       inDegree.set(edge.outer, (inDegree.get(edge.outer) ?? 0) + 1);
     }
   }
-  const available = sorted(nodes.filter(id => inDegree.get(id) === 0));
+  const available = uniqueNodes.filter(id => inDegree.get(id) === 0);
   const order = [];
   while (available.length) {
     const current = available.shift();
@@ -113,7 +114,7 @@ function regionOrder(nodes, edges) {
       }
     }
   }
-  return { order, hasCycle: order.length !== nodes.length };
+  return { order, hasCycle: order.length !== uniqueNodes.length };
 }
 
 /**
@@ -255,10 +256,27 @@ export function resolveWardrobeLayers(input, rules) {
 
   const cyclicIds = new Set(regions.filter(r => r.hasCycle).flatMap(r =>
     members.filter(m => m.regions.includes(r.region)).map(m => m.id)));
+  const visibility = [];
+  const visibilityConflicts = new Set();
+  const visibilityInput = { ...input, equipped: members.map(m => ({
+    id: m.id, classId: m.classId, sourceRevision: m.sourceRevision, modes: m.modes,
+  })) };
+  for (const member of members) for (const region of member.regions) {
+    const matches = (input.visibilityEvidence ?? []).filter(item =>
+      regionVisibilityEvidenceMatches(item, member, region, visibilityInput));
+    const unique = [...new Set(matches.map(x => x.visible))];
+    const state = unique.length === 1 ? (unique[0] ? "visible" : "hidden") : "unverified";
+    visibility.push({ garmentId: member.id, region, state });
+    if (unique.length > 1) {
+      visibilityConflicts.add(member.id);
+      issue("MODE_CONFLICT", [member.id], region, [],
+        "Conflicting visibility reports for this garment and pose/mode");
+    }
+  }
   const membership = members.map(member => {
     const memberPairs = related.filter(p => p.garmentIds.includes(member.id));
     const dep = dependencies.find(x => x.garmentId === member.id);
-    let status = invalid.has(member.id) || cyclicIds.has(member.id) ? "blocked" : "allowed";
+    let status = invalid.has(member.id) || cyclicIds.has(member.id) || visibilityConflicts.has(member.id) ? "blocked" : "allowed";
     for (const pair of memberPairs) status = worsen(status, pair.status);
     if (dep?.active === false && status !== "blocked") status = "needs-fitting";
     return {
@@ -269,22 +287,7 @@ export function resolveWardrobeLayers(input, rules) {
     };
   });
 
-  const visibility = [];
-  const normalizedSignature = outfitSignature(members.map(m => ({
-    id: m.id, classId: m.classId, sourceRevision: m.sourceRevision, modes: m.modes,
-  })));
-  const visibilityInput = { ...input, equipped: members.map(m => ({
-    id: m.id, classId: m.classId, sourceRevision: m.sourceRevision, modes: m.modes,
-  })) };
-  for (const member of members) for (const region of member.regions) {
-    const matches = (input.visibilityEvidence ?? []).filter(item =>
-      regionVisibilityEvidenceMatches(item, member, region, visibilityInput));
-    const unique = [...new Set(matches.map(x => x.visible))];
-    const state = unique.length === 1 ? (unique[0] ? "visible" : "hidden") : "unverified";
-    visibility.push({ garmentId: member.id, region, state });
-    if (unique.length > 1) issue("MODE_CONFLICT", [member.id], region, [],
-      "Conflicting visibility reports for this garment and pose/mode");
-  }
+
   const occlusionIntents = related.filter(rel => rel.outer && rel.status !== "blocked").flatMap(rel => {
     const coat = members.find(m => m.id === rel.outer && m.classId === "coat");
     if (!coat) return [];

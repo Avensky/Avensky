@@ -214,6 +214,38 @@ test("same outfit permuted, frozen, or re-resolved yields stable output without 
   assert.equal(outfit.equipped[0].id,"top-03");
 });
 
+test("item-specific overrides cannot create a cycle across an entire outfit", () => {
+  const manifest=structuredClone(rules);
+  manifest.itemOverrides.push({
+    garmentId:"coat-1",classId:"coat",reason:"Contradictory coat positioning test-only override.",
+    pairPolicies:[{otherGarmentId:"undergarment-1",regions:["torsoFront"],
+      position:"inside",outcome:"needs-fitting",
+      reason:"Makes coat inside underwear despite shirt under coat."}]
+  });
+  const report=run([sample("undergarment-1","underwear"),sample("top-1","top"),
+    sample("coat-1","coat")],{},manifest);
+  assert.equal(report.status,"blocked");
+  assert(problems(report,"ORDER_CYCLE").some(x=>x.region==="torsoFront"));
+  assert.equal(inRegion(report,"torsoFront").hasCycle,true);
+  assert(report.membership.every(x=>!x.active));
+});
+
+test("contradictory visibility reports must not leave a garment active", () => {
+  const coat=sample("coat-1","coat"), baseline=run([coat]);
+  const record={
+    garmentId:coat.id,region:"torsoFront",visible:true,reviewed:true,
+    reportId:"example-render",sourceRevision:coat.sourceRevision,
+    modes:baseline.membership[0].modes,
+    bodyProfileId:"test-body-v1",tier:"garage",poseId:"idle",
+    outfitSignature:outfitSignature(baseline.membership)
+  };
+  const report=run([coat],{visibilityEvidence:[record,{...record,visible:false}]});
+  assert.equal(report.status,"blocked");
+  assert.equal(report.membership[0].active,false);
+  assert(problems(report,"MODE_CONFLICT").length);
+  assert.equal(report.visibility.find(x=>x.region==="torsoFront").state,"unverified");
+});
+
 test("catalog mapping respects actual piece, not misleading slot or name", () => {
   assert.equal(classifyWardrobeCatalogItem({id:"top-03",slot:"top",piece:"shirt"}),"top");
   assert.equal(classifyWardrobeCatalogItem({id:"armor-01",slot:"top",piece:"armor"}),"armor");
