@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://avensky.com/schema/wardrobe-layers-save-v1.json",
+  "title": "Optional saved wardrobeLayers sidecar v1",
+  "description": "Mode annotations for exact existing CharacterChoice selections. Legacy IDs/waist/removal/color fields remain authoritative.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "entries"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "entries": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "$ref": "#/$defs/entry"
+      }
+    }
+  },
+  "$defs": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "slot",
+        "id",
+        "modes"
+      ],
+      "properties": {
+        "source": {
+          "enum": [
+            "garments",
+            "wardrobe",
+            "wardrobeTrial"
+          ]
+        },
+        "slot": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "modes": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      }
+    }
+  }
+}
