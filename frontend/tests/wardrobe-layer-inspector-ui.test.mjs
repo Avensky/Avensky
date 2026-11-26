@@ -98,6 +98,17 @@ test("W-06 fitting-room stack inspection preserves camera, live selections and o
     assert.match(document.querySelector("[data-outerwear-readonly]").textContent,/inspection-only/i);
     assert.equal(document.querySelector('[data-wardrobe-item="coat-01"]'),null,
       "Retired coat cannot be selected or tried on");
+    for (const id of ["clo-coat-01","clo-jacket-01","clo-jacket-02"]) {
+      const card=document.querySelector('[data-wardrobe-item="'+id+'"]');
+      assert(card,"W-07 source candidate must appear as a review card");
+      assert.equal(card.dataset.unavailable,"true","unrigged FBX is never equippable");
+      assert.match(card.textContent,/Requires fitting/i);
+      await click('[data-wardrobe-item="'+id+'"]');
+      assert.match(document.querySelector(".dressing-details").textContent,/skin weights/i);
+      assert.equal(preview.getState().camera,"Face","Inspecting an unfit coat preserves camera");
+      assert.equal(preview.getState().zoom,1.15);
+      assert.equal(callback.changed+callback.tried,0);
+    }
     assert.equal(preview.getState().camera,"Face","Opening Outerwear preserves the current camera");
     assert.equal(preview.getState().zoom,1.15,"Opening Outerwear preserves mobile zoom");
     assert.equal(preview.getState().focusRevision,outerwearFocus);
