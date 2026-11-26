@@ -17,6 +17,12 @@
 | Documentation | One canonical index plus Rules/Pipeline/Testing/Decisions/Command Queue; link instead of duplicate README prose | Documentation-only change in this branch |
 | Release | Staging review separate from manual live publication; commercial sources remain private and rights-gated | Existing asset-clearance policy |
 
+## 2026-11-25 — Agent onboarding and anti-repetition guardrail
+
+- Updated the repository-level `AGENTS.md` to require wardrobe agents to read the canonical foundation before editing, identify the W-xx work item, preserve source assets and saved clothing IDs, run relevant geometry/visual/pose tests, and document each outcome in this log.
+- The agent instructions are a **discovery and process gate**, not implementation of garment fitting or an enforcement mechanism for every possible external agent. Automated test gates remain part of W-15/W-20.
+- This documentation change intentionally does not modify selection, rendering, appearance, or staging behavior.
+
 ## Verified current-code observations (not desired new semantics)
 
 - `frontend/src/game/characters/wardrobeGarments.ts` defines `wardrobeGarmentReplacements`; its `setWardrobeGarment` currently deletes selected top/skirt when equipping a dress and deletes dress when selecting top/skirt.

@@ -25,6 +25,15 @@ Characters and appearance
 - Regular skirt/corset contact failures and engine PBR visual checks remain outstanding.
 - Keep accepted silhouette, skirt waist heights, hairline, corset lacing, body coverage and animation behavior unless a task explicitly targets them.
 - Validate new hair for UVs/opacity, scalp clearance, head turns, hoods, clothing, material color and target mobile performance.
+Wardrobe AI-agent rules (mandatory for wardrobe, fitting, clothing materials, layers and outfit UI)
+- BEFORE changing wardrobe code, read docs/wardrobe/README.md and its applicable RULES.md, PIPELINE.md, TESTING.md, DECISIONS.md and COMMAND_QUEUE.md. These are the canonical specifications. Inspect the actual current implementation and fixtures as well; proposed design is not implemented behavior.
+- Begin each task by identifying the specific W-xx command, baseline commit, affected garment IDs, preserved fit constraints, required tests, and any unavailable source GLBs. If a task is not in the queue, add a concise task/dependency there instead of inventing behavior.
+- Follow the agreed moderate-fitting policy: bounded regional deformation, protected lace/eyelets/seams/hardware, signed and visibility-aware clipping checks, and pose-specific verification. Numerical thresholds are proposals until calibrated against full assets. Never stretch an entire garment to hide a localized collision.
+- Layering must separate saved equipped, resolved active and rendered visible states. A coat must not erase the top underneath it; dress, corset, cuff, belt and boot overrides require explicit modes and fit evidence. Keep historical saves, appearance IDs and dye channels stable.
+- Never report garment geometry, mobile performance or visual quality as PASSED when the relevant asset was absent or its test skipped. Distinguish source-code/test validation from rendered preview, animation and physical-phone review.
+- AFTER every change: update the owning wardrobe specification if a rule changed; append a short evidence/decision note to docs/wardrobe/DECISIONS.md with the changed files, baseline, commands, test results including skips, quantitative/visual evidence, remaining failure cases and next W-xx step. Link canonical guidance from component READMEs instead of copying it.
+- Do not silently approve assets for Hero/NPC use, release commercial assets, merge to main, or deploy live. Keep approval and licensing separate from technical fitting.
+
 Asset rights
 - Do not commit purchased source hair, clothing, character archives, extracted textures or modified commercial models to this public repository without checking redistributable licensing.
 - Prefer source-safe fitting code, manifests, tests, import recipes and documentation. Document any assets that are intentionally installed separately.
