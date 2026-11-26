@@ -148,12 +148,12 @@ async fn creator_saves_the_preview_and_slot_together_and_restores_them_after_res
     let owner = account["profile_id"].as_str().unwrap();
     let preview = json!({
         "id":"mara-vega", "identity":"female", "outfit":"shop-crew",
-        "appearance":{"hair":"natural", "skin":"warm", "hair_color":"copper", "makeup":"berry",
+        "appearance":{"hair":"natural", "skin":"warm", "hair_color":"copper", "makeup":"berry", "face_shape":"vesper-soft-contour",
             "headwear":"none", "color":"#2c5066", "accent":"#a0e2d4", "personality":"racer"}
     });
     let create = |character: &Value| json!({"action":"character_create_styled","name":"Street Runner",
         "style":"street","body":"female","character":character});
-    for (field, value) in [("makeup", "unlisted"), ("personality", "friendly")] {
+    for (field, value) in [("makeup", "unlisted"), ("personality", "friendly"), ("face_shape", "unlisted")] {
         let mut invalid = preview.clone();
         invalid["appearance"][field] = json!(value);
         assert!(s.handle(&player, create(&invalid)).await.is_err());

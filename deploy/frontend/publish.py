@@ -21,6 +21,11 @@ MAX_ENTRIES = 20_000
 SHA = re.compile(r"[a-f0-9]{40}")
 RELEASE = re.compile(r"[a-f0-9]{64}")
 STAGING_MODEL = "/models/roads/Road_Narrow_Oneway/Road_Narrow_Oneway_LOD0.glb"
+STAGING_ENTRY_MODELS = (
+    "/models/world/garage_special.glb",
+    "/models/characters/villagers/villager-female/villager-female.portrait.glb",
+    "/models/characters/female/wardrobe/dress/linen-nightgown.mobile.glb",
+)
 STAGING_VERIFIED_ASSET_ROOT = Path("/etc/avensky-assets")
 
 
@@ -81,6 +86,21 @@ def check_staging_assets(verified, release):
             raise ValueError("The private gateway is not serving the verified release")
 
 
+def probe_staging_entry_models(release):
+    if not isinstance(release, str) or not RELEASE.fullmatch(release):
+        raise ValueError("The staging bundle has an invalid asset release ID")
+    for model in STAGING_ENTRY_MODELS:
+        request = Request("http://127.0.0.1:9060/__staging-assets/" + release + model,
+                          headers={"Range": "bytes=0-3"})
+        try:
+            with urlopen(request, timeout=15) as response:
+                if response.status == 206 and response.read(4) == b"glTF":
+                    continue
+        except URLError as error:
+            raise ValueError(f"Gateway could not serve {model} for release {release}: {error}") from error
+        raise ValueError(f"Gateway returned an invalid GLB range for {model} in release {release}")
+
+
 def publish(args, commit, *, deploy_game=False):
     staging = args.environment == "staging"
     if deploy_game and not staging:
@@ -126,6 +146,11 @@ def publish(args, commit, *, deploy_game=False):
                     raise ValueError("This commit already has a different installed bundle")
             else:
                 candidate.rename(final)
+            if staging:
+                # The loopback gateway resolves catalogs once their release is
+                # installed. Confirm the app can load before restarting the game
+                # or moving the live frontend symlink.
+                probe_staging_entry_models(metadata.get("assetRelease"))
             if deploy_game:
                 subprocess.run(["sudo", "-n", "--", "/usr/local/lib/avensky/staging_game.py", commit],
                                stdin=subprocess.DEVNULL, check=True)
