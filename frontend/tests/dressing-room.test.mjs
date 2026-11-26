@@ -213,7 +213,9 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'entering the fitting room mounts only visible wardrobe controls');
     assert.equal(find('.dressing-details').hidden, true);
     assert.equal(find('.dressing-catalog').parentElement, find('.dressing-categories').parentElement, 'catalog shares the left wardrobe rail');
-    assert.equal(preview.getState().camera, 'Full body');
+    // Entering the dressing room must preserve a requested on-foot camera,
+    // rather than resetting Hands/Face behind garage walls. Only Whole car resets.
+    assert.equal(preview.getState().camera, 'Hands');
     const assertPiece = piece => {
       assert.equal(preview.getState().camera, 'Selected item');
       assert.equal(preview.getState().selectedPiece, piece);
