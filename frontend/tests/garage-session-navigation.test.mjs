@@ -56,3 +56,161 @@ test("repeated portal and game handoffs carry one canvas and reuse the loaded ga
     window.close();
   }
 });
+
+const base = "https://staging.avensky.com";
+const credentials = '<main class="garage-entry-body"><section class="garage-entry-card">' +
+  '<form method="post" class="garage-credentials" action="/sign-in">' + garageCredentials(true) +
+  '</form><div class="garage-recovery"><a href="/__alpha/forgot-password">Forgot password?</a></div></section></main>';
+const protectedPage = '<div id="root"></div><script type="module" src="/assets/game.js"></script>';
+const portalScript = await readFile(new URL("../public/images/sign-in-navigation.js", import.meta.url), "utf8");
+
+function entryFixture() {
+  const dom = new JSDOM('<body class="garage-entry">' + garageBackdrop() + garageBrandHeader("/__alpha/entry") + credentials +
+    '</body>', { url: base + "/sign-in", runScripts: "outside-only", pretendToBeVisual: true });
+  const { window } = dom;
+  const { document } = window;
+  const room = document.querySelector("[data-live-garage]");
+  const canvas = room.appendChild(document.createElement("canvas"));
+  const requests = [];
+  const answers = [];
+  window.fetch = async (url, options) => {
+    requests.push([options.method ?? "GET", new URL(url, base).pathname]);
+    const [status, pathname, html] = answers.shift();
+    return { ok: status < 400, url: base + pathname, headers: new Headers({ "content-type": "text/html" }), text: async () => html };
+  };
+  function mount(event) {
+    event.preventDefault();
+    const screen = document.createElement("main");
+    screen.className = "welcome-screen";
+    document.querySelector("#root").append(room, screen);
+    document.querySelector("#startup-screen").remove();
+  }
+  window.eval(portalScript);
+  return { window, document, canvas, requests, answers, mount,
+    submit: () => document.querySelector("form").dispatchEvent(new window.Event("submit", { bubbles: true, cancelable: true })),
+    tick: () => new Promise(resolve => setImmediate(resolve)) };
+}
+
+test("verified credentials become an inert, sanitized face until the roster starts its camera shot", async () => {
+  const { window, document, canvas, answers, mount, submit, tick } = entryFixture();
+  try {
+    window.addEventListener("avensky:resume-game", mount);
+    const email = document.querySelector('[name="email"]');
+    const password = document.querySelector('[name="password"]');
+    email.value = "fixture-player@example.test";
+    password.type = "text";
+    password.value = "fixture-secret";
+    password.focus();
+    const card = document.querySelector(".garage-entry-card");
+    card.getBoundingClientRect = () => ({ left: 33, top: 62, width: 299 });
+    answers.push([200, "/", protectedPage]);
+    submit();
+    await tick();
+    const layer = document.querySelector("#garage-entry-handoff");
+    assert.equal(layer.inert, true);
+    assert.equal(layer.getAttribute("aria-hidden"), "true");
+    assert.equal(layer.querySelector("input,button,textarea,form,a,[tabindex],[href]"), null);
+    assert.doesNotMatch(layer.innerHTML, /fixture-secret|fixture-player/);
+    assert.equal(layer.querySelector(".garage-entry-card").style.top, "62px");
+    assert.equal(email.value, "");
+    assert.equal(password.value, "");
+    assert.equal(password.type, "password");
+    assert.notEqual(document.activeElement, password);
+    assert.equal(document.querySelector("canvas"), canvas);
+    assert.equal(document.querySelectorAll(".garage-entry-header").length, 1);
+
+    for (const detail of ["pending", "roster"]) window.dispatchEvent(new window.CustomEvent("avensky:entry-view", { detail }));
+    assert.equal(document.documentElement.dataset.entryHandoff, "waiting");
+    const screen = document.querySelector(".welcome-screen");
+    assert.equal(screen.inert, true);
+    const interactive = new Promise(resolve => window.addEventListener("avensky:entry-interactive", resolve, { once: true }));
+    window.dispatchEvent(new window.Event("avensky:roster-framing"));
+    await interactive;
+    assert.equal(screen.inert, false);
+    assert.equal(document.documentElement.dataset.entryHandoff, "fading");
+    layer.dispatchEvent(new window.Event("animationend", { bubbles: true }));
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    assert.equal(document.documentElement.hasAttribute("data-entry-handoff"), false);
+    assert.equal(document.querySelector("canvas"), canvas);
+  } finally { window.close(); }
+});
+
+test("a rejected password and the MFA challenge remain real forms; a failed verified module retries using GET", async () => {
+  const { window, document, canvas, answers, requests, mount, submit, tick } = entryFixture();
+  try {
+    const factor = '<main class="garage-entry-body"><section class="garage-entry-card garage-entry-account">' +
+      '<form method="post" action="/sign-in"><input type="hidden" name="challenge" value="used-challenge">' +
+      '<input name="code" autocomplete="one-time-code"><button>Verify</button></form></section></main>';
+    answers.push([400, "/sign-in", credentials], [200, "/sign-in", factor], [200, "/", protectedPage]);
+    submit();
+    await tick();
+    assert.ok(document.querySelector('form input[name="password"]'));
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    submit();
+    await tick();
+    assert.equal(document.querySelector("form input[name=challenge]").value, "used-challenge");
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    const code = document.querySelector("[name=code]");
+    code.value = "123456";
+    submit(); // No resume-game listener and no VM module loader: the protected import rejects.
+    await tick();
+    const retry = document.querySelector("a[href='/']");
+    assert.equal(retry?.textContent, "Retry game");
+    assert.equal(code.value, "");
+    assert.equal(document.querySelector("[name=challenge], #garage-entry-handoff, form"), null);
+
+    window.addEventListener("avensky:resume-game", mount);
+    window.matchMedia = () => ({ matches: true });
+    answers.push([200, "/", protectedPage]);
+    retry.click();
+    await tick();
+    window.dispatchEvent(new window.CustomEvent("avensky:entry-view", { detail: "ready" }));
+    assert.equal(document.querySelector("#garage-entry-handoff"), null, "reduced motion makes the game immediately interactive");
+    assert.equal(document.querySelector("canvas"), canvas);
+    assert.deepEqual(requests, [["POST","/sign-in"],["POST","/sign-in"],["POST","/sign-in"],["GET","/"]]);
+  } finally { window.close(); }
+});
+
+test("a protected build without entry events releases the previous shell", async () => {
+  const { window, document, answers, mount, submit, tick } = entryFixture();
+  try {
+    window.addEventListener("avensky:resume-game", mount);
+    const timers = new Map();
+    window.setTimeout = (fn, delay) => { timers.set(delay, fn); return delay; };
+    window.matchMedia = () => ({ matches: true });
+    answers.push([200, "/", protectedPage]);
+    submit();
+    await tick();
+    assert.ok(document.querySelector("#garage-entry-handoff"));
+    timers.get(1600)();
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    assert.ok(document.querySelector("#root canvas"));
+  } finally { window.close(); }
+});
+
+test("a stalled avatar and an unavailable renderer both release the roster", async () => {
+  for (const rendererUnavailable of [false, true]) {
+    const { window, document, answers, mount, submit, tick } = entryFixture();
+    try {
+      window.addEventListener("avensky:resume-game", mount);
+      const timers = new Map();
+      window.setTimeout = (fn, delay) => { timers.set(delay, fn); return delay; };
+      answers.push([200, "/", protectedPage]);
+      submit();
+      await tick();
+      if (rendererUnavailable) document.querySelector("[data-live-garage]").dataset.garageUnavailable = "true";
+      window.dispatchEvent(new window.CustomEvent("avensky:entry-view", { detail: "roster" }));
+      const screen = document.querySelector(".welcome-screen");
+      if (rendererUnavailable) assert.equal(timers.has(480), false, "no camera to wait for");
+      else {
+        assert.equal(screen.inert, true);
+        timers.get(480)();
+      }
+      await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+      assert.equal(document.documentElement.dataset.entryHandoff, "fading");
+      assert.notEqual(screen.inert, true);
+      document.querySelector("#garage-entry-handoff").dispatchEvent(new window.Event("animationend"));
+      assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    } finally { window.close(); }
+  }
+});

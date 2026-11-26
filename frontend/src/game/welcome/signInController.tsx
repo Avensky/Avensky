@@ -184,7 +184,9 @@ function attachController(form: HTMLElement) {
   for (const event of ["blur", "pagehide"]) window.addEventListener(event, stop, options);
   document.addEventListener("visibilitychange", () => document.hidden ? stop() : start(), options);
   window.addEventListener("avensky:leave-portal-form", () => {
-    scope.abort(); stop(); root.unmount(); islands.forEach(island => island.unmount()); controls.remove();
+    scope.abort(); stop();
+    if (useTextKeyboardStore.getState().session) useTextKeyboardStore.getState().close();
+    root.unmount(); islands.forEach(island => island.unmount()); controls.remove();
   }, { ...options, once: true });
   start();
 }

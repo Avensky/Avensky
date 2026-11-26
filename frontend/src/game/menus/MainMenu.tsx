@@ -2,7 +2,6 @@ import { ProgressBadge } from "../alpha/ProgressBadge";
 import { useUIStore } from "../../store";
 import { GameButton } from "../../components/GameButton";
 import { useCallback, useEffect, useRef } from "react";
-import { MenuLogo } from "../../components/menus/MenuLogo";
 import { MenuIcon } from "../../components/menus/MenuIcon";
 import { MainMenuProfile } from "./MainMenuProfile";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
@@ -34,17 +33,9 @@ export function MainMenu() {
       <GarageOrbitSurface />
       <MainMenuProfile focusMenu={focusSelection} />
       <div className="menu-home-content">
-        <section className="main-menu-identity" aria-label="Avensky">
-          <header className="menu-brand menu-brand-main">
-            <MenuLogo />
-            <div className="menu-brand-copy">
-              <h1 className="menu-brand-title">AVENSKY</h1>
-              <p className="menu-brand-tagline">Vehicle simulation, world building, and real-time multiplayer.</p>
-            </div>
-          </header>
-
+        <div className="main-menu-progression">
           <ProgressBadge />
-        </section>
+        </div>
         <section className="main-menu-actions" aria-label="Main menu">
           <div className="menu-action-list">
             {MAIN_MENU_ITEMS.map((item, index) => (

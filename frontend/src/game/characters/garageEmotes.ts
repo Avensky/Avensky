@@ -1,3 +1,4 @@
+import { personalityEmoteIds, type CharacterPersonality } from "./characterPersonality";
 import { HANDS_BEHIND_BACK as behind, SELECTION_EMOTES } from "./selectionPoses";
 import { fittedArmTarget, fittedElbowPole, fittedHandTarget, skirtArmTarget, skirtHandTarget } from "./animationFit";
 import {
@@ -85,7 +86,13 @@ export const EMOTE_GROUPS = [
   "After Hours", "Showroom", "Elegant", "Performer", "Stoic", "Explorer", "Tech", "Workshop", "Starter", "Starter Comedy", "Race Reactions",
 ] as const;
 export type EmoteGroup = typeof EMOTE_GROUPS[number];
-export const AUTOMATIC_GARAGE_EMOTE_IDS = ["035", "002", "005", "009", "010", ...SELECTION_EMOTES.map(emote => emote.id)];
+const STANDING_GARAGE_IDS = ["035", "002", "005", "009", "010"];
+export const AUTOMATIC_GARAGE_EMOTE_IDS = [...STANDING_GARAGE_IDS, ...SELECTION_EMOTES.map(emote => emote.id)];
+export const GARAGE_REST_SECONDS = 2.35;
+
+export function automaticGarageEmoteIds(bag: boolean) {
+  return bag ? [...STANDING_GARAGE_IDS, ...BAG_EMOTES.map(emote => emote.id)] : AUTOMATIC_GARAGE_EMOTE_IDS;
+}
 const BEST_EMOTE_IDS = ["035", "090", "072", "051", "018", "094", "095", "100"];
 const GARAGE_PICK_IDS = ["005", "010", "002", "003", "009", "035", "090", "092", "093"];
 
@@ -625,6 +632,23 @@ export function findGaragePreviewEmote(id: string, bag: boolean): Emote | undefi
     const emote = emoteCollection(group, false).find(item => item.id === id);
     if (emote) return emote;
   }
+}
+
+/** Present ordinary garage and equipped-personality gestures between additional stances.
+ * Carrying uses the same automatic bag actions and the pack's eligible personality motions. */
+export function rosterGarageEmotes(personality: CharacterPersonality, bag: boolean): Emote[] {
+  const eligible = new Map(EMOTE_GROUPS.flatMap(group => emoteCollection(group, bag)).map(emote => [emote.id, emote]));
+  const personal = personalityEmoteIds(personality).flatMap(id => eligible.get(id) ?? []);
+  const automatic = automaticGarageEmoteIds(bag).flatMap(id => findGaragePreviewEmote(id, bag) ?? []);
+  const ordinary = automatic.filter(emote => !SELECTION_EMOTES.includes(emote));
+  const stances = automatic.filter(emote => SELECTION_EMOTES.includes(emote));
+  const pool = new Map<string, Emote>();
+  for (let i = 0; i < Math.max(personal.length, ordinary.length, stances.length); i++) {
+    for (const emote of [personal[i], ordinary[i], stances[i]]) {
+      if (emote) pool.set(emote.id, emote);
+    }
+  }
+  return [...pool.values()];
 }
 
 export function buildGarageEmotes(root: Object3D, bag = false, previewPacks = false) {

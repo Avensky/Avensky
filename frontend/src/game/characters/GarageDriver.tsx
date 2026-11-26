@@ -9,7 +9,7 @@ import { AnimationMixer, type Object3D } from "three";
 import { buildEmoteClips } from "./garageEmotes";
 import { useRosterEmoteCycle } from "../preview/useRosterEmoteCycle";
 import { DriverBag } from "./DriverBag";
-import { SELECTION_POSES, holdCharacterPose, type SelectionPoseId } from "./selectionPoses";
+import { SELECTION_POSES, holdCharacterPose } from "./selectionPoses";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterLook } from "./characterCatalog";
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
@@ -34,6 +34,7 @@ type WardrobeAssetListener = (url: string, scene: Object3D | null) => void;
 type VillagerPlayback = {
   bag: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit;
   victory?: VictoryPlayback; cockpit?: GarageCockpit; paused: boolean; upright: boolean; rosterPreview?: boolean;
+  onSettled?: (available: boolean) => void;
 };
 
 function WardrobeAsset({ url, onReady }: { url: string; onReady: WardrobeAssetListener }) {
@@ -47,7 +48,8 @@ function MissingWardrobeAsset({ url, onReady }: { url: string; onReady: Wardrobe
   return null;
 }
 
-function MissingCharacterModel({ cockpit }: { cockpit?: GarageCockpit }) {
+function MissingCharacterModel({ cockpit, onSettled }: { cockpit?: GarageCockpit; onSettled?: VillagerPlayback["onSettled"] }) {
+  useLayoutEffect(() => onSettled?.(false), [onSettled]);
   const waiting = useCharacterPreviewStore(s => Boolean(cockpit && s.insideCar));
   useEffect(() => {
     if (waiting) failCockpitPreview("The character model is unavailable.");
@@ -89,7 +91,7 @@ function HighCollarMotion({ update }: { update: () => void }) {
   return null;
 }
 
-function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview }: VillagerPlayback & { preview: WardrobePreview }) {
+function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, onSettled }: VillagerPlayback & { preview: WardrobePreview }) {
   const { look, scene, garments, garmentBody, corsetScene, corsetSet, hairSource } = preview;
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
@@ -106,6 +108,7 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
     return model;
   }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, rosterPreview]);
   const model = useCommittedResource(createModel);
+  useLayoutEffect(() => { if (model) onSettled?.(true); }, [model, onSettled]);
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
@@ -116,30 +119,28 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
 }
 
 // A reduced-motion selection shows the same stance without advancing the mixer.
-function HeldSelectionPose({ root, id }: { root: Object3D; id: SelectionPoseId }) {
+function HeldSelectionPose({ root }: { root: Object3D }) {
   const invalidate = useThree(state => state.invalidate);
   useEffect(() => {
-    const pose = SELECTION_POSES.find(item => item.id === id);
-    if (!pose) return;
     const mixer = new AnimationMixer(root);
-    const [clip] = buildEmoteClips(root, [holdCharacterPose(pose)]);
+    const [clip] = buildEmoteClips(root, [holdCharacterPose(SELECTION_POSES[0])]);
     mixer.clipAction(clip).play();
     mixer.update(0);
     root.updateMatrixWorld(true);
     invalidate();
     return () => { mixer.uncacheRoot(root); };
-  }, [root, id, invalidate]);
+  }, [root, invalidate]);
   return <primitive object={root} dispose={null} />;
 }
 
 function RosterEmotePlayer({ root, look, bag, paused }: { root: Object3D; look: CharacterLook; bag: boolean; paused: boolean }) {
-  const cycle = useRosterEmoteCycle(root, paused);
+  const cycle = useRosterEmoteCycle(root, paused, look.appearance.personality ?? "friendly", bag);
   const colors = clothingColors(look, "bag");
   if (cycle.paused) return <>
-    <HeldSelectionPose root={root} id={cycle.pose} />
+    <HeldSelectionPose root={root} />
     {bag && <DriverBag driver={root} colors={colors} />}
   </>;
-  return <GarageEmotePlayer root={root} bag={bag} bagColors={colors} selectionPose={cycle.pose} onSelectionEnd={cycle.onSelectionEnd} />;
+  return <GarageEmotePlayer root={root} bag={bag} bagColors={colors} rosterEmote={cycle.emote} onSelectionEnd={cycle.onSelectionEnd} />;
 }
 
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview }:
@@ -174,15 +175,16 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
   </group>;
 }
 
-export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview }: {
+export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview, onSettled }: {
   choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; rosterPreview?: boolean;
+  onSettled?: VillagerPlayback["onSettled"];
 }) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const compact = useThree(s => isCompactPreview(s.size.width));
-  if (!look) return null;
+  const fallback = <MissingCharacterModel cockpit={cockpit} onSettled={onSettled} />;
+  if (!look) return onSettled ? fallback : null;
   const bag = choice.prop === "shop-bag";
   const coatFitsLean = choice.id === ROOK_ID && (choice.outfit === "night-run" || choice.outfit === "race-crew");
-  const fallback = <MissingCharacterModel cockpit={cockpit} />;
   const kind = compact ? "portrait" : "garage";
   // The portrait export has the original mesh and rig with smaller textures.
   const villageKind = victory ? kind : "portrait";
@@ -192,7 +194,7 @@ export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory
       {url
         ? <VillagerDriver key={choice.id} url={url} look={look} kind={kind} villageKind={villageKind} fallback={fallback} bag={bag}
             previewPacks={previewPacks} leanFit={coatFitsLean ? leanFit : undefined} mirrorFit={mirrorFit}
-            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} />
+            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} onSettled={onSettled} />
         : fallback}
     </CharacterTurntable>
   );

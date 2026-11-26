@@ -10,7 +10,10 @@ import { AssetBoundary } from './components/debugger/AssetBoundary'
 useGLTF.setDecoderPath('/draco/')
 
 function StagingLoadError() {
-  useEffect(() => { document.getElementById('startup-screen')?.remove() }, [])
+  useEffect(() => {
+    document.getElementById('startup-screen')?.remove();
+    window.dispatchEvent(new CustomEvent('avensky:entry-view', { detail: 'recovery' }));
+  }, [])
   return <main role="alert">
     <h1>Staging could not load</h1>
     <p>Check that you have staging access and reload. If the problem persists, ask the staging operator to check the asset release.</p>

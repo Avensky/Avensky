@@ -17,7 +17,7 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
   let wakePointer: number | undefined;
   let swallowClickUntil = 0;
   const root = document.documentElement;
-  const isLogin = () => !!document.querySelector(".garage-credentials") && !interactivePreview();
+  const isLogin = () => !!document.querySelector("form.garage-credentials") && !interactivePreview();
   const checkIdle = () => {
     idleTimer = 0;
     if (!isLogin()) return;

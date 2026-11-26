@@ -4,6 +4,132 @@
   if (window.avenskyPortalNavigation) return;
   const gameStyles = new Set();
   let pending = false;
+  let handoff;
+  function finishHandoff() {
+    if (!handoff) return;
+    clearTimeout(handoff.timer);
+    if (handoff.frame) cancelAnimationFrame(handoff.frame);
+    if (handoff.roster) handoff.roster.inert = false;
+    handoff.layer.remove();
+    handoff.status.remove();
+    handoff = undefined;
+    delete document.documentElement.dataset.entryHandoff;
+  }
+  function reduceMotion() {
+    return document.hidden || document.documentElement.dataset.reduceMotion === "true" ||
+      window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  }
+  function fadeHandoff() {
+    if (!handoff || document.documentElement.dataset.entryHandoff === "fading") return;
+    clearTimeout(handoff.timer);
+    if (handoff.roster) {
+      handoff.roster.inert = false;
+      window.dispatchEvent(new Event("avensky:entry-interactive"));
+    }
+    if (reduceMotion()) {
+      finishHandoff();
+      return;
+    }
+    document.documentElement.dataset.entryHandoff = "fading";
+    handoff.layer.addEventListener("animationend", event => {
+      if (event.target === handoff?.layer) finishHandoff();
+    });
+    // If styles fail to load or an animation is cancelled, ownership still passes.
+    handoff.timer = setTimeout(finishHandoff, 550);
+  }
+  function fadeAfterPaint() {
+    // The first mesh upload can stall a mobile frame. Let that frame present
+    // before starting the CSS clock, so a long upload can't skip the blend.
+    if (!handoff || handoff.frame) return;
+    clearTimeout(handoff.timer);
+    if (reduceMotion() || !window.requestAnimationFrame) return fadeHandoff();
+    handoff.frame = requestAnimationFrame(() => {
+      if (handoff) handoff.frame = requestAnimationFrame(fadeHandoff);
+    });
+  }
+  window.addEventListener("avensky:entry-view", event => {
+    if (!handoff || document.documentElement.dataset.entryHandoff !== "waiting") return;
+    clearTimeout(handoff.timer);
+    handoff.receivedView = true;
+    handoff.status.remove();
+    if (event.detail === "pending") {
+      // Most profiles arrive with the first socket state. Avoid flashing the
+      // connection notice between the two forms, but show it on a slow response.
+      handoff.timer = setTimeout(fadeAfterPaint, 1100);
+    } else if (event.detail === "roster" && !reduceMotion() &&
+        !document.querySelector("[data-live-garage][data-garage-unavailable]") &&
+        !["framing","framed"].includes(document.documentElement.dataset.garageShot)) {
+      // Align the UI with a ready actor; slow/missing assets must never own menu input.
+      handoff.roster = document.querySelector(".welcome-screen");
+      if (handoff.roster) handoff.roster.inert = true;
+      handoff.timer = setTimeout(fadeAfterPaint, 480);
+    } else fadeAfterPaint();
+  });
+  for (const event of ["avensky:roster-framing","avensky:roster-framed"])
+    window.addEventListener(event, () => { if (handoff?.roster) fadeAfterPaint(); });
+  function signInFace(node) {
+    if (node.nodeType === Node.TEXT_NODE) return document.createTextNode(node.textContent);
+    if (!(node instanceof Element)) return document.createTextNode("");
+    // Never copy live form controls, input values, hidden data, IDs or links.
+    if (node.matches('input[type=hidden],script,.garage-gamepad-controls')) return document.createTextNode("");
+    const field = node.matches("input");
+    const face = document.createElement(field || node.tagName === "SPAN" ? "span" : node.tagName === "FIELDSET" ? "fieldset" : "div");
+    face.className = field ? "garage-handoff-value" : node.className;
+    if (node.matches("button,a,[role=button]")) face.classList.add("garage-handoff-action");
+    if (field) face.textContent = node.placeholder;
+    else {
+      if (node.hasAttribute("data-selected")) face.dataset.selected = node.dataset.selected;
+      for (const child of node.childNodes) face.append(signInFace(child));
+    }
+    return face;
+  }
+  function beginHandoff(main, header) {
+    finishHandoff();
+    const layer = document.createElement("div");
+    layer.id = "garage-entry-handoff";
+    layer.inert = true;
+    layer.setAttribute("aria-hidden", "true");
+    if (header && getComputedStyle(header).display !== "none") layer.append(header.cloneNode(true));
+    const form = main.querySelector("form.garage-credentials");
+    if (form) {
+      const body = document.createElement("div");
+      body.className = "garage-entry-body";
+      const card = document.createElement("div");
+      card.className = "garage-entry-card";
+      // The protected root can change body fonts and viewport layout on mount.
+      // Copy the outgoing card's position once before removing its real inputs.
+      const bounds = form.closest(".garage-entry-card")?.getBoundingClientRect();
+      if (bounds?.width) Object.assign(card.style, { position: "fixed", left: bounds.left + "px",
+        top: bounds.top + "px", width: bounds.width + "px", margin: "0" });
+      card.append(signInFace(form));
+      const recovery = main.querySelector(".garage-recovery");
+      if (recovery) card.append(signInFace(recovery));
+      body.append(card);
+      layer.append(body);
+    }
+    const status = document.createElement("div");
+    status.className = "garage-handoff-status";
+    status.setAttribute("role", "status");
+    status.textContent = "Loading characters…";
+    document.body.append(layer, status);
+    document.documentElement.dataset.entryHandoff = "waiting";
+    handoff = { layer, status, timer: undefined };
+  }
+  function retryGame(room, header) {
+    finishHandoff();
+    suspendGameStyles();
+    document.body.append(room);
+    document.getElementById("startup-screen")?.remove();
+    document.getElementById("root")?.remove();
+    document.body.classList.add("garage-entry");
+    if (header) document.body.append(header);
+    const main = document.createElement("main");
+    main.className = "garage-entry-body";
+    main.innerHTML = '<section class="garage-entry-card" data-controller-rows data-controls-ready="true" aria-label="Game connection">' +
+      '<p role="alert">The game could not load. Try again to continue.</p><nav data-controller-row><a href="/">Retry game</a></nav></section>';
+    document.body.append(main);
+    window.dispatchEvent(new Event("avensky:portal-form"));
+  }
   function portalPath(url) {
     return url.origin === location.origin && (url.pathname === "/sign-in" || url.pathname.startsWith("/__alpha/"));
   }
@@ -75,6 +201,7 @@
       notices.append(message);
       main.prepend(notices);
     }
+    finishHandoff();
     // A socket expiry and an explicit logout can both finish at this form.
     if (document.body.classList.contains("garage-entry") && document.querySelector("main.garage-entry-body")) {
       if (location.pathname !== next.pathname || notice) showPortalForm(page, next.pathname, main);
@@ -98,7 +225,7 @@
     }
     window.dispatchEvent(new Event("avensky:portal-form"));
   }
-  window.avenskyPortalNavigation = { showSignIn };
+  window.avenskyPortalNavigation = { showSignIn, beginHandoff };
   async function navigate(url, options) {
     if (pending) return;
     pending = true;
@@ -121,15 +248,24 @@
       const modules = [...page.querySelectorAll('script[type=module][src]')].map(el => new URL(el.getAttribute("src"), next));
       if (!modules.length || modules.some(src => src.origin !== next.origin || !src.pathname.startsWith("/assets/")))
         throw Error("The game entry is unavailable.");
-      const previousMain = document.querySelector("main.garage-entry-body").cloneNode(true);
-      previousMain.querySelector(".garage-gamepad-controls")?.remove();
-      previousMain.querySelector(".garage-entry-card")?.removeAttribute("data-controls-ready");
+      const outgoing = document.querySelector("main.garage-entry-body");
       const previousHeader = document.querySelector(".garage-entry-header");
-      const previousUrl = location.href;
+      outgoing.inert = true;
+      document.activeElement?.blur?.();
+      // Only the verified game document reaches this point. A later module
+      // failure retries authenticated GET /, including after a one-time MFA code.
+      for (const field of outgoing.querySelectorAll("input,textarea")) {
+        field.value = "";
+        field.defaultValue = "";
+        field.removeAttribute("value");
+        if (field.autocomplete?.includes("password")) field.type = "password";
+      }
+      beginHandoff(outgoing, previousHeader);
       window.dispatchEvent(new Event("avensky:leave-portal-form"));
+      const entering = handoff;
       const room = document.querySelector("[data-live-garage]");
-      document.querySelector("main.garage-entry-body").remove();
-      document.querySelector(".garage-entry-header")?.remove();
+      outgoing.remove();
+      previousHeader?.remove();
       document.body.classList.remove("garage-entry");
       history.replaceState(null, "", "/");
       for (const link of gameStyles) link.disabled = false;
@@ -149,18 +285,11 @@
             includeLink(link, next);
           for (const module of modules) await import(module.href);
         }
+        // A release can change underneath a warm page. Older game bundles
+        // do not dispatch entry-view, so they must still receive the interface.
+        if (handoff === entering && !entering.receivedView) entering.timer = setTimeout(fadeAfterPaint, 1600);
       } catch {
-        suspendGameStyles();
-        // A failed bundle request leaves the room and a usable sign-in form in place.
-        document.body.append(room);
-        document.getElementById("startup-screen")?.remove();
-        document.getElementById("root")?.remove();
-        document.body.classList.add("garage-entry");
-        if (previousHeader) document.body.append(previousHeader);
-        document.body.append(previousMain);
-        history.replaceState(null, "", previousUrl);
-        window.dispatchEvent(new Event("avensky:portal-form"));
-        throw Error("The game could not start.");
+        if (root.isConnected && !document.body.classList.contains("garage-entry")) retryGame(room, previousHeader);
       }
     } catch {
       showError("Couldn’t open the next screen. Check your connection and try again.");

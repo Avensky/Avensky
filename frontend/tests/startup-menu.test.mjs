@@ -88,16 +88,54 @@ test("real App removes the startup cover and opens the latest main menu without 
     await act(async () => guest.click());
     assert.equal(profilePanel.hidden, true, "offline guests can dismiss the panel and use the menu");
     assert.equal(document.querySelectorAll(".main-menu .menu-action-list .menu-icon").length, 6);
-    assert.ok(
-      document
-        .querySelector(".main-menu")
-        .textContent.includes("AVENSKY"),
-    );
+    assert.doesNotMatch(document.querySelector(".main-menu").textContent, /Avensky/i);
+    assert.equal(document.querySelector('.main-menu img[src$="/logo.svg"]'), null);
+    assert.ok(document.querySelector(".main-menu .alpha-progress"), "the menu still shows player progression");
     assert.equal(
       document.querySelector("canvas"),
       null,
       "main menu must not need WebGL",
     );
+    const { useSocialStore: social } = await server.ssrLoadModule("/src/store/social/socialStore.ts");
+    const originalSocial = social.getState();
+    const choice = { id: "mara-vega", outfit: "dockwear" };
+    const slot = { id: "career-2", name: "Vega", style: "original", level: 1, appearance: choice };
+    const profileData = { id: "account", name: "Vega", active_character_id: slot.id,
+      characters: [slot], progression: { character: choice, tier: "Bronze", prestige: 0,
+        level: 1, xp: 0, required_xp: 100, credits: 0 } };
+    const view = { profile: profileData, players: [], teammates: [], requests: [], groups: [],
+      worlds: [], world_invites: [], maps: [], limits: { max_active_worlds: 1 } };
+    await act(async () => {
+      social.setState({ view, profileOwner: profileData.id, stagingSignIn: true,
+        registeredProfile: true, profileStatus: "ready", available: true });
+      ui.getState().setScreen("welcome");
+    });
+    const garage = globalThis.__avenskyGarage;
+    assert.equal(garage.preview.contents.props.choice, choice);
+    const handoffs = [];
+    const observe = () => handoffs.push(garage.preview?.contents.type);
+    garage.listeners.add(observe);
+    const actorType = garage.preview.contents.type;
+    try {
+      await act(async () => {
+        // An acknowledgement is a fresh object, even when its clothes are identical.
+        social.getState().acknowledgeCharacter(structuredClone(profileData));
+        ui.getState().setScreen("main");
+      });
+      assert.equal(garage.preview.contents.props.mode, "main");
+      assert.deepEqual(garage.preview.contents.props.choice, choice);
+      await act(async () => ui.getState().setScreen("welcome", "account"));
+      assert.equal(garage.preview.contents.props.mode, "profile");
+      await act(async () => ui.getState().setScreen("main"));
+      assert.ok(handoffs.length >= 3);
+      assert.ok(handoffs.every(type => type === actorType), "route changes never release ownership of the live actor");
+      await act(async () => social.setState({ view: { ...view, profile: { ...profileData, active_character_id: null, characters: [] } } }));
+      assert.equal(garage.preview, null, "a player with no careers does not get a draft or a default actor");
+    } finally {
+      garage.listeners.delete(observe);
+      await act(async () => social.setState(originalSocial));
+    }
+    assert.equal(garage.preview, null, "a main menu without a selected character keeps only the room");
     const settings = [
       ...document.querySelectorAll('.main-menu [role="button"]'),
     ].find((e) => /settings/i.test(e.textContent));

@@ -176,8 +176,8 @@ html[data-ui-theme] .main-menu {
   background: #060a14;
 }
 html[data-ui-theme] .main-menu .menu-home-content { text-shadow: 0 1px 4px #000; }
-html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-brand-title,.menu-action) { color: var(--scene-ink); }
-html[data-ui-theme] .main-menu :is(.menu-brand-tagline,.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }
+html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-action) { color: var(--scene-ink); }
+html[data-ui-theme] .main-menu :is(.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }
 html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action {
   background: var(--garage-menu-row);
   color: var(--garage-menu-ink);

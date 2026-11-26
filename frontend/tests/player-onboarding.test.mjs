@@ -6,7 +6,7 @@ import { act, createElement } from "react";
 import { createServer } from "vite";
 
 test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
-  const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true });
+  const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true, runScripts:"outside-only" });
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis,key));
@@ -69,13 +69,14 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(button("Sign up"), undefined);
     assert.match(document.querySelector('.garage-notices [role="status"]').textContent, /Loading your characters/);
     assert.equal(document.querySelector(".garage-entry-card"), null, "pending character data needs no empty menu panel");
+    assert.equal(document.querySelector(".garage-entry-brand"), null, "a profile handoff does not show a second login badge");
     assert.equal(button("Reconnect"), undefined, "a normal handoff has no recovery action");
     await act(async () => social.setState({ entryIssue: { kind: "other-tab" } }));
     assert.match(document.querySelector(".garage-notices").textContent, /another tab/);
     assert.equal(document.activeElement, button("Reconnect"), "controller can retry without leaving the garage");
     await act(async () => social.setState({ entryIssue: null }));
     await act(async () => social.setState({ profileStatus: "idle" }));
-    assert.equal(document.querySelector(".garage-entry-header"), header);
+    assert.ok(document.querySelector(".garage-entry-brand img"), "returning to sign-in restores the login badge");
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
     assert.equal(disabled(button("Continue")),true);
@@ -92,7 +93,7 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>submit());
     assert.equal(sent.length,0,"draft stays local until the player registers");
     assert.equal(button("Play as guest"),undefined);
-    assert.equal(document.querySelector(".garage-entry-header"), header);
+    assert.ok(document.querySelector(".garage-entry-brand img"), "registration is part of account entry");
     const form=document.querySelector("form");
     form.elements.login.value="lightfoot@example.net";
     form.elements.password.value="a staging passphrase for test";
@@ -137,14 +138,31 @@ test("welcome picks a personality and gender before registration and lets return
       social.setState({view:null,profileStatus:"idle"});
       root.render(createElement(WelcomeScreen,{key:"returning"}));
     });
+    // The local browser uses this same standalone helper from /images.
+    dom.window.eval(await readFile(new URL("../public/images/sign-in-navigation.js", import.meta.url), "utf8"));
+    const destinations = [];
+    window.addEventListener("avensky:entry-view", event => destinations.push(event.detail));
     const loginForm=document.querySelector("form");
     loginForm.elements.login.value="lightfoot@example.net";
     loginForm.elements.password.value="a staging passphrase for test";
     await act(async()=>submit());
+    const rejected = sent.at(-1);
+    assert.equal(rejected.action, "account_login");
+    assert.equal(loginForm.isConnected, true, "the real form stays mounted during authentication");
+    await act(async () => reply(rejected, {}, false, "That email or password is incorrect."));
+    assert.match(document.querySelector('[role="alert"]').textContent, /incorrect/);
+    assert.equal(loginForm.elements.login.value, "lightfoot@example.net");
+    assert.equal(loginForm.elements.password.value, "a staging passphrase for test");
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+    assert.deepEqual(destinations, [], "a rejected login never announces a destination");
+
+    await act(async()=>submit());
     const login=sent.at(-1);
     assert.equal(login.action,"account_login");
+    await act(async()=>reply(login,{profile_id:"registered-player",name:"Track Fox II",token,account:true}));
+    assert.equal(loginForm.isConnected, true, "confirmation alone has no destination to show");
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
     await act(async()=>{
-      reply(login,{profile_id:"registered-player",name:"Track Fox II",token,account:true});
       const hub = {
         id:7, name:"Shared world", map:"road_precision", owner_id:null, listed:true, locked:false,
         walkable:true, active:true, players:0, max_players:6, invite_code:null, members:[],
@@ -154,6 +172,19 @@ test("welcome picks a personality and gender before registration and lets return
         saved.characters[0],
       ]}});
     });
+    const outgoing = document.getElementById("garage-entry-handoff");
+    assert(outgoing?.inert && outgoing.getAttribute("aria-hidden") === "true");
+    assert.equal(outgoing.querySelector("input,button,form,[name]"), null, "the outgoing face contains no credential controls");
+    assert.doesNotMatch(outgoing.innerHTML, /lightfoot@example|staging passphrase/);
+    assert.equal(loginForm.isConnected, false);
+    assert.equal(destinations.length, 1, "one ready event transfers ownership to the local roster");
+    assert(["ready", "roster"].includes(destinations[0]));
+    window.dispatchEvent(new Event("avensky:roster-framing"));
+    await act(async () => {
+      await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+    });
+    outgoing.dispatchEvent(new Event("animationend"));
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
     const { currentOpenWorld } = await vite.ssrLoadModule("/src/game/social/openWorld.ts");
     assert.equal(currentOpenWorld(social.getState().view)?.id, 7);
     assert.equal(document.querySelector('[name="characterName"]'),null);
@@ -219,6 +250,7 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>button("Back").click());
     assert.ok(button("Log out"));
     const headerActions=document.querySelector(".garage-entry-header nav[data-controller-row]");
+    assert.equal(document.querySelector(".garage-entry-brand"),null,"the signed-in roster uses the account tabs only");
     assert.deepEqual([...headerActions.querySelectorAll("[role=button]")].map(tab=>tab.getAttribute("aria-label")),["Log out","Profile"]);
     assert.equal(headerActions.querySelector("button"),null);
     assert.equal(button("Profile").getAttribute("aria-pressed"),"false");
@@ -235,6 +267,7 @@ test("welcome picks a personality and gender before registration and lets return
         await vite.ssrLoadModule("/src/game/characters/GarageProfilePanel.tsx");
       });
       assert.equal(document.querySelector(".garage-entry-header nav"),headerActions);
+      assert.equal(document.querySelector(".garage-entry-brand"),null,"opening the profile preserves the unbranded header");
       assert.equal(button("Profile").getAttribute("aria-pressed"),"true");
       assert.equal(document.querySelectorAll('[aria-label="Log out"]').length,1);
       const settings = document.querySelector('[aria-label="Account settings"]');
@@ -266,6 +299,29 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async () => social.setState({ stagingSignIn: false, registeredProfile: true }));
     assert.ok(button("Log out"), "a restored registered profile with no characters can log out");
     assert.equal(button("Sign in"), undefined);
+    // The optional module has not arrived. The confirmed empty roster must
+    // open immediately with neither an avatar load nor a presentation dependency.
+    delete window.avenskyPortalNavigation;
+    await act(async () => {
+      client.setSocialConnection(socket);
+      client.beginSocialSession("local-no-navigation-helper", undefined, true);
+      root.render(createElement(WelcomeScreen, { key: "local-no-helper" }));
+    });
+    const emptyForm = document.querySelector("form.garage-credentials");
+    emptyForm.elements.login.value = "lightfoot@example.net";
+    emptyForm.elements.password.value = "a staging passphrase for test";
+    await act(async () => submit());
+    assert(document.head.querySelector('script[src="/images/sign-in-navigation.js"]'), "local helper request is still pending");
+    const noHelperLogin = sent.at(-1);
+    assert.equal(noHelperLogin.action, "account_login");
+    await act(async () => {
+      reply(noHelperLogin, { profile_id: view.profile.id, token, account: true });
+      client.receiveSocialState(view);
+    });
+    assert.ok(document.querySelector(".character-roster.garage-entry-incoming"));
+    assert.ok(button("Create character"));
+    assert.equal(document.querySelector("#garage-entry-handoff"), null);
+
   } finally {
     await act(async()=>root.unmount());
     await vite.close();
