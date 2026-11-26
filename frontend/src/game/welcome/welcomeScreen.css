@@ -13,6 +13,7 @@
 /* The compact inner tab and the outer title follow the same slant as the
    brand in the opposite direction. Painted height and hit height are independent. */
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
+#garage-roster-header-exit { right: 0; z-index: 31; }
 .garage-entry-actions {
   grid-column: -2 / -1; justify-self: end; display: flex; align-items: flex-start;
   pointer-events: none;
@@ -22,47 +23,56 @@
   display: grid; justify-items: center; align-items: start;
   width: var(--action-width); height: max(44px,var(--action-face-height));
   margin: 0; border: 0; border-radius: 0;
-  padding: calc((var(--action-face-height) - var(--action-icon-size)) / 2) var(--action-safe-end,0px) 0 var(--angled-tab-cut);
+  padding: calc((var(--action-face-height) - var(--action-icon-size)) / 2) var(--action-safe-end,0px) 0 var(--action-padding-start,0px);
   color: var(--app-text); background: transparent;
   cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .garage-entry-action--logout {
-  --action-width: 44px;
+  --action-width: calc(44px + var(--angled-tab-cut));
   --action-icon-size: 17px;
   --action-face-height: var(--angled-tabs-height);
-  --action-end: calc(2px - var(--angled-tab-cut));
-  --action-shape: polygon(0 0,calc(100% - var(--angled-tab-cut)) 0,100% 100%,var(--angled-tab-cut) 100%);
+  --action-cut: var(--angled-tab-cut);
 }
-.garage-entry-action--profile {
+/* Overlap the faces across the full diagonal. The outer tab's clip also
+   routes each point on the seam to the action that owns that visible area. */
+.garage-entry-actions .garage-entry-action--profile {
   --action-safe-end: env(safe-area-inset-right,0px);
   --action-width: calc(clamp(64px,6.5vw,88px) + var(--action-safe-end));
   --action-icon-size: clamp(21px,1.9vw,26px);
   --action-face-height: var(--angled-header-height);
-  --action-shape: var(--angled-title-shape);
-  --action-transform: scaleX(-1);
-  /* Between the diagonals, Log out owns its visible tip. Both controls have
-     a full-height touch target below the shorter paint on compact screens. */
-  clip-path: polygon(0 0,100% 0,100% 100%,var(--angled-title-cut) 100%,var(--angled-title-cut) var(--angled-header-height),var(--angled-tab-cut) var(--angled-tabs-height));
+  --action-cut: var(--angled-title-cut);
+  --action-padding-start: var(--angled-tab-cut);
+  margin-inline-start: calc(-1 * var(--angled-tab-cut));
 }
-.garage-entry-action::before, .garage-entry-action::after {
-  content: ""; position: absolute; inset: 0 var(--action-end,0px) auto 0; z-index: -1;
-  height: var(--action-face-height); clip-path: var(--action-shape); transform: var(--action-transform,none);
+.garage-entry-actions .garage-entry-action {
+  clip-path: polygon(0 0,100% 0,100% 100%,var(--action-cut) 100%,var(--action-cut) var(--action-face-height));
 }
-.garage-entry-action::before { background: var(--app-accent); }
+.garage-entry-action::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: -1;
+  box-sizing: border-box;
+  height: var(--action-face-height);
+  background: var(--joined-action-fill);
+  border-bottom: var(--joined-action-rule) solid var(--app-accent);
+}
 .garage-entry-action::after {
-  inset: 1px calc(1px + var(--action-end,0px)) auto 1px; height: calc(var(--action-face-height) - 2px);
-  background: var(--angled-title-fill);
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: calc(var(--action-cut) + 1px);
+  height: var(--action-face-height);
+  background: var(--app-line);
+  clip-path: polygon(0 0,1px 0,100% 100%,var(--action-cut) 100%);
+  pointer-events: none;
 }
 .garage-entry-action .menu-icon { width: var(--action-icon-size); height: var(--action-icon-size); }
-.garage-entry-action[aria-pressed="true"]::after,
-.garage-entry-action:focus-visible::after { background: var(--app-raised); }
-.garage-entry-action[aria-pressed="true"] .menu-icon { color: var(--app-accent); }
-.garage-entry-action:focus-visible { outline: 0; }
-.garage-entry-action:focus-visible .menu-icon { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+.garage-entry-action:focus { outline: 0; }
 @media (forced-colors: active) {
-  .garage-entry-action::before { background: ButtonText; }
-  .garage-entry-action::after { background: ButtonFace; }
-  .garage-entry-action:focus-visible .menu-icon { outline-color: Highlight; }
+  .garage-entry-action::before { forced-color-adjust: none; background: ButtonFace; border-color: ButtonText; }
+  .garage-entry-action:is(:focus,[aria-pressed="true"])::before { border-color: Highlight; }
+  .garage-entry-action::after { background: ButtonText; }
 }
 .welcome-scroll {
   position: relative;
@@ -182,17 +192,18 @@
   --menu-panel-cut: 4px; width: 44px; min-height: 44px; justify-content: center; padding: 6px;
 }
 .roster-tool .menu-icon { width: 21px; height: 21px; }
-.roster-choices, .roster-entry {
+.roster-choices {
   position: absolute; right: var(--roster-end); width: min(45%, var(--roster-rail));
+  top: max(calc(var(--roster-top) + 46px),18%); bottom: var(--roster-bottom);
+  display: flex; flex-direction: column;
 }
-.roster-choices { top: max(calc(var(--roster-top) + 46px),18%); }
 .roster-caption {
   display: flex; justify-content: flex-end; align-items: baseline; gap: 5px; margin: 0 8px var(--roster-gap);
   color: var(--garage-menu-ink); text-shadow: 0 1px 3px #000;
 }
 .roster-caption small { font-weight: 700; font-size: .82rem; font-variant-numeric: tabular-nums; }
 .roster-mobile-name { display: none; }
-.roster-tiles { display: grid; gap: var(--roster-gap); max-height: calc(78dvh - 98px); overflow: auto; overscroll-behavior: contain; }
+.roster-tiles { display: grid; gap: var(--roster-gap); min-height: 0; overflow: auto; overscroll-behavior: contain; }
 .character-roster .roster-tile {
   display: flex; align-items: center; justify-content: flex-start; gap: clamp(8px,1.2vw,18px);
   padding: clamp(4px, .8vh, 12px) clamp(7px,1vw,16px); text-align: left;
@@ -209,26 +220,23 @@
 .welcome-character-details strong, .roster-mobile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .welcome-character-details strong { font-size: clamp(.95rem,1.6vw,1.35rem); }
 .welcome-character-details small { color: var(--garage-menu-muted); font-size: clamp(.72rem,1.1vw,.93rem); font-weight: 500; }
+.roster-tile > .controller-key { margin-inline-start: auto; flex: none; }
+.roster-tile:not(:focus) > .controller-key { visibility: hidden; }
 .roster-preview-tools {
   position: absolute; bottom: var(--roster-bottom); left: max(var(--roster-side),env(safe-area-inset-left));
   display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 3px #000;
 }
 .roster-rotate { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
-.roster-entry { bottom: var(--roster-bottom); }
-.character-roster .roster-enter, .character-roster .roster-enter:is(:hover,:focus-visible):not([aria-disabled=true]) {
-  width: 100%; min-height: 45px; gap: 10px; justify-content: center; font-size: clamp(1rem,1.7vw,1.45rem);
-  --menu-panel-fill: var(--app-accent); --menu-panel-edge: var(--garage-menu-accent); color: var(--app-background);
-}
 .character-roster[data-portrait] {
   display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;
   padding: var(--roster-top) var(--roster-end) var(--roster-bottom) max(var(--roster-side),env(safe-area-inset-left));
 }
-.character-roster[data-portrait] :is(.roster-choices,.roster-entry,.roster-preview-tools) { position: static; width: 100%; }
+.character-roster[data-portrait] :is(.roster-choices,.roster-preview-tools) { position: static; width: 100%; }
 .character-roster[data-portrait] .roster-preview-tools { order: -1; justify-content: flex-end; }
 .character-roster[data-portrait]:not([data-input-device="controller"]) .roster-rotate { display: none; }
 .character-roster[data-portrait] .roster-caption { justify-content: space-between; }
 .character-roster[data-portrait] .roster-mobile-name { display: block; font-weight: 700; }
-.character-roster[data-portrait] .roster-tiles { display: flex; justify-content: center; max-height: none; gap: 6px; }
+.character-roster[data-portrait] .roster-tiles { display: flex; justify-content: center; gap: 6px; }
 .character-roster[data-portrait] .roster-tile {
   display: grid; grid-template-columns: minmax(0,1fr); justify-content: stretch; place-items: center;
   flex: 1 1 0; aspect-ratio: 1; padding: 4px; min-width: 0; max-width: min(22vw,10dvh,6rem);
@@ -236,6 +244,7 @@
 .character-roster[data-portrait] .roster-tile :is(.profile-portrait-frame,.roster-plus) {
   width: 100%; height: 100%; border: 0; background: transparent;
 }
+.character-roster[data-portrait] .roster-tile > .controller-key { position: absolute; inset: auto 5px 5px auto; }
 .character-roster[data-portrait] .welcome-character-details,
 .character-roster[data-portrait] .roster-create-label { display: none; }
 .character-roster[data-portrait] .roster-create:only-child { max-width: none; aspect-ratio: auto; grid-template-columns: auto auto; justify-content: center; }

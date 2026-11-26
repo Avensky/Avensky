@@ -22,7 +22,7 @@ export function CharacterHeaderButton({
   joined?: boolean;
   angled?: boolean;
 }) {
-  return <button {...button} type="button" className="character-header-profile" data-compact={compact || undefined}
+  return <button {...button} type="button" className={joined || angled ? "character-header-profile joined-header-action" : "character-header-profile"} data-compact={compact || undefined}
     data-joined={joined || undefined} data-angled={angled || undefined}>
     <CharacterHeaderContent choice={choice} name={name} showProgress={showProgress} />
   </button>;

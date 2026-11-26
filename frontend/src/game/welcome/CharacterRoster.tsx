@@ -15,7 +15,7 @@ type Props = {
   connected: boolean;
   onChoose: (slot: CharacterSlot) => void;
   onCreate: () => void;
-  onEnter: () => void;
+  onEnter: (slot: CharacterSlot) => void;
   onBack?: () => void;
 };
 
@@ -38,16 +38,28 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
         </div>
         <div className="roster-tiles" role="group" aria-label="Saved characters" data-controller-row data-controller-columns={portrait ? limit : 1}
           onFocus={event => event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
-          {slots.map(slot => <GameButton key={slot.id} variant="menu" className="welcome-character roster-tile menu-panel-frame"
-            aria-label={slot.name} title={slot.name} data-character-id={slot.id} aria-pressed={slot.id === selected?.id}
-            selected={slot.id === selected?.id} disabled={busy}
-            onPointerUpCapture={event => { if (!busy && event.isPrimary && event.button === 0) event.currentTarget.focus({ preventScroll: true }); }}
-            onFocusCapture={() => { if (!busy && slot.id !== selected?.id) onChoose(slot); }}
-            onPress={() => onChoose(slot)}>
-            <ProfilePortrait choice={savedCharacterAppearance(profile, slot)} label={slot.name} welcomePreview="roster" />
-            <span className="welcome-character-details"><strong>{slot.name}</strong>
-              <small>{styleName(slot.style)} · Level {slot.level}</small></span>
-          </GameButton>)}
+          {slots.map(slot => {
+            const isSelected = slot.id === selected?.id;
+            const canEnter = isSelected && connected && !busy && Boolean(selectedAppearance);
+            return <GameButton key={slot.id} variant="menu" className="welcome-character roster-tile menu-panel-frame"
+              aria-label={slot.name} aria-description={canEnter ? "Open the main menu as this character" : undefined}
+              title={canEnter ? `Continue as ${slot.name}` : slot.name} data-character-id={slot.id}
+              aria-pressed={isSelected} selected={isSelected} disabled={busy}
+              onFocusCapture={() => { if (!busy && !isSelected) onChoose(slot); }}
+              onPress={event => {
+                if (canEnter) onEnter(slot);
+                else if (!isSelected) {
+                  // Moving focus previews the tile for touch, mouse and D-pad alike.
+                  if (document.activeElement !== event.currentTarget) event.currentTarget.focus({ preventScroll: true });
+                  else onChoose(slot);
+                }
+              }}>
+              <ProfilePortrait choice={savedCharacterAppearance(profile, slot)} label={slot.name} welcomePreview="roster" />
+              <span className="welcome-character-details"><strong>{slot.name}</strong>
+                <small>{styleName(slot.style)} · Level {slot.level}</small></span>
+              {canEnter && device === "controller" && <ControllerButton button="A" />}
+            </GameButton>;
+          })}
           {slots.length < limit && <GameButton variant="menu" className="roster-tile roster-create menu-panel-frame" aria-label="Create character"
             title="Create character" data-roster-create disabled={busy || !connected} onPress={onCreate}>
             <span className="roster-plus" aria-hidden="true"><MenuIcon name="add" /></span><span className="roster-create-label">Create character</span>
@@ -59,11 +71,5 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
       <span className="roster-rotate" aria-hidden="true">{device === "controller"
         ? <><ControllerButton button="LS" /> Look <ControllerButton button="RS" /> Rotate</> : "Drag to rotate"}</span>
     </div>}
-    <div className="roster-entry" data-controller-row>
-      <GameButton variant="menu" className="menu-panel-frame roster-enter" aria-label="Enter world"
-        disabled={!selectedAppearance || busy || !connected} onPress={onEnter}>
-        {device === "controller" && <ControllerButton button="A" />} Enter world
-      </GameButton>
-    </div>
   </div>;
 }

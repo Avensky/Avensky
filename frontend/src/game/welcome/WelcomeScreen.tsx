@@ -232,10 +232,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
       if (!(active instanceof HTMLElement)) return;
       if (action === "back") back();
       else if (action === "activate" && root.current.contains(active)) {
-        if (active.dataset.characterId && active.dataset.characterId === selectedSlot?.id && !accountOpen && player) {
-          // The D-pad already previews the focused character. A confirms entry.
-          root.current.querySelector<HTMLElement>(".roster-enter:not([aria-disabled=true])")?.click();
-        } else if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), summary, a[href]")) active.click();
+        if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), summary, a[href]")) active.click();
         else if (active instanceof HTMLInputElement) {
           if (active.readOnly) active.select();
           else openFieldKeyboard(active, active.name === "characterName" ? changeName : undefined);
@@ -413,9 +410,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
           </form> : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
             busy={busy} connected={connected}
             onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setError(""); }}
-            onCreate={openCreation} onEnter={() => {
-              if (selectedSlot) void run(() => saveCharacter(player.id, "character_select", { character_id: selectedSlot.id }));
-            }}
+            onCreate={openCreation} onEnter={slot => void run(() =>
+              saveCharacter(player.id, "character_select", { character_id: slot.id }))}
             onBack={accountRoot ? undefined : back} /> : screen === "register" ? (
           <form key={screen} method="post" onSubmit={authenticate}>
               <label data-controller-row>Email

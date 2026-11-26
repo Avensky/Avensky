@@ -196,25 +196,59 @@ test("welcome picks a personality and gender before registration and lets return
     const stopInput=listenForMenuInput();
     try {
       await act(async()=>reportMenuDevice("controller"));
-      assert.ok(document.querySelector('.roster-enter [data-controller-key="A"]'));
+      assert.equal(button("Enter world"), undefined);
+      assert.ok(document.querySelector('[data-character-id][aria-pressed=true] [data-controller-key="A"]'));
       assert.ok(document.querySelector('.roster-rotate [data-controller-key="RS"]'));
       const touch=new Event("pointerdown",{bubbles:true});
       Object.defineProperty(touch,"pointerType",{value:"touch"});
       await act(async()=>document.body.dispatchEvent(touch));
-      assert.equal(document.querySelector('.roster-enter [data-controller-key="A"]'),null);
+      assert.equal(document.querySelector('.roster-tile [data-controller-key="A"]'),null);
       assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"touch");
       await act(async()=>window.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowRight"})));
       assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"keyboard");
     } finally { stopInput(); }
     const previewRequests=sent.length;
-    await act(async()=>button("Nova").click());
+    const tap = (target, pointerType) => {
+      for (const type of ["pointerdown", "pointerup", "click"]) {
+        const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, button: 0, detail: 1 });
+        Object.defineProperties(event, { pointerType: { value: pointerType }, isPrimary: { value: true } });
+        target.dispatchEvent(event);
+      }
+    };
+    await act(async()=>tap(button("Nova"), "touch"));
     assert.equal(button("Nova").getAttribute("aria-pressed"),"true");
-    assert.equal(sent.length,previewRequests,"touch preview sends no character or gameplay action");
+    assert.equal(document.activeElement,button("Nova"));
+    assert.equal(sent.length,previewRequests,"touching another slot previews it locally");
+    await act(async()=>tap(button("Nova"), "touch"));
+    const touched = sent.at(-1);
+    assert.equal(touched.action, "character_select");
+    assert.equal(touched.character_id, button("Nova").dataset.characterId);
+    await act(async()=>tap(button("Nova"), "touch"));
+    assert.equal(sent.length,previewRequests+1,"a repeated activation while saving sends only one request");
+    await act(async()=>reply(touched,{},false,"Character select temporarily unavailable."));
+    assert.equal(ui.getState().screen,"welcome");
+    assert.match(document.querySelector('[role="alert"]').textContent,/temporarily unavailable/);
+    await act(async()=>tap(button("Track Fox II"), "mouse"));
+    assert.equal(button("Track Fox II").getAttribute("aria-pressed"),"true");
+    assert.equal(sent.length,previewRequests+1,"clicking another slot previews it locally");
+    await act(async()=>tap(button("Track Fox II"), "mouse"));
+    const clicked = sent.at(-1);
+    assert.equal(clicked.action, "character_select");
+    assert.equal(clicked.character_id, button("Track Fox II").dataset.characterId);
+    await act(async()=>reply(clicked,{},false,"Try again."));
     await act(async()=>button("Nova").focus());
     await act(async()=>panelAction("down"));
     assert.equal(document.activeElement,button("Track Fox II"),"D-pad follows the landscape roster rows");
     assert.equal(button("Track Fox II").getAttribute("aria-pressed"),"true");
-    assert.equal(sent.length,previewRequests,"controller focus previews without changing the saved character");
+    assert.equal(sent.length,previewRequests+2,"controller focus previews without changing the saved character");
+    const pressEnter = repeat => document.activeElement.dispatchEvent(
+      new window.KeyboardEvent("keydown", { bubbles: true, cancelable: true, code: "Enter", key: "Enter", repeat }));
+    await act(async()=>pressEnter(true));
+    assert.equal(sent.length,previewRequests+2,"held keys do not confirm");
+    await act(async()=>pressEnter(false));
+    const keyed = sent.at(-1);
+    assert.equal(keyed.character_id, button("Track Fox II").dataset.characterId);
+    await act(async()=>reply(keyed,{},false,"Try again."));
     assert.equal(document.querySelector(".roster-preview-tools [role=button]"),null,"the rotation hint does not add a controller stop");
     await act(async()=>panelAction("activate"));
     const select=sent.at(-1);
@@ -243,7 +277,8 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(button("Create character"),undefined,"a full registered account has four real slots");
     await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
     assert.equal(document.querySelector('[name="characterName"]'),null);
-    assert.equal(disabled(button("Enter world")),true);
+    assert.equal(button("Enter world"),undefined);
+    assert.equal(document.querySelector("[data-character-id]"),null);
     assert.ok(button("Create character"));
     await act(async()=>button("Create character").click());
     assert.ok(document.querySelector('[name="characterName"]'));
