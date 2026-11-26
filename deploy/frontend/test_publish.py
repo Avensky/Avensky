@@ -120,11 +120,13 @@ class ReleaseTest(unittest.TestCase):
             with (
                 patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
                 patch.object(publish, "check_staging_assets", side_effect=AssertionError("Unexpected release gate")),
+                patch.object(publish, "probe_staging_entry_models") as probe,
                 patch.object(publish.subprocess, "run") as action,
             ):
                 publish.publish(SimpleNamespace(environment="staging", root=path,
                                 verified_manifest=path / "verified"), COMMIT)
             action.assert_not_called()
+            probe.assert_called_once_with(ASSETS)
             self.assertEqual((path / "current/index.html").read_bytes(), b"staging")
             self.assertTrue((path / "releases" / COMMIT / "asset-release.json").is_file())
 
@@ -158,6 +160,7 @@ class ReleaseTest(unittest.TestCase):
             with (
                 patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
                 patch.object(publish, "check_staging_assets"),
+                patch.object(publish, "probe_staging_entry_models"),
                 patch.object(publish.subprocess, "run", side_effect=subprocess.CalledProcessError(1, "game")) as game,
             ):
                 with self.assertRaises(subprocess.CalledProcessError):
@@ -186,6 +189,7 @@ class ReleaseTest(unittest.TestCase):
             with (
                 patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
                 patch.object(publish, "check_staging_assets"),
+                patch.object(publish, "probe_staging_entry_models"),
             ):
                 publish.publish(SimpleNamespace(environment="staging", root=stage, verified_manifest=path / "verified"), COMMIT)
             self.assertEqual((stage / "current/index.html").read_bytes(), b"stage")
@@ -200,6 +204,26 @@ class ReleaseTest(unittest.TestCase):
             self.assertEqual((production / "current/index.html").read_bytes(), b"live")
             self.assertEqual((stage / "current/index.html").read_bytes(), b"stage")
 
+    def test_missing_gate_models_keep_previous_staging_frontend_and_game(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            old = root / "old"
+            old.mkdir()
+            (root / "current").symlink_to(old, target_is_directory=True)
+            data = tar_bytes({"bundle.json": bundle("staging", assetRelease=ASSETS), "web/index.html": b"stage",
+                              "asset-release.json": json.dumps({"id": ASSETS}).encode()})
+            args = SimpleNamespace(environment="staging", root=root)
+            with (
+                patch.object(publish.sys, "stdin", SimpleNamespace(buffer=io.BytesIO(data))),
+                patch.object(publish, "urlopen", side_effect=publish.URLError("404 release not loaded")) as fetch,
+                patch.object(publish.subprocess, "run") as game,
+            ):
+                with self.assertRaisesRegex(ValueError, "/models/world/garage_special.glb"):
+                    publish.publish(args, COMMIT, deploy_game=True)
+                self.assertIn(ASSETS, fetch.call_args.args[0].full_url)
+                game.assert_not_called()
+            self.assertEqual((root / "current").resolve(), old)
+            self.assertFalse((root / "releases" / COMMIT / "staged").exists())
 
 if __name__ == "__main__":
     unittest.main()

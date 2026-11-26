@@ -30,6 +30,17 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
   const waistBones = skin.skeleton.bones.map(({ name }) => /^(pelvis$|spine_|thigh_)/.test(name));
   if (roundedLeftCuff) for (let index = 0; index < skinPosition.count; index++) {
     const x = skinPosition.getX(index), y = skinPosition.getY(index), z = skinPosition.getZ(index);
+    // Recess just the rear inside edge of the left upper arm beneath the sleeve.
+    const sleeveRelief = y > 1.209 && y < 1.267 && x > .148 && x < .204 && z > -.084 && z < -.026
+      ? .010 * (1 - smooth(.007, .028, Math.hypot(x - .176, y - 1.238, z + .055))) : 0;
+    if (sleeveRelief) {
+      skirtSkin.push(index);
+      restoredSkin.set([x, y, z], index * 3);
+      fittedSkin.set([x + sleeveRelief, y, z], index * 3);
+      walkingSkin.set([x + sleeveRelief, y, z], index * 3);
+      seatedSkin.set([x, y, z], index * 3);
+      continue;
+    }
     if (Math.abs(x) >= .22 || y < .63 || y > 1.165) continue;
     let waistWeight = 0;
     for (let influence = 0; influence < 4; influence++) {

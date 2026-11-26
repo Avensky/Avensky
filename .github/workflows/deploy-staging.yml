@@ -49,15 +49,10 @@ jobs:
             import { writeFileSync, readFileSync } from "node:fs";
             const release = JSON.parse(readFileSync("frontend/.asset-release/staging.json", "utf8"));
             writeFileSync("snapshot/bundle.json", JSON.stringify({
-              // Temporary legacy Vultr receiver compatibility. It only checks
-              // the previously published 534-asset ID; the protected browser
-              // gateway already serves the actual 546-asset hair release.
-              // Keep the true client release ID explicit for diagnostics.
               environment: "staging", commit: process.env.GITHUB_SHA,
-              assetRelease: "462b8596b1895b89c02562b2ed8532156eb0438a4d8163a354f6a2af9983a031",
-              clientAssetRelease: release.id
+              assetRelease: release.id,
             }));'
-          tar --create --gzip --file staging.tar.gz -C snapshot bundle.json web
+          tar --create --gzip --file staging.tar.gz -C snapshot bundle.json asset-release.json web
       - uses: actions/upload-artifact@v4
         with:
           name: staging-frontend
