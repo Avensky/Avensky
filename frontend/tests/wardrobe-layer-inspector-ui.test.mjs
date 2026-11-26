@@ -86,6 +86,17 @@ test("W-06 fitting-room stack inspection preserves camera, live selections and o
     await click("[data-layer-preview-toggle]");
     assert.equal(document.querySelector("[data-layer-preview]"),null);
     assert.equal(preview.getState().focusRevision,revisionBefore);
+    await act(async()=>preview.setState({camera:"Face",zoom:1.15}));
+    const outerwearFocus=preview.getState().focusRevision;
+    await click("[data-wardrobe-back]");
+    await click('[data-category="outerwear"]');
+    assert.match(document.querySelector("[data-outerwear-readonly]").textContent,/inspection-only/i);
+    assert.equal(document.querySelector('[data-wardrobe-item="coat-01"]'),null,
+      "Retired coat cannot be selected or tried on");
+    assert.equal(preview.getState().camera,"Face","Opening Outerwear preserves the current camera");
+    assert.equal(preview.getState().zoom,1.15,"Opening Outerwear preserves mobile zoom");
+    assert.equal(preview.getState().focusRevision,outerwearFocus);
+    assert.equal(callback.changed+callback.tried,0);
   }finally{
     if(root)await act(async()=>root.unmount());
     await vite?.close();dom.window.close();

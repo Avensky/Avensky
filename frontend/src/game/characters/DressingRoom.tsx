@@ -348,8 +348,8 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       id: item.id, label: item.label, section: item.section, icon: category.icon, selected,
       pieces: [item.piece], focus: item.piece,
       included: true, layer: GARMENT_LAYERS[item.slot], unavailable: installed ? undefined : "Pack not installed",
-      choose: installed && !selected ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
-      remove: selected ? () => onTryOn(setWardrobeRemoval(choice, removal, true)) : undefined,
+      choose: installed && !selected && item.slot !== "coat" ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
+      remove: selected && item.slot !== "coat" ? () => onTryOn(setWardrobeRemoval(choice, removal, true)) : undefined,
     });
   }
   const wearsBonnet = !removedClothing.includes("hat") && (!garments?.hat || garments.hat === "village-bonnet");
