@@ -164,6 +164,8 @@ pub struct CharacterAppearance {
     glasses: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     tattoo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    makeup: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -258,6 +260,13 @@ pub fn validate_driver(driver: &crate::social::authoring::Driver) -> Result<(), 
 }
 
 impl CharacterChoice {
+    pub fn has_starter_identity(&self, starter: &Self) -> bool {
+        self.id == starter.id && self.identity == starter.identity && self.driver_id == starter.driver_id
+            && self.outfit == starter.outfit
+            && self.appearance.as_ref().and_then(|look| look.personality.as_deref())
+                == starter.appearance.as_ref().and_then(|look| look.personality.as_deref())
+    }
+
     pub fn known_driver(&self, drivers: &BTreeMap<String, crate::social::authoring::Driver>) -> bool {
         self.driver_id.as_ref().is_none_or(|id| !id.starts_with("custom-") || drivers.contains_key(id))
     }
@@ -360,6 +369,7 @@ impl CharacterChoice {
                 ("brow_color", appearance.brow_color.as_deref()),
                 ("glasses", appearance.glasses.as_deref()),
                 ("tattoo", appearance.tattoo.as_deref()),
+                ("makeup", appearance.makeup.as_deref()),
             ]
             .into_iter()
             .all(|(field, value)| value.is_none_or(|value| {

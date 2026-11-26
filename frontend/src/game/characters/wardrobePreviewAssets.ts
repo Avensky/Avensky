@@ -37,7 +37,7 @@ function isOutfitActor(scene: Object3D | null | undefined, bundledSet?: string) 
 
 /** Resolve the next requests and the preview that can be displayed from the current sources. */
 export function resolveWardrobePreview({
-  preferredUrl, look, kind, villageKind, sources, previous,
+  preferredUrl, look, kind, villageKind, sources, previous, allowStockHair = false,
 }: {
   preferredUrl: string;
   look: CharacterLook;
@@ -45,6 +45,7 @@ export function resolveWardrobePreview({
   villageKind: WardrobeAssetTier;
   sources: WardrobeAssetSources;
   previous?: WardrobePreview;
+  allowStockHair?: boolean;
 }) {
   // A candidate omitted from the verified release is already unavailable.
   // Resolve a shipped fallback without throwing inside the live scene.
@@ -140,15 +141,17 @@ export function resolveWardrobePreview({
   const pendingUrls = assetUrls.filter(asset => sourceFor(asset) === undefined);
   const style = installedHairStyles(look.character.id).find(item => item.id === look.appearance.hair);
   const hairScene = style ? sourceFor(style.url) : undefined;
-  if (style && hairScene === undefined) pendingUrls.push(style.url);
+  const pendingHair = style && hairScene === undefined ? style.url : undefined;
+  const optionalHairUrl = allowStockHair ? pendingHair : undefined;
+  if (pendingHair && !allowStockHair) pendingUrls.push(pendingHair);
   const hairMesh = style && hairScene ? hairScene.getObjectByName(style.mesh) : undefined;
   const hairSource = fitsHairRig(hairMesh ?? undefined, skeleton) ? hairMesh : undefined;
-  const unavailable = Boolean(style && hairScene !== undefined && !hairSource) || (corsetUrls.length > 0 && !corsetUrl) || requested.some(({ rejected }) => rejected)
+  const unavailable = Boolean(!allowStockHair && style && hairScene !== undefined && !hairSource) || (corsetUrls.length > 0 && !corsetUrl) || requested.some(({ rejected }) => rejected)
     || assetUrls.some(asset => sourceFor(asset) === null)
     || (needsBody && !garmentBody && (!skeleton || (needsSeparateBody && sourceFor(bodyUrl) !== undefined)));
 
   // Keep the last complete preview while a new selection is pending or unavailable.
-  if (!scene || pendingUrls.length || (unavailable && previous)) return { scene, pendingUrls, unavailable, preview: previous };
+  if (!scene || pendingUrls.length || (unavailable && previous)) return { scene, pendingUrls, optionalHairUrl, unavailable, preview: previous };
 
   const corsetScene = !needsBody || garmentBody ? loadedCorset ?? undefined : undefined;
   const corsetSet = corsetScene ? corset?.set : undefined;
@@ -166,5 +169,5 @@ export function resolveWardrobePreview({
     && previous.corsetScene === corsetScene && previous.corsetSet === corsetSet && previous.hairSource === hairSource
     ? previous
     : { look, scene, garments: sameGarments ? previous.garments : garments, garmentBody, corsetScene, corsetSet, hairSource };
-  return { scene, pendingUrls, unavailable: unavailable || Boolean(style && !hairSource), preview };
+  return { scene, pendingUrls, optionalHairUrl, unavailable, preview };
 }

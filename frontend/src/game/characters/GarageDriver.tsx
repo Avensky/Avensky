@@ -48,6 +48,13 @@ function MissingWardrobeAsset({ url, onReady }: { url: string; onReady: Wardrobe
   return null;
 }
 
+function MissingRosterHair({ url }: { url: string }) {
+  // A failed optional attachment keeps the natural hair. On leaving this
+  // selection discard the rejected loader promise so returning can retry.
+  useEffect(() => () => useAssetGLTF.clear(url), [url]);
+  return null;
+}
+
 function MissingCharacterModel({ cockpit, onSettled }: { cockpit?: GarageCockpit; onSettled?: VillagerPlayback["onSettled"] }) {
   useLayoutEffect(() => onSettled?.(false), [onSettled]);
   const waiting = useCharacterPreviewStore(s => Boolean(cockpit && s.insideCar));
@@ -64,14 +71,17 @@ function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, 
   const [sources, setSources] = useState<WardrobeAssetSources>({});
   const onReady = useCallback<WardrobeAssetListener>((asset, loaded) => setSources(current => current[asset] === loaded
     ? current : { ...current, [asset]: loaded }), []);
-  const { scene, pendingUrls, unavailable, preview } = useMemo(() => resolveWardrobePreview({
-    preferredUrl, look, kind, villageKind, sources, previous: active,
-  }), [preferredUrl, look, kind, villageKind, sources, active]);
+  const { scene, pendingUrls, optionalHairUrl, unavailable, preview } = useMemo(() => resolveWardrobePreview({
+    preferredUrl, look, kind, villageKind, sources, previous: active, allowStockHair: playback.rosterPreview,
+  }), [preferredUrl, look, kind, villageKind, sources, active, playback.rosterPreview]);
   if (preview !== active) setActive(preview);
 
   const status = scene === null ? "Character model unavailable"
     : pendingUrls.length ? "Loading garments" : unavailable ? "Garment unavailable" : undefined;
   return <>
+    {optionalHairUrl && <AssetBoundary key={optionalHairUrl} fallback={<MissingRosterHair url={optionalHairUrl} />}>
+      <Suspense fallback={null}><WardrobeAsset url={optionalHairUrl} onReady={onReady} /></Suspense>
+    </AssetBoundary>}
     {pendingUrls.map(asset => <AssetBoundary key={asset} fallback={<MissingWardrobeAsset url={asset} onReady={onReady} />}>
       <Suspense fallback={null}><WardrobeAsset url={asset} onReady={onReady} /></Suspense>
     </AssetBoundary>)}

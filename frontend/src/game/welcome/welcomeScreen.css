@@ -269,16 +269,6 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   max-width: min(45%,28rem); pointer-events: none;
 }
 .welcome-layout[data-step="characters"] .welcome-notices:empty { display: none; }
-.welcome-layout[data-step="create"] { justify-items: end; }
-.welcome-layout[data-step="create"] .welcome-panel { width: min(47%,27rem); background: var(--garage-menu-panel); }
-.welcome-layout[data-step="create"] .welcome-characters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
-.welcome-layout[data-step="create"] .menu-control { min-height: 44px; padding: 6px 10px; text-transform: none; }
-.welcome-layout[data-step="create"] .welcome-character { justify-items: start; gap: 2px; }
-@media (orientation:portrait) {
-  .welcome-layout[data-step="create"] { align-content: end; padding-top: min(42dvh,300px); }
-  .welcome-layout[data-step="create"] .welcome-panel { width: 100%; }
-}
-
 .garage-entry-body[data-session-pending] { isolation: isolate; }
 .welcome-connection-actions [role="button"] {
   display: inline-flex; min-height: 44px; align-items: center; padding: .4rem .85rem;

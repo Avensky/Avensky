@@ -3,21 +3,56 @@
     "id": "street",
     "name": "Street",
     "attitude": "racer",
-    "female": { "outfit": "shop-crew", "color": "#2c5066", "accent": "#a0e2d4" },
-    "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4" }
+    "female": { "outfit": "shop-crew", "color": "#2c5066", "accent": "#a0e2d4", "hair": "hair-03" },
+    "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4", "hair": "natural" }
   },
   {
     "id": "workshop",
     "name": "Workshop",
     "attitude": "friendly",
-    "female": { "outfit": "dockwear", "color": "#5e5949", "accent": "#dfb879" },
-    "male": { "outfit": "race-crew", "color": "#505d4d", "accent": "#dfb879" }
+    "female": { "outfit": "dockwear", "color": "#5e5949", "accent": "#dfb879", "hair": "hair-02" },
+    "male": { "outfit": "race-crew", "color": "#505d4d", "accent": "#dfb879", "hair": "natural" }
   },
   {
     "id": "night-shift",
     "name": "Night Shift",
     "attitude": "stoic",
-    "female": { "outfit": "shop-crew", "color": "#373146", "accent": "#c9a7e6" },
-    "male": { "outfit": "night-run", "color": "#38334c", "accent": "#c9a7e6" }
+    "female": { "outfit": "shop-crew", "color": "#373146", "accent": "#c9a7e6", "hair": "hair-09" },
+    "male": { "outfit": "night-run", "color": "#38334c", "accent": "#c9a7e6", "hair": "natural" }
+  },
+  {
+    "id": "boardwalk",
+    "name": "Boardwalk",
+    "attitude": "playful",
+    "female": { "outfit": "dockwear", "color": "#624358", "accent": "#e5ac7a", "hair": "hair-11" },
+    "male": { "outfit": "race-crew", "color": "#564453", "accent": "#e5ac7a", "hair": "natural" }
+  },
+  {
+    "id": "quiet-hours",
+    "name": "Quiet Hours",
+    "attitude": "shy",
+    "female": { "outfit": "dockwear", "color": "#585666", "accent": "#c0adae", "hair": "hair-06" },
+    "male": { "outfit": "night-run", "color": "#555663", "accent": "#c0adae", "hair": "natural" }
+  },
+  {
+    "id": "backstreet",
+    "name": "Backstreet",
+    "attitude": "tsundere",
+    "female": { "outfit": "shop-crew", "color": "#542d38", "accent": "#cf8381", "hair": "hair-10" },
+    "male": { "outfit": "night-run", "color": "#4d333e", "accent": "#cf8381", "hair": "natural" }
+  },
+  {
+    "id": "evening",
+    "name": "Evening",
+    "attitude": "elegant",
+    "female": { "outfit": "dockwear", "color": "#342c45", "accent": "#d5bc88", "hair": "hair-07" },
+    "male": { "outfit": "night-run", "color": "#302d42", "accent": "#d5bc88", "hair": "natural" }
+  },
+  {
+    "id": "fieldwork",
+    "name": "Fieldwork",
+    "attitude": "scientist",
+    "female": { "outfit": "shop-crew", "color": "#52665e", "accent": "#d2dec4", "hair": "hair-04" },
+    "male": { "outfit": "race-crew", "color": "#405b57", "accent": "#d2dec4", "hair": "natural" }
   }
 ]

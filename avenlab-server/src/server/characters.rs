@@ -45,7 +45,7 @@ impl Server {
         if !self.player_accounts_enabled() { return Err("Saved characters are unavailable on this server.".into()); }
         let actor = self.actor(player).await?;
         let text = |field: &str| value[field].as_str().unwrap_or_default();
-        let creating = text("action") == "character_create";
+        let creating = text("action") != "character_select";
         let requested = text("character_id");
         {
             let data = self.data.lock().await;
@@ -78,10 +78,22 @@ impl Server {
             }
             let style = text("style").to_owned();
             let first = profile.active_character.is_none();
-            let choice = if first && style == "original" {
+            let starter = if first && style == "original" {
                 profile.progression.equipped_character().cloned().ok_or("Choose a starter style.")?
             } else {
                 style_choice(&style, text("body"))?
+            };
+            // Validate the entire draft before switching slots. The previous client
+            // sends no preview and still uses the server's original preset.
+            let choice = if text("action") == "character_create_styled" {
+                let draft: CharacterChoice = serde_json::from_value(value["character"].clone())
+                    .map_err(|_| "Choose an available character appearance.")?;
+                if !draft.is_equippable() || !draft.has_starter_identity(&starter) {
+                    return Err("The character appearance does not match the selected starter.".into());
+                }
+                draft
+            } else {
+                starter
             };
             Some((if first { actor.clone() } else { id() }, SavedCharacter { name, style, inactive: None }, choice))
         } else {

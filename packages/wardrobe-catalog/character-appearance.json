@@ -17,6 +17,12 @@
     { "id": "warm", "label": "Warm", "color": "#bb7953" },
     { "id": "deep", "label": "Deep", "color": "#85513c" }
   ],
+  "makeup": [
+    { "id": "none", "label": "None" },
+    { "id": "rose", "label": "Rose", "color": "#ad6068" },
+    { "id": "berry", "label": "Berry", "color": "#8c354f" },
+    { "id": "plum", "label": "Plum", "color": "#69415e" }
+  ],
   "tattoo": [
     { "id": "none", "label": "None" },
     { "id": "twin-band", "label": "Twin upper-arm bands" }

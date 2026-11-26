@@ -20,3 +20,5 @@ export function useAssetGLTF(url: string, ...options: Options) {
 }
 
 useAssetGLTF.preload = (url: string, ...options: Options) => useGLTF.preload(assetUrl(url), ...imageOptions(options));
+
+useAssetGLTF.clear = (url: string) => useGLTF.clear(assetUrl(url));

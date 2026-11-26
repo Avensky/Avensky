@@ -6,7 +6,13 @@ Drag the character to turn them, or drag the exposed garage to move the camera. 
 
 **Profile** opens beside the character in landscape and below the character in portrait. **Display name** edits the account name. Each roster slot keeps its own character name and progression. On staging, expand **Email** or **Sign-in & security** to manage the account. Staging admins can create tester invitations, and **Delete account** opens the existing deletion request form. Back closes the current row before leaving Profile.
 
-Street, Workshop, and Night Shift use the existing female and male rigs and approved wardrobe IDs. Styles set the starting outfit palette and emote personality. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) is shared by the browser preview and server. Previously equipped roster looks remain available under **Keep current look** when creating the first character. Players can return to the character picker from the main menu after leaving any active world or queue.
+## Create a character
+
+The left header opens **Gender**, **Looks**, **Skin tone**, **Hair color**, **Makeup**, and **Personality**. Players can revisit any step before saving. The Avensky back tab returns to the roster. The compact action in the lower-right advances the current step.
+
+Looks shows the installed face for the chosen rig. Skin tone, hair color, and lip makeup preview on that face. The same garage camera eases from the body view into a close-up, stays there across those steps, and widens for the starter outfit. Switching steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
+
+Personality previews the starting hairstyle and wardrobe with the chosen skin tone, hair color, and makeup. Enter a character name on this step to finish. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) supplies the starting outfits. The creator saves the name and appearance together and opens the saved slot on the roster after the server confirms it. Duplicate names can be corrected in the same draft.
 
 ## How the save works
 

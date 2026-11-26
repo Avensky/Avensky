@@ -141,6 +141,41 @@ async fn account_survives_a_restart_with_named_characters_and_separate_careers()
 }
 
 #[tokio::test]
+async fn creator_saves_the_preview_and_slot_together_and_restores_them_after_restart() {
+    let mut s = server(3, 8);
+    s.accounts = Some(AccountAccess::default());
+    let (player, account, _) = client(&s, "Creator").await;
+    let owner = account["profile_id"].as_str().unwrap();
+    let preview = json!({
+        "id":"mara-vega", "identity":"female", "outfit":"shop-crew",
+        "appearance":{"hair":"natural", "skin":"warm", "hair_color":"copper", "makeup":"berry",
+            "headwear":"none", "color":"#2c5066", "accent":"#a0e2d4", "personality":"racer"}
+    });
+    let create = |character: &Value| json!({"action":"character_create_styled","name":"Street Runner",
+        "style":"street","body":"female","character":character});
+    for (field, value) in [("makeup", "unlisted"), ("personality", "friendly")] {
+        let mut invalid = preview.clone();
+        invalid["appearance"][field] = json!(value);
+        assert!(s.handle(&player, create(&invalid)).await.is_err());
+    }
+    let mut wrong_rig = preview.clone();
+    wrong_rig["id"] = json!("jules-okafor");
+    assert!(s.handle(&player, create(&wrong_rig)).await.is_err());
+    assert!(s.data.lock().await.profiles[owner].characters.is_empty());
+
+    let response = s.handle(&player, create(&preview)).await.unwrap();
+    assert_eq!(response["profile"]["active_character_id"], owner);
+    assert_eq!(response["profile"]["progression"]["character"], preview);
+    assert!(s.handle(&player, create(&preview)).await.is_err());
+    let restored = database::load_or_import(&s.path.with_extension("sqlite3"), &s.path).unwrap();
+    let saved = &restored.profiles[owner];
+    assert_eq!(saved.characters.len(), 1);
+    assert_eq!(saved.characters[owner].style, "street");
+    assert_eq!(saved.player_view(true)["progression"]["character"], preview);
+    cleanup(s).await;
+}
+
+#[tokio::test]
 async fn account_survives_a_restart_and_restores_the_same_character_and_outfit() {
     let mut server = server(3, 8);
     let (desktop, legacy, mut view) = client(&server, "River").await;

@@ -240,6 +240,24 @@ test("the wardrobe resolver requests donors and authored tiers in order", async 
       assert.equal(fallback.preview.hairSource, undefined);
     }
 
+    // Fitted hair is optional for the live roster, creator and menu. Its GLB can arrive
+    // after the stock actor or fail without freezing the outfit/color preview.
+    const draftLook = characterLook({ ...DEFAULT_CHARACTER, appearance: {
+      ...hairLook.appearance, skin: "deep", hair_color: "copper", makeup: "berry"
+    } });
+    const rosterHair = sources => resolveWardrobePreview({ ...defaultRequest, allowStockHair: true,
+      look: draftLook, sources: { village, ...sources }, previous });
+    const pendingHair = rosterHair({});
+    assert.deepEqual(pendingHair.pendingUrls, []);
+    assert.equal(pendingHair.optionalHairUrl, hairUrl);
+    for (const result of [pendingHair, rosterHair({ [hairUrl]: null }), rosterHair({ [hairUrl]: incompatible })]) {
+      assert.equal(result.unavailable, false);
+      assert.equal(result.preview.look, draftLook);
+      assert.equal(result.preview.scene, village);
+      assert.equal(result.preview.hairSource, undefined);
+    }
+    assert.equal(rosterHair({ [hairUrl]: compatibleHair }).preview.hairSource, compatibleHair.getObjectByName("Hair_12"));
+
     const stockSkirt = characterLook({ ...DEFAULT_CHARACTER, garments: { skirt: "village-skirt" } });
     const originalPortrait = makeVillageAvailable("village-raw");
     for (const kind of ["garage", "portrait"]) {
