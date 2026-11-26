@@ -541,7 +541,9 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
                 aria-controls={item.icon === "remove" ? undefined : detailsId} onClick={() => {
                   setInspectedId(item.icon === "remove" ? undefined : item.id);
                   item.choose?.();
-                  inspectWardrobe(item.focus ?? categoryFocus[category]);
+                  // Outerwear remains inspection-only until W-07 fit/rig verification.
+                  // Even a future discovered coat card must not reset the camera.
+                  if (category !== "outerwear") inspectWardrobe(item.focus ?? categoryFocus[category]);
                 }}>
                 <span className="dressing-item-art" style={{ "--item-color": item.color ?? "var(--app-muted)", "--item-accent": item.accent ?? item.color ?? "var(--app-accent)" } as CSSProperties}>
                   <WardrobeIcon name={item.icon} />{item.color && <i className="dressing-swatch" />}
