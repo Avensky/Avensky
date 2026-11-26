@@ -74,7 +74,7 @@
 - **Decision:** Add optional `wardrobeLayers` v1 **sidecar** on the same serialized `CharacterChoice`. Retain every old key and ID as the source of truth. Avoid auto-migration on read, mode guessing from historical `shirt`, and any implicit conversion of retired/unknown accessories.
 - **Implementation branch:** `feat/wardrobe-legacy-save-w05`, [draft PR #94](https://github.com/Avensky/Avensky/pull/94) based on the W-04 review branch. New pure migration adapter, JSON Schema, shared old/new fixture, Rust optional field with shared-manifest validation, TypeScript type, server persistence test and browser storage regression are review-only.
 - **Security / order:** Rust rejects wrong version, stale slot/ID, duplicate bindings, unsupported mode, contradictory corset waist and unknown entry fields. Explicit body-fit modes remain saved intent, not approved mesh fit. The new field is not emitted by live UI; upgrade server validation before client writes this metadata.
-- **Verified:** [Node contract](https://github.com/Avensky/Avensky/actions/runs/45756697855) passed **26 W-03/W-04 + 7 W-05 pure tests**, 0 failures/skips. [Rust W-05 persistence](https://github.com/Avensky/Avensky/actions/runs/45756823729) passed **3/3 targeted tests**, including actual profile save/reload and strict invalid-entry rejection. [Deployment environment isolation](https://github.com/Avensky/Avensky/actions/runs/45756951908) passed on W-05 code. Browser-storage CI failed initially due to Vite's launch directory; corrected rerun [45757119689](https://github.com/Avensky/Avensky/actions/runs/45757119689) pending.
+- **Verified:** [Node contract](https://github.com/Avensky/Avensky/actions/runs/45756697855) passed **26 W-03/W-04 + 7 W-05 pure tests**, 0 failures/skips. [Rust W-05 persistence](https://github.com/Avensky/Avensky/actions/runs/45756823729) passed **3/3 targeted tests**, including actual profile save/reload and strict invalid-entry rejection. [Deployment environment isolation](https://github.com/Avensky/Avensky/actions/runs/45756951908) passed on W-05 code. Browser-storage CI initially failed due to Vite's launch directory; the corrected [W-05 verification run](https://github.com/Avensky/Avensky/actions/runs/45757119689) completed with **all three jobs green**: Node **7/7**, Rust **3/3**, and actual browser storage via Vite/JSDOM **1/1**; no failed or skipped targeted tests.
 - **No live behavior changed:** `setWardrobeGarment`, `wornClothing`, `SavedOutfits` and Rust equip restrictions remain unchanged. Existing browser and server records are never rewritten en masse.
 - **Next:** W-06 should use W-05 projections read-only, then add explicit mode editing and exposure diagnostics with validated actual coat assets; never connect the resolver before staged regression review.
 
@@ -82,7 +82,7 @@
 
 - The initial browser-storage CI failed before loading saved data because Vite was launched with the repository root, so `/src/game/characters/localOutfits.ts` did not resolve. This is a **test runner path/configuration issue**, not a measured save-format defect.
 - Corrected the GitHub Actions browser job to use `working-directory: frontend` and updated the documented verification command. Rust and pure Node save contract tests passed separately.
-- Browser rerun status: pending; record actual result after GitHub Actions completes.
+- Browser rerun **passed 1/1, with 0 failed and 0 skipped**, running from `frontend`. Node and Rust jobs in the same [run](https://github.com/Avensky/Avensky/actions/runs/45757119689) also passed. The Vite warning about multiple Three.js instances did not fail this test; it is not evidence of wardrobe rendering correctness.
 
 ## Explicitly unresolved
 
@@ -90,7 +90,7 @@
 2. Which currently installed corset/coat and gown/coat pairs actually pass mobile and garage pose checks.
 3. Initial class-specific soft/hard millimeter values, fabric stretch thresholds and actual phone budgets.
 4. Whether to support multiple coats/tops in a single selection slot; v1 proposes one selected item per functional slot.
-5. **Designed in W-05:** optional v1 layer-mode sidecar and reversible adapter. Remaining: full cross-language CI, rollout/server-first deployment and old-save migration/renderer integration reviews.
+5. **W-05 tested on the review branch:** optional v1 layer-mode sidecar, reversible adapter, Node/Rust/browser round trips. Remaining: human review, server-first deployment planning, and W-06 in-game migration/renderer integration; no live rollout occurred.
 6. Presence/provenance and legal status of privately stored purchased texture/model collections.
 7. How to represent dress+pants and dress+top exceptional combinations safely in catalog schema.
 

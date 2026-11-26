@@ -8,7 +8,7 @@ The `layer-rules.json` manifest is validated without installing character GLBs o
 
 ## W-04 pure resolver acceptance
 
-Run `npm run wardrobe:layers:check` to validate the manifest and run both `wardrobe-layer-manifest.test.mjs` and `wardrobe-layer-resolver.test.mjs` on Node 24. This tests deterministic ordering, three-layer outfits, mode-specific waist/belt/boot reversals, invalid and unknown relationships, protected saved IDs, class mapping by actual `piece`, dependent layers, and fit/visibility evidence that must match the exact body/tier/pose/outfit as applicable. These **pure checks use test-only synthetic assets** and do not claim that an actual fitted garment has been visually verified. W-05 must add old-save round trips; W-07/W-15/W-13 require real posed GLBs and on-device evidence before approval.
+Run `npm run wardrobe:layers:check` to validate the manifest and run both `wardrobe-layer-manifest.test.mjs` and `wardrobe-layer-resolver.test.mjs` on Node 24. This tests deterministic ordering, three-layer outfits, mode-specific waist/belt/boot reversals, invalid and unknown relationships, protected saved IDs, class mapping by actual `piece`, dependent layers, and fit/visibility evidence that must match the exact body/tier/pose/outfit as applicable. These **pure checks use test-only synthetic assets** and do not claim that an actual fitted garment has been visually verified. W-05 old-save round trips are implemented and tested; W-07/W-15/W-13 require real posed GLBs and on-device evidence before approval.
 
 W-04 evidence: [2026-11-25 Node 24 contract run](https://github.com/Avensky/Avensky/actions/runs/45743026433) completed with **26 passed, 0 failed, 0 skipped** (manifest + pure resolver). Tests require no source GLB models and are **not** a garment geometry, rendering, saved-profile persistence, physical device, or asset-license approval. Full Cloud asset streaming/build CI is separate and should not be inferred from this green contract run.
 
@@ -29,7 +29,7 @@ The final browser-storage command requires `npm --prefix frontend ci` first, and
 
 **Safety acceptance:** read old localStorage unmodified; explicit opt-in conversion preserves all original keys and dyes; revert drops only sidecar; duplicate/stale IDs or unknown modes are rejected; existing outfit-save endpoint persists both legacy and layered profiles; neither format bypasses old equipment restrictions; no GLB collision, real coat, or mobile claims from these contract tests. Rust's historical normalization of obsolete `shirt` codes is a pre-existing documented behavior.
 
-CI test results must be recorded in [DECISIONS.md](DECISIONS.md) with pass/fail/skip. Distinguish unit contracts, on-disk persistence and game-render acceptance.
+**Verified W-05 CI:** [Run 45757119689](https://github.com/Avensky/Avensky/actions/runs/45757119689) passed all three jobs: Node 7/7, Rust 3/3, actual browser storage 1/1, with no test failures/skips. These do not prove garment geometry, actual coat fitting, deployment compatibility with an old server, or mobile rendering. See [DECISIONS.md](DECISIONS.md) for the initial Vite test-runner path failure and corrective change. Distinguish unit contracts, on-disk persistence and game-render acceptance.
 
 ## Test layers and failure classification
 
