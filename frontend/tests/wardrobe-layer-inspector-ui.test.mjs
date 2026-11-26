@@ -21,7 +21,7 @@ test("W-06 fitting-room stack inspection preserves camera, live selections and o
     original.set(key,Object.getOwnPropertyDescriptor(globalThis,key));
     Object.defineProperty(globalThis,key,{configurable:true,writable:true,value});
   }
-  let root,vite,act;
+  let root,vite,act,garmentRegistry;
   try{
     const {createElement,act:reactAct}=await import("react");
     const {createRoot}=await import("react-dom/client");
@@ -36,6 +36,11 @@ test("W-06 fitting-room stack inspection preserves camera, live selections and o
     },server:{middlewareMode:true,hmr:false,ws:false},appType:"custom",logLevel:"error",
     optimizeDeps:{noDiscovery:true,include:[]}});
     const {DressingRoom}=await vite.ssrLoadModule("/src/game/characters/DressingRoom.tsx");
+    garmentRegistry=(await vite.ssrLoadModule("/src/game/characters/wardrobeGarments.ts")).importedWardrobeItems;
+    // Simulate future discovered outerwear without promoting an unreviewed model.
+    garmentRegistry.push({id:"w06-unreviewed-coat",label:"Unreviewed Test Coat",
+      category:"outerwear",section:"Coats",slot:"coat",piece:"coat",
+      url:"/models/test/w06-unreviewed-coat.garage.glb"});
     const {useCharacterPreviewStore:preview}=await vite.ssrLoadModule("/src/game/characters/characterPreviewStore.ts");
     const callback={changed:0,tried:0};
     const originalSaved=JSON.stringify(fixture.layered);
@@ -96,8 +101,20 @@ test("W-06 fitting-room stack inspection preserves camera, live selections and o
     assert.equal(preview.getState().camera,"Face","Opening Outerwear preserves the current camera");
     assert.equal(preview.getState().zoom,1.15,"Opening Outerwear preserves mobile zoom");
     assert.equal(preview.getState().focusRevision,outerwearFocus);
+    assert(document.querySelector('[data-wardrobe-item="w06-unreviewed-coat"]'),
+      "New coats can be inspected even before asset clearance");
+    await click('[data-wardrobe-item="w06-unreviewed-coat"]');
+    assert.equal(preview.getState().camera,"Face",
+      "Clicking an unreviewed coat must not reset the camera");
+    assert.equal(preview.getState().zoom,1.15);
+    assert.equal(preview.getState().focusRevision,outerwearFocus);
     assert.equal(callback.changed+callback.tried,0);
+    assert.equal(window.localStorage.length,0);
   }finally{
+    if(garmentRegistry){
+      const index=garmentRegistry.findIndex(x=>x.id==="w06-unreviewed-coat");
+      if(index>=0)garmentRegistry.splice(index,1);
+    }
     if(root)await act(async()=>root.unmount());
     await vite?.close();dom.window.close();
     for(const [key,descriptor] of original){
