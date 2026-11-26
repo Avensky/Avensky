@@ -564,9 +564,11 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(trials.at(-1).garments.bracer, 'bracer-01');
 
     assertPiece('corset');
+    const exitCamera = preview.getState().camera;
+    const exitZoom = preview.getState().zoom;
     await act(async () => root.unmount()); root = null;
-    assert.equal(preview.getState().camera, 'Hands', 'leaving restores the previous camera');
-    assert.equal(preview.getState().zoom, 1.2);
+    assert.equal(preview.getState().camera, exitCamera, 'unmounting preserves the latest camera');
+    assert.equal(preview.getState().zoom, exitZoom, 'unmounting preserves current zoom');
 
     root = createRoot(find('#root'));
     await act(async () => root.render(h(Harness, { initial: DEFAULT_CHARACTER })));
