@@ -80,18 +80,126 @@
   .welcome-character .character-portrait { width: 4rem; }
 }
 
-/* Signed-in selection is the player's profile, not a second marketing prescreen. */
-.welcome-layout[data-step="characters"]{grid-template-columns:minmax(0,1fr);align-content:center}
-.welcome-layout[data-step="characters"] .welcome-panel{width:min(92vw,860px)}
-.welcome-layout[data-step="characters"] .welcome-characters{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:.75rem}
-.welcome-layout[data-step="characters"] .welcome-character{display:grid;grid-template-columns:minmax(100px,42%) minmax(0,1fr);align-items:center;justify-items:stretch;gap:clamp(10px,2vw,25px);text-align:left;padding:clamp(8px,1.5vw,18px);background:var(--app-panel);border:1px solid var(--app-line);min-height:150px}
-.welcome-layout[data-step="characters"] .welcome-character .character-portrait{width:100%;height:auto;max-width:none;aspect-ratio:1;object-fit:cover;}
-.welcome-character-details{min-width:0;display:grid;gap:5px;align-content:center}
-.welcome-character-details strong{font-size:clamp(18px,2.6vw,31px);line-height:1.1}
-.welcome-character-details span{font-size:clamp(12px,1.4vw,16px);color:var(--app-text)}
-.welcome-character-details small{font-size:clamp(11px,1vw,14px);color:var(--app-muted)}
-.welcome-layout[data-step="characters"] .welcome-actions{justify-content:flex-end}
-@media(max-height:500px) and (orientation:landscape){.welcome-layout[data-step="characters"] .welcome-character{min-height:100px;grid-template-columns:minmax(85px,28%) 1fr}.welcome-character-details strong{font-size:18px}}
+/* Controls float on the existing garage. Only the visible tiles intercept a drag. */
+.welcome-layout[data-step="characters"] { display: block; padding: 0; }
+.welcome-layout[data-step="characters"] .welcome-panel {
+  width: 100%; padding: 0; background: transparent; pointer-events: none;
+}
+.character-roster {
+  --roster-gap: clamp(4px, .8vh, 9px);
+  --roster-side: clamp(12px, 2.7vw, 48px);
+  --roster-rail: clamp(230px, 32vw, 450px);
+  --roster-top: max(8px, env(safe-area-inset-top));
+  --roster-bottom: max(12px, env(safe-area-inset-bottom));
+  --roster-end: max(var(--roster-side), env(safe-area-inset-right));
+  position: absolute; inset: 0; pointer-events: none;
+  color: var(--garage-menu-ink);
+}
+.character-roster .menu-control, .roster-tiles { pointer-events: auto; }
+.character-roster .menu-control {
+  text-transform: none; letter-spacing: normal; line-height: 1.2; margin: 0;
+  touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  --menu-panel-edge: var(--garage-menu-line);
+  --menu-panel-fill: var(--garage-menu-row);
+  --menu-panel-cut: 7px;
+  --menu-panel-shape: polygon(var(--menu-panel-cut) 0,calc(100% - var(--menu-panel-cut)) 0,100% var(--menu-panel-cut),100% calc(100% - var(--menu-panel-cut)),calc(100% - var(--menu-panel-cut)) 100%,var(--menu-panel-cut) 100%,0 calc(100% - var(--menu-panel-cut)),0 var(--menu-panel-cut));
+}
+/* Keep the middle of the outline open so the 65% tile surface shows the room. */
+.character-roster .menu-panel-frame::before {
+  clip-path: none;
+  background: linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) center top / calc(100% - 2 * var(--menu-panel-cut)) 1px,
+    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) center bottom / calc(100% - 2 * var(--menu-panel-cut)) 1px,
+    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) left center / 1px calc(100% - 2 * var(--menu-panel-cut)),
+    linear-gradient(var(--menu-panel-edge),var(--menu-panel-edge)) right center / 1px calc(100% - 2 * var(--menu-panel-cut)),
+    linear-gradient(135deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) top left / var(--menu-panel-cut) var(--menu-panel-cut),
+    linear-gradient(45deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) top right / var(--menu-panel-cut) var(--menu-panel-cut),
+    linear-gradient(45deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) bottom left / var(--menu-panel-cut) var(--menu-panel-cut),
+    linear-gradient(135deg,transparent 45%,var(--menu-panel-edge) 46% 57%,transparent 58%) bottom right / var(--menu-panel-cut) var(--menu-panel-cut);
+  background-repeat: no-repeat;
+}
+.character-roster .menu-control:is([aria-pressed=true],:focus-visible) {
+  --menu-panel-edge: var(--garage-menu-accent); --menu-panel-fill: color-mix(in srgb, var(--garage-menu-row) 88%, var(--garage-menu-accent));
+}
+.character-roster .menu-control:focus-visible { outline: 2px solid var(--garage-menu-accent); outline-offset: -3px; }
+.roster-tools {
+  position: absolute; right: var(--roster-end); top: var(--roster-top); display: flex; gap: 5px;
+}
+.character-roster .roster-tool {
+  --menu-panel-cut: 4px; width: 44px; min-height: 44px; justify-content: center; padding: 6px;
+}
+.roster-tool .menu-icon { width: 21px; height: 21px; }
+.roster-choices, .roster-entry {
+  position: absolute; right: var(--roster-end); width: min(45%, var(--roster-rail));
+}
+.roster-choices { top: max(calc(var(--roster-top) + 46px),18%); }
+.roster-caption {
+  display: flex; justify-content: flex-end; align-items: baseline; gap: 5px; margin: 0 8px var(--roster-gap);
+  color: var(--garage-menu-ink); text-shadow: 0 1px 3px #000;
+}
+.roster-caption small { font-weight: 700; font-size: .82rem; font-variant-numeric: tabular-nums; }
+.roster-mobile-name { display: none; }
+.roster-tiles { display: grid; gap: var(--roster-gap); max-height: calc(78dvh - 98px); overflow: auto; overscroll-behavior: contain; }
+.character-roster .roster-tile {
+  display: flex; align-items: center; justify-content: flex-start; gap: clamp(8px,1.2vw,18px);
+  padding: clamp(4px, .8vh, 12px) clamp(7px,1vw,16px); text-align: left;
+  font-size: clamp(.875rem,1.5vw,1.35rem); font-weight: 650; min-height: 48px;
+}
+.character-roster .roster-tile :is(.profile-portrait-frame,.roster-plus) {
+  display: grid; place-items: center; flex: none; width: clamp(40px,8.5vh,78px); height: clamp(40px,8.5vh,78px);
+  overflow: hidden; border: 1px solid var(--garage-menu-line); background: color-mix(in srgb,var(--app-background) 62%,transparent);
+  border-radius: 4px;
+}
+.character-roster .roster-tile .character-portrait { width: 100%; height: 100%; max-width: none; object-fit: cover; }
+.roster-plus .menu-icon { width: clamp(24px,3vw,34px); height: clamp(24px,3vw,34px); color: var(--garage-menu-ink); }
+.welcome-character-details { min-width: 0; display: grid; gap: 3px; }
+.welcome-character-details strong, .roster-mobile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.welcome-character-details strong { font-size: clamp(.95rem,1.6vw,1.35rem); }
+.welcome-character-details small { color: var(--garage-menu-muted); font-size: clamp(.72rem,1.1vw,.93rem); font-weight: 500; }
+.roster-preview-tools {
+  position: absolute; bottom: var(--roster-bottom); left: max(var(--roster-side),env(safe-area-inset-left));
+  display: flex; gap: 10px; align-items: center; text-shadow: 0 1px 3px #000;
+}
+.roster-rotate { display: inline-flex; align-items: center; gap: 6px; font-size: .85rem; }
+.roster-entry { bottom: var(--roster-bottom); }
+.character-roster .roster-enter, .character-roster .roster-enter:is(:hover,:focus-visible):not([aria-disabled=true]) {
+  width: 100%; min-height: 45px; gap: 10px; justify-content: center; font-size: clamp(1rem,1.7vw,1.45rem);
+  --menu-panel-fill: var(--app-accent); --menu-panel-edge: var(--garage-menu-accent); color: var(--app-background);
+}
+.character-roster[data-portrait] {
+  display: flex; flex-direction: column; justify-content: flex-end; gap: 6px;
+  padding: var(--roster-top) var(--roster-end) var(--roster-bottom) max(var(--roster-side),env(safe-area-inset-left));
+}
+.character-roster[data-portrait] :is(.roster-choices,.roster-entry,.roster-preview-tools) { position: static; width: 100%; }
+.character-roster[data-portrait] .roster-preview-tools { order: -1; justify-content: flex-end; }
+.character-roster[data-portrait]:not([data-input-device="controller"]) .roster-rotate { display: none; }
+.character-roster[data-portrait] .roster-caption { justify-content: space-between; }
+.character-roster[data-portrait] .roster-mobile-name { display: block; font-weight: 700; }
+.character-roster[data-portrait] .roster-tiles { display: flex; justify-content: center; max-height: none; gap: 6px; }
+.character-roster[data-portrait] .roster-tile {
+  display: grid; grid-template-columns: minmax(0,1fr); justify-content: stretch; place-items: center;
+  flex: 1 1 0; aspect-ratio: 1; padding: 4px; min-width: 0; max-width: min(22vw,10dvh,6rem);
+}
+.character-roster[data-portrait] .roster-tile :is(.profile-portrait-frame,.roster-plus) {
+  width: 100%; height: 100%; border: 0; background: transparent;
+}
+.character-roster[data-portrait] .welcome-character-details,
+.character-roster[data-portrait] .roster-create-label { display: none; }
+.character-roster[data-portrait] .roster-create:only-child { max-width: none; aspect-ratio: auto; grid-template-columns: auto auto; justify-content: center; }
+.character-roster[data-portrait] .roster-create:only-child .roster-create-label { display: inline; }
+.welcome-layout[data-step="characters"] .welcome-notices {
+  position: absolute; top: max(52px,calc(env(safe-area-inset-top) + 44px)); left: max(12px,env(safe-area-inset-left));
+  max-width: min(45%,28rem); pointer-events: none;
+}
+.welcome-layout[data-step="characters"] .welcome-notices:empty { display: none; }
+.welcome-layout[data-step="create"] { justify-items: end; }
+.welcome-layout[data-step="create"] .welcome-panel { width: min(47%,27rem); background: var(--garage-menu-panel); }
+.welcome-layout[data-step="create"] .welcome-characters { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.welcome-layout[data-step="create"] .menu-control { min-height: 44px; padding: 6px 10px; text-transform: none; }
+.welcome-layout[data-step="create"] .welcome-character { justify-items: start; gap: 2px; }
+@media (orientation:portrait) {
+  .welcome-layout[data-step="create"] { align-content: end; padding-top: min(42dvh,300px); }
+  .welcome-layout[data-step="create"] .welcome-panel { width: 100%; }
+}
 
 .garage-entry-body[data-session-pending] { isolation: isolate; }
 .welcome-connection-actions [role="button"] {

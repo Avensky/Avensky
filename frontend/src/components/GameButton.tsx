@@ -7,7 +7,7 @@ type GameButtonProps = Omit<HTMLAttributes<HTMLDivElement>, "children" | "onFocu
   onFocus?: () => void;
   disabled?: boolean;
   selected?: boolean;
-  variant?: "primary" | "secondary" | "danger" | "warning" | "neutral" | "selector" | "menu";
+  variant?: "primary" | "secondary" | "danger" | "warning" | "neutral" | "selector" | "menu" | "custom";
   className?: string;
 };
 
@@ -30,6 +30,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
       "select-none border text-left font-bold transition ";
 
     const variants = {
+      custom: "",
       menu: "menu-control",
       primary:
         "border-cyan-300/40 bg-cyan-500/10 text-cyan-100 hover:bg-cyan-400/20",
@@ -44,6 +45,8 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
       selector:
         `${getSelectionClasses(selected)} text-cyan-100 hover:border-cyan-300/45 hover:bg-[radial-gradient(ellipse_at_center,_rgba(30,41,59,0.72)_20%,_rgba(8,47,73,0.3)_60%,_rgba(2,6,23,0.9)_100%)] hover:shadow-[inset_0_0_18px_rgba(0,0,0,0.55),0_0_12px_rgba(34,211,238,0.08)]`,
     };
+    const accentSelected = selected && (variant === "primary" || variant === "secondary" ||
+      variant === "danger" || variant === "warning");
 
     return (
       <div
@@ -53,7 +56,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
         data-selected={selected}
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled || rest["aria-disabled"] || false}
-        className={`${base} ${variants[variant]} ${selected && variant !== "neutral" && variant !== "selector" && variant !== "menu" ? "ring-2 ring-yellow-300/80 bg-yellow-400/10" : ""
+        className={`${base} ${variants[variant]} ${accentSelected ? "ring-2 ring-yellow-300/80 bg-yellow-400/10" : ""
           } ${disabled ? "pointer-events-none opacity-40" : "cursor-pointer"} ${className} px-1`}
         onPointerEnter={() => { if (!disabled) onFocus?.(); }}
         onFocus={() => { if (!disabled) onFocus?.(); }}

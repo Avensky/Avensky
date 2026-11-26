@@ -1,4 +1,6 @@
+import { activeMenuDevice, listenForMenuInput, reportMenuDevice } from "./activeMenuDevice";
 import { createMenuDirections, menuNeutral } from "./menuDirections";
+import { readRosterSticks, releaseRosterSticks } from "../game/preview/rosterStickControls";
 import {barrageReady, requestTankBarrage} from "../combat/tankBarrage";
 import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove, turnHubCamera } from "../game/hub/hubControls";
 import {requestNearestRevive,isMechanicPlayer} from '../combat/reviveTargets';
@@ -48,6 +50,8 @@ export function GameController() {
     let lastSecondary=useCombatStore.getState().secondaryWeapon;
     let previousButtons: boolean[] = [];
     let padKey: string | null = null;
+    let stickActive = false;
+    const stopTrackingMenuInput = listenForMenuInput();
     let armed = false;
     let onFoot = false;
     let menuArmed = true;
@@ -76,6 +80,7 @@ export function GameController() {
       useInputStore.getState().releaseInputSource("gamepad");
     };
     const onBlur = () => {
+      releaseRosterSticks();
       releasePanelPress();
       focused = false;
       menuArmed = false;
@@ -87,6 +92,7 @@ export function GameController() {
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
+        releaseRosterSticks();
         releasePanelPress();
         menuArmed = false;
         release();
@@ -96,12 +102,14 @@ export function GameController() {
     };
     const onFocusIn = (event: FocusEvent) => {
       if (isTypingTarget(event.target)) {
+        releaseRosterSticks();
         releasePanelPress();
         menuArmed = false;
         release();
       }
     };
     const resetMenuInput = () => {
+      releaseRosterSticks();
       releasePanelPress();
       const pads = Array.from(navigator.getGamepads?.() ?? []);
       const pad =
@@ -148,8 +156,13 @@ export function GameController() {
           (item) => item?.connected && `${item.index}:${item.id}` === padKey,
         ) ?? pads.find((item) => item?.connected);
       if (!pad) {
+        releaseRosterSticks();
         releasePanelPress();
-        if (padKey !== null) release();
+        if (padKey !== null) {
+          release();
+          if (activeMenuDevice.getState() === "controller") reportMenuDevice(null);
+        }
+        stickActive = false;
         padKey = null;
         previousButtons = [];
         return;
@@ -314,7 +327,18 @@ export function GameController() {
           }
           return;
         }
-        const direction = menuDirections.read(pad, edges, performance.now());
+        const now = performance.now();
+        let usingRosterSticks = false;
+        if (ui.screen === "welcome" && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
+          const deadzone = usePreferencesStore.getState().controllerDeadzone;
+          usingRosterSticks = readRosterSticks(axis(pad.axes[0], deadzone), axis(pad.axes[1], deadzone), axis(pad.axes[2], deadzone), now);
+        } else releaseRosterSticks();
+        // A fresh press or deliberate stick tilt changes automatic hints. A held or
+        // drifting stick must not immediately steal them back from touch or typing.
+        const tilted = pad.axes.some(value => Math.abs(value) >= (stickActive ? .25 : .5));
+        if ((tilted && !stickActive) || edges.some(Boolean)) reportMenuDevice("controller");
+        stickActive = tilted;
+        const direction = menuDirections.read(pad, edges, now, !usingRosterSticks);
         if (direction) {
           routeMenuAction(direction);
           return;
@@ -453,6 +477,7 @@ export function GameController() {
     startPolling();
     return () => {
       cancelAnimationFrame(frameId);
+      stopTrackingMenuInput();
       window.removeEventListener("gamepadconnected", startPolling);
       window.removeEventListener("blur", onBlur);
       window.removeEventListener("focus", onFocus);

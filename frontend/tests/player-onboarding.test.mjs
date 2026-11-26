@@ -8,7 +8,7 @@ import { createServer } from "vite";
 test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true });
   const previous = new Map();
-  for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
+  for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
     previous.set(key, Object.getOwnPropertyDescriptor(globalThis,key));
     Object.defineProperty(globalThis,key,{ configurable:true, value:key === "window" ? dom.window : dom.window[key] });
   }
@@ -25,6 +25,8 @@ test("welcome picks a personality and gender before registration and lets return
     const { useSocialStore: social, selectEquippedCharacter } = await vite.ssrLoadModule("/src/store/social/socialStore.ts");
     const { CHARACTER_STYLES, styleLook } = await vite.ssrLoadModule("/src/game/characters/characterStyles.ts");
     const { isEquippableOutfit } = await vite.ssrLoadModule("/src/game/characters/characterCatalog.ts");
+    const { listenForMenuInput, reportMenuDevice }=await vite.ssrLoadModule("/src/controls/activeMenuDevice.ts");
+    const { useTextKeyboardStore: keyboard }=await vite.ssrLoadModule("/src/store/text/keyboardStore.ts");
     const client=await vite.ssrLoadModule("/src/net/socialClient.ts");
     const sent=[];
     const token="a".repeat(64);
@@ -33,7 +35,9 @@ test("welcome picks a personality and gender before registration and lets return
       progression:{character:null,cosmetics_revision:0}},
       limits:{max_active_worlds:2},players:[],teammates:[],requests:[],groups:[],worlds:[],world_invites:[],maps:[],current_world_id:null};
     const reply=(request,data,ok=true,message)=>client.receiveSocialResult({request_id:request.request_id,ok,data,message});
-    const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>button.textContent.trim() === label);
+    const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>(button.getAttribute("aria-label") ?? button.textContent.trim()) === label);
+    const disabled=control=>control.matches(":disabled,[aria-disabled=true]");
+    const panelAction=detail=>window.dispatchEvent(new CustomEvent("avenlab:panel-action",{detail}));
     const submit=()=>document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
     const typeName=name=>{
       const input=document.querySelector('[name="characterName"]');
@@ -72,12 +76,17 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(document.querySelector(".garage-entry-header"), header);
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
-    assert.equal(button("Continue").disabled,true);
+    assert.equal(disabled(button("Continue")),true);
     await act(async()=>button("Male").click());
     const style=[...document.querySelectorAll(".welcome-character")].find(card=>card.textContent.includes("Night Shift"));
     await act(async()=>style.click());
-    await act(async()=>typeName("Track Fox"));
-    assert.equal(button("Continue").disabled,false);
+    await act(async()=>document.querySelector('[name="characterName"]').focus());
+    assert.ok(document.activeElement.closest("[data-controller-form]"), "the gamepad can navigate while a field is focused");
+    await act(async()=>panelAction("activate"));
+    assert.ok(keyboard.getState().session);
+    await act(async()=>{keyboard.getState().edit("Track Fox"); keyboard.getState().close();});
+    assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
+    assert.equal(disabled(button("Continue")),false);
     await act(async()=>submit());
     assert.equal(sent.length,0,"draft stays local until the player registers");
     assert.equal(button("Play as guest"),undefined);
@@ -113,7 +122,9 @@ test("welcome picks a personality and gender before registration and lets return
       characters:[{id:"registered-player",name:"Track Fox II",style:"night-shift",level:1,appearance:fox}],
       progression:{character:fox,cosmetics_revision:1}};
     await act(async()=>reply(sent.at(-1),{profile:saved}));
-    assert.equal(ui.getState().screen,"main");
+    assert.equal(ui.getState().screen,"welcome","creating a character returns to the roster for explicit entry");
+    assert.equal(document.querySelector("[data-character-id][aria-pressed=true]").dataset.characterId,"registered-player");
+    assert.equal(sent.filter(request=>request.action==="character_select").length,0);
     assert.equal(vehicles.getState().getSelectedVehicle().id,beforeVehicle);
     assert.deepEqual(selectEquippedCharacter(social.getState()),fox);
     assert.equal(JSON.parse(localStorage.getItem("avenlab-social-profile-v1:onboarding-test")).token,token);
@@ -132,16 +143,45 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(login.action,"account_login");
     await act(async()=>{
       reply(login,{profile_id:"registered-player",name:"Track Fox II",token,account:true});
-      client.receiveSocialState({...view,profile:saved});
+      client.receiveSocialState({...view,profile:{...saved,characters:[
+        {...saved.characters[0],id:"second",name:"Nova"},
+        saved.characters[0],
+      ]}});
     });
     assert.equal(document.querySelector('[name="characterName"]'),null);
-    assert.match(document.querySelector('.welcome-character').textContent,/Track Fox/);
+    assert.match(document.querySelector('[data-character-id][aria-pressed=true]').textContent,/Track Fox/);
     assert.equal(document.querySelector("h1"), null, "saved character selection has no redundant heading");
     assert.ok(document.querySelector(".welcome-character-details"), "profile details accompany a larger portrait");
     assert.ok(button("Log out"));
-    assert.ok(button("New character"));
-    assert.equal(button("Enter main menu"),undefined);
-    await act(async()=>document.querySelector('.welcome-character').click());
+    assert.ok(button("Create character"));
+    const stopInput=listenForMenuInput();
+    try {
+      await act(async()=>reportMenuDevice("controller"));
+      assert.ok(document.querySelector('.roster-enter [data-controller-key="A"]'));
+      assert.ok(document.querySelector('.roster-rotate [data-controller-key="RS"]'));
+      const touch=new Event("pointerdown",{bubbles:true});
+      Object.defineProperty(touch,"pointerType",{value:"touch"});
+      await act(async()=>document.body.dispatchEvent(touch));
+      assert.equal(document.querySelector('.roster-enter [data-controller-key="A"]'),null);
+      assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"touch");
+      await act(async()=>window.dispatchEvent(new window.KeyboardEvent("keydown",{key:"ArrowRight"})));
+      assert.equal(document.querySelector(".character-roster").dataset.inputDevice,"keyboard");
+    } finally { stopInput(); }
+    const previewRequests=sent.length;
+    await act(async()=>button("Nova").click());
+    assert.equal(button("Nova").getAttribute("aria-pressed"),"true");
+    assert.equal(sent.length,previewRequests,"touch preview sends no character or gameplay action");
+    await act(async()=>button("Nova").focus());
+    await act(async()=>panelAction("down"));
+    assert.equal(document.activeElement,button("Track Fox II"),"D-pad follows the landscape roster rows");
+    assert.equal(button("Track Fox II").getAttribute("aria-pressed"),"true");
+    assert.equal(sent.length,previewRequests,"controller focus previews without changing the saved character");
+    const pose=()=>document.querySelector(".roster-pose").getAttribute("aria-label");
+    const firstPose=pose();
+    await act(async()=>document.querySelector(".roster-pose").click());
+    assert.notEqual(pose(),firstPose);
+    assert.equal(sent.length,previewRequests,"poses stay local");
+    await act(async()=>panelAction("activate"));
     const select=sent.at(-1);
     assert.equal(select.action,"character_select");
     assert.equal(select.character_id,"registered-player");
@@ -162,8 +202,16 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(button("Sign in"), undefined);
     assert.match(document.querySelector(".welcome-character").textContent, /Track Fox/);
     assert.deepEqual(selectEquippedCharacter(social.getState()), fox);
+    await act(async () => client.receiveSocialState({...view, profile:{...saved,
+      characters:Array.from({length:4},(_,i)=>({...saved.characters[0], id:i===0?saved.active_character_id:"slot"+i}))}}));
+    assert.equal(button("Create character"),undefined,"a full registered account has four real slots");
     await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "new-staging-player" } }));
+    assert.equal(document.querySelector('[name="characterName"]'),null);
+    assert.equal(disabled(button("Enter world")),true);
+    assert.ok(button("Create character"));
+    await act(async()=>button("Create character").click());
     assert.ok(document.querySelector('[name="characterName"]'));
+    await act(async()=>button("Back").click());
     assert.ok(button("Log out"));
     assert.ok(button("Account"));
     const previousFetch = globalThis.fetch;
@@ -180,7 +228,7 @@ test("welcome picks a personality and gender before registration and lets return
       assert.equal(settings.querySelector('input[name="newEmail"]'), null);
       assert.equal(settings.querySelector('input[type="password"]').value, "");
       await act(async () => document.querySelector('button[aria-label="Back"]').click());
-      assert.ok(document.querySelector('[name="characterName"]'));
+      assert.ok(button("Create character"));
       await act(async () => ui.getState().setScreen("welcome", "account"));
       assert.ok(document.querySelector('[aria-label="Account settings"]'));
       await act(async () => document.querySelector('button[aria-label="Back"]').click());
@@ -189,7 +237,7 @@ test("welcome picks a personality and gender before registration and lets return
     } finally { globalThis.fetch = previousFetch; }
     assert.equal(document.querySelector('button[aria-label="Back"]'), null);
     await act(async () => window.dispatchEvent(new CustomEvent("avenlab:panel-action", { detail: "back" })));
-    assert.ok(document.querySelector('[name="characterName"]'));
+    assert.ok(button("Create character"));
     assert.equal(button("Sign in"), undefined);
     await act(async () => social.setState({ stagingSignIn: false, registeredProfile: true }));
     assert.ok(button("Log out"), "a restored registered profile with no characters can log out");

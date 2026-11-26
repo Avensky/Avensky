@@ -1,5 +1,6 @@
 import { useGLTF } from "@react-three/drei";
 import { assetUrl } from "./runtimeAssets";
+import { embeddedTextureImages } from "./embeddedTextureImages";
 
 type Options = [
   useDraco?: Parameters<typeof useGLTF>[1],
@@ -7,8 +8,15 @@ type Options = [
   extendLoader?: Parameters<typeof useGLTF>[3],
 ];
 
-export function useAssetGLTF(url: string, ...options: Options) {
-  return useGLTF(assetUrl(url), ...options);
+function imageOptions([draco, meshopt, extend]: Options): Options {
+  return [draco, meshopt, loader => {
+    loader.register(embeddedTextureImages);
+    extend?.(loader);
+  }];
 }
 
-useAssetGLTF.preload = (url: string, ...options: Options) => useGLTF.preload(assetUrl(url), ...options);
+export function useAssetGLTF(url: string, ...options: Options) {
+  return useGLTF(assetUrl(url), ...imageOptions(options));
+}
+
+useAssetGLTF.preload = (url: string, ...options: Options) => useGLTF.preload(assetUrl(url), ...imageOptions(options));

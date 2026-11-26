@@ -5,6 +5,9 @@ const portraits = new Map<string, string>();
 const pendingPortraits = new Map<string, PendingPortrait>();
 const listeners = new Set<() => void>();
 const CACHE_SIZE = 24;
+// One transient WebGL context across all menu portraits. Waiting requests hold
+// their saved looks only and can be canceled before they load any model.
+let workerAvailable = Promise.resolve();
 
 export const peekCharacterPortrait = (key: string) => portraits.get(key) ?? null;
 export function subscribeCharacterPortrait(listener: () => void) {
@@ -15,17 +18,21 @@ export function subscribeCharacterPortrait(listener: () => void) {
 function startPortrait(key: string, input: CharacterPortraitJob): PendingPortrait {
   const abort = new AbortController();
   let worker: Worker | undefined;
-  const image = new Promise<Blob>((resolve, reject) => {
-    worker = new Worker(new URL("./characterPortrait.worker.ts", import.meta.url), { type: "module" });
-    worker.onmessage = ({ data }: MessageEvent<CharacterPortraitResult>) => {
-      if ("image" in data) resolve(data.image);
-      else reject(Error(data.error));
-    };
-    worker.onerror = event => reject(Error(event.message || "Character portrait worker failed."));
-    worker.onmessageerror = () => reject(Error("Character portrait worker returned unreadable data."));
-    abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
-    worker.postMessage(input);
+  const image = workerAvailable.then(() => {
+    abort.signal.throwIfAborted();
+    return new Promise<Blob>((resolve, reject) => {
+      worker = new Worker(new URL("./characterPortrait.worker.ts", import.meta.url), { type: "module" });
+      worker.onmessage = ({ data }: MessageEvent<CharacterPortraitResult>) => {
+        if ("image" in data) resolve(data.image);
+        else reject(Error(data.error));
+      };
+      worker.onerror = event => reject(Error(event.message || "Character portrait worker failed."));
+      worker.onmessageerror = () => reject(Error("Character portrait worker returned unreadable data."));
+      abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
+      worker.postMessage(input);
+    });
   }).finally(() => worker?.terminate());
+  workerAvailable = image.then(() => {}, () => {});
   const result = image.then(blob => {
     abort.signal.throwIfAborted();
     const src = URL.createObjectURL(blob);

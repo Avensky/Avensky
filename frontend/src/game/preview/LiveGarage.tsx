@@ -11,13 +11,19 @@ import { isUITheme } from "../../theme/catalog";
 import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry";
 import { collectGarageFixtures } from "./garageFixtures";
 import { setFloorFinish } from "./mechanicsFloor";
-import { installGarageEntryInteraction, type EntryMotion } from "./garageEntryInteraction";
+import { installGarageEntryInteraction, type ActorInput, type EntryMotion } from "./garageEntryInteraction";
 import { restoreGaragePreferences } from "../../theme/garagePreferences";
+import { embeddedTextureImages } from "../../assets/embeddedTextureImages";
 
 declare const __GARAGE_MODEL_URL__: string;
 const decoder = new DRACOLoader().setDecoderPath("/draco/");
-const configure = (loader: GLTFLoader) => { loader.setDRACOLoader(decoder); };
-type Preview = { contents: ReactNode; demand: boolean; dpr: number; shadows: boolean };
+const configure = (loader: GLTFLoader) => { loader.setDRACOLoader(decoder).register(embeddedTextureImages); };
+export type GarageEntryShot = {
+  frame(camera: PerspectiveCamera, width: number, height: number): void;
+  orbit(camera: PerspectiveCamera, yaw: number, pitch: number): void;
+  actor?: ActorInput;
+};
+type Preview = { contents: ReactNode; demand: boolean; dpr?: number; shadows: boolean; shot?: GarageEntryShot };
 type GarageRuntime = { preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
 const shared = globalThis as typeof globalThis & { __avenskyGarage?: GarageRuntime };
 const runtime = shared.__avenskyGarage ??= {
@@ -38,7 +44,7 @@ function revealGarage(host: HTMLElement) {
   window.dispatchEvent(new Event("avensky:garage-ready"));
 }
 
-function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: PerspectiveCamera; entry: boolean }) {
+function GarageObject({ host, camera, entry, shot }: { host: HTMLElement; camera: PerspectiveCamera; entry: boolean; shot?: GarageEntryShot }) {
   const { scene } = useLoader(GLTFLoader, __GARAGE_MODEL_URL__, configure);
   const invalidate = useThree(state => state.invalidate);
   const gl = useThree(state => state.gl);
@@ -116,12 +122,12 @@ function GarageObject({ host, camera, entry }: { host: HTMLElement; camera: Pers
   return <>
     <primitive object={display.root} dispose={null} />
     <primitive object={display.fixtures.lights} />
-    <EntryCamera camera={camera} active={entry} />
+    <EntryCamera camera={camera} active={entry} shot={shot} />
     <object3D name="garage-camera-envelope" userData={display.envelope} />
   </>;
 }
 
-function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: boolean }) {
+function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; active: boolean; shot?: GarageEntryShot }) {
   const { width, height } = useThree(state => state.size);
   const dpr = useThree(state => state.viewport.dpr);
   const invalidate = useThree(state => state.invalidate);
@@ -132,11 +138,13 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
   useLayoutEffect(() => {
     if (!active) return;
     const portrait = width < height;
+    camera.clearViewOffset();
     camera.position.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
     camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
-    restingOrientation.copy(camera.quaternion);
     camera.aspect = width / Math.max(1, height);
     camera.fov = portrait ? 70 : 59;
+    shot?.frame(camera, Math.max(1, width), Math.max(1, height));
+    restingOrientation.copy(camera.quaternion);
     camera.updateProjectionMatrix();
     // A small rotation moves details fastest near the corners of a perspective image.
     // Stop when even a corner would travel less than a quarter of a rendered pixel.
@@ -156,7 +164,7 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
       preferences.disconnect();
       reducedMotion?.removeEventListener("change", changed);
     };
-  }, [active, width, height, dpr, invalidate, reducedMotion, camera, restingOrientation]);
+  }, [active, width, height, dpr, invalidate, reducedMotion, camera, restingOrientation, shot]);
   useFrame(() => {
     if (!active || document.hidden) return;
     const motion = runtime.motion;
@@ -164,10 +172,11 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
     const started = motion.dragging ? motion.dragStarted : motion.lastInput;
     const elapsed = Math.max(0, now - Math.max(previousFrame.current, started ?? 0)) / 1000;
     previousFrame.current = now;
-    const yaw = motion.dragging ? motion.targetYaw ?? motion.yaw : 0;
-    const pitch = motion.dragging ? motion.targetPitch ?? motion.pitch : 0;
+    const yaw = motion.dragging ? motion.targetYaw ?? motion.yaw : motion.stickYaw ?? 0;
+    const pitch = motion.dragging ? motion.targetPitch ?? motion.pitch : motion.stickPitch ?? 0;
+    const following = motion.dragging || Boolean(motion.stickYaw || motion.stickPitch);
     const immediate = reducedMotion?.matches || document.documentElement.dataset.reduceMotion === "true";
-    const blend = immediate ? 1 : -Math.expm1(-(motion.dragging ? 16 : 1.7) * elapsed);
+    const blend = immediate ? 1 : -Math.expm1(-(following ? 16 : 1.7) * elapsed);
     motion.yaw += (yaw - motion.yaw) * blend;
     motion.pitch += (pitch - motion.pitch) * blend;
     const moving = (yaw - motion.yaw) ** 2 + (pitch - motion.pitch) ** 2 > settledAngleSquared.current;
@@ -175,9 +184,12 @@ function EntryCamera({ camera, active }: { camera: PerspectiveCamera; active: bo
       motion.yaw = yaw;
       motion.pitch = pitch;
     }
-    camera.quaternion.copy(restingOrientation);
-    camera.rotateY(motion.yaw);
-    camera.rotateX(motion.pitch);
+    if (shot) shot.orbit(camera, motion.yaw, motion.pitch);
+    else {
+      camera.quaternion.copy(restingOrientation);
+      camera.rotateY(motion.yaw);
+      camera.rotateX(motion.pitch);
+    }
     if (moving) invalidate();
   }, -1);
   return null;
@@ -200,7 +212,7 @@ function LiveGarage({ host }: { host: HTMLElement }) {
       dpr={view?.dpr ?? (coarse ? 1 : [1, 1.5])} shadows={view?.shadows ?? false}
       frameloop={view && !view.demand ? "always" : "demand"}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} fallback={null}>
-      <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view} /></Suspense></GarageFailure>
+      <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view || Boolean(view.shot)} shot={view?.shot} /></Suspense></GarageFailure>
       {view?.contents}
     </Canvas>
   </GarageFailure>;
@@ -221,7 +233,7 @@ export function mountGarage(host: HTMLElement) {
     return;
   }
   runtime.owner = import.meta.url;
-  runtime.input ??= installGarageEntryInteraction(runtime.motion, () => runtime.preview !== null);
+  runtime.input ??= installGarageEntryInteraction(runtime.motion, () => Boolean(runtime.preview && !runtime.preview.shot), () => runtime.preview?.shot?.actor);
   restoreGaragePreferences(document.documentElement);
   if ((window.navigator as Navigator & { standalone?: boolean }).standalone || window.matchMedia?.("(display-mode: standalone)")?.matches) {
     document.documentElement.dataset.garageStandalone = "true";
@@ -235,3 +247,5 @@ export function mountGarage(host: HTMLElement) {
     createRoot(host).render(<LiveGarage host={host} />);
   }
 }
+
+export function getGarageMotion() { return runtime.motion; }

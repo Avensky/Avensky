@@ -41,6 +41,14 @@ function installGlobals(values) {
 test('portraits create one background job for each quiet, visible main-menu request', { timeout: 20000 }, async () => {
   const dom = new JSDOM('<div id="root"></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   const workers = [], mainRequests = [];
+  const observedTiles = new Set();
+  let visibleTiles;
+  class TileObserver {
+    constructor(callback) { visibleTiles = () => callback([...observedTiles].map(target => ({ target, isIntersecting: true }))); }
+    observe(tile) { observedTiles.add(tile); }
+    unobserve(tile) { observedTiles.delete(tile); }
+    disconnect() { observedTiles.clear(); }
+  }
   class FakeWorker {
     constructor(url, options) {
       this.url = url;
@@ -54,7 +62,7 @@ test('portraits create one background job for each quiet, visible main-menu requ
   const restore = installGlobals({
     window: dom.window, document: dom.window.document, navigator: dom.window.navigator,
     HTMLElement: dom.window.HTMLElement, localStorage: dom.window.localStorage,
-    Worker: FakeWorker, OffscreenCanvas: class {}, IS_REACT_ACT_ENVIRONMENT: true,
+    Worker: FakeWorker, OffscreenCanvas: class {}, IntersectionObserver: TileObserver, IS_REACT_ACT_ENVIRONMENT: true,
     fetch: async url => { mainRequests.push(url); throw Error('Unexpected main-thread portrait fetch'); },
   });
 
@@ -98,7 +106,7 @@ test('portraits create one background job for each quiet, visible main-menu requ
       ...serverOptions,
       cacheDir: 'node_modules/.vite-character-portrait-cadence',
     });
-    const { CharacterPortrait } = await vite.ssrLoadModule('/src/game/characters/CharacterPortrait.tsx');
+    const { CharacterPortrait, ProfilePortrait } = await vite.ssrLoadModule('/src/game/characters/CharacterPortrait.tsx');
     const { DEFAULT_CHARACTER, characterAppearance } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
     const { useUIStore: ui } = await vite.ssrLoadModule('/src/store/menus/uiStore.ts');
     const choice = { ...DEFAULT_CHARACTER, appearance: characterAppearance(DEFAULT_CHARACTER) };
@@ -205,6 +213,44 @@ test('portraits create one background job for each quiet, visible main-menu requ
     assert.ok(outfitPortrait);
     await screen('heroes');
     assert.equal(image(), outfitPortrait, 'Heroes reuses the visible outfit portrait');
+
+    const { savedCharacterAppearance } = await vite.ssrLoadModule('/src/store/social/socialStore.ts');
+    const profile = { id: 'legacy', progression: { character: choice } };
+    const slots = [
+      { id: 'legacy' }, { id: 'unknown' },
+      { id: 'red', appearance: { ...choice, appearance: { ...choice.appearance, color: '#cc2323' } } },
+      { id: 'blue', appearance: { ...choice, appearance: { ...choice.appearance, color: '#4f5fdf' } } },
+    ];
+    const renderRoster = () => act(async () => root.render(slots.map(slot => h(ProfilePortrait, {
+      key: slot.id, choice: savedCharacterAppearance(profile, slot), label: slot.id, welcomePreview: 'roster',
+    }))));
+    await screen('welcome');
+    await renderRoster();
+    assert.equal(document.querySelector('img[alt=legacy]').src, cached, 'older active careers reuse their saved progress and cached portrait');
+    assert.equal(document.querySelector('img[alt=unknown]'), null, 'an incomplete inactive career never borrows the active appearance');
+    await step(900);
+    assert.equal(workers.length, 5, 'a mounted tile outside the visible roster requests no model');
+    await act(async () => visibleTiles());
+    await step(900);
+    assert.equal(workers.length, 6, 'two cold portraits start one worker');
+    await act(async () => window.dispatchEvent(new window.CustomEvent('avenlab:panel-action', { detail: 'right' })));
+    assert.ok(workers[5].terminated, 'browsing releases active portrait work and cancels its queue');
+    await step(899);
+    assert.equal(workers.length, 6);
+    await step(1);
+    assert.equal(workers.length, 7);
+    await finish(workers[6]);
+    assert.equal(workers.length, 8, 'the other saved look bakes only after the first worker is released');
+    assert.ok(workers[6].terminated);
+    assert.equal(workers[7].input.look.appearance.color, '#4f5fdf');
+    await finish(workers[7]);
+    assert.equal(document.querySelectorAll('img.character-portrait').length, 3);
+    assert.equal(document.querySelectorAll('canvas').length, 0, 'roster tiles only display images');
+    await render();
+    assert.equal(observedTiles.size, 0, 'closing the list releases its visibility observer');
+    await renderRoster();
+    await step(900);
+    assert.equal(workers.length, 8, 'revisiting the roster reuses all three pictures');
     assert.deepEqual(mainRequests, [], 'GLTF requests never run on the main thread');
   } finally {
     if (root) await act(async () => root.unmount());

@@ -1,6 +1,8 @@
 # Player accounts and onboarding
 
-New players select **Sign up**, pick a gender and personality, and name their character before registering by email or playing as a guest. Returning players can use their email or existing account name. Tap a saved character portrait to enter the main menu. Registered accounts have four slots. Guests have one and can register the same profile to add slots. Choose a vehicle later in Play or Open World. The selected character stays with the player through vehicle changes. Match vehicle and role rules still apply.
+After staging sign-in, the roster opens in the same 3D garage and previews the last active character. Tap a portrait or focus its tile with the D-pad to preview another saved character. **Create character** opens an available slot and returns to the roster after saving. Registered accounts have four slots. Environments that support guest profiles offer one slot.
+
+Drag the character to turn them, or drag the exposed garage to move the camera. On a controller, use the left stick for the camera and the right stick for the character. The pose control cycles through hands near pockets, one hand on hip, and hands behind the back with crossed ankles. **Enter world** confirms the character with the server and joins the shared hub through the existing deployment screen. When the server has no available hub, it opens the main menu. **Log out** returns to sign-in over the same garage.
 
 Street, Workshop, and Night Shift use the existing female and male rigs and approved wardrobe IDs. Styles set the starting outfit palette and emote personality. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) is shared by the browser preview and server. Previously equipped roster looks remain available under **Keep current look** when creating the first character. Players can return to the character picker from the main menu after leaving any active world or queue.
 
@@ -26,7 +28,7 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 
 ## Branding and startup
 
-The welcome screen shows the transparent triangular A at `/images/logo.svg`. The emblem is also available as `/images/logo.png` and `/favicon.ico`. Welcome, main menu, queue, and loading share a muted 47 kB purple sunflare loop. Players who prefer reduced motion see the 10.5 kB still.
+The welcome screen shows the transparent triangular A at `/images/logo.svg`. Sign-in, character selection, and the main menu share the live garage. The roster displays one full-size character and uses cached images for its tiles.
 
 ## Wardrobe follow-up
 
