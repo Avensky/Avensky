@@ -100,6 +100,10 @@ export function prepareVillagerFaceAccessories(root: Object3D, female: boolean, 
   focus.name = "villager-face-focus";
   focus.position.set(0, fit.y - .022, fit.z);
   faceOrigin.add(focus);
+  const eyes = new Object3D();
+  eyes.name = "villager-eye-focus";
+  eyes.position.set(0, fit.y, fit.z);
+  faceOrigin.add(eyes);
   const tears = wetEyes && head ? tearline(fit) : null;
   if (tears) faceOrigin.add(tears);
   return {

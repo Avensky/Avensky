@@ -10,7 +10,7 @@ import { requestSocial } from "../../net/socialClient";
 import { selectActiveCharacterName, selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, availableHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { AlphaAccountPanel } from "./AlphaAccountPanel";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
@@ -367,8 +367,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   }
 
   function editBodyAppearance(field: BodyAppearanceField, value: string) {
-    const next = { ...choice, appearance: { ...characterAppearance(choice), [field]: value } };
-    const preview = activeTrial && { ...activeTrial, appearance: { ...appearance, [field]: value } };
+    const change = field === "hair_color" ? { hair_color: value, hair_palette: undefined } : { [field]: value };
+    const next = { ...choice, appearance: { ...characterAppearance(choice), ...change } };
+    const preview = activeTrial && { ...activeTrial, appearance: { ...appearance, ...change } };
     update(next, preview);
     const target = field === "skin" || field === "tattoo" ? "Full body" : "Face";
     if (camera !== target || emote) {
@@ -590,7 +591,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     }>Stop</button>
   </div>;
   const fitting = tab === "appearance";
-  const fittedStyles = installedHairStyles(choice.id);
+  const hairstyles = availableHairStyles(choice.id);
   const rotationDisabled = insideCar || Boolean(garageDoorForEmote(emote?.id)) || isMirrorMakeupEmote(emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
   const cameraViews = vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
@@ -668,14 +669,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
           {fields.map(([field, label]) => (field === "hair" && choice.id === ROOK_ID && __ROOK_MODEL_URL__) ||
             (section === "Hair" && choice.id === "mara-vega" && fittedHair) ? null
             : <label className="character-setting" key={field} data-controller-row>{label}
-              <select className="menu-control" aria-label={label} value={appearance[field] ?? (field === "hair" ? "natural" : field === "tattoo" ? "none" : "original")}
+              <select className="menu-control" aria-label={label} value={field === "hair_color" && appearance.hair_palette ? "" : appearance[field] ?? (field === "hair" ? "natural" : field === "tattoo" ? "none" : "original")}
                 disabled={field === "tattoo" && saveToProfile && !bodyTattoosAvailable}
                 onChange={event => editBodyAppearance(field, event.target.value)}>
-                {CHARACTER_APPEARANCE_OPTIONS[field].map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-                {field === "hair" && fittedStyles.map(style =>
-                  <option key={style.id} value={style.id}>{style.label}</option>)}
-                {field === "hair" && !CHARACTER_APPEARANCE_OPTIONS.hair.some(style => style.id === appearance.hair)
-                  && !fittedStyles.some(style => style.id === appearance.hair)
+                {field === "hair_color" && appearance.hair_palette && <option disabled value="">Custom palette</option>}
+                {(field === "hair" ? hairstyles : CHARACTER_APPEARANCE_OPTIONS[field]).map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+                {field === "hair" && !hairstyles.some(style => style.id === appearance.hair)
                   && <option disabled value={appearance.hair}>Saved style unavailable</option>}
               </select>
               {field === "tattoo" && saveToProfile && !bodyTattoosAvailable && <small>Update the game server to save tattoos.</small>}

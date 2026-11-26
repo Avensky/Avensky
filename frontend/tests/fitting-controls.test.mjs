@@ -3,10 +3,46 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { createServer } from 'vite';
 import { AnimationMixer, Bone, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, Mesh,
-  MeshStandardMaterial, Quaternion, Raycaster, Skeleton, SkinnedMesh, Uint16BufferAttribute, Vector3 } from 'three';
+  MeshStandardMaterial, Quaternion, Raycaster, Skeleton, SkinnedMesh, Texture, Uint16BufferAttribute, Vector3 } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const server = () => createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
+
+test('named red and dirty blonde apply strand pigments to both authored hairstyles and restore the original atlas', async () => {
+  const vite = await server();
+  const atlas = new Texture(), geometry = new BoxGeometry();
+  const source = new MeshStandardMaterial({ map: atlas, color: '#322925' });
+  source.name = 'MAT_Hair';
+  try {
+    const { prepareVillager, applyVillagerLook } = await vite.ssrLoadModule('/src/game/characters/villagerModel.ts');
+    const { characterLook, characterAppearance } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
+    const { HAIR_COLOR_THEMES } = await vite.ssrLoadModule('/src/game/characters/fittedWardrobe/hairColors.ts');
+    for (const [id, outfit, meshName] of [['mara-vega', 'dockwear', 'HAIR_HAIR20'], ['jules-okafor', 'night-run', 'HAIR_SHORT']]) {
+      const scene = new Group(), hair = new Mesh(geometry, source);
+      hair.name = meshName; scene.add(hair);
+      const model = prepareVillager(scene, { female: id === 'mara-vega' });
+      try {
+        const material = model.root.getObjectByName(meshName).material;
+        const shader = { uniforms: {}, vertexShader: '', fragmentShader: '#include <map_fragment>' };
+        material.onBeforeCompile(shader);
+        const { avenskyHairOriginal, avenskyHairBase, avenskyHairRoots } = shader.uniforms;
+        for (const [hair_color, label] of [['red', 'Red'], ['dirty-blonde', 'Dirty Blonde']]) {
+          const look = characterLook({ id, outfit, appearance: { ...characterAppearance({ id, outfit }), hair_color } });
+          applyVillagerLook(model, look);
+          assert.equal(look.hair, HAIR_COLOR_THEMES[label].base);
+          assert.equal(avenskyHairOriginal.value, 0);
+          assert.equal('#' + avenskyHairBase.value.getHexString(), look.hair);
+          assert.equal('#' + avenskyHairRoots.value.getHexString(), HAIR_COLOR_THEMES[label].roots);
+          assert.equal(material.color.getHexString(), 'ffffff', 'the dark source tint cannot mute the dye');
+        }
+        applyVillagerLook(model, characterLook({ id, outfit }));
+        assert.equal(avenskyHairOriginal.value, 1);
+        assert.equal(material.color.getHexString(), source.color.getHexString());
+        assert.equal(material.map, atlas);
+      } finally { model.dispose(); }
+    }
+  } finally { atlas.dispose(); geometry.dispose(); source.dispose(); await vite.close(); }
+});
 
 test('preview raycasts skip hidden skin and fit branches while preserving the active mesh hits', async () => {
   const vite = await server();

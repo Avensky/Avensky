@@ -1,3 +1,5 @@
+import appearanceOptions from "../../../../../packages/wardrobe-catalog/character-appearance.json";
+
 export const HAIR_COLOR_ZONES = ["base", "roots", "highlights", "tips"] as const;
 export type HairColorZone = typeof HAIR_COLOR_ZONES[number];
 export type HairPalette = Record<HairColorZone, string> & { highlightStrength: number; tipBlend: number };
@@ -5,11 +7,20 @@ export type HairPalette = Record<HairColorZone, string> & { highlightStrength: n
 const palette = (base: string, roots: string, highlights: string, tips: string, highlightStrength = .4, tipBlend = .6): HairPalette =>
   ({ base, roots, highlights, tips, highlightStrength, tipBlend });
 
+const stockDyes = appearanceOptions.hair_color.flatMap(({ id, label, color, zones }) =>
+  zones ? [{ id, label, palette: { base: color, ...zones } }] : []);
+const stockPalettes = new Map(stockDyes.map(dye => [dye.id, dye.palette]));
+
+export function appearanceHairPalette(appearance: { hair_color: string; hair_palette?: HairPalette }) {
+  return appearance.hair_palette ?? stockPalettes.get(appearance.hair_color);
+}
+
 export const HAIR_COLOR_THEMES = {
   Espresso: palette("#533a30", "#38271f", "#805a44", "#594033", .33, .38),
   "Soft Black": palette("#252226", "#151419", "#48414b", "#322b35"),
   "Cool Brunette": palette("#59473f", "#342b29", "#8b7469", "#70605b"),
   "Warm Chestnut": palette("#654231", "#3d2924", "#a67550", "#825136"),
+  ...Object.fromEntries(stockDyes.map(dye => [dye.label, dye.palette])),
   "Caramel Balayage": palette("#805538", "#432c24", "#d59d5f", "#bc824b", .57, .83),
   "Honey Blonde": palette("#af844f", "#66462f", "#e5bf81", "#cfa366", .5, .72),
   "Platinum Smoke": palette("#cbc7c2", "#59535c", "#f2ece2", "#9b9cae", .45, .75),

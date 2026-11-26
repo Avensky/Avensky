@@ -34,11 +34,13 @@ function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelec
     if (portraitRig.current?.shot === shot && portraitRig.current.id === choice.id) return;
     // The starter rigs have different proportions. Measure once on the dressed
     // actor after loading, before the shared camera applies its view for this frame.
-    const head = pivot.current.getObjectByName("head");
+    const eyes = mode === "create" && pivot.current.getObjectByName("villager-eye-focus");
+    const head = eyes || pivot.current.getObjectByName("head");
     const waist = pivot.current.getObjectByName("spine_03");
     if (!head || !waist) return;
-    const position = new Vector3();
-    shot.fitPortrait(head.getWorldPosition(position).y + .065, waist.getWorldPosition(position).y + .03);
+    const position = head.getWorldPosition(new Vector3());
+    const waistHeight = waist.getWorldPosition(new Vector3()).y + .03;
+    shot.fitPortrait(position.y + (eyes ? 0 : .065), waistHeight, position.x, position.z);
     portraitRig.current = { shot, id: choice.id };
   }, -1.25);
   useLayoutEffect(() => {

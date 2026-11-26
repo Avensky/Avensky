@@ -6,7 +6,7 @@ import type { MenuAction } from "../../controls/inputRouting";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { CHARACTER_APPEARANCE_OPTIONS as options, characterAppearance, characterLook,
   type CharacterAppearance, type CharacterChoice } from "../characters/characterCatalog";
-import { DEFAULT_HAIR_PALETTE, HAIR_COLOR_THEMES, HAIR_COLOR_ZONES, type HairColorZone } from "../characters/fittedWardrobe/hairColors";
+import { appearanceHairPalette, DEFAULT_HAIR_PALETTE, HAIR_COLOR_THEMES, HAIR_COLOR_ZONES, type HairColorZone } from "../characters/fittedWardrobe/hairColors";
 import { CreatorOption } from "./CreatorOption";
 import "./creatorColors.css";
 
@@ -44,7 +44,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
   const channels: readonly Channel[] = step === "hair" ? (appearance.hair === "cropped" ? singleChannels.cropped : hairChannels)
     : step === "makeup" ? makeupChannels : singleChannels[step];
   const channel = channels.includes(requested) ? requested : channels[0];
-  const palette = appearance.hair_palette;
+  const palette = appearanceHairPalette(appearance);
   const base = look?.hair ?? DEFAULT_HAIR_PALETTE.base;
   const currentPalette = palette ?? { ...DEFAULT_HAIR_PALETTE, base, roots: base, highlights: base, tips: base };
   const mix = channel === "highlights" ? "highlightStrength" : channel === "tips" ? "tipBlend" : undefined;
@@ -67,7 +67,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
     change = option => {
       if (channel === "base" && option.id === "original") return { hair_color: "original", hair_palette: undefined };
       const stock = options.hair_color.some(item => item.id === option.id);
-      if (channel === "base" && stock && !palette) return { hair_color: option.id };
+      if (channel === "base" && stock && !appearance.hair_palette) return { hair_color: option.id };
       return { hair_color: channel === "base" && stock ? option.id : appearance.hair_color, hair_palette: { ...currentPalette, [channel]: option.color! } };
     };
   }

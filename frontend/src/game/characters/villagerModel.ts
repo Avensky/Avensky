@@ -16,7 +16,7 @@ import { prepareNeckBows } from "./neckBowFit";
 import { prepareVillageBonnet } from "./villageBonnet";
 import { prepareWardrobeGarments, type WardrobeGarmentSource } from "./wardrobeGarmentFit";
 import { prepareHairDye } from "./fittedWardrobe/hairDye";
-import { DEFAULT_HAIR_PALETTE } from "./fittedWardrobe/hairColors";
+import { appearanceHairPalette, DEFAULT_HAIR_PALETTE } from "./fittedWardrobe/hairColors";
 import { bindFittedHair } from "./fittedHair";
 import { prepareStandaloneCorset, type StandaloneCorsetSource } from "./standaloneCorset";
 import { smoothUnderarmSkin } from "./villagerUnderarm";
@@ -301,8 +301,8 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
       for (const material of materials) if (material instanceof MeshStandardMaterial) material.color.set(look.hair);
     }
   }
+  const palette = appearanceHairPalette(look.appearance);
   for (const [material, setPalette] of model.hairDyes) {
-    const palette = look.appearance.hair_palette;
     if (palette) material.color.set(0xffffff);
     setPalette(palette ?? DEFAULT_HAIR_PALETTE, !palette);
   }

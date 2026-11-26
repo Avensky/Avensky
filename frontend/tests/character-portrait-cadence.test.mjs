@@ -347,7 +347,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       postMessage(value) { response = value; },
     },
     OffscreenCanvas: class {
-      constructor(width, height) { assert.deepEqual([width, height], [192, 192]); }
+      constructor(width, height) { assert.equal(width, height); assert.ok([192, 320].includes(width)); }
       async convertToBlob(options) {
         assert.deepEqual(options, { type: 'image/webp', quality: .90 });
         return new Blob(['test portrait'], { type: options.type });
@@ -371,13 +371,18 @@ test('portrait worker renders authored GLTF assets and skips missing character m
         load(id) {
           if (id === '\0' + rendererMock) return `
             export * from 'three';
-            export const renderedModels = [], renderedDresses = [];
+            export const renderedModels = [], renderedDresses = [], renderedMeshes = [];
             export class WebGLRenderer {
               constructor({ canvas }) { if (!(canvas instanceof OffscreenCanvas)) throw Error('Missing offscreen canvas'); }
               setSize(width, height, updateStyle) { if (updateStyle) throw Error('An offscreen canvas has no style'); }
               setClearColor() {}
-              render(scene) {
+              render(scene, camera) {
                 const model = scene.children[0];
+                const meshes = [];
+                model.traverseVisible(object => {
+                  if (object.isMesh && object.layers.test(camera.layers)) meshes.push(object.name);
+                });
+                renderedMeshes.push(meshes);
                 renderedModels.push(model.name);
                 renderedDresses.push(model.getObjectByName('wardrobe-linen-nightgown')?.visible === true);
               }
@@ -391,7 +396,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
     const { characterLook } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
     const { getWardrobeGarment } = await vite.ssrLoadModule('/src/game/characters/wardrobeGarments.ts');
     await vite.ssrLoadModule('/src/game/characters/characterPortrait.worker.ts');
-    const { renderedModels, renderedDresses } = await vite.ssrLoadModule(rendererMock);
+    const { renderedModels, renderedDresses, renderedMeshes } = await vite.ssrLoadModule(rendererMock);
     const rook = characterLook({ id: 'jules-okafor', outfit: 'night-run' });
     const vega = characterLook({ id: 'mara-vega', outfit: 'linen-nightgown' });
 
@@ -418,14 +423,16 @@ test('portrait worker renders authored GLTF assets and skips missing character m
     const styleJob = { look: fittedLook, modelUrl: 'http://localhost/full-driver.gltf' };
     const hairUrl = '/models/characters/female/hair/Hair_01_espresso.glb';
     const beforeHair = renderedModels.length;
-    await handler({ data: { ...styleJob, requireFittedHair: true } });
+    await handler({ data: { ...styleJob, hairstylePreview: true } });
     assert.match(response.error, /hairstyle preview is unavailable/);
     assert.equal(renderedModels.length, beforeHair, 'a missing hairstyle never gets a duplicate stock preview');
     await handler({ data: styleJob });
     assert.equal(response.image?.type, 'image/webp', 'a roster portrait retains the stock fallback');
     files.set(hairUrl, skinnedModel('Hair_01'));
-    await handler({ data: { ...styleJob, requireFittedHair: true } });
+    await handler({ data: { ...styleJob, hairstylePreview: true } });
     assert.equal(response.image?.type, 'image/webp', response.error);
+
+    assert.deepEqual(renderedMeshes.at(-1), ['Hair_01'], 'fitted hair renders in isolation from the outfit, body and stock hair');
 
     const dress = { url: 'http://localhost/dress.gltf', item: getWardrobeGarment('linen-nightgown') };
     for (const { label, actor, primary, fallback, donorRequests, fitted } of [

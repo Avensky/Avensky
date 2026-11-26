@@ -63,11 +63,10 @@ export function installedHairStyles(characterId: string) {
     ? fittedHair.filter(style => __FITTED_HAIR_IDS__.includes(style.id)) : [];
 }
 
-// The male actor has one authored HAIR_SHORT mesh. The stock Close crop cap and
-// the independently fitted hair attachments belong to the female actor.
+// Retired cuts stay in the appearance catalog so saved characters still load.
+const selectableStockHair = CHARACTER_APPEARANCE_OPTIONS.hair.filter(style => style.id !== "cropped");
 export function availableHairStyles(characterId: string) {
-  const stock = CHARACTER_APPEARANCE_OPTIONS.hair.filter(style => style.id === "natural" || characterId === VILLAGER_ID);
-  return [...stock, ...installedHairStyles(characterId)];
+  return [...selectableStockHair, ...installedHairStyles(characterId)];
 }
 
 export function isEquippableOutfit(choice: CharacterChoice) {
