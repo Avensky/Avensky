@@ -1,0 +1,39 @@
+name: Hair scalp authoring checks
+
+on:
+  push:
+    branches:
+      - 'hair/**'
+    paths:
+      - 'scripts/hair/fit/**'
+      - 'frontend/tests/hair-scalp-audit.test.mjs'
+      - 'frontend/src/game/characters/fittedWardrobe/hairScalpAudit.mjs'
+      - '.github/workflows/hair-scalp-authoring.yml'
+  pull_request:
+    paths:
+      - 'scripts/hair/fit/**'
+      - 'frontend/tests/hair-scalp-audit.test.mjs'
+      - 'frontend/src/game/characters/fittedWardrobe/hairScalpAudit.mjs'
+      - '.github/workflows/hair-scalp-authoring.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-authoring-math:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install minimal alignment dependency
+        run: python -m pip install 'numpy>=1.26,<3' 'scipy>=1.11,<2'
+      - name: Pure-Python geometry and guard tests
+        run: python -m unittest discover -s scripts/hair/fit -p 'test_*.py' -v
+      - name: Python authoring script syntax
+        run: python -m py_compile scripts/hair/fit/*.py
+      - name: Dev-only scalp diagnostic mode tests
+        run: node --test frontend/tests/hair-scalp-audit.test.mjs

@@ -35,7 +35,7 @@ export function villagerModelUrl(look: CharacterLook, kind: "garage" | "portrait
   return villageKind === "portrait" ? __VILLAGER_PORTRAIT_URL__ : __VILLAGER_MODEL_URL__;
 }
 
-function prepareScalpCap(root: Object3D) {
+export function prepareScalpCap(root: Object3D) {
   const head = root.getObjectByName("head");
   if (!head) return;
   const segments = 32, rows = 14;

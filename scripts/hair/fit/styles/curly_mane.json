@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "style_id": "curly_mane",
+  "display_name": "Curly Mane",
+  "source_filename": "CURLY 01.FBX",
+  "source_object_hint": "Curly_Mane",
+  "character_profile": "../character_profiles/vesper.json",
+  "source_units": "UNVERIFIED",
+  "source_up_axis": "UNVERIFIED",
+  "source_landmarks": {
+    "forehead": null,
+    "crown": null,
+    "temple_left": null,
+    "temple_right": null,
+    "nape": null
+  },
+  "root_vertex_group": null,
+  "root_length_fraction": 0.2,
+  "fit": {
+    "mode": "uniform_similarity_then_root_only",
+    "max_landmark_rms_m": 0.015,
+    "max_root_displacement_m": 0.035,
+    "cap_offset_m": 0.0015,
+    "needs_author_confirmed_root_mask": true
+  },
+  "materials": {
+    "atlas_family": "Curls",
+    "cutout_alpha_threshold": 0.28
+  },
+  "headwear": {
+    "mode": "show",
+    "auto_equip_accessory": null
+  },
+  "lods": [
+    "hero-close",
+    "gameplay-mobile",
+    "npc-silhouette"
+  ],
+  "license": "VERIFY_BEFORE_DISTRIBUTION",
+  "status": "source-textured-global-candidate-awaiting-blender-approval",
+  "source_fbx_metadata": {
+    "up_axis_metadata": "Y",
+    "raw_height_axis": "Z",
+    "fbx_unit_scale_factor": 2.54,
+    "source_node_prerotation_degrees": [
+      -90,
+      0,
+      0
+    ],
+    "observed_node_world_xyz_map": "(raw x, raw z, -raw y)",
+    "note": "Do not double-rotate meshes already imported with Blender's FBX node transforms; physical units still require verification."
+  },
+  "first_real_asset_pilot": {
+    "connected_curl_sections": 253,
+    "offline_sections_adjusted": 39,
+    "affected_vertices": 819,
+    "max_apparent_vertex_shift_cm": 2,
+    "remaining_curl_sections_to_classify": 214,
+    "original_opacity_atlas": "NOW_SUPPLIED_AND_SOFTWARE_TESTED",
+    "blender_visual_qa": "NOT_RUN",
+    "game_readiness": "NOT_READY"
+  },
+  "source_alignment_candidate": {
+    "status": "OFFLINE_SOURCE_COORDINATES_ONLY",
+    "source_units_verified_in_blender": false,
+    "uniform_scale": 0.92,
+    "translation_xyz_source_units": [
+      -1,
+      -21.65,
+      -1.05
+    ],
+    "root_candidate_count": 209,
+    "candidates_within_2_units_before": 0,
+    "candidates_within_2_units_after": 166,
+    "scale_hit_lower_bound": true,
+    "approval_required": true,
+    "do_not_apply_raw_numbers_in_blender": true,
+    "face_basecolor": "T_Villager_Lady_Face_BaseColor.tga",
+    "curls_diffuse": "DIFFUSE_AUBURN.png",
+    "curls_opacity": "OPACITY.png"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "character_id": "vesper",
+  "display_name": "Vesper Vega",
+  "head_mesh_object": null,
+  "armature_object": null,
+  "head_bone": null,
+  "scalp_faces_vertex_group": null,
+  "coordinate_frame": "head_bone_local",
+  "unit": "meters",
+  "landmarks": {
+    "forehead": null,
+    "crown": null,
+    "temple_left": null,
+    "temple_right": null,
+    "ear_left": null,
+    "ear_right": null,
+    "nape": null
+  },
+  "authoring_notes": "Populate object and group names and measured landmark coordinates from the actual neutral Vesper scene; null values deliberately block fitting."
+}
