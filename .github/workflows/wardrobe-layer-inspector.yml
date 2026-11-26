@@ -1,0 +1,54 @@
+name: Wardrobe layer inspector
+on:
+  pull_request:
+    paths:
+      - "frontend/src/game/characters/DressingRoom.tsx"
+      - "frontend/src/game/characters/WardrobeLayerInspector.tsx"
+      - "frontend/src/game/characters/wardrobeLayerInspector.css"
+      - "frontend/src/game/characters/dressingRoom.css"
+      - "frontend/tests/dressing-room.test.mjs"
+      - "frontend/tests/wardrobe-layer-inspector-ui.test.mjs"
+      - "frontend/tests/wardrobe-layer-preview.test.mjs"
+      - "packages/wardrobe-catalog/wardrobe-layer-preview.mjs"
+      - "packages/wardrobe-catalog/wardrobe-layer-preview.d.mts"
+      - "packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs"
+      - "packages/wardrobe-catalog/layer-rules.json"
+      - "package.json"
+      - ".github/workflows/wardrobe-layer-inspector.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  preview-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate schema, saved layers and read-only preview
+        run: npm run wardrobe:layers:check
+
+  dressing-room:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install frontend dependencies
+        run: npm --prefix frontend ci
+      - name: Typecheck frontend integration
+        run: npm --prefix frontend run typecheck
+      - name: Lint modified wardrobe components
+        working-directory: frontend
+        run: ./node_modules/.bin/eslint src/game/characters/DressingRoom.tsx src/game/characters/WardrobeLayerInspector.tsx
+      - name: Test dressing room and saved-layer inspector
+        working-directory: frontend
+        run: node --test tests/dressing-room.test.mjs tests/wardrobe-layer-inspector-ui.test.mjs

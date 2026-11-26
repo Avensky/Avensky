@@ -27,6 +27,10 @@ The pure [layer resolver](resolve-wardrobe-layers.mjs) accepts normalized equipp
 
 The [reversible migration adapter](migrate-legacy-wardrobe.mjs) and [v1 schema](wardrobe-layers-save.schema.json) allow a saved `CharacterChoice` to include `wardrobeLayers` mode annotations while keeping its existing `garments`, `wardrobe`, dyes and removals unchanged. Runtime selection is still legacy-only. See [the canonical contract](../../docs/wardrobe/RULES.md#8-w-05-versioned-saved-outfit-adapter-normative-contract), not a duplicated policy here. Test with `npm run wardrobe:legacy:check` (Node 24). Browser/profile persistence and deployment require [W-05 verification](../../docs/wardrobe/TESTING.md#w-05-device-and-server-save-compatibility).
 
+## W-06 inspect-only preview
+
+The [pure layer preview model](wardrobe-layer-preview.mjs) bridges the W-05 saved selections to W-04 per-region ordering without claiming geometric approval. The client panel is [`WardrobeLayerInspector.tsx`](../../frontend/src/game/characters/WardrobeLayerInspector.tsx); rules live only in [the canonical specification](../../docs/wardrobe/RULES.md#9-w-06-read-only-layer-inspector-contract). Node contract: `npm run wardrobe:preview:check`.
+
 ## Edit the catalog
 
 Keep IDs stable across relabeling, refits, and Garage or Mobile revisions.

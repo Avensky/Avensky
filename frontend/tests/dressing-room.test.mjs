@@ -202,7 +202,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     preview.setState({ camera: 'Hands', zoom: 1.2 });
     await act(async () => root.render(h(Harness, { initial: DEFAULT_CHARACTER })));
     assert.deepEqual([...document.querySelectorAll('[data-category]')].map(button => button.dataset.category),
-      ['outfits', 'saved', 'layers', 'underwear', 'corsets', 'tops', 'bottoms', 'footwear', 'headwear', 'bows', 'accessories', 'props']);
+      ['outfits', 'saved', 'layers', 'underwear', 'corsets', 'tops', 'outerwear', 'bottoms', 'footwear', 'headwear', 'bows', 'accessories', 'props']);
     assert.equal(find('.dressing-camera-block').previousElementSibling, find('.dressing-wardrobe'));
     assert.equal(find('.dressing-room-title').nextElementSibling, find('.dressing-camera-shortcuts'));
     assert(find('[data-wearable-quick-select="corset"]'));
@@ -213,7 +213,9 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'entering the fitting room mounts only visible wardrobe controls');
     assert.equal(find('.dressing-details').hidden, true);
     assert.equal(find('.dressing-catalog').parentElement, find('.dressing-categories').parentElement, 'catalog shares the left wardrobe rail');
-    assert.equal(preview.getState().camera, 'Full body');
+    // Entering the dressing room must preserve a requested on-foot camera,
+    // rather than resetting Hands/Face behind garage walls. Only Whole car resets.
+    assert.equal(preview.getState().camera, 'Hands');
     const assertPiece = piece => {
       assert.equal(preview.getState().camera, 'Selected item');
       assert.equal(preview.getState().selectedPiece, piece);
@@ -304,6 +306,16 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     }
     await open('layers');
     assert.equal(preview.getState().camera, 'Full body');
+    assert.equal(find('[data-layer-preview]'), null, 'expensive layer preview is opt-in');
+    const focusBeforeLayerPlan = preview.getState().focusRevision;
+    await click('[data-layer-preview-toggle]');
+    assert(find('[aria-label="Layer compatibility preview"]'));
+    assert.match(find('[data-layer-preview]').textContent, /Read-only preview/);
+    assert.match(find('[data-layer-preview]').textContent, /built-in outfit layers still use the legacy renderer/);
+    assert.equal(preview.getState().focusRevision, focusBeforeLayerPlan, 'opening the inspector never resets the camera');
+    assert.equal(changes.length + trials.length, 0, 'read-only inspection cannot equip/save anything');
+    await click('[data-layer-preview-toggle]');
+    assert.equal(find('[data-layer-preview]'), null, 'closing inspector releases preview content');
     const chooseLayer = name => act(async () => {
       const button = [...document.querySelectorAll('[aria-label="Clothing layers"] button')].find(item => item.textContent === name);
       assert(button, name);
@@ -326,6 +338,12 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.deepEqual([...document.querySelectorAll('[data-wardrobe-item]')].map(button => button.dataset.wardrobeItem),
       ['underwear-bra', 'underwear-briefs']);
     assert.equal(changes.length + trials.length, 0, 'category and camera changes never alter the outfit');
+    const focusBeforeOuterwear = preview.getState().focusRevision;
+    await open('outerwear');
+    assert.match(find('[data-outerwear-readonly]').textContent, /inspection-only/);
+    assert.equal(find('[data-wardrobe-item=coat-01]'), null, 'retired coat remains unavailable for fitting');
+    assert.equal(preview.getState().focusRevision, focusBeforeOuterwear, 'opening Outerwear never changes the camera');
+    assert.equal(changes.length + trials.length, 0, 'Outerwear tab does not equip retired models');
 
     await open('underwear');
     assert(find('[aria-label="Clear Underwear"]').disabled);
@@ -546,9 +564,11 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(trials.at(-1).garments.bracer, 'bracer-01');
 
     assertPiece('corset');
+    const exitCamera = preview.getState().camera;
+    const exitZoom = preview.getState().zoom;
     await act(async () => root.unmount()); root = null;
-    assert.equal(preview.getState().camera, 'Hands', 'leaving restores the previous camera');
-    assert.equal(preview.getState().zoom, 1.2);
+    assert.equal(preview.getState().camera, exitCamera, 'unmounting preserves the latest camera');
+    assert.equal(preview.getState().zoom, exitZoom, 'unmounting preserves current zoom');
 
     root = createRoot(find('#root'));
     await act(async () => root.render(h(Harness, { initial: DEFAULT_CHARACTER })));

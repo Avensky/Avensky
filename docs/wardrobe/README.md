@@ -15,7 +15,7 @@ This is the **single entry point** for human contributors and AI coding agents. 
 
 ## W-03 machine-readable contract (not live integration)
 
-See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON Schema](../../packages/wardrobe-catalog/layer-rules.schema.json), and [strict validator](../../packages/wardrobe-catalog/validate-layer-rules.mjs). Run `npm run wardrobe:layers:check`. Class rules remain proposed `needs-fitting` or `blocked`, not approved geometry; W-04/W-05 must integrate resolution and save migration.
+See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON Schema](../../packages/wardrobe-catalog/layer-rules.schema.json), and [strict validator](../../packages/wardrobe-catalog/validate-layer-rules.mjs). Run `npm run wardrobe:layers:check`. Class rules remain proposed `needs-fitting` or `blocked`, not approved geometry; W-04/W-05 are available as pure resolver and optional reversible-save metadata on review branches. W-06 surfaces read-only diagnostics only; game-render integration remains gated.
 
 ## W-04 pure resolver candidate (not live)
 
@@ -24,6 +24,10 @@ See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON 
 ## W-05 reversible save adapter (review-only)
 
 [Migration adapter](../../packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs), [sidecar schema](../../packages/wardrobe-catalog/wardrobe-layers-save.schema.json), and [shared fixture](../../frontend/tests/fixtures/wardrobe-layer-save-v1.json) preserve historical saved outfits while optionally recording garment mode intent. Rust can deserialize and validate this field on the W-05 review branch; legacy records without it remain unchanged. **No automatic conversion or live-render changes.** Read [normative save rules](RULES.md#8-w-05-versioned-saved-outfit-adapter-normative-contract) and [cross-language tests](TESTING.md#w-05-device-and-server-save-compatibility).
+
+## W-06 read-only fitting-room layer preview (review-only)
+
+[Preview projector](../../packages/wardrobe-catalog/wardrobe-layer-preview.mjs) and [inspector UI](../../frontend/src/game/characters/WardrobeLayerInspector.tsx) expose saved garment modes and provisional ordering behind an opt-in **Inspect outfit stack** control in the existing Layers tab. A small Outerwear tab is inspection-only until W-07 has a non-retired, reviewed coat. The feature does not equip, save, alter camera focus, hide meshes, or authenticate fitting evidence. [Focused CI](https://github.com/Avensky/Avensky/actions/runs/45762594236) verified 39 pure and 4 UI tests on the review branch; this does not prove real fit or phone rendering. See [W-06 rules](RULES.md#9-w-06-read-only-layer-inspector-contract) and [W-06 tests](TESTING.md#w-06-layer-inspector-acceptance).
 
 ## Current architecture; not the intended future behavior
 

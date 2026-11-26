@@ -298,6 +298,9 @@ weights, and masks.
 
 ## Dressing room
 
+Layer inspection in the [W-06 read-only stack panel](WardrobeLayerInspector.tsx) is governed by the [single wardrobe contract](../../../../docs/wardrobe/RULES.md#9-w-06-read-only-layer-inspector-contract) and [test plan](../../../../docs/wardrobe/TESTING.md#w-06-layer-inspector-acceptance). This component does not replace the historical outfit/camera/garment logic, and Outerwear remains inspection-only until W-07 coat fitting. Keep the normative rules in `docs/wardrobe`, not in this component README.
+
+
 Character tabs are Identity, Appearance, and Emotes. Appearance keeps the live
 character in the center, with a scrollable left wardrobe rail and one item per
 catalog row. It reuses the existing scene and draws cards with lightweight SVG

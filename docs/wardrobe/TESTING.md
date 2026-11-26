@@ -1,6 +1,6 @@
 # Wardrobe testing and verification
 
-**Status:** Acceptance and evidence specification; pure W-03/W-04/W-05 tests are implemented, while garment/phone verification remains planned. Never claim a proposed threshold has passed without actual fixture evidence.
+**Status:** Acceptance and evidence specification; pure W-03/W-04/W-05 checks are implemented and W-06 review tests are added. Garment pose/geometry and physical phone verification remain planned. Never claim a proposed threshold has passed without actual fixture evidence.
 
 ## W-03: shared manifest structure and conditional graph checks
 
@@ -30,6 +30,27 @@ The final browser-storage command requires `npm --prefix frontend ci` first, and
 **Safety acceptance:** read old localStorage unmodified; explicit opt-in conversion preserves all original keys and dyes; revert drops only sidecar; duplicate/stale IDs or unknown modes are rejected; existing outfit-save endpoint persists both legacy and layered profiles; neither format bypasses old equipment restrictions; no GLB collision, real coat, or mobile claims from these contract tests. Rust's historical normalization of obsolete `shirt` codes is a pre-existing documented behavior.
 
 **Verified W-05 CI:** [Run 45757119689](https://github.com/Avensky/Avensky/actions/runs/45757119689) passed all three jobs: Node 7/7, Rust 3/3, actual browser storage 1/1, with no test failures/skips. These do not prove garment geometry, actual coat fitting, deployment compatibility with an old server, or mobile rendering. See [DECISIONS.md](DECISIONS.md) for the initial Vite test-runner path failure and corrective change. Distinguish unit contracts, on-disk persistence and game-render acceptance.
+
+## W-06 layer inspector acceptance
+
+The [pure view-model tests](../../frontend/tests/wardrobe-layer-preview.test.mjs) check legacy ID/color preservation, a separately selected top and corset with proposed `over-top` mode, unverified front exposure for open/closed coat, retired coat exclusion, unknown accessories kept, malformed sidecars displayed without data deletion, and uninspected base outfits.
+
+Run from repo root, with Node 24:
+
+```sh
+npm run wardrobe:preview:check
+npm run wardrobe:layers:check
+npm --prefix frontend ci
+npm --prefix frontend run typecheck
+(cd frontend && ./node_modules/.bin/eslint src/game/characters/DressingRoom.tsx src/game/characters/WardrobeLayerInspector.tsx)
+(cd frontend && node --test tests/dressing-room.test.mjs tests/wardrobe-layer-inspector-ui.test.mjs)
+```
+
+The last line runs the real React/Vite/JSDOM fitting-room tests using `frontend` as working directory. The **changed-file lint** gate is deliberately scoped; the full `npm --prefix frontend run lint` currently fails on unrelated pre-existing combat/rendering modules (**75 problems: 69 errors, 6 warnings**) and is tracked separately. Do not report global lint as green. The inspector MUST be absent on initial load, appear only when the player activates **Inspect outfit stack** in Layers, never call `onChange` or `onTryOn`, and never alter camera focus/zoom while opening or closing the inspector. Outerwear browsing MUST NOT equip a retired coat or reset the current camera shot. Malformed sidecar metadata MUST display the raw legacy garment IDs with a warning instead of crashing or deleting selections.
+
+**Verified 2026-11-25 W-06 check:** [GitHub Actions run 45762594236](https://github.com/Avensky/Avensky/actions/runs/45762594236) on code revision `b0beb06` passed **39/39 pure contracts** (26 manifest/resolver + 7 migration + 6 preview) and **4/4 React/Vite dressing-room tests**, **0 failed, 0 skipped**. TypeScript and lint of the two changed React components passed; full repo ESLint is not green. The focused UI test includes a synthetic unapproved coat card click while retaining Face/zoom and preserved saved outfit data. Earlier suite failures were one unverified-fit label and two stale camera assertions, corrected without camera runtime changes.
+
+The suite is maintained in [CI](../../.github/workflows/wardrobe-layer-inspector.yml). These checks are **not screenshot, GLB collider, rig, mobile FPS, pose, or legal/distribution certification**. For history and remaining issues see [DECISIONS.md](DECISIONS.md).
 
 ## Test layers and failure classification
 

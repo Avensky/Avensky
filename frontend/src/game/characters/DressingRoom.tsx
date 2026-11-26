@@ -9,6 +9,7 @@ import { braFitsWith, CLOTHING_PIECES, clothingPieceLabel, UNDERWEAR_PIECES, und
 import { FittingCameraSelect, FittingWearableShortcuts } from "./FittingCameraSelect";
 import { getWardrobeGarment, importedWardrobeItems, setWardrobeGarment, setWardrobeRemoval, wardrobeGarmentModelUrl, villageWardrobeItems, wardrobeRemovalPieces, type WardrobeGarmentSlot, type WardrobeRemoval } from "./wardrobeGarments";
 import { SavedOutfits } from "./SavedOutfits";
+import { WardrobeLayerInspector } from "./WardrobeLayerInspector";
 import "./dressingRoom.css";
 
 const CATEGORIES = [
@@ -18,6 +19,7 @@ const CATEGORIES = [
   { id: "underwear", label: "Underwear", group: "Wardrobe", icon: "layers", femaleOnly: true },
   { id: "corsets", label: "Corsets", group: "Wardrobe", icon: "corsets", femaleOnly: true },
   { id: "tops", label: "Tops", group: "Wardrobe", icon: "tops", femaleOnly: true },
+  { id: "outerwear", label: "Outerwear", group: "Wardrobe", icon: "tops", femaleOnly: true },
   { id: "bottoms", label: "Skirts", group: "Wardrobe", icon: "skirts", femaleOnly: true },
   { id: "footwear", label: "Shoes & socks", group: "Wardrobe", icon: "footwear" },
   { id: "headwear", label: "Headwear", group: "Finishing touches", icon: "headwear" },
@@ -125,6 +127,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   const [search, setSearch] = useState("");
   const [alphaOnly, setAlphaOnly] = useState(false);
   const [layer, setLayer] = useState<ClothingLayer>("Inner");
+  const [showLayerPlan, setShowLayerPlan] = useState(false);
   const catalogId = useId(), detailsId = useId();
   const catalogRef = useRef<HTMLElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
@@ -155,7 +158,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   const upperPiece = female ? "corset" : "coat";
   const categoryFocus: Record<Category, WardrobeFocus> = {
     outfits: garments?.dress ? "Full body" : upperPiece, saved: "Full body", layers: "Full body", underwear: "Full body",
-    corsets: "corset", tops: "shirt", bottoms: "skirt", bows: "bow",
+    corsets: "corset", tops: "shirt", outerwear: "Full body", bottoms: "skirt", bows: "bow",
     footwear: "shoes", headwear: pieces.includes("hat") ? "hat" : "Face", accessories: pieces.includes("glasses") ? "glasses" : "Face",
     props: pieces.includes("bag") ? "bag" : "Hands",
   };
@@ -296,6 +299,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       };
     }) : [],
     tops: [],
+    outerwear: [],
     bottoms: [],
     footwear: female ? [] : [{ id: "outfit-shoes", label: "Outfit boots", section: "Shoes", icon: "footwear", selected: !removedClothing.includes("shoes"),
       pieces: ["shoes"], included: true, layer: "Overwear", focus: "shoes",
@@ -319,14 +323,15 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     const selected = garments?.[item.slot] === item.id;
     allItems[category.id].push({
       id: item.id, label: item.label, section: item.section, icon: category.icon,
-      trial: true, selected, detail: revised ? "Revised model" : "Try-on", focus: item.piece, pieces: [item.piece],
+      trial: true, selected, detail: item.slot === "coat" ? "Inspection only · fit pending" : revised ? "Revised model" : "Try-on",
+      focus: item.piece, pieces: [item.piece],
       layer: item.piece === "armor" ? "Outer" : GARMENT_LAYERS[item.slot],
       unavailable: modelUrl ? undefined : "Pack not installed",
       description: item.description,
-      choose: modelUrl ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
-      remove: selected ? () => onTryOn(item.slot === "dress" || item.slot === "top" || item.slot === "skirt"
+      choose: modelUrl && item.slot !== "coat" ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
+      remove: selected && item.slot !== "coat" ? () => onTryOn(item.slot === "dress" || item.slot === "top" || item.slot === "skirt"
         ? setWardrobeRemoval(choice, item.slot, true) : setWardrobeGarment(choice, item.slot)) : undefined,
-      clear: choice.garments?.[item.slot] === item.id ? next => {
+      clear: item.slot !== "coat" && choice.garments?.[item.slot] === item.id ? next => {
         const cleared = setWardrobeGarment(next, item.slot);
         return selected && (item.slot === "top" || item.slot === "skirt") ? setWardrobeRemoval(cleared, item.slot, true) : cleared;
       } : undefined,
@@ -343,8 +348,8 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       id: item.id, label: item.label, section: item.section, icon: category.icon, selected,
       pieces: [item.piece], focus: item.piece,
       included: true, layer: GARMENT_LAYERS[item.slot], unavailable: installed ? undefined : "Pack not installed",
-      choose: installed && !selected ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
-      remove: selected ? () => onTryOn(setWardrobeRemoval(choice, removal, true)) : undefined,
+      choose: installed && !selected && item.slot !== "coat" ? () => onTryOn(setWardrobeGarment(choice, item.slot, item.id)) : undefined,
+      remove: selected && item.slot !== "coat" ? () => onTryOn(setWardrobeRemoval(choice, removal, true)) : undefined,
     });
   }
   const wearsBonnet = !removedClothing.includes("hat") && (!garments?.hat || garments.hat === "village-bonnet");
@@ -406,7 +411,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   function openCategory(next: Category) {
     focusLayer.current = true;
     showCatalog(next);
-    inspectWardrobe(categoryFocus[next]);
+    if (next !== "outerwear") inspectWardrobe(categoryFocus[next]);
   }
   function closeCatalog() {
     focusLayer.current = true;
@@ -492,6 +497,16 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
           {LAYERS.map(option => <button key={option} type="button" className="menu-control" aria-pressed={layer === option}
             onClick={() => { setLayer(option); setInspectedId(undefined); }}>{option}</button>)}
         </div>}
+        {category === "layers" && <div className="dressing-layer-options" data-controller-row>
+          <button type="button" className="menu-control" data-layer-preview-toggle
+            aria-expanded={showLayerPlan} onClick={() => setShowLayerPlan(value => !value)}>
+            {showLayerPlan ? "Hide outfit stack" : "Inspect outfit stack"}
+          </button>
+        </div>}
+        {category === "layers" && showLayerPlan && <WardrobeLayerInspector choice={choice} />}
+        {category === "outerwear" && <p className="dressing-outerwear-readonly" role="note" data-outerwear-readonly>
+          Coat fitting has not passed geometry review. Outerwear is inspection-only; no new coat is equipped or saved.
+        </p>}
         {(category === "underwear" || category === "layers" && layer === "Underwear") &&
           <div className="dressing-layer-options" role="group" aria-label="Underwear preview" data-controller-row>
             <button type="button" className="menu-control" data-wardrobe-remove="top" disabled={!pieces.some(piece =>
@@ -526,7 +541,9 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
                 aria-controls={item.icon === "remove" ? undefined : detailsId} onClick={() => {
                   setInspectedId(item.icon === "remove" ? undefined : item.id);
                   item.choose?.();
-                  inspectWardrobe(item.focus ?? categoryFocus[category]);
+                  // Outerwear remains inspection-only until W-07 fit/rig verification.
+                  // Even a future discovered coat card must not reset the camera.
+                  if (category !== "outerwear") inspectWardrobe(item.focus ?? categoryFocus[category]);
                 }}>
                 <span className="dressing-item-art" style={{ "--item-color": item.color ?? "var(--app-muted)", "--item-accent": item.accent ?? item.color ?? "var(--app-accent)" } as CSSProperties}>
                   <WardrobeIcon name={item.icon} />{item.color && <i className="dressing-swatch" />}
@@ -541,7 +558,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
             </div>
           </section>;
         })}
-        {!items.length && <p className="dressing-empty" role="status">{query ? "No items match your search." : alphaOnly ? "No alpha items in this category yet." : "No separate pieces for this character yet."}</p>}
+        {!items.length && category !== "outerwear" && <p className="dressing-empty" role="status">{query ? "No items match your search." : alphaOnly ? "No alpha items in this category yet." : "No separate pieces for this character yet."}</p>}
         </>}
       </section>
     </aside>
