@@ -1,4 +1,4 @@
-import { Color, Float32BufferAttribute, MathUtils, SkinnedMesh, Vector2, type BufferGeometry, type MeshStandardMaterial, type Object3D } from "three";
+import { Color, Float32BufferAttribute, MathUtils, SkinnedMesh, Vector2, Vector4, type BufferGeometry, type MeshStandardMaterial, type Object3D } from "three";
 import type { CharacterLook } from "./characterCatalog";
 
 const FACE_SHAPES = ["smile", "brow", "blink"] as const;
@@ -18,10 +18,43 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
   const irisDarkness = { value: 0 };
   const browColor = { value: new Color() };
   const browStrength = { value: 0 };
+  const lipPigment = { value: new Color() };
+  const lipStrength = { value: 0 };
+  // Mouth seam height, half-width, upper and lower lip heights in the authored bind pose.
+  const lipShape = { value: female ? new Vector4(1.4992, .0210, .0085, .0098) : new Vector4(1.6518, .0245, .0098, .0086) };
   const corneas: { material: MeshStandardMaterial; opacity: number; env: number }[] = [];
   for (const material of materials) {
     if (material.name === "MAT_Cornea") {
       corneas.push({ material, opacity: material.opacity, env: material.envMapIntensity });
+    }
+    if (material.name === "MAT_SkinFace") {
+      material.customProgramCacheKey = () => "villager-lip-pigment";
+      material.onBeforeCompile = shader => {
+        Object.assign(shader.uniforms, { lipPigment, lipStrength, lipShape, lipFront: { value: fit.z - .015 } });
+        shader.vertexShader = "varying vec3 vLipBind;\n" + shader.vertexShader.replace(
+          "#include <begin_vertex>", "#include <begin_vertex>\nvLipBind = position;",
+        );
+        shader.fragmentShader = `varying vec3 vLipBind;
+          uniform vec3 lipPigment;
+          uniform float lipStrength, lipFront;
+          uniform vec4 lipShape;
+        ` + shader.fragmentShader.replace("#include <map_fragment>", `
+          #include <map_fragment>
+          if (lipStrength > 0.0 && vLipBind.z > lipFront) {
+            float side = abs(vLipBind.x) / lipShape.y;
+            float seam = vLipBind.y - lipShape.x;
+            float height = seam > 0.0 ? lipShape.z : lipShape.w;
+            // Taper both lips into the corners and leave a small cupid's bow.
+            float taper = max(0.0, 1.0 - side * side);
+            float bow = seam > 0.0 ? 0.12 * (1.0 - smoothstep(0.0, 0.24, side)) : 0.0;
+            float edge = height * taper * (1.0 - bow) - abs(seam);
+            float lipMask = smoothstep(-0.0008, 0.0012, edge) * (1.0 - smoothstep(0.90, 1.04, side));
+            float detail = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+            diffuseColor.rgb = mix(diffuseColor.rgb, lipPigment * (0.25 + 1.7 * sqrt(detail)), lipMask * lipStrength);
+          }
+        `);
+      };
+      continue;
     }
     const iris = material.name === (female ? "MAT_Details" : "MAT_Eyes");
     if (!iris && material.name !== "MAT_LashBrow") continue;
@@ -66,6 +99,8 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
     };
   }
   return (look: CharacterLook) => {
+    lipStrength.value = look.lipstick ? .84 : 0;
+    if (look.lipstick) lipPigment.value.set(look.lipstick);
     irisColor.value.set(look.iris);
     const { r, g, b } = irisColor.value;
     irisDarkness.value = 1 - MathUtils.smoothstep(.2126 * r + .7152 * g + .0722 * b, .045, .145);

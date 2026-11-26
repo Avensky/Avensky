@@ -7,10 +7,10 @@ import { getGarageMotion, setGaragePreview } from "./LiveGarage";
 import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { bindRosterSticks } from "./rosterStickControls";
-import { ROSTER_HEADING, rosterCamera, type CharacterGarageShot, type CharacterGarageView } from "./rosterCamera";
+import { ROSTER_HEADING, rosterCamera, type CharacterGarageShot, type CharacterGarageView, type CreatorFrame } from "./rosterCamera";
 
 const GarageDriver = lazy(() => import("../characters/GarageDriver").then(module => ({ default: module.GarageDriver })));
-export type GarageCharacterSelection = { choice: CharacterChoice; mode: CharacterGarageView };
+export type GarageCharacterSelection = { choice: CharacterChoice; mode: CharacterGarageView; creatorFrame?: CreatorFrame };
 
 function UnavailableRosterActor({ settled }: { settled: (available: boolean) => void }) {
   useLayoutEffect(() => settled(false), [settled]);
@@ -28,7 +28,7 @@ function RosterActor({ choice, mode, shot }: GarageCharacterSelection & { shot: 
     invalidate();
   }, [shot, invalidate]);
   useFrame(() => {
-    if (mode !== "profile" || !pivot.current) return;
+    if ((mode !== "profile" && mode !== "create") || !pivot.current) return;
     if (portraitRig.current?.shot === shot && portraitRig.current.id === choice.id) return;
     // The starter rigs have different proportions. Measure once on the dressed
     // actor after loading, before the shared camera applies its view for this frame.
@@ -77,8 +77,11 @@ function RosterActor({ choice, mode, shot }: GarageCharacterSelection & { shot: 
 }
 
 /** Install just the selected actor in the already-mounted room; row thumbnails have no scene. */
-export function RosterGaragePreview({ choice, mode }: GarageCharacterSelection) {
-  const shot = useMemo(() => rosterCamera(mode), [mode]);
+export function RosterGaragePreview({ choice, mode, creatorFrame }: GarageCharacterSelection) {
+  // Changing rigs has a new measured endpoint. Color and makeup changes keep
+  // the existing shot and in-flight interpolation.
+  const creatorRig = mode === "create" ? choice.id : undefined;
+  const shot = useMemo(() => rosterCamera(mode, creatorFrame), [mode, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
     setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} /> });
   }, [choice, mode, shot]);

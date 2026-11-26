@@ -284,7 +284,8 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
   const tuckedHair = headwear?.hideLongHair && model.root.getObjectByName(`wardrobe-${headwear.id}`);
   const cropped = look.appearance.hair === "cropped" || Boolean(tuckedHair);
   const tucksHair = model.trialGarments?.tucksHair;
-  if (model.hat) model.hat.visible = true;
+  // The bundled bonnet belongs to the stock braid. Fitted hairstyles cover the scalp themselves.
+  if (model.hat) model.hat.visible = !model.fittedHair;
   if (model.fittedHair) {
     model.fittedHair.visible = !cropped && !tucksHair;
     if (look.appearance.hair_color !== "original") {

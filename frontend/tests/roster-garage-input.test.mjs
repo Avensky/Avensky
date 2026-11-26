@@ -140,6 +140,47 @@ test("a delayed selected rig travels from the live dragged room using the same c
   }
 });
 
+test("creator frames both rigs above the controls and can reverse an unfinished close-up", () => {
+  for (const [width, height] of [[1280, 720], [844, 390], [393, 852], [320, 568]]) {
+    const portrait = width < height;
+    for (const [eyes, waist] of [[1.569, 1.095], [1.711, 1.164]]) {
+      const camera = new PerspectiveCamera(), travel = new GarageCameraTravel();
+      const [body, face, outfit] = ["body", "face", "outfit"].map(framing => {
+        const shot = rosterCamera("create", framing);
+        shot.fitPortrait(eyes, waist);
+        shot.subject = "ready";
+        return shot;
+      });
+      const frame = (time, shot, reduced = false) => travel.frame(camera, shot, width, height, 1, .12, -.03, time, reduced);
+      const screenY = y => (1 - new Vector3(0, y, 0).project(camera).y) / 2;
+      frame(0, body, true);
+      const start = camera.clone();
+      frame(10, face);
+      assert.equal(travel.phase, "framing");
+      assert.ok(start.position.distanceTo(camera.position) < 1e-10 && start.projectionMatrix.equals(camera.projectionMatrix));
+      for (let t = 60; t <= 360; t += 50) frame(t, face);
+      const halfway = camera.clone();
+      assert.ok(start.position.distanceTo(halfway.position) > .05);
+      frame(370, outfit);
+      assert.ok(halfway.position.distanceTo(camera.position) < 1e-10);
+      assert.ok(halfway.quaternion.angleTo(camera.quaternion) < 1e-6 && halfway.projectionMatrix.equals(camera.projectionMatrix));
+      for (let t = 470; t <= 1370; t += 100) frame(t, outfit);
+      camera.updateMatrixWorld();
+      assert.equal(travel.moving, false);
+      assert.ok(screenY(eyes + .125) > .055, "the hairstyle clears the header");
+      assert.ok(portrait ? screenY(waist) < .49 : screenY(0) < .98, "the upper outfit is visible above the portrait controls and the full outfit fits in landscape");
+      const outfitSize = screenY(waist) - screenY(eyes);
+      frame(1380, face, true);
+      camera.updateMatrixWorld();
+      assert.equal(travel.phase, "framed");
+      assert.equal(travel.moving, false);
+      assert.ok(screenY(eyes + .125) > .055);
+      assert.ok(screenY(eyes) > .22 && screenY(eyes) < .45);
+      assert.ok(screenY(waist) - screenY(eyes) > outfitSize * 1.7, "makeup and colors use a visibly closer face shot");
+    }
+  }
+});
+
 test("failed, interrupted, and reduced-motion handoffs release the camera", () => {
   const camera = new PerspectiveCamera(), travel = new GarageCameraTravel(), shot = rosterCamera();
   const frame = (now, requested, still = false) => travel.frame(camera, requested, 844, 390, 1, 0, 0, now, still);

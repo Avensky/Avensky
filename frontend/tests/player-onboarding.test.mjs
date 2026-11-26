@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createServer } from "vite";
 
-test("welcome picks a personality and gender before registration and lets returning players pick a saved character", async () => {
+test("the creator preserves a six-step appearance through registration, name retry and roster selection", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true, runScripts:"outside-only" });
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
@@ -48,12 +48,13 @@ test("welcome picks a personality and gender before registration and lets return
     for (const style of CHARACTER_STYLES)
       for (const body of ["female","male"]) assert.ok(isEquippableOutfit(styleLook(style,body)),style.name);
     const beforeVehicle=vehicles.getState().getSelectedVehicle().id;
-    const fox=styleLook(CHARACTER_STYLES.find(style=>style.id==="night-shift"),"male");
+    const previews = [];
+    const onGarageCharacter = selection => previews.push(selection);
     await act(async()=>{
       client.setSocialConnection(socket);
       client.beginSocialSession("onboarding-test",undefined,true);
       ui.setState({screen:"welcome"});
-      root.render(createElement(WelcomeScreen));
+      root.render(createElement(WelcomeScreen, { onGarageCharacter }));
     });
     const header=document.querySelector(".garage-entry-header");
     assert.ok(header);
@@ -80,18 +81,60 @@ test("welcome picks a personality and gender before registration and lets return
     assert.ok(document.querySelector(".garage-entry-brand img"), "returning to sign-in restores the login badge");
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
-    assert.equal(disabled(button("Continue")),true);
-    await act(async()=>button("Male").click());
-    const style=[...document.querySelectorAll(".welcome-character")].find(card=>card.textContent.includes("Night Shift"));
-    await act(async()=>style.click());
+    const steps = () => [...document.querySelectorAll('[role="tablist"] [role="tab"]')];
+    const stepName = tab => (tab.getAttribute("aria-label") ?? tab.textContent).trim();
+    const activeStep = () => stepName(steps().find(tab => tab.getAttribute("aria-selected") === "true"));
+    const jumpTo = async name => {
+      const tab = steps().find(item => stepName(item) === name);
+      assert.ok(tab, name);
+      await act(async () => tab.click());
+      assert.equal(activeStep(), name);
+    };
+    const next = () => document.querySelector("[data-creator-continue]");
+    const select = async name => {
+      const item = ["Continue", "Create character"].includes(name) ? next() : button(name);
+      assert.ok(item, name);
+      await act(async () => {
+        const tap = new window.MouseEvent("pointerup", { bubbles: true, cancelable: true, button: 0 });
+        Object.defineProperty(tap, "pointerType", { value: "touch" });
+        item.dispatchEvent(tap);
+      });
+    };
+    assert.deepEqual(steps().map(stepName), ["Gender", "Looks", "Skin tone", "Hair color", "Makeup", "Personality"]);
+    assert.equal(activeStep(), "Gender");
+    assert.equal(previews.at(-1).choice.appearance.hair, "natural");
+    assert.equal(previews.at(-1).creatorFrame, "body");
+    await select("Male");
+    await select("Continue");
+    assert.equal(activeStep(), "Looks");
+    await jumpTo("Skin tone");
+    await select("Deep");
+    await jumpTo("Hair color");
+    await select("Copper");
+    assert.equal(previews.at(-1).choice.appearance.hair, "natural");
+    assert.equal(previews.at(-1).choice.appearance.hair_color, "copper");
+    assert.equal(previews.at(-1).creatorFrame, "face");
+    await jumpTo("Makeup");
+    const makeupOptions = [...document.querySelectorAll('[role="tabpanel"] [aria-pressed]')];
+    const lip = makeupOptions.find(control => control.getAttribute("aria-pressed") === "false");
+    assert.ok(lip, "an authored makeup option is available alongside the original look");
+    await select(lip.getAttribute("aria-label"));
+    await jumpTo("Personality");
+    await select("Stoic");
+    assert.equal(previews.at(-1).creatorFrame, "outfit");
+    assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
+    await jumpTo("Skin tone");
+    assert.equal(button("Deep").getAttribute("aria-pressed"), "true");
+    await jumpTo("Personality");
+    assert.equal(disabled(next()),true,"the final action requires a character name");
     await act(async()=>document.querySelector('[name="characterName"]').focus());
     assert.ok(document.activeElement.closest("[data-controller-form]"), "the gamepad can navigate while a field is focused");
     await act(async()=>panelAction("activate"));
     assert.ok(keyboard.getState().session);
     await act(async()=>{keyboard.getState().edit("Track Fox"); keyboard.getState().close();});
     assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
-    assert.equal(disabled(button("Continue")),false);
-    await act(async()=>submit());
+    assert.equal(disabled(next()),false);
+    await select("Continue");
     assert.equal(sent.length,0,"draft stays local until the player registers");
     assert.equal(button("Play as guest"),undefined);
     assert.ok(document.querySelector(".garage-entry-brand img"), "registration is part of account entry");
@@ -108,7 +151,12 @@ test("welcome picks a personality and gender before registration and lets return
       client.receiveSocialState(view);
     });
     const create=sent.at(-1);
-    assert.equal(create.action,"character_create");
+    assert.equal(create.action,"character_create_styled");
+    const fox=create.character;
+    assert.equal(fox.appearance.skin,"deep");
+    assert.equal(fox.appearance.hair_color,"copper");
+    assert.equal(fox.appearance.personality,"stoic");
+    assert.ok(fox.appearance.makeup && fox.appearance.makeup !== "none");
     assert.equal(create.name,"Track Fox");
     assert.equal(create.style,"night-shift");
     assert.equal(create.body,"male");
@@ -119,7 +167,8 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(ui.getState().screen,"welcome");
     assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
     await act(async()=>typeName("Track Fox II"));
-    await act(async()=>submit());
+    await select("Create character");
+    assert.deepEqual(sent.at(-1).character, fox, "retry preserves the whole draft");
     assert.equal(sent.at(-1).name,"Track Fox II");
     assert.equal(sent.filter(request=>request.action==="account_register").length,1);
     const saved={...view.profile,name:"Track Fox II",active_character_id:"registered-player",
@@ -254,11 +303,11 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>reply(keyed,{},false,"Try again."));
     assert.equal(document.querySelector(".roster-preview-tools [role=button]"),null,"the rotation hint does not add a controller stop");
     await act(async()=>panelAction("activate"));
-    const select=sent.at(-1);
-    assert.equal(select.action,"character_select");
-    assert.equal(select.character_id,"registered-player");
+    const rosterSelect=sent.at(-1);
+    assert.equal(rosterSelect.action,"character_select");
+    assert.equal(rosterSelect.character_id,"registered-player");
     assert.equal(ui.getState().screen,"welcome");
-    await act(async()=>reply(select,{profile:saved}));
+    await act(async()=>reply(rosterSelect,{profile:saved}));
     assert.equal(ui.getState().screen,"main","confirming a character opens the menu even with a shared world available");
     assert.equal(sent.some(request=>request.action==="world_join"),false);
     assert.deepEqual(selectEquippedCharacter(social.getState()),fox);
@@ -284,8 +333,9 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(document.querySelector("[data-character-id]"),null);
     assert.ok(button("Create character"));
     await act(async()=>button("Create character").click());
-    assert.ok(document.querySelector('[name="characterName"]'));
-    await act(async()=>button("Back").click());
+    assert.equal(activeStep(),"Gender");
+    assert.equal(document.querySelector('[name="characterName"]'),null);
+    await act(async()=>button("Back to character selection").click());
     assert.ok(button("Log out"));
     const headerActions=document.querySelector(".garage-entry-header nav[data-controller-row]");
     assert.equal(headerActions.previousElementSibling?.innerHTML,signInBrand,"the roster uses the same logo and wordmark as sign-in");

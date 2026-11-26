@@ -6,8 +6,9 @@ import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
-import { characterLook } from "../characters/characterCatalog";
-import { attitudeName, CHARACTER_STYLES, styleLook, type CharacterBody } from "../characters/characterStyles";
+import { CHARACTERS, characterAppearance, characterLook, ROOK_ID, type CharacterChoice } from "../characters/characterCatalog";
+import { CHARACTER_STYLES, creatorChoice, type CharacterBody } from "../characters/characterStyles";
+import { CharacterCreator, CREATOR_STEPS } from "./CharacterCreator";
 import { CharacterRoster } from "./CharacterRoster";
 import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
@@ -23,7 +24,12 @@ import "./welcomeScreen.css";
 type Step = "welcome" | "create" | "register" | "characters";
 type PendingAction = { kind: "submit" } | { kind: "logout"; player: PlayerProfile };
 const GarageProfilePanel = lazy(() => import("../characters/GarageProfilePanel").then(module => ({ default: module.GarageProfilePanel })));
-type Draft = { name: string; body: CharacterBody; style: string };
+type Draft = { name: string; body: CharacterBody; style: string; character: CharacterChoice };
+const starterStyle = CHARACTER_STYLES[0].id;
+
+function initialDraft(original?: CharacterChoice) {
+  return original ? { style: "original", choice: original } : { style: starterStyle, choice: creatorChoice(starterStyle, "female") };
+}
 
 async function waitForProfile(owner: string, confirmedSnapshot = false) {
   const ready = (state: ReturnType<typeof useSocialStore.getState>) =>
@@ -67,8 +73,9 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const [showSettings, setShowSettings] = useState(false);
   const [showAccountEntry, setShowAccountEntry] = useState(false);
   const [name, setName] = useState("");
-  const [body, setBody] = useState<CharacterBody>("female");
-  const [style, setStyle] = useState<string>();
+  const [creation, setCreation] = useState(() => initialDraft());
+  const [creatorStep, setCreatorStep] = useState<typeof CREATOR_STEPS[number]>("gender");
+  const [previewStyle, setPreviewStyle] = useState<string>();
   const [preview, setPreview] = useState<{ owner: string; slotId: string }>();
   const [error, setError] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
@@ -92,15 +99,34 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const selectedSlot = (preview?.owner === player?.id && slots?.find(slot => slot.id === preview?.slotId))
     || slots?.find(slot => slot.id === (player?.active_character_id ?? player?.id)) || slots?.[0];
   const slotLimit = registered || stagingSignIn || leavingPlayer ? 4 : 1;
-  const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
-  const selectedStyle = style ?? (original ? "original" : undefined);
+  const original = slots?.length === 0 && saved && characterLook(saved) ? saved : undefined;
+  const body: CharacterBody = creation.choice.id === ROOK_ID ? "male" : "female";
+  // An adopted career can keep its existing outfit. Restoring it from another
+  // personality must respect the rig and the player's earlier color choices.
+  const originalLook = useMemo(() => {
+    if (!original || original.id !== creation.choice.id) return undefined;
+    if (creation.style === "original") return creation.choice;
+    const { skin, hair_color, makeup } = characterAppearance(creation.choice);
+    return { ...original, appearance: { ...characterAppearance(original), skin, hair_color, makeup } };
+  }, [original, creation]);
+  const facePreview = useMemo<CharacterChoice>(() => {
+    const { choice } = creation;
+    const rig = CHARACTERS.find(item => item.id === choice.id);
+    const face = characterAppearance(choice);
+    // The first five steps need only the base rig and the chosen face colors.
+    // An outfit or fitted hairstyle is requested when its class is actually shown.
+    return { id: choice.id, identity: choice.identity, outfit: rig?.outfits[0].id ?? choice.outfit,
+      appearance: { hair: "natural", headwear: "none", color: "original", skin: face.skin, hair_color: face.hair_color,
+        makeup: face.makeup, eye_color: face.eye_color, brow_color: face.brow_color } };
+  }, [creation]);
   const draftLook = useMemo(() => {
-    if (selectedStyle === "original") return original;
-    const starter = CHARACTER_STYLES.find(option => option.id === selectedStyle);
-    return starter && styleLook(starter, body);
-  }, [selectedStyle, original, body]);
+    if (creatorStep !== "personality") return facePreview;
+    if (!previewStyle || previewStyle === creation.style) return creation.choice;
+    if (previewStyle === "original" && originalLook) return originalLook;
+    return creatorChoice(previewStyle, body, creation.choice);
+  }, [creatorStep, previewStyle, creation, originalLook, body, facePreview]);
   const previewChoice = screen === "create" ? draftLook : player && selectedSlot ? savedCharacterAppearance(player, selectedSlot) : undefined;
-  const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
+  const draft: Draft | null = name.trim().length >= 2 ? { name: name.trim(), body, style: creation.style, character: creation.choice } : null;
   const working = pendingAction !== null;
   const busy = working || restoring;
   const sessionPending = !localLogin && screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
@@ -119,9 +145,10 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const showBrand = screen === "characters" && !accountOpen ||
     !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
+  const creatorFrame = garageMode !== "create" ? undefined : creatorStep === "gender" ? "body" : creatorStep === "personality" ? "outfit" : "face";
   useLayoutEffect(() => {
-    onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode } : null);
-  }, [onGarageCharacter, previewChoice, garageMode]);
+    onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode, creatorFrame } : null);
+  }, [onGarageCharacter, previewChoice, garageMode, creatorFrame]);
   // The parent takes ownership of the confirmed career when the roster closes.
   useLayoutEffect(() => () => onGarageCharacter?.(undefined), [onGarageCharacter]);
   const unconfirmedSignIn = stagingAccountPortal && connected && !stagingSignIn;
@@ -169,7 +196,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     else setShowSettings(false);
   }
 
-  function back() {
+  function back(leaveCreator = false) {
     if (pending.current || restoring) return;
     if (accountOpen) {
       const profileBack = root.current?.querySelector<HTMLElement>("[data-profile-back]");
@@ -182,13 +209,15 @@ export function WelcomeScreen({ onGarageCharacter }: {
     if (accountRoot) return;
     setError("");
     if (step === "register" && newPlayer) { setStep("create"); return; }
-    if (screen === "create" && player) { setStep("characters"); return; }
+    if (screen === "create") {
+      const previous = CREATOR_STEPS[CREATOR_STEPS.indexOf(creatorStep) - 1];
+      if (!leaveCreator && previous) { changeCreatorStep(previous); return; }
+      if (player) { setStep("characters"); return; }
+    }
     setConfirmedProfile(undefined);
     setStep("welcome");
     setShowAccountEntry(true);
     setNewPlayer(false);
-    setBody("female");
-    setStyle(undefined);
     setName("");
   }
 
@@ -250,7 +279,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
       if (!(active instanceof HTMLElement)) return;
       if (action === "back") back();
       else if (action === "activate" && root.current.contains(active)) {
-        if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), summary, a[href]")) active.click();
+        if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), [role=tab]:not([aria-disabled=true]), summary, a[href]")) active.click();
         else if (active instanceof HTMLInputElement) {
           if (active.readOnly) active.select();
           else openFieldKeyboard(active, active.name === "characterName" ? changeName : undefined);
@@ -310,24 +339,25 @@ export function WelcomeScreen({ onGarageCharacter }: {
     });
   }
 
-  async function saveCharacter(owner: string, action: "character_create" | "character_select", fields: Draft | { character_id: string }) {
+  async function saveCharacter(owner: string, action: "character_create_styled" | "character_select", fields: Draft | { character_id: string }) {
     await waitForProfile(owner);
     const confirmed = await requestSocial(action, fields);
     const savedProfile = confirmed.profile as PlayerProfile | undefined;
-    if (savedProfile?.id !== owner || !savedProfile.active_character_id ||
-        !Array.isArray(savedProfile.characters) || !savedProfile.characters.some(slot => slot.id === savedProfile.active_character_id) ||
-        !characterLook(savedProfile.progression?.character)) throw new Error("The server did not confirm your character.");
-    if ("character_id" in fields && savedProfile.active_character_id !== fields.character_id)
+    const activeSlot = savedProfile?.characters?.find(slot => slot.id === savedProfile.active_character_id);
+    if (savedProfile?.id !== owner || !activeSlot || !characterLook(savedProfile.progression?.character))
+      throw new Error("The server did not confirm your character.");
+    if ("style" in fields && (activeSlot.style !== fields.style || activeSlot.name !== fields.name.replace(/ +/g, " ")))
+      throw new Error("The server did not confirm the new character.");
+    if ("character_id" in fields && activeSlot.id !== fields.character_id)
       throw new Error("The server did not confirm the selected character.");
     if (useSocialStore.getState().view?.profile.id !== owner) throw new Error("Your profile is reconnecting. Try again.");
     useSocialStore.getState().acknowledgeCharacter(savedProfile);
     if (action === "character_select") {
       useUIStore.getState().setScreen("main");
     } else {
-      setPreview({ owner, slotId: savedProfile.active_character_id });
+      setPreview({ owner, slotId: activeSlot.id });
       setStep("characters");
       setName("");
-      setStyle(undefined);
     }
   }
 
@@ -336,7 +366,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     setConfirmedProfile(owner);
     setNewPlayer(false);
     setStep("create");
-    return saveCharacter(owner, "character_create", newCharacter);
+    return saveCharacter(owner, "character_create_styled", newCharacter);
   }
 
   async function logOut() {
@@ -350,27 +380,44 @@ export function WelcomeScreen({ onGarageCharacter }: {
     setShowAccountEntry(true);
     setNewPlayer(false);
     setName("");
-    setStyle(undefined);
-    setBody("female");
   }
-  const navigation = <MenuBackButton label="Back" onClick={back} disabled={busy} />;
+  const navigation = <MenuBackButton label="Back" onClick={() => back()} disabled={busy} />;
+  function changeCreatorStep(next: typeof creatorStep) {
+    setPreviewStyle(undefined);
+    setCreatorStep(next);
+  }
+  function beginCreation(adopting?: CharacterChoice) {
+    setCreation(initialDraft(adopting));
+    changeCreatorStep("gender");
+    setName("");
+    setError("");
+    setStep("create");
+  }
   function openCreation() {
     if (!player || !slots || slots.length >= slotLimit) return;
     setConfirmedProfile(player.id);
-    setStep("create");
     setNewPlayer(false);
-    setName("");
-    setBody("female");
-    setStyle(original ? "original" : CHARACTER_STYLES[0].id);
-    setError("");
+    beginCreation(original);
+  }
+  function chooseBody(next: CharacterBody) {
+    if (next === body) return;
+    const style = creation.style === "original" ? starterStyle : creation.style;
+    setCreation({ style, choice: creatorChoice(style, next, creation.choice) });
+    setPreviewStyle(undefined);
+  }
+  function chooseStyle(style: string) {
+    setPreviewStyle(undefined);
+    if (style === creation.style) return;
+    const choice = style === "original" && originalLook ? originalLook : creatorChoice(style, body, creation.choice);
+    setCreation({ style, choice });
   }
   function changeName(value: string) {
     setName(value);
     setError("");
   }
   function createDraft() {
-    if (!draft || !connected || !accounts || busy) return;
-    if (player) void run(() => saveCharacter(player.id, "character_create", draft));
+    if (!draft || !connected || !accounts || busy || creatorStep !== "personality") return;
+    if (player) void run(() => saveCharacter(player.id, "character_create_styled", draft));
     else if (newPlayer) setStep("register");
   }
   const labels: Record<Step, string> = {
@@ -382,7 +429,11 @@ export function WelcomeScreen({ onGarageCharacter }: {
   return <>
     <main className="welcome-screen garage-entry" ref={root} data-logging-out={leavingPlayer ? true : undefined} data-controller-rows data-controller-form onKeyDown={event => {
       if (event.key === "Tab") { event.preventDefault(); return; }
-      if (event.key === "Escape") back();
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (!event.repeat) back();
+        return;
+      }
       if ((["ArrowUp","ArrowDown"].includes(event.key) || !isTypingTarget(event.target) && ["ArrowLeft","ArrowRight"].includes(event.key))) {
         event.preventDefault();
         navigateFormRows(root.current!, (root.current!.contains(document.activeElement) ? document.activeElement : root.current!.querySelector(".garage-field[data-selected=true] input")) as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
@@ -395,42 +446,17 @@ export function WelcomeScreen({ onGarageCharacter }: {
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
       {(sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
-      {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
-        {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
+      {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : screen === "create" ? "welcome-creator" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
+        {!accountOpen && screen === "register" && <h1>{label}</h1>}
         {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
           <GarageProfilePanel key={player?.id} onBack={leaveProfile} />
-        </Suspense> : screen === "create" ? <form key="new-character" onSubmit={event => {
-            event.preventDefault();
-            createDraft();
-          }}>
-            <label data-controller-row>Character name
-              <input name="characterName" autoComplete="nickname" minLength={2} maxLength={24} disabled={busy} required
-                value={name} onChange={event => changeName(event.target.value)} />
-            </label>
-            <div className="welcome-actions" role="group" aria-label="Gender" data-controller-row>
-              {(["female", "male"] as const).map(option => <GameButton variant="menu" key={option} disabled={busy}
-                selected={selectedStyle !== "original" && body === option} aria-pressed={selectedStyle !== "original" && body === option}
-                onPress={() => {
-                  setBody(option);
-                  if (selectedStyle === "original") setStyle(CHARACTER_STYLES[0].id);
-                }}>{option === "female" ? "Female" : "Male"}</GameButton>)}
-            </div>
-            <div className="welcome-characters" role="group" aria-label="Personality" data-controller-row data-controller-columns="2">
-              {original && <GameButton variant="menu" className="welcome-character" aria-pressed={selectedStyle === "original"}
-                selected={selectedStyle === "original"} disabled={busy} onPress={() => setStyle("original")}>
-                <strong>Keep current look</strong></GameButton>}
-              {CHARACTER_STYLES.map(item => <GameButton variant="menu" key={item.id} className="welcome-character"
-                aria-pressed={selectedStyle === item.id} selected={selectedStyle === item.id} disabled={busy}
-                onPress={() => { setStyle(item.id); setError(""); }}>
-                <strong>{item.name}</strong><span>{attitudeName(item.attitude)}</span>
-              </GameButton>)}
-            </div>
-            <div className="welcome-actions" data-controller-row>
-              {navigation}
-              <GameButton variant="menu" className="welcome-primary" disabled={!draft || busy || !connected || (!player && !newPlayer)}
-                onPress={createDraft}>{player ? "Create character" : "Continue"}</GameButton>
-            </div>
-          </form> : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
+        </Suspense> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
+          choice={creation.choice} facePreview={facePreview} previewStyle={previewStyle} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
+          style={creation.style} onStyle={chooseStyle} onPreviewStyle={setPreviewStyle} onBody={chooseBody}
+          name={name} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}
+          onBack={() => back(true)} onSubmit={createDraft}
+          submitLabel={player ? "Create character" : "Continue"} original={originalLook} />
+        : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
             busy={busy} connected={connected}
             onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setError(""); }}
             onCreate={openCreation} onEnter={slot => void run(() =>
@@ -463,7 +489,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
             {accounts && <GameButton variant="menu" disabled={busy} onPress={() => {
               setError("");
               if (profile && !registered && profile.characters?.length) setStep("register");
-              else { setNewPlayer(true); setStep("create"); }
+              else { setNewPlayer(true); beginCreation(); }
             }}>Sign up</GameButton>}
           </div>
           {connected && !accounts && <p className="welcome-help">This welcome screen needs the updated game server.</p>}

@@ -52,7 +52,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
       <div
         {...rest}
         ref={ref}
-        role="button"
+        role={rest.role ?? "button"}
         data-selected={selected}
         tabIndex={disabled ? -1 : 0}
         aria-disabled={disabled || rest["aria-disabled"] || false}

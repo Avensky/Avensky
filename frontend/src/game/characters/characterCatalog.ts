@@ -12,7 +12,7 @@ import { findVehicleDriver, type VehicleDriver } from "./driverRoster";
 export const CHARACTERS = catalog.filter(item => item.id !== "niko-park");
 export const CHARACTER_APPEARANCE_OPTIONS = appearanceOptions;
 export type CharacterStyleField = keyof typeof appearanceOptions;
-type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo";
+type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup";
 export type CharacterAppearance = Record<Exclude<CharacterStyleField, OptionalAppearanceField>, string>
   & Partial<Record<OptionalAppearanceField, string>> & {
     accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;
@@ -141,6 +141,7 @@ export function characterLook(choice: CharacterChoice | null | undefined) {
     skin: color("skin") ?? (female ? "#d49673" : "#95553d"),
     iris: color("eye_color") ?? (female ? "#8a7347" : "#68422b"),
     brow: color("brow_color"),
+    lipstick: appearanceOptions.makeup.find(option => option.id === appearance.makeup)?.color,
   };
 }
 
