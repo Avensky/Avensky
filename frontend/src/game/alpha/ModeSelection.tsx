@@ -46,8 +46,7 @@ export function ModeSelection() {
   const profileReady=Boolean(profileId)&&profileStatus!=="restoring";
   const needsProfileChoice=useSocialStore(s=>s.available && s.profileScope===null);
   const selectedWorld=useWorldSelection(s=>s.getSelectedMap());
-  const editorSetup = useUIStore(s => s.welcomeSection === "world_editor");
-  const mode = useAlphaStore(s => editorSetup ? "editor" : s.mode);
+  const mode = useAlphaStore((s) => s.mode);
   const teamSize = useAlphaStore((s) => s.teamSize);
   const defaultHero = useHeroLoadouts(s=>s.defaultHero);
   const connected = useConnectionView(s => s.connected);
@@ -59,19 +58,17 @@ export function ModeSelection() {
   const match = isMatchMode(mode);
   const openWorld = mode === "open_world";
   const play = isPlayMenuMode(mode);
-  const destinations = GAME_MODES.filter(entry => editorSetup ? entry.id === "editor" : isPlayMenuMode(entry.id) === play);
+  const destinations = GAME_MODES.filter(entry => isPlayMenuMode(entry.id) === play);
   const item = GAME_MODES.find((m) => m.id === canonicalGameMode(mode))!;
   const pressOwner = useMenuPressOwner();
   const back = useCallback(() => {
-    if (pending.current) return;
-    const ui = useUIStore.getState();
-    ui.setScreen(ui.welcomeSection === "world_editor" ? "world_builder" : "main");
+    if (!pending.current) useUIStore.getState().setScreen("main");
   }, []);
   const selectMode = useCallback((id: string) => {
-    if (pending.current || editorSetup) return;
+    if (pending.current) return;
     useAlphaStore.getState().chooseMode(id as PlayMode);
     setStatus("");
-  }, [editorSetup]);
+  }, []);
   const tab = useCallback((direction: number) => {
     const current = useAlphaStore.getState().mode;
     const entries = GAME_MODES.filter(entry => isPlayMenuMode(entry.id) === isPlayMenuMode(current));
@@ -106,7 +103,6 @@ export function ModeSelection() {
     useSocialStore.setState({recoveryMessage:undefined});
     setStatus("");
     try {
-      if (editorSetup) useAlphaStore.getState().chooseMode("editor");
       useAlphaStore.getState().clearHero();
       await joinSelectedMode();
     } catch (error) {
@@ -115,7 +111,7 @@ export function ModeSelection() {
       pending.current = false;
       setBusy(false);
     }
-  }, [planned, openWorld, hub, profileReady, selectMatchSize, editorSetup]);
+  }, [planned, openWorld, hub, profileReady, selectMatchSize]);
   const recoverProfile=async(connect:()=>Promise<void>)=>{
     if(pending.current||profileStatus==="restoring")return;
     pending.current=true;setBusy(true);setStatus("");
@@ -167,7 +163,7 @@ export function ModeSelection() {
       <SceneTabHeader
         title={play ? "PLAY" : "EXPLORE"}
         compact
-        character={{ showProgress: true, readOnly: PLAYER_ONBOARDING || editorSetup }}
+        character={{ showProgress: true, readOnly: PLAYER_ONBOARDING }}
         busy={busy}
         backAction={{ onClick: back, disabled: busy }}
         tablistLabel="Game mode"

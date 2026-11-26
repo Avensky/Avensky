@@ -71,9 +71,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const [localLogin, setLocalLogin] = useState(false);
   const [confirmedProfile, setConfirmedProfile] = useState<string>();
   const [newPlayer, setNewPlayer] = useState(false);
-  const welcomeSection = useUIStore(state => state.welcomeSection);
-  const openedFromMenu = welcomeSection === "account";
-  const focusReturningEditor = useRef(welcomeSection === "world_editor");
+  const openedFromMenu = useUIStore(state => state.welcomeSection === "account");
   const [showSettings, setShowSettings] = useState(false);
   const [showAccountEntry, setShowAccountEntry] = useState(false);
   const [name, setName] = useState("");
@@ -234,10 +232,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
       if (screen === "welcome") return;
       if (busy || (!returningFromProfile && root.current?.contains(document.activeElement))) return;
       if (!accountOpen && screen === "characters") {
-        const editor = focusReturningEditor.current && root.current?.querySelector<HTMLElement>('[data-roster-editor]:not([aria-disabled=true])');
-        const initial = editor || root.current?.querySelector<HTMLElement>('[data-character-id][aria-pressed=true], [data-roster-create]:only-child');
+        const initial = root.current?.querySelector<HTMLElement>('[data-character-id][aria-pressed=true], [data-roster-create]:only-child');
         initial?.focus({ preventScroll: true });
-        if (editor) focusReturningEditor.current = false;
       } else if (!window.matchMedia?.("(pointer: coarse)")?.matches) {
         root.current?.querySelector(".welcome-panel")?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled), [role=button]:not([aria-disabled=true])")?.focus({ preventScroll: true });
       }
@@ -499,7 +495,6 @@ export function WelcomeScreen({ onGarageCharacter }: {
         : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
             busy={busy} connected={connected}
             onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setError(""); }}
-            onOpenEditor={accountRoot ? () => useUIStore.getState().setScreen("world_builder") : undefined}
             onCreate={openCreation} onEnter={slot => void run(() =>
               saveCharacter(player.id, "character_select", { character_id: slot.id }))}
             onBack={accountRoot ? undefined : back} /> : screen === "register" ? (

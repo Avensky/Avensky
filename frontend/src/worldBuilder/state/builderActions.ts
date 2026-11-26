@@ -298,8 +298,7 @@ export function finishBuilderEdits() {
 export function closeWorldBuilder() {
   finishBuilderEdits();
   const ui = useUIStore.getState();
-  if (ui.screen === "world_builder" && ui.welcomeSection === "world_editor") ui.setScreen("welcome", "world_editor");
-  else if (ui.screen === "world_builder") ui.setScreen("main");
+  if (ui.screen === "world_builder") ui.setScreen("main");
   else ui.setOverlay(ui.screen === "sandbox" ? "pause" : null);
 }
 export function exportBuilderMap() {
