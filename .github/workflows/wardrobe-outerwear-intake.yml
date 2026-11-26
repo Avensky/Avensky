@@ -1,0 +1,38 @@
+name: W-07 private outerwear intake
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/wardrobe-outerwear-intake.yml"
+      - "packages/wardrobe-catalog/outerwear-candidates.json"
+      - "scripts/wardrobe/inspect_outerwear_assets.py"
+      - "scripts/wardrobe/tests/test_outerwear_intake.py"
+      - "frontend/tests/wardrobe-outerwear-intake.test.mjs"
+      - "frontend/src/game/characters/DressingRoom.tsx"
+      - "frontend/tests/wardrobe-layer-inspector-ui.test.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  private-intake-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Test read-only binary FBX scanner with synthetic file
+        run: python -m unittest discover -s scripts/wardrobe/tests -p 'test_outerwear_intake.py' -v
+      - name: Validate W-07 private candidate manifest
+        run: node --test frontend/tests/wardrobe-outerwear-intake.test.mjs
+      - name: State private asset validation boundary
+        run: |
+          echo 'This CI tests the scanner and manifest with synthetic data.'
+          echo 'Nine private source FBXs were inspected separately; none are checked into git.'
+          echo 'No bone transfer, pose QA, actual coat fitting, or distribution approval in this workflow.'
