@@ -1,0 +1,43 @@
+name: Wardrobe legacy save migration
+on:
+  pull_request:
+    paths:
+      - "packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs"
+      - "packages/wardrobe-catalog/wardrobe-layers-save.schema.json"
+      - "packages/wardrobe-catalog/layer-rules.json"
+      - "frontend/tests/wardrobe-layer-migration.test.mjs"
+      - "frontend/tests/fixtures/wardrobe-layer-save-v1.json"
+      - "frontend/src/game/characters/characterCatalog.ts"
+      - "avenlab-server/src/alpha/character.rs"
+      - "avenlab-server/src/server/tests.rs"
+      - ".github/workflows/wardrobe-legacy-save.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  node-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Check reversible legacy layer save adapter
+        run: npm run wardrobe:legacy:check
+
+  rust-persistence:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "avenlab-server"
+      - name: Test legacy and layered profile round trips
+        run: cargo test --locked --manifest-path avenlab-server/Cargo.toml layered_wardrobe_
