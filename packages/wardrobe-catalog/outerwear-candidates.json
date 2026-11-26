@@ -1,0 +1,203 @@
+{
+  "schemaVersion": 1,
+  "project": "W-07 outerwear fitting candidates",
+  "sourceType": "CLO binary FBX with 2K normal atlas and private .zprj",
+  "sourceHandling": "Private inputs only. Never copy source projects, FBX, normal maps, or derived GLBs into public git or CDN until distribution rights are independently confirmed.",
+  "rigProfile": "Vesper / 88 joints",
+  "gameSlot": "coat",
+  "importPolicy": {
+    "publish": false,
+    "autoDiscover": false,
+    "equip": false,
+    "retiredCatalogIdNotReused": "coat-01",
+    "verifySourceHash": true,
+    "needs": [
+      "source/license approval",
+      "body donor geometry and scale matching",
+      "88-joint skin weight transfer",
+      "arm and shoulder pose fit",
+      "inter-layer contact evidence",
+      "garage/mobile LODs",
+      "visual review"
+    ]
+  },
+  "candidates": [
+    {
+      "id": "clo-coat-01",
+      "label": "Open-front coat",
+      "category": "outerwear",
+      "slot": "coat",
+      "piece": "coat",
+      "status": "intake-only",
+      "authoredClosure": "open",
+      "source": {
+        "preferred": {
+          "name": "z-h_Coat 01-THIN WELD.fbx",
+          "sha256": "bdb4127ec22614c3e0535c92e66de5563ce25f869ee14fd1d69ca05a21ef2143",
+          "bytes": 4387536,
+          "triangles": 166620,
+          "controlPoints": 86118
+        },
+        "alternates": [
+          "z-h_Coat 01-THICK.fbx",
+          "z-h_Coat 01-THIN UNWELD.fbx"
+        ],
+        "normalMap": "z-h_Coat 01-normal.png",
+        "cloProject": "z-h_Coat 01.zprj"
+      },
+      "materialSlots": 3,
+      "approxBoundsMeters": [
+        0.92547,
+        0.67547,
+        0.30631
+      ],
+      "trialPriority": 1,
+      "firstLayerTrial": [
+        "thin-top",
+        "coat"
+      ],
+      "laterLayerTrials": [
+        [
+          "top",
+          "corset",
+          "coat"
+        ],
+        [
+          "gown",
+          "coat"
+        ]
+      ],
+      "protectedFeatures": [
+        "front opening",
+        "front button placket",
+        "ribbed cuff",
+        "pocket edges",
+        "collar",
+        "hem"
+      ],
+      "unverified": [
+        "closure change requires new fitted geometry",
+        "body and sleeve clearance",
+        "skin weights"
+      ]
+    },
+    {
+      "id": "clo-jacket-01",
+      "label": "Cropped zip jacket",
+      "category": "outerwear",
+      "slot": "coat",
+      "piece": "coat",
+      "status": "intake-only",
+      "authoredClosure": "open",
+      "source": {
+        "preferred": {
+          "name": "z-h_Jacket 01-THIN WELD.fbx",
+          "sha256": "e4933b448b663c23ae3905affaa9c04501dc9a3e703a28ace8b971eb46de493c",
+          "bytes": 3029584,
+          "triangles": 124942,
+          "controlPoints": 66867
+        },
+        "alternates": [
+          "z-h_Jacket 01-THICK.fbx",
+          "z-h_Jacket 01-THIN UNWELD.fbx"
+        ],
+        "normalMap": "z-h_Jacket 01-normal.png",
+        "cloProject": "z-h_Jacket 01.zprj"
+      },
+      "materialSlots": 12,
+      "approxBoundsMeters": [
+        1.06138,
+        0.52827,
+        0.3066
+      ],
+      "trialPriority": 2,
+      "firstLayerTrial": [
+        "thin-top",
+        "coat"
+      ],
+      "laterLayerTrials": [
+        [
+          "top",
+          "corset",
+          "coat"
+        ],
+        [
+          "gown",
+          "coat"
+        ]
+      ],
+      "protectedFeatures": [
+        "zipper",
+        "front edges",
+        "chest pockets",
+        "cuffs",
+        "collar",
+        "cropped hem"
+      ],
+      "unverified": [
+        "closure change requires new fitted geometry",
+        "cropped hem intersecting corset",
+        "skin weights"
+      ]
+    },
+    {
+      "id": "clo-jacket-02",
+      "label": "Tailored blazer jacket",
+      "category": "outerwear",
+      "slot": "coat",
+      "piece": "coat",
+      "status": "intake-only",
+      "authoredClosure": "single-button and deep lapels",
+      "source": {
+        "preferred": {
+          "name": "z-h_Jacket 02-THIN WELD.fbx",
+          "sha256": "51ddd36bd184bc4071a1f4cbf4589fffd7450aded86cbf6d19671fe94133a4e4",
+          "bytes": 4407296,
+          "triangles": 175554,
+          "controlPoints": 90462
+        },
+        "alternates": [
+          "z-h_Jacket 02-THICK.fbx",
+          "z-h_Jacket 02-THIN UNWELD.fbx"
+        ],
+        "normalMap": "z-h_Jacket 02-normal.png",
+        "cloProject": "z-h_Jacket 02.zprj"
+      },
+      "materialSlots": 4,
+      "approxBoundsMeters": [
+        1.09564,
+        0.70339,
+        0.36185
+      ],
+      "trialPriority": 3,
+      "firstLayerTrial": [
+        "thin-top",
+        "coat"
+      ],
+      "laterLayerTrials": [
+        [
+          "top",
+          "corset",
+          "coat"
+        ],
+        [
+          "gown",
+          "coat"
+        ]
+      ],
+      "protectedFeatures": [
+        "lapels",
+        "front button",
+        "waist seam",
+        "hip pockets",
+        "cuffs",
+        "longer hem"
+      ],
+      "unverified": [
+        "fitted waist clearance",
+        "open neckline visibility and lapel occlusion",
+        "skin weights"
+      ]
+    }
+  ]
+}
