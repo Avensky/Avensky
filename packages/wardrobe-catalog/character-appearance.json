@@ -1,4 +1,8 @@
 {
+  "face_shape": [
+    { "id": "original", "label": "Look 1" },
+    { "id": "vesper-soft-contour", "label": "Look 2" }
+  ],
   "hair": [
     { "id": "natural", "label": "Natural" },
     { "id": "cropped", "label": "Close crop" }

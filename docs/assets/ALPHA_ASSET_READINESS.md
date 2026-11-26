@@ -11,6 +11,7 @@ Updated 2026-11-24. This is an approval/integration tracker, **not** a statement
 | Asset | Appearance approval | Current evidence | Release gate |
 | --- | --- | --- | --- |
 | Vesper Vega (hero) | Existing default hero | Desktop/portrait LODs and 88-joint rig exist | Verify shipped Vesper assets in Avensky, physical-phone behavior, and animations |
+| Vesper Look 2 | Creator variant | Optional face contour on Vesper’s existing rig, with separate expression weights | Verify appearance and expressions on desktop and mobile |
 | Rook Okafor (starter) | Existing second starter | Existing roster entry | Verify packaging and game appearance |
 | Pack 7 Tops 01–05 | Approved for alpha | Approved in wardrobe history; merged fixes in AvenLab | Validate installed asset files in Avensky, underarm poses |
 | Corsets 01–05 | Approved for alpha | Approved as standalone clothing; Ruffled Corset 03 further accepted after smoothing | Verify installed files and skirt combinations; standalone Gothic Underbust remains distinct from retired full outfit |
@@ -19,6 +20,7 @@ Updated 2026-11-24. This is an approval/integration tracker, **not** a statement
 | Socks 01–04 | Provisional pass | Alpha category graded Pass in wardrobe | In-game look and save/restore |
 | Belted tunic (`medieval-06`) | Provisional pass | User accepted the fit. The leather utility belt and pouch have a saved color. | Verify belt color and reload on a physical phone. |
 | Linen nightgown (`linen-nightgown`) | Provisional pass for Sleepwear | User accepted the fit. Both model tiers passed the hem and thigh checks in sampled idle, walk, hop and sit poses. | Verify animation and outfit restore on a physical phone. |
+| Tennis Dress (`local-tennis-dress`) | Provisional pass for private alpha | Tight skirt, sheer waist, lowered underwear and relaxed-arm clearance passed local pose checks. The dress model and authored contact samples are served through private staging. | Verify in-game shading and motion on a physical phone before broader release. |
 | Underwear and bras | Integrated functionality, not independent final sign-off | V-cut/boxer briefs and classic/pushup bra controls merged in AvenLab | Verify skin clipping, colors, saves on phone |
 | Repaired 12-style hair pack | **Provisional appearance pass** | 12 fitted hair meshes; UVs reconstructed; Style 12 exported as a Vesper GLB with strand maps | **In-game color + highlight + roots**, save/reload, caps, hat rules, mobile cost |
 | CC-character detailed hairstyle | Textured fit proof, not final alpha pass | Fitted to Vesper; 13 controls and six material groups; 64,984 triangles | Mobile LODs, hairline, clothing contact and animation |

@@ -4,7 +4,7 @@ import {
 import { clone } from "three/addons/utils/SkeletonUtils.js";
 import { aimDriverJoint, driverArm } from "./garageEmotes";
 import { ROOK_ID, VILLAGER_ID, type CharacterLook } from "./characterCatalog";
-import { addVillagerFaceShapes, prepareVillagerFaceColors } from "./villagerFace";
+import { addVillagerFaceShapes, prepareVillagerFaceColors, prepareVillagerFaceLook } from "./villagerFace";
 import { prepareVillagerFaceAccessories } from "./villagerFaceAccessories";
 import { cockpitWardrobe } from "./cockpitWardrobe";
 import { clothingColors, clothingPieceFor, type ClothingPiece } from "./clothingPieces";
@@ -130,7 +130,8 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const skirtRoom = skirtRadius === undefined || (fullBody && removedClothing.includes("skirt"))
     ? undefined : MathUtils.clamp(skirtRadius - .23, 0, .12);
   root.userData.skirtHandRoom = skirtRoom;
-  const faceGeometry = animateFace ? addVillagerFaceShapes(root, female) : [];
+  const faceGeometry = addVillagerFaceShapes(root, female, animateFace);
+  const applyFaceLook = prepareVillagerFaceLook(root);
   const wardrobe = prepareWardrobe(root);
   const trialGarments = female ? prepareWardrobeGarments(root, garments, fullBody, detachedCorset, removedClothing) : undefined;
   // Vesper's bare thighs need the same minimum clearance as a slim skirt.
@@ -198,7 +199,7 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   if (grounded) root.position.y = -new Box3().setFromObject(grounded, true).min.y;
   const applyTattoo = prepareBodyTattoo(getWardrobeActorBody(root) ?? actorBody);
   return {
-    root, materials, pieceMaterials, crop, scalpCap, hairDyes, applyFaceColors, faceAccessories, wardrobe, trialGarments, detachedCorset,
+    root, materials, pieceMaterials, crop, scalpCap, hairDyes, applyFaceColors, applyFaceLook, faceAccessories, wardrobe, trialGarments, detachedCorset,
     hat, bonnet, neckBows, bundledWaist, applyTattoo, fittedHair,
     longHair: root.getObjectByName("HAIR_HAIR20"),
     bow: root.getObjectByName("ACC_BOW"),
@@ -231,6 +232,7 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
     ? { ...look.wardrobe, waist: look.corset.waist } : look.wardrobe;
   model.wardrobe.apply(savedWardrobe, model.detachedCorset ? 0 : look.overEase);
   model.applyFaceColors(look);
+  model.applyFaceLook(look.appearance.face_shape);
   model.applyTattoo?.(look.appearance.tattoo);
   model.faceAccessories.setGlasses(look.appearance.glasses);
   model.faceAccessories.setColors(clothingColors(look, "glasses"));

@@ -2,7 +2,7 @@ import type { Object3D } from "three";
 import { assetAvailable } from "../../assets/runtimeAssets";
 import { installedHairStyles, type CharacterLook } from "./characterCatalog";
 import { fitsHairRig } from "./fittedHair";
-import { tennisFittingBodyUrl } from "./fittedWardrobe/alphaAssets";
+import { tennisDressBodyUrl, tennisFittingBodyUrl } from "./fittedWardrobe/alphaAssets";
 import { getWardrobeActorBody, getWardrobeBodyDonor, isWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
 import { hasAuthoredLacedBodiceFit, hasBindableStandaloneCorset, rebuiltUnderbustPart } from "./standaloneCorset";
 import { corsetModelUrls, corsetRenderChoice, isRebuiltHighCollarUrl, isRebuiltLacedBodiceUrl, isRebuiltUnderbustUrl, wardrobeModelUrls } from "./wardrobe";
@@ -106,7 +106,9 @@ export function resolveWardrobePreview({
   const compatibleBody = (source: Object3D | null | undefined) => skeleton ? getWardrobeBodyDonor(source, skeleton) : undefined;
   const tennisBodyRequested = Boolean(scene && skeleton && requested.some(({ item, rejected }) =>
     !rejected && (item.id === "local-wave-wedges" || item.id === "local-tennis-dress")));
-  const tennisBody = tennisBodyRequested ? compatibleBody(sourceFor(tennisFittingBodyUrl)) : undefined;
+  const dressBodyRequested = tennisBodyRequested && requested.some(({ item, rejected }) => !rejected && item.id === "local-tennis-dress");
+  const tennisBodyUrl = dressBodyRequested ? tennisDressBodyUrl : tennisFittingBodyUrl;
+  const tennisBody = tennisBodyRequested ? compatibleBody(sourceFor(tennisBodyUrl)) : undefined;
   // Replacements can expose skin cut from the stock Village outfit.
   const needsBody = Boolean(scene && (corsetUrl || requested.some(({ item, rejected }) => !rejected && (replacesVillagerBody(item.slot) || (item.slot === "shoes" && item.preserveSkin)))
     || look.removedClothing.some(removalNeedsVillagerBody)) && !compatibleBody(scene));
@@ -134,7 +136,7 @@ export function resolveWardrobePreview({
     }
   }
   const urls = new Set([url, ...requested.map(item => item.url)]);
-  if (tennisBodyRequested) urls.add(tennisFittingBodyUrl);
+  if (tennisBodyRequested) urls.add(tennisBodyUrl);
   if (needsSeparateBody && !tennisBody) urls.add(bodyUrl);
   if (corsetUrl) urls.add(corsetUrl);
   const assetUrls = [...urls];

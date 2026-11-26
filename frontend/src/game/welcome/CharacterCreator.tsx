@@ -8,7 +8,7 @@ import { bindCreatorPanel, routeMenuAction, type MenuAction } from "../../contro
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { APP_BRANDING } from "../../theme/branding";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
-import { CHARACTERS, type CharacterChoice } from "../characters/characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, VILLAGER_ID, characterAppearance, type CharacterChoice } from "../characters/characterCatalog";
 import { CHARACTER_STYLES, attitudeName, type CharacterBody } from "../characters/characterStyles";
 import { CreatorColors } from "./CreatorColors";
 import { CreatorHairstyles } from "./CreatorHairstyles";
@@ -53,9 +53,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
   const nameRow = useRef<HTMLSpanElement>(null);
   const [editingName, setEditingName] = useState(false);
   const scope = useId();
-  const currentFace = starterFaces.find(({ character }) => character.id === choice.id) ?? starterFaces[0];
-  const body = currentFace.character.gender as CharacterBody;
-  const visibleFaces = starterFaces.filter(({ character }) => step === "gender" || character.gender === body);
+  const faceOptions = choice.id === VILLAGER_ID ? CHARACTER_APPEARANCE_OPTIONS.face_shape : CHARACTER_APPEARANCE_OPTIONS.face_shape.slice(0, 1);
 
   function go(next: CreatorStep) {
     if (busy) return;
@@ -181,14 +179,25 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
       <h1>{labels[step]}</h1>
       {(step === "gender" || step === "looks") && <div key={step} className="creator-options creator-portraits" role="group"
         aria-label={labels[step]}>
-        {visibleFaces.map(({ character, choice: face }, position) => {
+        {step === "gender" ? starterFaces.map(({ character, choice: face }) => {
           const gender = character.gender as CharacterBody;
           const selected = choice.id === face.id;
-          const title = step === "gender" ? gender === "female" ? "Female" : "Male" : `Look ${position + 1}`;
+          const title = gender === "female" ? "Female" : "Male";
           const pick = () => { if (!selected) onBody(gender); };
-          return <CreatorOption key={face.id} id={step === "gender" ? gender : face.id} label={title}
+          return <CreatorOption key={face.id} id={gender} label={title}
             selected={selected} busy={busy} onFocusOption={pick} onPick={pick} onConfirm={advance}>
-            <ProfilePortrait choice={step === "looks" ? facePreview : face} label={title} welcomePreview="roster" />
+            <ProfilePortrait choice={face} label={title} welcomePreview="roster" />
+          </CreatorOption>;
+        }) : faceOptions.map(({ id, label }) => {
+          const selected = (choice.appearance?.face_shape ?? "original") === id;
+          const faceShape = id === "original" ? undefined : id;
+          const preview = { ...facePreview, appearance: { ...(facePreview.appearance ?? characterAppearance(facePreview)), face_shape: faceShape } };
+          const pick = () => {
+            if (!selected) onChoice({ ...choice, appearance: { ...(choice.appearance ?? characterAppearance(choice)), face_shape: faceShape } });
+          };
+          return <CreatorOption key={id} id={id} label={label} selected={selected} busy={busy}
+            onFocusOption={pick} onPick={pick} onConfirm={advance}>
+            <ProfilePortrait choice={preview} label={label} welcomePreview="roster" />
           </CreatorOption>;
         })}
       </div>}

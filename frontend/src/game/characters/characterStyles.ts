@@ -32,7 +32,8 @@ export function applyCreatorWardrobe(starter: CharacterChoice, previous?: Charac
   const hair = keepSavedHair || availableHairStyles(starter.id).some(style => style.id === previousLook.hair)
     ? previousLook.hair : "natural";
   return { ...starter, appearance: {
-    ...previousLook, hair, color: kit.color, accent: kit.accent, headwear: kit.headwear,
+    ...previousLook, hair, face_shape: previous.id === starter.id ? previousLook.face_shape : undefined,
+    color: kit.color, accent: kit.accent, headwear: kit.headwear,
     item_colors: kit.item_colors, bra_style: kit.bra_style, briefs_style: kit.briefs_style, personality: kit.personality,
   } };
 }

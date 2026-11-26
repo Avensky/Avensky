@@ -105,7 +105,7 @@ function portraitKey(look: CharacterLook, url: string, outfitUrl?: string) {
     .map(([key, values]) => [key, Object.entries(values).sort(([a], [b]) => a.localeCompare(b))]);
   const { wardrobe } = look;
   return JSON.stringify([look.character.id, look.outfit.id, url, outfitUrl ?? null, hair, hair_color, skin, headwear,
-    color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, hair_palette, colors, wardrobe && [wardrobe.set, wardrobe.shirt, wardrobe.waist]]);
+    color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, look.appearance.face_shape, hair_palette, colors, wardrobe && [wardrobe.set, wardrobe.shirt, wardrobe.waist]]);
 }
 
 /** Render the saved look from its authored model while the menus are idle. */

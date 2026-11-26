@@ -54,8 +54,26 @@ function boxerHem(point: Vector3) {
   return .796 + .026 * MathUtils.smoothstep(Math.abs(point.x), .030, .160);
 }
 
-type UnderwearStyle = BraStyle | BriefsStyle | "dress-briefs" | "dress-boxer-briefs";
+type UnderwearStyle = "tennis-briefs" | "tennis-boxer-briefs" | BraStyle | BriefsStyle | "dress-briefs" | "dress-boxer-briefs";
 const lowRiseWaist = (point: Vector3) => briefsWaist(point) - .075;
+function tennisWaist(point: Vector3) {
+  const rearHip = MathUtils.smoothstep(Math.abs(point.x), .085, .12) * (1 - MathUtils.smoothstep(point.z, -.055, -.020));
+  const outerHip = MathUtils.smoothstep(Math.abs(point.x), .140, .165);
+  return Math.min(.918, lowRiseWaist(point) - .036) - .015 * rearHip - .006 * outerHip;
+}
+function tennisRearLeg(point: Vector3, lower: number) {
+  const rear = (1 - MathUtils.smoothstep(point.z, -.059, -.025))
+    * (1 - MathUtils.smoothstep(Math.abs(point.x), .086, .121));
+  return MathUtils.lerp(lower, Math.max(lower, .865), rear);
+}
+function tennisBriefsLeg(point: Vector3) {
+  return Math.min(tennisRearLeg(point, briefsLeg(point)), tennisWaist(point) - .018);
+}
+function tennisBoxerLeg(point: Vector3) {
+  const outerHip = MathUtils.smoothstep(Math.abs(point.x), .092, .131);
+  const innerLeg = tennisRearLeg(point, Math.max(boxerHem(point), .823));
+  return MathUtils.lerp(innerLeg, tennisBriefsLeg(point), outerHip);
+}
 type UnderwearCut = {
   fabric: BufferGeometry;
   topBinding?: BufferGeometry;
@@ -67,6 +85,8 @@ const patterns = {
   "push-up": { upper: pushUpNeckline, lower: braHem, halfWidth: .145, clearance: pushUpPadding, topWidth: .005, hemWidth: .008 },
   "boxer-briefs": { upper: briefsWaist, lower: boxerHem, halfWidth: .185, clearance: .001, topWidth: .012, hemWidth: .007 },
   briefs: { upper: briefsWaist, lower: briefsLeg, halfWidth: .185, clearance: .0008, topWidth: .010, hemWidth: .006 },
+  "tennis-briefs": { upper: tennisWaist, lower: tennisBriefsLeg, halfWidth: .185, clearance: .0008, topWidth: .008, hemWidth: .005 },
+  "tennis-boxer-briefs": { upper: tennisWaist, lower: tennisBoxerLeg, halfWidth: .185, clearance: .0008, topWidth: .008, hemWidth: .005 },
   "dress-briefs": { upper: lowRiseWaist, lower: (point: Vector3) => Math.min(briefsLeg(point), lowRiseWaist(point) - .018), halfWidth: .185, clearance: .0008, topWidth: .008, hemWidth: .005 },
   "dress-boxer-briefs": { upper: lowRiseWaist, lower: boxerHem, halfWidth: .185, clearance: .001, topWidth: .009, hemWidth: .006 },
 };
@@ -78,11 +98,12 @@ export function insideBraNeckline(style: BraStyle, point: Vector3) {
 
 /** Only mask entire donor triangles well inside the cloth. Across a leg opening,
  * an outward ray can hit the opposite thigh when both legs are close together. */
-function briefsPattern(style: BriefsStyle, underDress: boolean): UnderwearStyle {
+function briefsPattern(style: BriefsStyle, underDress: boolean | "tennis"): UnderwearStyle {
+  if (underDress === "tennis") return style === "briefs" ? "tennis-briefs" : "tennis-boxer-briefs";
   return underDress ? (style === "briefs" ? "dress-briefs" : "dress-boxer-briefs") : style;
 }
 
-export function insideBriefs(style: BriefsStyle, point: Vector3, underDress = false) {
+export function insideBriefs(style: BriefsStyle, point: Vector3, underDress: boolean | "tennis" = false) {
   const { upper, lower, halfWidth } = patterns[briefsPattern(style, underDress)];
   return Math.abs(point.x) < halfWidth - .003 && point.y > lower(point) + .006 && point.y < upper(point) - .006;
 }
@@ -124,7 +145,7 @@ function underwearCut(source: BufferGeometry, style: UnderwearStyle) {
 }
 
 /** Trace opaque fabric and its binding from the same rig as the restored skin. */
-export function prepareWardrobeUnderwear(body: SkinnedMesh, pieces: { bra: boolean; briefs: false | "under-skirt" | "under-dress" | "standalone" }) {
+export function prepareWardrobeUnderwear(body: SkinnedMesh, pieces: { bra: boolean; briefs: false | "under-skirt" | "under-dress" | "under-tennis-dress" | "standalone" }) {
   // The live body receives a changing skin mask. Build each cut from the intact donor.
   const source = body.geometry;
   const group = new Group();
@@ -167,7 +188,7 @@ export function prepareWardrobeUnderwear(body: SkinnedMesh, pieces: { bra: boole
   }
 
   const bra = pieces.bra ? makePiece("classic") : undefined;
-  const underDress = pieces.briefs === "under-dress";
+  const underDress = pieces.briefs === "under-tennis-dress" ? "tennis" : pieces.briefs === "under-dress";
   const briefs = pieces.briefs ? makePiece(briefsPattern("briefs", underDress)) : undefined;
   let pushUp: Group | null | undefined;
   let boxer: Group | null | undefined;

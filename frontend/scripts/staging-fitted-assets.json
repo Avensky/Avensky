@@ -4,8 +4,12 @@
     "size": 24199444
   },
   "/models/characters/female/wardrobe/alpha/tennis-dress.glb": {
-    "sha256": "6af13024e5574ba1c6d31cc076e9df2c1097081bd5ae80845b376301744ba3e2",
-    "size": 9199928
+    "sha256": "835e4e5efc23e601d4418d5fc62b59a8bcf1ae9017afcc7c677446f329767696",
+    "size": 10811148
+  },
+  "/models/characters/female/wardrobe/alpha/vesper-tennis-dress-body.glb": {
+    "sha256": "0d566171911b20ff23351cae8ea3f15532606b002ddfdffcb69f0162c2c67b6f",
+    "size": 1587080
   },
   "/models/characters/female/wardrobe/alpha/wave-wedge-sandals.glb": {
     "sha256": "e3e6802aac6af856fcc86eb2b46d83414322eb68bd389aad9e9f02f03d062976",

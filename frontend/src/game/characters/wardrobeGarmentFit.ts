@@ -529,6 +529,9 @@ export function prepareWardrobeGarments(
     for (const { part, lining } of wardrobeMeshCandidates({ item, scene }, removeSleeves)) {
       const mesh = bindWardrobeGarmentMesh(part, original.skeleton);
       if (!mesh) continue;
+      if (item.id === "local-tennis-dress") {
+        garment.userData.tennisContactPoses ??= part.parent?.userData.tennisContactPoses ?? part.userData.tennisContactPoses;
+      }
       mesh.userData.clothingPiece = item.piece;
       if (lining) mesh.userData.wardrobeRole = "shorts";
       const cloneMaterial = (source: Material) => {
@@ -793,7 +796,8 @@ export function prepareWardrobeGarments(
   const body = (top || skirt || restoresBody) && full && fullBody instanceof SkinnedMesh ? bindWardrobeGarmentMesh(fullBody, original.skeleton) : undefined;
   const stockBodice = stock.some(({ piece }) => (piece === "corset" || piece === "shirt") && !replacements.has(piece));
   const bra = (exposesTop || Boolean(corset)) && !upperGarment && !stockBodice && (!corset || corset.underbust);
-  const briefs = hasDress ? "under-dress" : skirtNeedsBriefs ? "under-skirt" : exposesBottom && !skirt && "standalone";
+  const tennisDress = hasDress && group.getObjectByName("wardrobe-local-tennis-dress");
+  const briefs = tennisDress ? "under-tennis-dress" : hasDress ? "under-dress" : skirtNeedsBriefs ? "under-skirt" : exposesBottom && !skirt && "standalone";
   const underwear = body && (bra || briefs) ? prepareWardrobeUnderwear(body, { bra, briefs }) : undefined;
   const braShapes = new Map<Group, { surfaces: MeshBVH[]; covers: TriangleCoverage }>();
   function underwearSurfaces(piece?: Group) {
@@ -906,7 +910,7 @@ export function prepareWardrobeGarments(
           : fit?.userData.preserveShoulderSkin === true ? isHighCollarOpening : undefined;
         const braCovers = activeBraCoverage(activeBra);
         const underwearCovers: TriangleCoverage | undefined = briefsStyle ? (center, a, b, c) =>
-          (center.y < 1.05 && insideBriefs(briefsStyle, a, hasDress) && insideBriefs(briefsStyle, b, hasDress) && insideBriefs(briefsStyle, c, hasDress))
+          (center.y < 1.05 && insideBriefs(briefsStyle, a, tennisDress ? "tennis" : hasDress) && insideBriefs(briefsStyle, b, tennisDress ? "tennis" : hasDress) && insideBriefs(briefsStyle, c, tennisDress ? "tennis" : hasDress))
           || Boolean(braCovers?.(center, a, b, c)) : braCovers;
         fitBodyMask(body, original, full, top, skirt, restored, visibleShapes,
           underwearCovers, checkTopEdges, corset?.group.userData.lacedBodiceStraps ? corsetWaist : undefined,
