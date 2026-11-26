@@ -4,7 +4,7 @@
 
 ## W-03: shared manifest structure and conditional graph checks
 
-The `layer-rules.json` manifest is validated without installing character GLBs or npm packages. From the repository root, run `npm run wardrobe:layers:check`. This executes the strict structural/semantic validator and `frontend/tests/wardrobe-layer-manifest.test.mjs`. The independent CI workflow `.github/workflows/wardrobe-layer-rules.yml` runs the same command for relevant pull requests. Validation covers class IDs, known body regions, exclusive mode values, item override shapes, mutually exclusive conditionals, contradictory pair rules and satisfiable ordering cycles. A valid manifest does **not** mean the fitted garment or its materials pass.
+The `layer-rules.json` manifest is validated without installing character GLBs or npm packages. From the repository root, run `npm run wardrobe:layers:check`. This executes the strict structural/semantic validator and `frontend/tests/wardrobe-layer-manifest.test.mjs`. This also validates derived-vs-explicit dependent underlayer lifecycles (e.g., skirt/petticoat). The [verified 2026-11-25 CI run](https://github.com/Avensky/Avensky/actions/runs/45742227024) completed with **9 passed, 0 failed, 0 skipped** using Node 24.22.3. The independent CI workflow `.github/workflows/wardrobe-layer-rules.yml` runs the same command for relevant pull requests. Validation covers class IDs, known body regions, exclusive mode values, item override shapes, mutually exclusive conditionals, contradictory pair rules and satisfiable ordering cycles. A valid manifest does **not** mean the fitted garment or its materials pass.
 
 ## Test layers and failure classification
 
