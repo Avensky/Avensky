@@ -123,6 +123,9 @@ export default defineConfig(({ command, mode }) => {
           order: "post",
           handler(html) {
             if (!html.includes("<!-- staging garage -->")) return html;
+            // The startup image, preload and tab icon outlive a staging logout.
+            // Serve the same SVG the public portal already allows without a cookie.
+            if (staging && command === "build") html = html.replaceAll('"/images/logo.svg"', '"/__alpha/entry/logo.svg"');
             return html.replace("<!-- staging garage -->", garageBackdrop());
           },
         },

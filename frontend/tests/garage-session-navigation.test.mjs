@@ -6,7 +6,9 @@ import { garageBrandHeader, garageBackdrop, garageCredentials } from "../src/the
 
 test("repeated portal and game handoffs carry one canvas and reuse the loaded game", async () => {
   const base = "https://staging.avensky.com";
-  const dom = new JSDOM('<div id="root"></div>', { url: base, runScripts: "outside-only" });
+  const legacyIcons = '<link rel="icon" type="image/svg+xml" href="/images/logo.svg">' +
+    '<link rel="preload" as="image" href="/images/logo.svg">';
+  const dom = new JSDOM(legacyIcons + '<div id="root"></div>', { url: base, runScripts: "outside-only" });
   const { window } = dom;
   const { document } = window;
   const game = '<div id="root"></div><script type="module" src="/assets/game.js"></script>';
@@ -35,6 +37,9 @@ test("repeated portal and game handoffs carry one canvas and reuse the loaded ga
       await window.avenskyPortalNavigation.showSignIn(true);
       if (session === 0) await window.avenskyPortalNavigation.showSignIn(true);
       assert.equal(window.location.pathname, "/sign-in");
+      assert.equal(document.head.querySelector('[href="/images/logo.svg"]'), null);
+      assert.equal(document.head.querySelectorAll('link[rel="icon"]').length, 1);
+      assert.equal(document.head.querySelector('link[rel="icon"]').getAttribute("href"), "/__alpha/entry/logo.svg");
       assert.equal(document.querySelectorAll(".garage-entry-header").length, 1);
       assert.equal(document.querySelectorAll(".garage-credentials").length, 1);
       assert.equal(document.body.querySelector("canvas"), canvas);

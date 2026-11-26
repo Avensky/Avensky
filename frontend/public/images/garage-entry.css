@@ -55,6 +55,7 @@ body.garage-entry:has(.garage-entry-account) > .garage-entry-header { display: n
 /* The public portal and the in-game menu both load this surface. Tint the panel
    instead of its contents so text, focus rings and controller hints stay opaque. */
 :root {
+  --garage-entry-emblem: url("./logo.svg");
   --garage-menu-panel: color-mix(in srgb, color-mix(in srgb, #101012 82%, var(--app-panel)) 88%, transparent);
   --garage-menu-row: color-mix(in srgb, #252426 65%, transparent);
   --garage-menu-ink: #fcf4e9;
@@ -134,6 +135,29 @@ html[data-high-contrast="true"] {
   align-items: center;
   padding-block: max(1rem, env(safe-area-inset-bottom, 0px));
 }
+/* The emblem belongs to the sign-in controls, including their outgoing fade.
+   Leave the surrounding garage available for dragging. */
+.garage-entry-body {
+  --login-emblem-size: clamp(44px, 6vw, 80px);
+  --login-emblem-gap: clamp(6px, 1vw, 16px);
+}
+.garage-entry-card:has(.garage-credentials)::after {
+  content: ""; position: absolute; pointer-events: none;
+  inset-inline-end: calc(100% + var(--login-emblem-gap)); top: 50%;
+  width: var(--login-emblem-size); aspect-ratio: 1; transform: translateY(-50%);
+  background: var(--garage-entry-emblem) center / contain no-repeat;
+}
+@media (max-width: 600px) and (orientation: portrait) {
+  .garage-entry-body {
+    --login-emblem-size: clamp(28px, 8vw, 40px);
+    --login-emblem-gap: 2px;
+  }
+  .garage-entry-body > .garage-entry-card:has(.garage-credentials) {
+    --login-emblem-rail: calc(var(--login-emblem-size) + var(--login-emblem-gap));
+    margin-inline-start: var(--login-emblem-rail);
+    width: min(calc(100% - var(--login-emblem-rail)), 390px);
+  }
+}
 .garage-entry-card h1 { font-size:1.35rem; margin:0 0 .8rem; line-height:1.15; }
 .garage-entry-card form:not(.garage-credentials),
 .garage-entry-card form:not(.garage-credentials) label { display:grid; gap:.4rem; }
@@ -173,12 +197,38 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
   --login-bar-border: #b7aaa080;
   --login-active-fill: color-mix(in srgb, var(--garage-menu-row) 86%, var(--garage-menu-accent));
 }
-.garage-credentials :is(.garage-field,.garage-sign-in) {
-  --login-current-border: var(--login-bar-border);
-  position:relative; border:0; background:var(--login-bar-fill);
-  box-shadow:inset 0 0 0 1px var(--login-current-border);
+/* One hollow frame for public credentials and in-game tiles. On a 45-degree
+   cut a perpendicular stroke moves the inner vertex by (sqrt(2) - 1) widths. */
+:is(.chamfered-frame, .garage-credentials :is(.garage-field,.garage-sign-in)) {
+  --cut-top: var(--frame-top-cut, 8px);
+  --cut-bottom: var(--frame-bottom-cut, 8px);
+  --stroke: var(--frame-line-width, 1px);
+  position: relative;
+  clip-path: polygon(var(--cut-top) 0, calc(100% - var(--cut-top)) 0, 100% var(--cut-top),
+    100% calc(100% - var(--cut-bottom)), calc(100% - var(--cut-bottom)) 100%, var(--cut-bottom) 100%,
+    0 calc(100% - var(--cut-bottom)), 0 var(--cut-top));
 }
-.garage-credentials .garage-field { padding:1px; }
+:is(.chamfered-frame, .garage-credentials :is(.garage-field,.garage-sign-in))::before {
+  --corner-offset: calc(var(--stroke) * .41421356);
+  --inner-top: max(var(--stroke), calc(var(--cut-top) + var(--corner-offset)));
+  --inner-bottom: max(var(--stroke), calc(var(--cut-bottom) + var(--corner-offset)));
+  --far-edge: calc(100% - var(--stroke));
+  content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
+  background: var(--frame-line-color);
+  clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0,
+    var(--inner-top) var(--stroke), calc(100% - var(--inner-top)) var(--stroke),
+    var(--far-edge) var(--inner-top), var(--far-edge) calc(100% - var(--inner-bottom)),
+    calc(100% - var(--inner-bottom)) var(--far-edge), var(--inner-bottom) var(--far-edge),
+    var(--stroke) calc(100% - var(--inner-bottom)), var(--stroke) var(--inner-top),
+    var(--inner-top) var(--stroke));
+}
+.garage-credentials :is(.garage-field,.garage-sign-in) {
+  --frame-top-cut: 0px;
+  --frame-bottom-cut: 0px;
+  --frame-line-color: var(--login-bar-border);
+  border:0; background:var(--login-bar-fill);
+}
+.garage-credentials .garage-field { padding:var(--stroke); }
 .garage-credentials .garage-field input {
   appearance:none; background:transparent; caret-color:var(--garage-menu-ink);
 }
@@ -186,37 +236,14 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
   -webkit-text-fill-color:var(--garage-menu-ink); caret-color:var(--garage-menu-ink);
   -webkit-background-clip:text; box-shadow:none;
 }
-.garage-credentials .garage-field:first-child {
-  clip-path:polygon(8px 0,calc(100% - 8px) 0,100% 8px,100% 100%,0 100%,0 8px);
-}
-.garage-credentials .garage-field:first-child input {
-  clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%,0 7px);
-}
+.garage-credentials .garage-field:first-child { --frame-top-cut: 8px; }
 .garage-credentials .garage-sign-in {
+  --frame-bottom-cut: 8px;
   display:flex; align-items:center; justify-content:center; font-weight:750; cursor:pointer;
-  clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px));
-}
-/* Continue each 1px border along the chamfered corner. */
-.garage-credentials :is(.garage-field:first-child,.garage-sign-in)::before,
-.garage-credentials :is(.garage-field:first-child,.garage-sign-in)::after {
-  content:""; position:absolute; width:calc(8px * sqrt(2));
-  border-top:1px solid var(--login-current-border); pointer-events:none;
-}
-.garage-credentials .garage-field:first-child::before {
-  left:0; top:8px; transform:rotate(-45deg); transform-origin:top left;
-}
-.garage-credentials .garage-field:first-child::after {
-  right:0; top:8px; transform:rotate(45deg); transform-origin:top right;
-}
-.garage-credentials .garage-sign-in::before {
-  left:0; bottom:8px; transform:rotate(45deg); transform-origin:top left;
-}
-.garage-credentials .garage-sign-in::after {
-  right:0; bottom:8px; transform:rotate(-45deg); transform-origin:top right;
 }
 .garage-credentials .garage-field:is(:focus-within,[data-selected="true"]),
 .garage-credentials .garage-sign-in:is(:hover,:focus,[data-selected="true"]) {
-  --login-current-border:var(--garage-menu-accent);
+  --frame-line-color:var(--garage-menu-accent);
   background:var(--login-active-fill);
 }
 /* The bar owns the focus stroke and its chamfers, including while its input is autofilled. */
@@ -229,16 +256,14 @@ html[data-high-contrast="true"] .garage-credentials {
   --login-bar-fill:#141414; --login-active-fill:#242424; --login-bar-border:#e9e9e9;
 }
 @media (forced-colors: active) {
-  /* System contrast suppresses inset shadows. Use the same single edge in system colors. */
+  /* Keep the frame visible when the system replaces decorative backgrounds. */
   .garage-credentials {
     --login-bar-border: ButtonText;
     --garage-menu-accent: Highlight;
   }
-  .garage-credentials :is(.garage-field,.garage-sign-in) {
-    outline: 1px solid var(--login-current-border);
-    outline-offset: -1px;
+  :is(.chamfered-frame, .garage-credentials :is(.garage-field,.garage-sign-in))::before {
+    forced-color-adjust: none;
   }
-  .garage-credentials .garage-sign-in:focus { outline: 1px solid Highlight; }
   .garage-credentials .garage-field-icon, .garage-credentials .garage-eye::after {
     forced-color-adjust: none;
     background-color: ButtonText;
@@ -262,7 +287,7 @@ html:has(.garage-entry), body:has(.garage-entry), body.garage-entry { background
 .garage-entry-card { touch-action:pan-y; }
 .garage-entry::before {
   content:""; position:fixed; inset:0; z-index:10000; pointer-events:none;
-  background:#080808 url("./logo.svg") center / 84px 84px no-repeat;
+  background:#080808 var(--garage-entry-emblem) center / 84px 84px no-repeat;
   opacity:1; transition:opacity .5s ease;
 }
 html[data-garage-ready="true"] .garage-entry::before { opacity:0; }

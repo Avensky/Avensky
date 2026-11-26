@@ -27,7 +27,7 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
   const selectedAppearance = selected && savedCharacterAppearance(profile, selected);
   return <div className="character-roster" data-input-device={device} data-portrait={portrait || undefined}>
     {onBack && <div className="roster-tools" data-controller-row data-controller-header-action>
-      <GameButton variant="menu" className="menu-panel-frame roster-tool" aria-label="Back"
+      <GameButton variant="custom" className="roster-tool chamfered-frame" aria-label="Back"
         title="Back" disabled={busy} onPress={onBack}><MenuIcon name="back" /></GameButton>
     </div>}
     <div className="roster-choices">
@@ -41,7 +41,7 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
           {slots.map(slot => {
             const isSelected = slot.id === selected?.id;
             const canEnter = isSelected && connected && !busy && Boolean(selectedAppearance);
-            return <GameButton key={slot.id} variant="menu" className="welcome-character roster-tile menu-panel-frame"
+            return <GameButton key={slot.id} variant="custom" className="welcome-character roster-tile chamfered-frame"
               aria-label={slot.name} aria-description={canEnter ? "Open the main menu as this character" : undefined}
               title={canEnter ? `Continue as ${slot.name}` : slot.name} data-character-id={slot.id}
               aria-pressed={isSelected} selected={isSelected} disabled={busy}
@@ -60,16 +60,17 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
               {canEnter && device === "controller" && <ControllerButton button="A" />}
             </GameButton>;
           })}
-          {slots.length < limit && <GameButton variant="menu" className="roster-tile roster-create menu-panel-frame" aria-label="Create character"
+          {slots.length < limit && <GameButton variant="custom" className="roster-tile roster-create chamfered-frame" aria-label="Create character"
             title="Create character" data-roster-create disabled={busy || !connected} onPress={onCreate}>
             <span className="roster-plus" aria-hidden="true"><MenuIcon name="add" /></span><span className="roster-create-label">Create character</span>
           </GameButton>}
         </div>
       </> : <p role="status" className="welcome-help">Character selection needs the updated game server.</p>}
     </div>
-    {selectedAppearance && <div className="roster-preview-tools">
-      <span className="roster-rotate" aria-hidden="true">{device === "controller"
-        ? <><ControllerButton button="LS" /> Look <ControllerButton button="RS" /> Rotate</> : "Drag to rotate"}</span>
+    {selectedAppearance && device === "controller" && <div className="roster-preview-tools">
+      <span className="roster-rotate" aria-hidden="true">
+        <ControllerButton button="LS" /> Look <ControllerButton button="RS" /> Rotate
+      </span>
     </div>}
   </div>;
 }
