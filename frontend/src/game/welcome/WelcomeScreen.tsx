@@ -17,10 +17,11 @@ import { GarageEntryHeader } from "./GarageEntryHeader";
 import { retryEntryConnection } from "../../net/rustSocket";
 import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
 import { stagingAccountPortal } from "./config";
-import { prepareLocalEntryHandoff, beginLocalEntryHandoff } from "./localEntryHandoff";
+import { prepareLocalEntryHandoff, beginLocalEntryHandoff, captureLocalLogout } from "./localEntryHandoff";
 import "./welcomeScreen.css";
 
 type Step = "welcome" | "create" | "register" | "characters";
+type PendingAction = { kind: "submit" } | { kind: "logout"; player: PlayerProfile };
 const GarageProfilePanel = lazy(() => import("../characters/GarageProfilePanel").then(module => ({ default: module.GarageProfilePanel })));
 type Draft = { name: string; body: CharacterBody; style: string };
 
@@ -70,23 +71,27 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const [style, setStyle] = useState<string>();
   const [preview, setPreview] = useState<{ owner: string; slotId: string }>();
   const [error, setError] = useState("");
-  const [working, setWorking] = useState(false);
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [connectionSlow, setConnectionSlow] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
+  const logoutReveal = useRef<() => void>(undefined);
   const wasProfileOpen = useRef(false);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
+  // Revoking a session can close the socket before its HTTP response arrives.
+  // Keep the outgoing roster visible with its controls disabled until sign-in takes over.
+  const leavingPlayer = pendingAction?.kind === "logout" ? pendingAction.player : undefined;
   const signedIn = !localLogin && Boolean(profile && (stagingSignIn || (!stagingAccountPortal && registered)));
   const rememberedPlayer = step === "welcome" && (signedIn || (!stagingAccountPortal && !showAccountEntry && profile?.characters?.length)) ? profile : undefined;
-  const player = rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
+  const player = leavingPlayer ?? rememberedPlayer ?? (profile && profile.id === confirmedProfile ? profile : undefined);
   const slots = player?.characters;
   const saved = player?.progression?.character;
-  const screen = localLogin || entryIssue || (stagingAccountPortal && !profile) ? "welcome"
+  const screen = leavingPlayer ? "characters" : localLogin || entryIssue || (stagingAccountPortal && !profile) ? "welcome"
     : rememberedPlayer ? "characters" : step;
   const selectedSlot = (preview?.owner === player?.id && slots?.find(slot => slot.id === preview?.slotId))
     || slots?.find(slot => slot.id === (player?.active_character_id ?? player?.id)) || slots?.[0];
-  const slotLimit = registered || stagingSignIn ? 4 : 1;
+  const slotLimit = registered || stagingSignIn || leavingPlayer ? 4 : 1;
   const original = slots?.length === 0 && characterLook(saved) ? saved : undefined;
   const selectedStyle = style ?? (original ? "original" : undefined);
   const draftLook = useMemo(() => {
@@ -96,10 +101,23 @@ export function WelcomeScreen({ onGarageCharacter }: {
   }, [selectedStyle, original, body]);
   const previewChoice = screen === "create" ? draftLook : player && selectedSlot ? savedCharacterAppearance(player, selectedSlot) : undefined;
   const draft: Draft | null = selectedStyle && name.trim().length >= 2 ? { name: name.trim(), body, style: selectedStyle } : null;
+  const working = pendingAction !== null;
   const busy = working || restoring;
   const sessionPending = !localLogin && screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
-  const accountRoot = signedIn && screen === "characters";
+  const accountRoot = (signedIn || Boolean(leavingPlayer)) && screen === "characters";
+  useEffect(() => {
+    // A remembered account may open the roster without visiting the local sign-in form.
+    if (accountRoot && !stagingSignIn) prepareLocalEntryHandoff();
+  }, [accountRoot, stagingSignIn]);
+  useLayoutEffect(() => {
+    if (!logoutReveal.current || busy || sessionPending || screen !== "welcome") return;
+    const reveal = logoutReveal.current;
+    logoutReveal.current = undefined;
+    reveal();
+  }, [busy, sessionPending, screen]);
   const accountOpen = accountRoot && (showSettings || openedFromMenu);
+  const showBrand = screen === "characters" && !accountOpen ||
+    !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
   useLayoutEffect(() => {
     onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode } : null);
@@ -245,14 +263,14 @@ export function WelcomeScreen({ onGarageCharacter }: {
     return () => window.removeEventListener("avenlab:panel-action", navigate);
   });
 
-  async function run(task: () => Promise<void>) {
+  async function run(task: () => Promise<void>, action: PendingAction = { kind: "submit" }) {
     if (pending.current || restoring) return;
     pending.current = true;
-    setWorking(true);
+    setPendingAction(action);
     setError("");
     try { await task(); }
     catch (failure) { setError(failure instanceof Error ? failure.message : "Could not continue."); }
-    finally { pending.current = false; setWorking(false); }
+    finally { pending.current = false; setPendingAction(null); }
   }
 
   function authenticate(event: FormEvent<HTMLFormElement>) {
@@ -322,7 +340,11 @@ export function WelcomeScreen({ onGarageCharacter }: {
   }
 
   async function logOut() {
-    if (await signOutPlayerProfile() === "portal") return;
+    const main = root.current;
+    const reveal = main && !stagingSignIn && !stagingAccountPortal ? captureLocalLogout(main) : undefined;
+    if (await signOutPlayerProfile() === "portal" || root.current !== main) return;
+    logoutReveal.current = reveal;
+    setShowSettings(false);
     setConfirmedProfile(undefined);
     setStep("welcome");
     setShowAccountEntry(true);
@@ -355,9 +377,10 @@ export function WelcomeScreen({ onGarageCharacter }: {
     welcome: "Sign in", create: "Create your character", register: "Create an account", characters: "Saved characters",
   };
   const label = labels[screen];
+  const workingMessage = leavingPlayer ? "Logging out…" : localLogin ? "Signing in…" : "Saving…";
 
   return <>
-    <main className="welcome-screen garage-entry" ref={root} data-controller-rows data-controller-form onKeyDown={event => {
+    <main className="welcome-screen garage-entry" ref={root} data-logging-out={leavingPlayer ? true : undefined} data-controller-rows data-controller-form onKeyDown={event => {
       if (event.key === "Tab") { event.preventDefault(); return; }
       if (event.key === "Escape") back();
       if ((["ArrowUp","ArrowDown"].includes(event.key) || !isTypingTarget(event.target) && ["ArrowLeft","ArrowRight"].includes(event.key))) {
@@ -365,8 +388,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
         navigateFormRows(root.current!, (root.current!.contains(document.activeElement) ? document.activeElement : root.current!.querySelector(".garage-field[data-selected=true] input")) as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
-      <GarageEntryHeader loginEntry={!signedIn && (screen === "register" || (screen === "welcome" && !sessionPending))} account={accountRoot ? {
-        profileOpen: accountOpen, busy, onLogOut: () => void run(logOut),
+      <GarageEntryHeader showBrand={showBrand} account={accountRoot && player ? {
+        profileOpen: accountOpen, busy, onLogOut: () => void run(logOut, { kind: "logout", player }),
         onProfile: () => { if (accountOpen) leaveProfile(); else setShowSettings(true); },
       } : undefined} />
       <div className="welcome-scroll">
@@ -453,7 +476,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
             <GameButton variant="menu" onPress={recoverEntry}>{signInReason ? "Return to sign-in" : "Reconnect"}</GameButton>
           </div>}
         </> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
-          {working ? (localLogin ? "Signing in…" : "Saving…") : restoring ? "Loading your characters…" : "Waiting for the game server…"}
+          {working ? workingMessage : restoring ? "Loading your characters…" : "Waiting for the game server…"}
         </p>}
         {(error || (restoreError && !sessionPending)) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
       </aside>

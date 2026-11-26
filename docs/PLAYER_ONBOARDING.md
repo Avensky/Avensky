@@ -30,7 +30,7 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 
 ## Branding and startup
 
-The sign-in header uses the triangular A and game name. After a successful sign-in, the controls fade into the roster and the garage camera moves from its current angle toward the dressed character. Reduced motion switches directly to the settled view. A new account can use **Create character** while the camera stays on the room.
+Sign-in and character selection share the top-left header with the triangular A and game name. After a successful sign-in, the controls fade into the roster and the garage camera moves from its current angle toward the dressed character. Reduced motion switches directly to the settled view. A new account can use **Create character** while the camera stays on the room.
 
 Sign-in, character selection, and the main menu share one live garage. The roster tiles use cached portraits. Confirming a slot keeps that character on the garage floor while the main menu opens. **Play → Open World** remains the entry to the shared hub.
 

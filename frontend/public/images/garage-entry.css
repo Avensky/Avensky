@@ -279,7 +279,8 @@ html[data-garage-ui-idle="true"] :is(.garage-entry-header,.garage-entry-body) {
 }
 html[data-garage-ui-idle="true"] .garage-entry-card { pointer-events:none; }
 .garage-recovery [role="button"] {
-  display:inline-flex; align-items:center; justify-content:center;
+  display:inline-flex; align-items:center; justify-content:center; box-sizing:border-box;
+  letter-spacing:normal; text-transform:none;
   min-height:44px; padding:.35rem .65rem; border:0; background:transparent;
   color:var(--garage-menu-accent); text-decoration:none; font:inherit;
 }
@@ -337,6 +338,17 @@ html[data-entry-handoff="fading"] #garage-entry-handoff {
   color:var(--app-text); font:500 1rem/1.4 system-ui,sans-serif;
 }
 #garage-entry-handoff * { pointer-events:none; }
+#garage-logout-handoff {
+  position: fixed; inset: 0; z-index: 10; pointer-events: none; user-select: none;
+  color: var(--app-text); font: 500 1rem/1.4 system-ui,sans-serif;
+}
+#garage-logout-handoff > header { right: 0; }
+#garage-logout-handoff [aria-disabled="true"] { opacity: 1; }
+#garage-logout-handoff * { pointer-events: none; }
+/* The warm form has one opacity clock, including after the old sheets retire. */
+.garage-entry-header[data-warm-sign-in], .garage-entry-body[data-warm-sign-in],
+.garage-entry-body[data-warm-sign-in] .garage-entry-card { transition: none; }
+html[data-logout-handoff="waiting"] :is(body > main.garage-entry-body,.welcome-screen .garage-entry-body) { opacity: 0; }
 #garage-entry-handoff .garage-entry-body { height:100%; }
 #garage-entry-handoff .garage-entry-card { padding:var(--garage-menu-pad); background:transparent; }
 .garage-handoff-value {
