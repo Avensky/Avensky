@@ -122,7 +122,7 @@ function KeyboardDialog() {
             className="menu-control"
             onPress={() => useTextKeyboardStore.getState().close(true)}
           >
-            <ControlGlyph controller="B" /> CANCEL
+            <ControlGlyph controller="B" /> {session.preserveOnExit ? "Exit" : "CANCEL"}
           </GameButton>
         </header>
         <output
@@ -202,7 +202,7 @@ export function OnScreenKeyboard() {
           ? Array.from(store.session.value).slice(0, -1).join("")
           : store.session.value + event.key,
       );
-      if (store.mode === "auto") store.close();
+      if (store.mode === "auto") store.close(false, store.session.nativeInput);
     };
     const hidden = () => {
       if (document.visibilityState === "hidden")

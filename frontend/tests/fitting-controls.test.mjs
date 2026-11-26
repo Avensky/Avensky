@@ -139,6 +139,12 @@ test('personality kits change the wardrobe and base emotes while keeping persona
     for (const [field, value] of Object.entries(edits)) assert.deepEqual(restored.appearance[field], value, field);
     const other = creatorChoice('trailhead', 'male', edited);
     assert.equal(other.appearance.hair, 'natural');
+    const cropped = { ...edited, appearance: { ...edited.appearance, hair: 'cropped' } };
+    assert.equal(creatorChoice('street', 'female', cropped).appearance.hair, 'cropped');
+    assert.equal(creatorChoice('trailhead', 'male', cropped).appearance.hair, 'natural',
+      'changing rigs replaces the female close crop with a hairstyle displayed in the male gallery');
+    const legacyMale = { ...other, appearance: { ...other.appearance, hair: 'cropped' } };
+    assert.equal(creatorChoice('trailhead', 'male', legacyMale).appearance.hair, 'natural');
     assert.deepEqual(other.appearance.hair_palette, edits.hair_palette);
     assert.equal(other.appearance.makeup, 'berry');
   } finally { await vite.close(); }

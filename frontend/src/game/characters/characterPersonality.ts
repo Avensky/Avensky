@@ -7,6 +7,7 @@ export const CHARACTER_PERSONALITIES = [
   { id: "stoic", label: "Stoic", emotes: ["131", "132", "133", "134"] },
   { id: "elegant", label: "Elegant", emotes: ["113", "114", "115", "116"] },
   { id: "racer", label: "Racer", emotes: ["081", "082", "083", "084"] },
+  { id: "mechanic", label: "Mechanic", emotes: ["165", "164", "163", "161"] },
   { id: "scientist", label: "Scientist", emotes: ["157", "158", "159", "160"] },
   { id: "explorer", label: "Explorer", emotes: ["141", "145", "147", "150"] },
   { id: "performer", label: "Performer", emotes: ["121", "122", "126", "128"] },

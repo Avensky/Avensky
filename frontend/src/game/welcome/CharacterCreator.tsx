@@ -1,26 +1,28 @@
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, type KeyboardEvent } from "react";
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 import { GameButton } from "../../components/GameButton";
 import { ControlGlyph } from "../../components/controller/ControlGlyph";
 import { AngledGameTab } from "../../components/menus/MenuTabButton";
 import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
-import type { MenuAction } from "../../controls/inputRouting";
+import { bindCreatorPanel, routeMenuAction, type MenuAction } from "../../controls/inputRouting";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { APP_BRANDING } from "../../theme/branding";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
 import { CHARACTERS, type CharacterChoice } from "../characters/characterCatalog";
 import { CHARACTER_STYLES, attitudeName, type CharacterBody } from "../characters/characterStyles";
 import { CreatorColors } from "./CreatorColors";
+import { CreatorHairstyles } from "./CreatorHairstyles";
+import { nextCreatorControl } from "./creatorNavigation";
 import { CreatorOption } from "./CreatorOption";
 import "./characterCreator.css";
 
-export const CREATOR_STEPS = ["gender", "looks", "skin", "hair", "makeup", "personality"] as const;
+export const CREATOR_STEPS = ["gender", "looks", "skin", "hairstyle", "hair", "eyes", "makeup", "personality"] as const;
 export type CreatorStep = typeof CREATOR_STEPS[number];
 const labels: Record<CreatorStep, string> = {
-  gender: "Gender", looks: "Looks", skin: "Skin tone", hair: "Hair color", makeup: "Makeup", personality: "Personality",
+  gender: "Gender", looks: "Looks", skin: "Skin tone", hairstyle: "Hairstyle", hair: "Hair color", eyes: "Eyes", makeup: "Makeup", personality: "Personality",
 };
 const personalityIcons: Record<string, MenuIconName> = {
-  neutral: "profile", friendly: "social", racer: "missions", stoic: "explore", scientist: "concepts",
+  neutral: "profile", friendly: "social", racer: "missions", mechanic: "garage", stoic: "explore", scientist: "concepts",
   elegant: "appearance", shy: "profile", playful: "controller", tsundere: "heroes", explorer: "explore", performer: "audio",
 };
 const starterFaces = CHARACTERS.map(character => ({
@@ -46,14 +48,17 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
   const tabs = useRef<HTMLElement>(null);
   const field = useRef<HTMLInputElement>(null);
   const footerAction = useRef<HTMLDivElement>(null);
-  const nameBeforeEdit = useRef("");
+  const nameRow = useRef<HTMLSpanElement>(null);
+  const [editingName, setEditingName] = useState(false);
   const scope = useId();
   const currentFace = starterFaces.find(({ character }) => character.id === choice.id) ?? starterFaces[0];
   const body = currentFace.character.gender as CharacterBody;
   const visibleFaces = starterFaces.filter(({ character }) => step === "gender" || character.gender === body);
 
   function go(next: CreatorStep) {
-    if (!busy && next !== step) onStep(next);
+    if (busy || next === step) return;
+    setEditingName(false);
+    onStep(next);
   }
   function advance() {
     if (busy) return;
@@ -70,14 +75,13 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
     const input = field.current;
     if (!input) return;
     if (controller) {
-      openFieldKeyboard(input, onName, { cancel: document.activeElement?.closest<HTMLElement>("[data-creator-option]") ?? selectedOption(), done: footerAction.current });
+      openFieldKeyboard(input, onName, { cancel: nameRow.current, done: footerAction.current, preserveOnExit: true });
     } else {
       input.focus({ preventScroll: true });
     }
   }
-  function finishNativeName(cancel: boolean) {
-    if (cancel) onName(nameBeforeEdit.current);
-    const next = cancel || !canSubmit ? selectedOption() : footerAction.current;
+  function finishNativeName(done: boolean) {
+    const next = done && canSubmit ? footerAction.current : nameRow.current;
     next?.focus({ preventScroll: true });
   }
 
@@ -86,39 +90,55 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
     const active = document.activeElement;
     if (field.current && active === field.current) {
       if (action === "activate") beginName(true);
-      if (action === "back") finishNativeName(true);
+      if (action === "back") finishNativeName(false);
       return;
     }
     if (action === "previous_tab" || action === "next_tab") {
       const offset = action === "previous_tab" ? -1 : 1;
       go(CREATOR_STEPS[(index + offset + CREATOR_STEPS.length) % CREATOR_STEPS.length]);
-    } else if (action === "left" || action === "right") {
-      const options = Array.from(panel.current?.querySelectorAll<HTMLElement>('[data-creator-option]:not([aria-disabled="true"])') ?? []);
-      if (!options.length) return;
-      const current = options.indexOf(active as HTMLElement);
-      const from = current < 0 ? Math.max(0, options.findIndex(option => option.getAttribute("aria-pressed") === "true")) : current;
-      options[(from + (action === "right" ? 1 : -1) + options.length) % options.length].focus({ preventScroll: true });
+    } else if (action === "left" || action === "right" || action === "up" || action === "down") {
+      const controls = Array.from(panel.current?.querySelectorAll<HTMLElement>('[data-creator-option]:not([aria-disabled="true"]), [data-creator-name-nav]') ?? []);
+      const from = active instanceof HTMLElement && controls.includes(active) ? active : selectedOption();
+      if (from) nextCreatorControl(controls, from, action)?.focus({ preventScroll: true });
     } else if (action === "activate") {
-      if (active instanceof HTMLElement && active.closest(".creator-controls")) active.click();
+      if (nameRow.current && active === nameRow.current) beginName(true);
+      else if (active instanceof HTMLElement && active.closest(".creator-controls")) active.click();
       else selectedOption()?.click();
     } else if (action === "back") onBack();
   }
   const onPanelAction = useEffectEvent((event: Event) => navigate((event as CustomEvent<MenuAction>).detail));
   useEffect(() => {
     window.addEventListener("avenlab:panel-action", onPanelAction);
-    return () => window.removeEventListener("avenlab:panel-action", onPanelAction);
+    return () => {
+      window.removeEventListener("avenlab:panel-action", onPanelAction);
+      const keyboard = useTextKeyboardStore.getState();
+      if (keyboard.session?.id === scope + "-name") keyboard.close();
+    };
+  }, [scope]);
+  useLayoutEffect(() => {
+    if (panel.current) return bindCreatorPanel(panel.current);
   }, []);
   useLayoutEffect(() => {
-    selectedOption()?.focus({ preventScroll: true });
+    if (!panel.current?.contains(document.activeElement)) selectedOption()?.focus({ preventScroll: true });
     tabs.current?.querySelector('[aria-selected="true"]')?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }, [step]);
   function keyboard(event: KeyboardEvent) {
     if (event.defaultPrevented || event.target === field.current || event.altKey || event.ctrlKey || event.metaKey || event.nativeEvent.isComposing) return;
     const key = event.key.toLowerCase();
-    const actions: Record<string, MenuAction> = { q: "previous_tab", e: "next_tab", arrowleft: "left", arrowright: "right", escape: "back" };
-    if (!(key in actions) && !["arrowup", "arrowdown", "pageup", "pagedown", "tab"].includes(key)) return;
-    event.preventDefault(); event.stopPropagation();
-    if (!event.repeat && key in actions) navigate(actions[key]);
+    const actions: Record<string, MenuAction> = {
+      q: "previous_tab", e: "next_tab", "1": "previous_option", "3": "next_option",
+      arrowleft: "left", a: "left", arrowright: "right", d: "right",
+      arrowup: "up", w: "up", arrowdown: "down", s: "down", escape: "back",
+    };
+    const nameKey = nameRow.current && event.target === nameRow.current && (key === "enter" || key === " ");
+    const action = actions[key];
+    if (!action && !nameKey && !["pageup", "pagedown", "tab"].includes(key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.repeat) return;
+    if (nameKey) beginName(false);
+    else if (action === "previous_option" || action === "next_option") routeMenuAction(action);
+    else if (action) navigate(action);
   }
 
   return <div className="creator-controls" onKeyDown={keyboard}>
@@ -146,7 +166,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
         option?.focus({ preventScroll: true });
       }}
       onFocusCapture={event => {
-        if (event.target.closest(".creator-options")) event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+        if (event.target.matches("[data-creator-option],[data-creator-name-nav]")) event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
       }}>
       <h1>{labels[step]}</h1>
       {(step === "gender" || step === "looks") && <div key={step} className="creator-options creator-portraits" role="group"
@@ -162,7 +182,8 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
           </CreatorOption>;
         })}
       </div>}
-      {(step === "skin" || step === "hair" || step === "makeup") &&
+      {step === "hairstyle" && <CreatorHairstyles choice={choice} facePreview={facePreview} onChoice={onChoice} busy={busy} onContinue={advance} />}
+      {(step === "skin" || step === "hair" || step === "eyes" || step === "makeup") &&
         <CreatorColors key={step} step={step} choice={choice} onChoice={onChoice} busy={busy} onContinue={advance} />}
       {final && <>
         <div className="creator-options creator-personalities" role="group" aria-label="Personality"
@@ -179,18 +200,26 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
             <MenuIcon name="profile" /><span>Keep current look</span>
           </CreatorOption>}
         </div>
-        <label className="creator-name">
-          <span>Character name</span>
-          <span className="creator-name-field chamfered-frame">
-            <input ref={field} name="characterName" value={name} autoComplete="nickname" autoCapitalize="words"
-              minLength={2} maxLength={24} required disabled={busy} onFocus={() => { nameBeforeEdit.current = name; }}
-              onChange={event => onName(event.target.value)} onKeyDown={event => {
-                if (event.nativeEvent.isComposing || !["Escape", "Enter"].includes(event.key)) return;
-                event.preventDefault(); event.stopPropagation();
-                if (!event.repeat) finishNativeName(event.key === "Escape");
-              }} />
-          </span>
-        </label>
+        <div className="creator-name">
+          <label htmlFor={scope + "-name"}>Character name</label>
+          <div className="creator-name-input-wrap">
+            <span ref={nameRow} data-creator-name-nav className="creator-name-field chamfered-frame"
+              role="group" aria-label="Character name" tabIndex={busy ? -1 : 0}>
+              <input ref={field} id={scope + "-name"} name="characterName" value={name} autoComplete="nickname" autoCapitalize="words"
+                minLength={2} maxLength={24} required disabled={busy} tabIndex={-1}
+                onFocus={() => setEditingName(true)} onBlur={() => setEditingName(false)}
+                onChange={event => onName(event.target.value)} onKeyDown={event => {
+                  if (event.nativeEvent.isComposing || !["Escape", "Enter"].includes(event.key)) return;
+                  event.preventDefault(); event.stopPropagation();
+                  if (!event.repeat) finishNativeName(event.key === "Enter");
+                }} />
+            </span>
+            {editingName && <GameButton variant="custom" className="creator-name-exit chamfered-frame"
+              aria-label="Exit name editing" onPress={() => finishNativeName(false)}>
+              <ControlGlyph controller="B" /><span>Exit</span>
+            </GameButton>}
+          </div>
+        </div>
       </>}
     </div>
     <footer className="creator-footer">

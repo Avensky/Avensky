@@ -1,10 +1,10 @@
-/* The outgoing sign-in layer keeps the same responsive tab geometry as the live form. */
-:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 41px; }
+/* Shared dimensions for scene menus and both sides of the sign-in handoff. */
+:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(41px * var(--menu-text-scale, 1)); }
 @media (max-width: 760px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 39px; }
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(39px * var(--menu-text-scale, 1)); }
 }
 @media (max-height: 480px) and (min-width: 560px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: 35px; }
+  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(35px * var(--menu-text-scale, 1)); }
 }
 .angled-tab-header {
   --angled-brand-padding: clamp(10px, 1.2vw, 18px);

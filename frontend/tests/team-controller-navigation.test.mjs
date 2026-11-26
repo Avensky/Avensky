@@ -45,6 +45,45 @@ test('team filters and Heroes respect controller ownership',async t=>{
    await act(async()=>ui.setState({screen:'sandbox',overlay:'match_results'}));await poll();const actions=[];const handle=e=>actions.push(e.detail);window.addEventListener('avenlab:panel-action',handle);
    try{await press(7,true);assert.deepEqual(actions,['next_option']);await poll();assert.equal(actions.length,1);assert.equal(input.getState().input.throttle,0);await press(7,false);await press(6,true);assert.deepEqual(actions,['next_option','previous_option']);await press(6,false);}finally{window.removeEventListener('avenlab:panel-action',handle);}
   });
+  await t.test('creator assigns the left stick to options, right stick to the character, and triggers to visible submenus', async () => {
+    const { bindCreatorPanel } = await load("controls/inputRouting.ts");
+    const { bindRosterSticks } = await load("game/preview/rosterStickControls.ts");
+    const panel = document.createElement("section");
+    const stickSamples = [], actions = [];
+    const unbindPanel = bindCreatorPanel(panel);
+    const unbindSticks = bindRosterSticks((x, y, turn) => stickSamples.push([x, y, turn]));
+    const handle = event => actions.push(event.detail);
+    window.addEventListener("avenlab:panel-action", handle);
+    try {
+      await act(async () => ui.setState({ screen: "welcome", overlay: null }));
+      await poll();
+      pad.axes = [0, 1, .8, 0];
+      await poll();
+      assert.deepEqual(actions.splice(0), ["down"]);
+      assert.deepEqual(stickSamples.at(-1).slice(0, 2), [0, 0]);
+      assert.ok(stickSamples.at(-1)[2] > 0);
+      pad.axes = [0, 0, .8, 0];
+      await poll();
+      assert.deepEqual(actions, [], "rotating the character does not select a tile");
+      pad.axes.fill(0);
+      await press(7, true); await press(7, false);
+      assert.deepEqual(actions, []);
+      panel.innerHTML = '<div role="tab" data-creator-channel="roots"></div>';
+      await press(7, true); await poll(); await press(7, false);
+      await press(6, true); await press(6, false);
+      await press(5, true); await press(5, false);
+      assert.deepEqual(actions.splice(0), ["next_option", "previous_option", "next_tab"]);
+      unbindPanel();
+      pad.axes = [0, 1, .8, 0];
+      await poll();
+      assert.ok(stickSamples.at(-1)[1] > 0, "the roster regains camera orbit on exit");
+      assert.deepEqual(actions, []);
+    } finally {
+      pad.axes.fill(0);
+      unbindPanel(); unbindSticks();
+      window.removeEventListener("avenlab:panel-action", handle);
+    }
+  });
   await t.test('Mechanic U and LB issue the same recovery action without accidentally boosting',async()=>{
    const sent=[];client.setSocialConnection({readyState:WebSocket.OPEN,send:body=>sent.push(JSON.parse(body))});
    const actor={id:'mechanic',vehicle_id:'fortuner',team:'red',room_id:1,position:[0,1,0],rotation:[0,0,0,1],speed:0,health:{hp:500,max_hp:500,defeated:false,revive_cooldown_s:0}},target={...actor,id:'ally',position:[6,1,0],health:{hp:0,max_hp:500,defeated:true,recovery_window_s:12,respawn_remaining_s:10,disabled_reason:'combat'}};

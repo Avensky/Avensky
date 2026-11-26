@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { act, createElement } from "react";
 import { createServer } from "vite";
 
-test("the creator preserves a six-step appearance through registration, name retry and roster selection", async () => {
+test("the creator preserves an eight-step appearance through registration, name retry and roster selection", async () => {
   const dom = new JSDOM('<div id="root"></div>', { url:"http://localhost/", pretendToBeVisual:true, runScripts:"outside-only" });
   const previous = new Map();
   for (const key of ["window", "document", "navigator", "HTMLElement", "HTMLInputElement", "HTMLButtonElement", "FormData", "Event", "CustomEvent", "localStorage", "sessionStorage"]) {
@@ -81,7 +81,7 @@ test("the creator preserves a six-step appearance through registration, name ret
     assert.ok(document.querySelector(".garage-entry-brand img"), "returning to sign-in restores the login badge");
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
-    const steps = () => [...document.querySelectorAll('[role="tablist"] [role="tab"]')];
+    const steps = () => [...document.querySelectorAll('[aria-label="Character creation steps"] [role="tab"]')];
     const stepName = tab => (tab.getAttribute("aria-label") ?? tab.textContent).trim();
     const activeStep = () => stepName(steps().find(tab => tab.getAttribute("aria-selected") === "true"));
     const jumpTo = async name => {
@@ -91,8 +91,10 @@ test("the creator preserves a six-step appearance through registration, name ret
       assert.equal(activeStep(), name);
     };
     const next = () => document.querySelector("[data-creator-continue]");
+    const secondaryTabs = () => [...document.querySelectorAll(".creator-color-channels [role=tab]")];
+    const activeChannel = () => secondaryTabs().find(tab => tab.getAttribute("aria-selected") === "true")?.textContent;
     const select = async name => {
-      const item = ["Continue", "Create character"].includes(name) ? next() : button(name);
+      const item = ["Continue", "Create character"].includes(name) ? next() : button(name) ?? secondaryTabs().find(tab => tab.textContent === name);
       assert.ok(item, name);
       await act(async () => {
         const tap = new window.MouseEvent("pointerup", { bubbles: true, cancelable: true, button: 0 });
@@ -100,16 +102,26 @@ test("the creator preserves a six-step appearance through registration, name ret
         item.dispatchEvent(tap);
       });
     };
-    assert.deepEqual(steps().map(stepName), ["Gender", "Looks", "Skin tone", "Hair color", "Makeup", "Personality"]);
+    assert.deepEqual(steps().map(stepName), ["Gender", "Looks", "Skin tone", "Hairstyle", "Hair color", "Eyes", "Makeup", "Personality"]);
     assert.equal(activeStep(), "Gender");
     assert.equal(previews.at(-1).choice.appearance.hair, "natural");
     assert.equal(previews.at(-1).creatorFrame, "body");
+    await jumpTo("Hairstyle");
+    await select("Close crop");
+    assert.equal(previews.at(-1).choice.appearance.hair, "cropped");
+    await jumpTo("Hair color");
+    assert.equal(secondaryTabs().length, 0, "close-cropped hair only has its base color");
+    await jumpTo("Hairstyle");
+    assert.equal(button("Close crop").getAttribute("aria-pressed"), "true");
+    await select("Natural");
+    await jumpTo("Gender");
     const focusedGender = document.activeElement;
     for (const direction of ["up", "down"]) {
       await act(async () => panelAction(direction));
-      assert.equal(document.activeElement, focusedGender);
+      assert.ok(document.activeElement.matches("[data-creator-option]"));
       assert.equal(activeStep(), "Gender");
     }
+    assert.equal(document.activeElement, focusedGender);
     await act(async () => panelAction("right"));
     assert.equal(button("Male").getAttribute("aria-pressed"), "true", "left/right changes just the rig");
     await act(async () => panelAction("left"));
@@ -126,8 +138,25 @@ test("the creator preserves a six-step appearance through registration, name ret
     await jumpTo("Skin tone");
     await select("Deep");
     assert.ok(button("Ebony"));
-    await jumpTo("Hair color");
+    await select("Continue");
+    assert.equal(activeStep(), "Hairstyle");
+    assert.ok(button("Natural"));
+    assert.equal(secondaryTabs().length, 0);
+    assert.ok(document.querySelector('[aria-label="Hairstyles"] [data-creator-option]'));
+    await select("Continue");
+    assert.equal(activeStep(), "Hair color");
+    const appearanceBeforeChannels = previews.at(-1).choice.appearance;
+    await act(async () => panelAction("next_option"));
+    assert.equal(activeChannel(), "Roots");
+    assert.deepEqual(previews.at(-1).choice.appearance, appearanceBeforeChannels, "opening a color channel keeps the draft");
+    assert.equal(activeStep(), "Hair color");
+    await act(async () => panelAction("previous_option"));
+    assert.equal(activeChannel(), "Base");
     await select("Copper");
+    const appearanceBeforePresets = previews.at(-1).choice.appearance;
+    await act(async () => panelAction("previous_option"));
+    assert.equal(activeChannel(), "Presets");
+    assert.deepEqual(previews.at(-1).choice.appearance, appearanceBeforePresets);
     await select("Highlights");
     await select("Icy Blue");
     const hair = previews.at(-1).choice.appearance;
@@ -135,7 +164,17 @@ test("the creator preserves a six-step appearance through registration, name ret
     assert.equal(hair.hair_color, "copper");
     assert.ok(hair.hair_palette.highlights, "a separately selected highlight is part of the draft");
     assert.equal(previews.at(-1).creatorFrame, "face");
-    await jumpTo("Makeup");
+    await select("Continue");
+    assert.equal(activeStep(), "Eyes");
+    assert.equal(secondaryTabs().length, 0);
+    await select("Hazel");
+    assert.equal(previews.at(-1).choice.appearance.eye_color, "hazel");
+    await select("Continue");
+    assert.equal(activeStep(), "Makeup");
+    await act(async () => panelAction("previous_option"));
+    assert.equal(activeChannel(), "Eyeliner");
+    await act(async () => panelAction("next_option"));
+    assert.equal(activeChannel(), "Lipstick");
     assert.equal(button("No makeup").getAttribute("aria-pressed"), "true");
     await select("Red");
     await select("Black");
@@ -145,6 +184,10 @@ test("the creator preserves a six-step appearance through registration, name ret
     await select("Cat eye");
     await jumpTo("Personality");
     assert.equal(button("Neutral").getAttribute("aria-pressed"), "true");
+    assert.equal(button("Rival"), undefined);
+    assert.ok(button("Racer"));
+    await select("Mechanic");
+    assert.equal(previews.at(-1).choice.appearance.personality, "mechanic");
     await select("Stoic");
     assert.equal(previews.at(-1).creatorFrame, "outfit");
     assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
@@ -155,16 +198,25 @@ test("the creator preserves a six-step appearance through registration, name ret
     assert.equal(button("Deep").getAttribute("aria-pressed"), "true");
     await jumpTo("Personality");
     assert.equal(disabled(next()),true,"the final action requires a character name");
-    await act(async()=>document.querySelector('[name="characterName"]').focus());
-    assert.ok(document.activeElement.closest("[data-controller-form]"), "the gamepad can navigate while a field is focused");
-    await act(async()=>panelAction("activate"));
+    const nameField = () => document.querySelector('[name="characterName"]');
+    const nameTarget = () => document.querySelector("[data-creator-name-nav]");
+    await act(async () => nameTarget().focus());
+    await act(async () => panelAction("activate"));
     assert.ok(keyboard.getState().session);
-    await act(async()=>{keyboard.getState().edit("Discard this"); keyboard.getState().close(true);});
-    assert.equal(document.querySelector('[name="characterName"]').value, "", "cancel restores the previous name");
-    await act(async()=>panelAction("activate"));
+    await act(async () => { keyboard.getState().edit("Track"); keyboard.getState().close(true); });
+    assert.equal(nameField().value, "Track", "controller B keeps the typed name");
+    assert.equal(document.activeElement, nameTarget(), "exiting returns navigation to the name row");
+    await act(async () => panelAction("activate"));
     assert.ok(keyboard.getState().session, "controller can re-enter the name");
-    await act(async()=>{keyboard.getState().edit("Track Fox"); keyboard.getState().close();});
-    assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
+    await act(async () => { keyboard.getState().edit("Track Fox"); keyboard.getState().close(); });
+    await act(async () => { nameField().focus(); typeName("Track Fox II"); });
+    await act(async () => nameField().dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
+    assert.equal(nameField().value, "Track Fox II", "Escape exits typing without undoing edits");
+    assert.equal(document.activeElement, nameTarget());
+    await act(async () => { nameField().focus(); typeName("Track Fox"); });
+    await select("Exit name editing");
+    assert.equal(nameField().value, "Track Fox", "the touch Exit action keeps typed text");
+    assert.equal(document.activeElement, nameTarget());
     assert.equal(disabled(next()),false);
     await select("Continue");
     assert.equal(sent.length,0,"draft stays local until the player registers");
@@ -186,6 +238,7 @@ test("the creator preserves a six-step appearance through registration, name ret
     assert.equal(create.action,"character_create_styled");
     const fox=create.character;
     assert.equal(fox.appearance.skin,"deep");
+    assert.equal(fox.appearance.eye_color,"hazel");
     assert.equal(fox.appearance.hair_color,"copper");
     assert.deepEqual(fox.appearance.hair_palette, hair.hair_palette, "the chosen palette survives registration and creation");
     assert.equal(fox.appearance.personality,"stoic");

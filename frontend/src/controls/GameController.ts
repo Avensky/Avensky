@@ -22,6 +22,8 @@ import { VehicleFlags, PlayerFlags } from "../store/input/protocol/inputMasks";
 import {
   canDrive,
   canNavigateMenu,
+  creatorUsesMenuStick,
+  hasSecondaryMenuControls,
   isTypingTarget,
   routeMenuAction,
 } from "./inputRouting";
@@ -332,7 +334,10 @@ export function GameController() {
         if ((ui.screen === "welcome" || ui.screen === "main") && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
           const deadzone = usePreferencesStore.getState().controllerDeadzone;
           const turn = axis(pad.axes[2], deadzone);
-          if (ui.screen === "welcome")
+          if (ui.screen === "welcome" && creatorUsesMenuStick()) {
+            readRosterSticks(0, 0, turn, now);
+            navigationSticks = "left";
+          } else if (ui.screen === "welcome")
             navigationSticks = !readRosterSticks(axis(pad.axes[0], deadzone), axis(pad.axes[1], deadzone), turn, now);
           else if (readRosterSticks(0, 0, turn, now)) navigationSticks = "left";
         } else releaseRosterSticks();
@@ -350,7 +355,7 @@ export function GameController() {
           routeMenuAction(edges[4] ? "previous_tab" : "next_tab");
           return;
         }
-        if ((edges[6] || edges[7]) && ((ui.screen === "mode_select" && ui.overlay === null) || ui.overlay === "match_results")) {
+        if ((edges[6] || edges[7]) && hasSecondaryMenuControls(ui)) {
           routeMenuAction(edges[6] ? "previous_option" : "next_option");
           return;
         }

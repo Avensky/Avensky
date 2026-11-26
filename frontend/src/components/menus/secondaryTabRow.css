@@ -1,0 +1,20 @@
+.menu-secondary-tabs {
+  display: flex; align-items: center; min-width: 0; color: var(--app-text);
+}
+.menu-secondary-hint { display: grid; place-items: center; padding-inline: 5px; }
+.menu-secondary-tabs .controller-key { width: 19px; height: 19px; font-size: 8px; }
+.menu-secondary-tabs [role="tab"] {
+  flex: 0 1 120px; min-width: 0; min-height: var(--secondary-tab-height,28px);
+  padding: var(--secondary-tab-padding,5px 10px); border: 0; border-radius: 0;
+  background: var(--secondary-tab-surface,color-mix(in srgb,var(--app-text) 5%,transparent));
+  color: var(--secondary-tab-muted,var(--app-muted)); cursor: pointer;
+  font: var(--secondary-tab-font,800 9px/1.2 system-ui);
+}
+.menu-secondary-tabs [role="tab"][aria-selected="true"] {
+  background: color-mix(in srgb,var(--app-accent) 19%,var(--app-panel));
+  color: var(--app-text); box-shadow: inset 0 -2px var(--app-accent);
+}
+.menu-secondary-tabs [role="tab"]:is(:hover,:focus-visible) {
+  outline: 0; background: color-mix(in srgb,var(--app-accent) 24%,var(--app-panel));
+  box-shadow: inset 0 -2px var(--app-accent);
+}

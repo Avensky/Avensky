@@ -8,6 +8,7 @@ import { characterLook, type CharacterChoice, type CharacterLook } from "./chara
 import "./characters.css";
 
 const PORTRAIT_QUIET_MS = 900;
+const ROSTER_IDLE_TIMEOUT_MS = 1200;
 const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action", "avenlab:panel-action"] as const;
 type WelcomePreview = "candidate" | "selected" | "roster";
 
@@ -69,8 +70,11 @@ function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) 
       timer = undefined;
       if (!canRun()) return;
       if (performance.now() < quietUntil) { schedule(); return; }
-      if (window.requestIdleCallback) idle = window.requestIdleCallback(start);
-      else start();
+      if (window.requestIdleCallback) {
+        // A live garage can consume every idle slot. Visible tiles may enqueue
+        // their offscreen worker after the deadline if the player is still idle.
+        idle = window.requestIdleCallback(start, preview === "roster" ? { timeout: ROSTER_IDLE_TIMEOUT_MS } : undefined);
+      } else start();
     }, Math.max(0, quietUntil - performance.now()));
   };
   function activity(event: Event) {
@@ -109,23 +113,24 @@ type PortraitProps = {
   choice: CharacterChoice | null | undefined;
   label?: string;
   welcomePreview?: WelcomePreview;
+  requireFittedHair?: boolean;
 };
 
-export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly }: PortraitProps & { cacheOnly?: boolean }) {
+export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, requireFittedHair }: PortraitProps & { cacheOnly?: boolean }) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
   const canRefresh = useUIStore(state => !cacheOnly && portraitMenuAllowsWork(state, welcomePreview));
   const dress = look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
-  const key = look && url ? portraitKey(look, url, dressUrl) : "";
+  const key = look && url ? portraitKey(look, url, dressUrl) + (requireFittedHair ? "|fitted-hair" : "") : "";
   const cached = useSyncExternalStore(subscribeCharacterPortrait, () => key ? peekCharacterPortrait(key) : null, () => null);
   const [failedKey, setFailedKey] = useState<string>();
   const needsBake = canRefresh && Boolean(key) && !cached && failedKey !== key;
   const startBake = useEffectEvent(() => {
     const job = new AbortController();
     if (look && url) void bakeCharacterPortrait(key, {
-      look, modelUrl: url, dress: dress && dressUrl ? { item: dress, url: dressUrl } : undefined,
+      look, modelUrl: url, dress: dress && dressUrl ? { item: dress, url: dressUrl } : undefined, requireFittedHair,
     }, job.signal).catch(() => { if (!job.signal.aborted) setFailedKey(key); });
     return () => job.abort();
   });

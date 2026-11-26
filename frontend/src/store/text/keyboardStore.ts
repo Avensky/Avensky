@@ -9,8 +9,10 @@ export type TextSession = {
   maxLength: number;
   secret: boolean;
   onChange: (value: string) => void;
+  nativeInput?: HTMLInputElement;
   returnFocus: HTMLElement | null;
   acceptFocus?: HTMLElement | null;
+  preserveOnExit?: boolean;
 };
 export function keyboardNeeded(
   mode: KeyboardAssist,
@@ -37,7 +39,7 @@ export const useTextKeyboardStore = create<{
   open: (session: TextSession, force?: boolean) => void;
   edit: (value: string) => void;
   sync: (id: string, value: string) => void;
-  close: (cancel?: boolean) => void;
+  close: (cancel?: boolean, focus?: HTMLElement) => void;
 }>((set, get) => ({
   mode: savedMode(),
   hardwareObserved: false,
@@ -67,14 +69,14 @@ export const useTextKeyboardStore = create<{
     if (session?.id === id && session.value !== value)
       set({ session: { ...session, value } });
   },
-  close: (cancel = false) => {
+  close: (cancel = false, focus) => {
     const session = get().session;
     if (!session) return;
-    if (cancel) session.onChange(session.initial);
+    if (cancel && !session.preserveOnExit) session.onChange(session.initial);
     set({ session: null });
     queueMicrotask(() => {
-      const target = !cancel && session.acceptFocus?.isConnected && session.acceptFocus.getAttribute("aria-disabled") !== "true"
-        ? session.acceptFocus : session.returnFocus;
+      const next = focus ?? (cancel ? undefined : session.acceptFocus);
+      const target = next?.isConnected && next.getAttribute("aria-disabled") !== "true" ? next : session.returnFocus;
       if (target?.isConnected) target.focus({ preventScroll: true });
     });
   },
