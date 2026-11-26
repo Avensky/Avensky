@@ -8,6 +8,7 @@ import { characterLook, type CharacterChoice, type CharacterLook } from "./chara
 import "./characters.css";
 
 const PORTRAIT_QUIET_MS = 900;
+const ROSTER_IDLE_TIMEOUT_MS = 1200;
 const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action", "avenlab:panel-action"] as const;
 type WelcomePreview = "candidate" | "selected" | "roster";
 
@@ -69,8 +70,11 @@ function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) 
       timer = undefined;
       if (!canRun()) return;
       if (performance.now() < quietUntil) { schedule(); return; }
-      if (window.requestIdleCallback) idle = window.requestIdleCallback(start);
-      else start();
+      if (window.requestIdleCallback) {
+        // A live garage can consume every idle slot. Visible tiles may enqueue
+        // their offscreen worker after the deadline if the player is still idle.
+        idle = window.requestIdleCallback(start, preview === "roster" ? { timeout: ROSTER_IDLE_TIMEOUT_MS } : undefined);
+      } else start();
     }, Math.max(0, quietUntil - performance.now()));
   };
   function activity(event: Event) {

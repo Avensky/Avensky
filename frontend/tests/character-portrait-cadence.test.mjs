@@ -78,10 +78,17 @@ test('portraits create one background job for each quiet, visible main-menu requ
   window.clearTimeout = id => timers.delete(id);
   window.requestIdleCallback = (callback, options) => {
     idleOptions.push(options);
-    idle.set(++serial, callback);
-    return serial;
+    const id = ++serial;
+    const deadline = options?.timeout === undefined ? undefined : window.setTimeout(() => {
+      if (idle.delete(id)) callback({ didTimeout: true, timeRemaining: () => 0 });
+    }, options.timeout);
+    idle.set(id, { callback, deadline });
+    return id;
   };
-  window.cancelIdleCallback = id => idle.delete(id);
+  window.cancelIdleCallback = id => {
+    window.clearTimeout(idle.get(id)?.deadline);
+    idle.delete(id);
+  };
   const advance = ms => {
     const end = time + ms;
     while (true) {
@@ -95,8 +102,8 @@ test('portraits create one background job for each quiet, visible main-menu requ
     time = end;
   };
   const runIdle = () => {
-    for (const [id, callback] of [...idle]) {
-      if (!idle.delete(id)) continue;
+    for (const [id, { callback }] of [...idle]) {
+      window.cancelIdleCallback(id);
       callback({ didTimeout: false, timeRemaining: () => 50 });
     }
   };
@@ -143,7 +150,7 @@ test('portraits create one background job for each quiet, visible main-menu requ
     await act(async () => advance(1));
     assert.ok(idle.size > 0, 'work is scheduled only after a quiet period');
     assert.equal(workers.length, 0, 'a settled request still waits for the browser idle callback');
-    assert.ok(idleOptions.every(options => options?.timeout === undefined), 'idle work is never forced by a deadline');
+    assert.ok(idleOptions.every(options => options?.timeout === undefined), 'main-menu portrait work always waits for idle time');
     await screen('mode_select');
     await step(900);
     assert.equal(workers.length, 0, 'navigation cancels already queued idle work');
@@ -232,8 +239,16 @@ test('portraits create one background job for each quiet, visible main-menu requ
     await step(900);
     assert.equal(workers.length, 5, 'a mounted tile outside the visible roster requests no model');
     await act(async () => visibleTiles());
-    await step(900);
-    assert.equal(workers.length, 6, 'two cold portraits start one worker');
+    await act(async () => advance(900));
+    const deadline = idleOptions.at(-1)?.timeout;
+    assert.ok(deadline > 0 && deadline <= 2000, 'visible tiles have a bounded idle wait');
+    await act(async () => advance(deadline - 1));
+    assert.equal(workers.length, 5, 'while possible the tile waits for a genuine idle frame');
+    await act(async () => window.dispatchEvent(new window.CustomEvent('avenlab:panel-action', { detail: 'right' })));
+    await act(async () => advance(900 + deadline - 1));
+    assert.equal(workers.length, 5, 'renewed input postpones even a starved callback');
+    await act(async () => advance(1));
+    assert.equal(workers.length, 6, 'zero idle frames still allow one serial worker for the visible tiles');
     await act(async () => window.dispatchEvent(new window.CustomEvent('avenlab:panel-action', { detail: 'right' })));
     assert.ok(workers[5].terminated, 'browsing releases active portrait work and cancels its queue');
     await step(899);

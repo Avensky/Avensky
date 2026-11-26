@@ -79,9 +79,11 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
         onClick={(event) => {
           onClick?.(event);
           if (event.defaultPrevented) return;
-          // Keyboard and assistive activation use click with no pointer detail.
-          // Pointer activation is already handled by onPointerUp.
-          if (event.detail === 0 && !disabled) {
+          // Some touch browsers also report zero clicks. Those pointers have
+          // already activated on release; keyboard, AT and .click() have no pointer type.
+          const native = event.nativeEvent;
+          const fromPointer = "pointerType" in native && Boolean(native.pointerType);
+          if (!disabled && !fromPointer && event.detail === 0) {
             event.preventDefault();
             event.stopPropagation();
             onPress?.(event);
