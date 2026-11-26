@@ -53,6 +53,13 @@
 - No GLB fit, material appearance or mobile QA is claimed by these synthetic tests. Evidence must be sourced and reviewed before publication. W-05 still owns legacy-save migration.
 - CI status: pending validation at branch creation. Record actual run and corrections in a following note.
 
+## 2026-11-25 — W-04 CI correction: region completeness
+
+- First W-04 contract run on PR #92 reported **21 pass, 2 fail**. Both failures concerned evidence approval for top + corset + coat; no actual asset tests were involved.
+- Cause: W-03 class relations left shared shoulder/hip regions unspecified, so the conservative W-04 resolver correctly returned `UNKNOWN_RELATION` even when all explicitly described regions had fit evidence.
+- Correction: expanded the intended class pair rules to cover every shared region where the same class relation applies, including shoulder/hips, and added a manifest regression test for region completeness. Unmodeled class pairings still fail closed as `UNKNOWN_RELATION`.
+- Rerun status: pending at time of this note; report the final CI results separately.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.
