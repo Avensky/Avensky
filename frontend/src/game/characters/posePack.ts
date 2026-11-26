@@ -2,7 +2,9 @@ import { EMOTE_GROUPS, emoteCollection, type Emote } from "./garageEmotes";
 
 import { MAKEHUMAN_POSE_GROUPS } from "./makehumanPoses";
 
-export type CharacterPose = { id: string; name: string; author?: string; pose: Emote["keys"][number][1] };
+import { SELECTION_POSES, holdCharacterPose, type CharacterPose } from "./selectionPoses";
+
+export { holdCharacterPose, type CharacterPose } from "./selectionPoses";
 
 const AVENLAB_POSES = [
   { id: "pose-neutral", name: "Neutral stand", pose: {} },
@@ -17,6 +19,7 @@ const AVENLAB_POSES = [
     sway: -.022, rise: -.015, torso: [.01, -.06, .025], head: [-.04, .075, .07],
     right: [[-1, -.55, .28], [-.24, 1, .28]], wrist: -.15, face: [.65, .32],
   } },
+  ...SELECTION_POSES,
 ] as const satisfies readonly CharacterPose[];
 
 export const CHARACTER_POSE_GROUPS: readonly { group: string; poses: readonly CharacterPose[] }[] = [
@@ -45,10 +48,6 @@ function collectPoseMotions() {
 
 export const POSE_MOTION_GROUPS = collectPoseMotions();
 const poseMotions = new Map(POSE_MOTION_GROUPS.flatMap(({ motions }) => motions.map(motion => [motion.id, motion] as const)));
-
-export function holdCharacterPose({ id, name, pose }: CharacterPose): Emote {
-  return { id, name, duration: .7, keys: [[0, pose], [1, pose]] };
-}
 
 /** Compose in the rig-independent authoring format before solving any joints. */
 export function composePoseSequence(from: CharacterPose, motion: Emote, to: CharacterPose): Emote {

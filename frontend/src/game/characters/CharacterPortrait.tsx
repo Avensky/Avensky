@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useEffectEvent, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MenuIcon } from "../../components/menus/MenuIcon";
 import { useUIStore } from "../../store/menus/uiStore";
 import { bakeCharacterPortrait, peekCharacterPortrait, subscribeCharacterPortrait } from "./bakeCharacterPortrait";
@@ -8,23 +8,43 @@ import { characterLook, type CharacterChoice, type CharacterLook } from "./chara
 import "./characters.css";
 
 const PORTRAIT_QUIET_MS = 900;
-const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action"] as const;
+const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action", "avenlab:panel-action"] as const;
+type WelcomePreview = "candidate" | "selected" | "roster";
 
-// Play, the fitting room and live scenes can display a finished portrait.
-// Only a selected, idle profile view is allowed to prepare a new portrait
-// outside the main menu; keep WebGL work off ordinary character turns.
-function portraitMenuAllowsWork({ screen, overlay, isModeLoading }: ReturnType<typeof useUIStore.getState>) {
-  return screen === "main" && overlay === null && !isModeLoading;
+const rosterVisibility = new Map<Element, (visible: boolean) => void>();
+let rosterObserver: IntersectionObserver | undefined;
+function observeRosterTile(tile: Element, update: (visible: boolean) => void) {
+  rosterObserver ??= new IntersectionObserver(entries => {
+    for (const entry of entries) rosterVisibility.get(entry.target)?.(entry.isIntersecting);
+  });
+  rosterVisibility.set(tile, update);
+  rosterObserver.observe(tile);
+  return () => {
+    rosterObserver?.unobserve(tile);
+    rosterVisibility.delete(tile);
+    if (!rosterVisibility.size) {
+      rosterObserver?.disconnect();
+      rosterObserver = undefined;
+    }
+  };
 }
 
-function schedulePortraitWork(work: () => () => void, inWelcome: boolean) {
+// Play, the fitting room and live scenes can display a finished portrait.
+// A cold roster prepares static images only while the selection menu is idle.
+function portraitMenuAllowsWork({ screen, overlay, isModeLoading }: ReturnType<typeof useUIStore.getState>, preview?: WelcomePreview) {
+  if (isModeLoading) return false;
+  if (screen === "main") return overlay === null;
+  if (screen === "welcome") return preview === "roster" || preview === "selected";
+  return screen === "heroes" && preview === "selected";
+}
+
+function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) {
   let timer: number | undefined, idle: number | undefined;
   let cancelWork: (() => void) | undefined;
   let quietUntil = performance.now() + PORTRAIT_QUIET_MS;
   const canRun = () => {
     const state = useUIStore.getState();
-    return document.visibilityState !== "hidden" && (portraitMenuAllowsWork(state)
-      || (inWelcome && (state.screen === "welcome" || state.screen === "heroes") && !state.isModeLoading));
+    return document.visibilityState !== "hidden" && portraitMenuAllowsWork(state, preview);
   };
   const cancel = () => {
     if (timer !== undefined) window.clearTimeout(timer);
@@ -56,7 +76,11 @@ function schedulePortraitWork(work: () => () => void, inWelcome: boolean) {
   function activity(event: Event) {
     if (event.type === "pointermove" && !(event as PointerEvent).buttons) return;
     quietUntil = performance.now() + PORTRAIT_QUIET_MS;
-    if (idle !== undefined) { cancel(); schedule(); }
+    if (preview === "roster" && cancelWork) {
+      cancelWork();
+      cancelWork = undefined;
+      schedule();
+    } else if (idle !== undefined) { cancel(); schedule(); }
   }
   function visibility() {
     cancel();
@@ -84,15 +108,14 @@ function portraitKey(look: CharacterLook, url: string, outfitUrl?: string) {
 type PortraitProps = {
   choice: CharacterChoice | null | undefined;
   label?: string;
-  welcomePreview?: "candidate" | "selected";
+  welcomePreview?: WelcomePreview;
 };
 
-export function CharacterPortrait({ choice, label, welcomePreview }: PortraitProps) {
+export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly }: PortraitProps & { cacheOnly?: boolean }) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
-  const canRefresh = useUIStore(state => portraitMenuAllowsWork(state)
-    || (welcomePreview === "selected" && (state.screen === "welcome" || state.screen === "heroes") && !state.isModeLoading));
+  const canRefresh = useUIStore(state => !cacheOnly && portraitMenuAllowsWork(state, welcomePreview));
   const dress = look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
   const key = look && url ? portraitKey(look, url, dressUrl) : "";
@@ -107,20 +130,26 @@ export function CharacterPortrait({ choice, label, welcomePreview }: PortraitPro
     return () => job.abort();
   });
   useEffect(() => {
-    if (needsBake) return schedulePortraitWork(() => startBake(), welcomePreview === "selected");
+    if (needsBake) return schedulePortraitWork(() => startBake(), welcomePreview);
   }, [needsBake, key, welcomePreview]);
   if (cached && failedKey !== key) {
     return <img className="character-portrait character-portrait--model" src={cached} alt={label ?? ""}
       decoding="async" onError={() => setFailedKey(key)} />;
   }
-  return needsBake
+  return needsBake && welcomePreview !== "roster"
     ? <span className="character-portrait character-portrait--loading" aria-hidden="true" />
     : null;
 }
 
 export function ProfilePortrait(props: PortraitProps) {
-  return <span className="profile-portrait-frame" aria-hidden="true">
+  const frame = useRef<HTMLSpanElement>(null);
+  const [visible, setVisible] = useState(false);
+  const watch = props.welcomePreview === "roster" && typeof IntersectionObserver !== "undefined";
+  useEffect(() => {
+    if (watch && frame.current) return observeRosterTile(frame.current, setVisible);
+  }, [watch]);
+  return <span className="profile-portrait-frame" aria-hidden="true" ref={frame}>
     <MenuIcon name="profile" />
-    <CharacterPortrait {...props} />
+    <CharacterPortrait {...props} cacheOnly={watch && !visible} />
   </span>;
 }

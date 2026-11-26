@@ -5,7 +5,10 @@ import { clothingColors } from "./clothingPieces";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
-import type { Object3D } from "three";
+import { AnimationMixer, type Object3D } from "three";
+import { buildEmoteClips } from "./garageEmotes";
+import { DriverBag } from "./DriverBag";
+import { SELECTION_POSES, holdCharacterPose, type SelectionPoseId } from "./selectionPoses";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterLook } from "./characterCatalog";
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
@@ -18,6 +21,7 @@ import { applyVillagerLook, prepareVillager, villagerModelUrl } from "./villager
 import type { GarageLeanFit } from "./garageLean";
 import type { GarageCockpit } from "../preview/garageCockpit";
 import { PreviewLoadingStatus } from "../preview/PreviewLoadingSeal";
+import { prepareGaragePointLights } from "../preview/garagePointLights";
 import { isCompactPreview } from "../preview/previewBudget";
 import { failCockpitPreview, useCharacterPreviewStore } from "./characterPreviewStore";
 import { useCommittedResource } from "./useCommittedResource";
@@ -28,7 +32,7 @@ const DRIVER_TILT: [number, number, number] = [-.095, -.16, -.045];
 type WardrobeAssetListener = (url: string, scene: Object3D | null) => void;
 type VillagerPlayback = {
   bag: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit;
-  victory?: VictoryPlayback; cockpit?: GarageCockpit; paused: boolean; upright: boolean;
+  victory?: VictoryPlayback; cockpit?: GarageCockpit; paused: boolean; upright: boolean; selectionPose?: SelectionPoseId;
 };
 
 function WardrobeAsset({ url, onReady }: { url: string; onReady: WardrobeAssetListener }) {
@@ -84,7 +88,7 @@ function HighCollarMotion({ update }: { update: () => void }) {
   return null;
 }
 
-function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }: VillagerPlayback & { preview: WardrobePreview }) {
+function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, selectionPose }: VillagerPlayback & { preview: WardrobePreview }) {
   const { look, scene, garments, garmentBody, corsetScene, corsetSet, hairSource } = preview;
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
@@ -92,21 +96,44 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   // Appearance edits can recreate the removal array without changing the rig.
   const removalKey = [...look.removedClothing].sort().join(",");
   const removedClothing = useMemo(() => removalKey ? removalKey.split(",") as WardrobeRemoval[] : [], [removalKey]);
-  const createModel = useCallback(() => prepareVillager(scene, {
-    female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, removedClothing,
-    corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
-  }), [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet]);
+  const selection = selectionPose !== undefined;
+  const createModel = useCallback(() => {
+    const model = prepareVillager(scene, {
+      female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, removedClothing,
+      corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
+    });
+    if (selection) prepareGaragePointLights(model.root, "subject");
+    return model;
+  }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, selection]);
   const model = useCommittedResource(createModel);
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
     <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID} />
     <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
-      leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} />
+      leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} selectionPose={selectionPose} />
   </> : null;
 }
 
-function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright }:
+// A selection portrait is a held pose on the existing actor. Solve it once on
+// selection, leaving the garage's demand render loop idle while it is displayed.
+function HeldSelectionPose({ root, id }: { root: Object3D; id: SelectionPoseId }) {
+  const invalidate = useThree(state => state.invalidate);
+  useLayoutEffect(() => {
+    const pose = SELECTION_POSES.find(item => item.id === id);
+    if (!pose) return;
+    const mixer = new AnimationMixer(root);
+    const [clip] = buildEmoteClips(root, [holdCharacterPose(pose)]);
+    mixer.clipAction(clip).play();
+    mixer.update(0);
+    root.updateMatrixWorld(true);
+    invalidate();
+    return () => { mixer.uncacheRoot(root); };
+  }, [root, id, invalidate]);
+  return <primitive object={root} dispose={null} />;
+}
+
+function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, selectionPose }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
   const previewHair = useLocalHairstyle(s => s.id);
@@ -133,12 +160,15 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
 
   return <group name="garage-driver" rotation={upright ? [0, 0, 0] : DRIVER_TILT}>
     {model.detachedCorset?.updateShoulders && <HighCollarMotion update={model.detachedCorset.updateShoulders} />}
-    <GarageEmotePlayer root={model.root} bag={bag} personality={look.appearance.personality} bagColors={clothingColors(look, "bag")} previewPacks={previewPacks} leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} />
+    {selectionPose ? <>
+      <HeldSelectionPose root={model.root} id={selectionPose} />
+      {bag && <DriverBag driver={model.root} colors={clothingColors(look, "bag")} />}
+    </> : <GarageEmotePlayer root={model.root} bag={bag} personality={look.appearance.personality} bagColors={clothingColors(look, "bag")} previewPacks={previewPacks} leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} />}
   </group>;
 }
 
-export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false }: {
-  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean;
+export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, selectionPose }: {
+  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; selectionPose?: SelectionPoseId;
 }) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const compact = useThree(s => isCompactPreview(s.size.width));
@@ -155,7 +185,7 @@ export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory
       {url
         ? <VillagerDriver key={choice.id} url={url} look={look} kind={kind} villageKind={villageKind} fallback={fallback} bag={bag}
             previewPacks={previewPacks} leanFit={coatFitsLean ? leanFit : undefined} mirrorFit={mirrorFit}
-            victory={victory} cockpit={cockpit} paused={paused} upright={upright} />
+            victory={victory} cockpit={cockpit} paused={paused} upright={upright} selectionPose={selectionPose} />
         : fallback}
     </CharacterTurntable>
   );

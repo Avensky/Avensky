@@ -1,7 +1,7 @@
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 
 /** Edit the same native control used by touch, autofill and form submission. */
-export function openFieldKeyboard(field: HTMLInputElement) {
+export function openFieldKeyboard(field: HTMLInputElement, updateValue?: (value: string) => void) {
   useTextKeyboardStore.getState().open({
     id: field.id || field.name,
     label: field.labels?.[0]?.textContent?.trim() || field.placeholder,
@@ -11,6 +11,7 @@ export function openFieldKeyboard(field: HTMLInputElement) {
     secret: field.autocomplete === "current-password" || field.type === "password",
     returnFocus: field,
     onChange(value) {
+      if (updateValue) { updateValue(value); return; }
       field.value = value;
       field.dispatchEvent(new Event("input", { bubbles: true }));
     },

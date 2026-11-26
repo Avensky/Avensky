@@ -99,6 +99,12 @@ export function selectEquippedCharacter(state: { view: SocialView | null; cached
   return state.view ? state.view.profile.progression?.character : state.cachedCosmetics?.character;
 }
 
+/** The active career's progression can already contain a newer wardrobe edit. */
+export function savedCharacterAppearance(profile: PlayerProfile, slot: CharacterSlot): CharacterChoice | null {
+  const active = slot.id === (profile.active_character_id ?? profile.id);
+  return (active ? profile.progression?.character : null) ?? slot.appearance ?? null;
+}
+
 function cosmeticsFrom({ character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision }: Cosmetics): Cosmetics {
   return { character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision };
 }

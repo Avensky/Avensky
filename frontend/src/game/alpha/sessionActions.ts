@@ -11,28 +11,32 @@ import { useRenderSettingsStore } from "../../store/presentation/renderSettingsS
 import { currentOpenWorld } from "../social/openWorld";
 import { enterWorld } from "../social/navigation";
 
+export async function joinOpenWorld() {
+  const owner = useSocialStore.getState().view?.profile.id;
+  await refreshInstalledWorlds();
+  const view = useSocialStore.getState().view;
+  if (!owner || view?.profile.id !== owner) throw Error("Reconnect to your profile to enter the world.");
+  const world = currentOpenWorld(view);
+  if (!world) throw Error("No Open World hub is available.");
+  if (!useWorldCatalog.getState().maps.some(map => map.id === world.map))
+    throw Error("The Open World map is unavailable in this client.");
+  const joined = view.current_world_id === world.id
+    ? { world_id: world.id, map: world.map }
+    : await requestSocial("world_join", { world_id: world.id });
+  if (useSocialStore.getState().view?.profile.id === owner) enterWorld(joined);
+}
+
 export async function joinSelectedMode() {
   const state = useAlphaStore.getState();
   if (isPlannedMode(state.mode))
     throw Error("Select a driving mode before joining the alpha queue.");
   if (!useSocialStore.getState().view?.profile.id)
     throw Error("Restore your player profile or choose New Tab Profile before joining.");
+  if (state.mode === "open_world") return joinOpenWorld();
   // Matchmaking owns the eligible-map rotation; editor/practice keeps the
   // player's installed-world selection. Fetch here too: match screens do not
   // render MapSelector, so relying on its mount hook breaks first-time joins.
   await refreshInstalledWorlds();
-  if (state.mode === "open_world") {
-    const view = useSocialStore.getState().view;
-    const world = currentOpenWorld(view);
-    if (!world) throw Error("No Open World hub is available.");
-    if (!useWorldCatalog.getState().maps.some(map => map.id === world.map))
-      throw Error("The Open World map is unavailable in this client.");
-    const joined = view?.current_world_id === world.id
-      ? { world_id: world.id, map: world.map }
-      : await requestSocial("world_join", { world_id: world.id });
-    enterWorld(joined);
-    return;
-  }
   const selectedMap=useSelectionStore.getState().getSelectedMap();
   if(!useWorldCatalog.getState().maps.length)
     throw Error("No installed environments found. Check the world catalog or server files.");

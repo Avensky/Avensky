@@ -166,11 +166,12 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     const actorPosition = getActorPosition();
     assert(Math.hypot(actorPosition.x, actorPosition.y - .023, actorPosition.z)<1e-8,'fitting cancels the garage motion');
     assert.equal(document.querySelector('[data-camera]'),mountedCamera,'the fitting room retains the camera');
-    assert(camera.position.distanceTo(position)>0 && camera.position.distanceTo(position)<.5,'fitting moves from the rendered garage position');
-    assert(camera.fov !== fov,'fitting starts blending the lens');
+    assert(camera.position.distanceTo(position)>1,'opening the fitting room cuts directly to the character without crossing the garage');
+    assert(Math.abs(camera.fov-fov)>1,'the first fitting frame uses its own lens');
+    const fittingPosition = camera.position.clone(), fittingFov = camera.fov;
     for (let frame=0;frame<180;frame++) stepCamera();
-    assert(camera.position.distanceTo(position)>1,'fitting settles on the character');
-    assert(Math.abs(camera.fov-fov)>1,'the lens finishes at the fitting field of view');
+    assert(camera.position.distanceTo(fittingPosition)<1e-8,'the fitting camera stays on its first resolved shot');
+    assert.equal(camera.fov,fittingFov);
     assert.equal(useCharacterPreviewStore.getState().cockpitVehicle,null);
     setGarageMotion(0, 0, 0);
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true,wardrobeOpen:true})));

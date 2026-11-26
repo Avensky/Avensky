@@ -22,14 +22,14 @@ export function GarageCredentialFields({ portal = false, disabled = false, login
       <input id="alpha-password" type={visible ? "text" : "password"} name="password" autoComplete="current-password"
         maxLength={portal ? 128 : 256} placeholder="Password" defaultValue={password} required
         onFocus={() => setSelection("password")} />
-      <GameButton className="garage-eye" variant="menu" aria-controls="alpha-password"
+      <GameButton className="garage-eye" variant="custom" aria-controls="alpha-password"
         aria-label={visible ? "Hide password" : "Show password"} disabled={disabled}
         selected={selection === "eye"} onFocus={() => setSelection("eye")} onPress={() => setVisible(value => !value)}>
         {visible ? "Hide password" : "Show password"}
       </GameButton>
     </div>
     <div data-controller-row>
-      <GameButton className="garage-sign-in" variant="menu" disabled={disabled}
+      <GameButton className="garage-sign-in" variant="custom" disabled={disabled}
         selected={selection === "submit"} onFocus={() => setSelection("submit")}
         onPress={() => document.getElementById("alpha-password")?.closest("form")?.requestSubmit()}>
         Sign in

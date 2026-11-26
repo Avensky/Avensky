@@ -1,15 +1,17 @@
 export type EntryMotion = {
   yaw: number; pitch: number; dragging: boolean; lastInput?: number; dragStarted?: number; targetYaw?: number; targetPitch?: number;
+  stickYaw?: number; stickPitch?: number;
   invalidate?: () => void;
 };
 
+export type ActorInput = { hit: (clientX: number, clientY: number) => boolean; turn: (radians: number) => void };
 const IDLE_MS = 18000;
-const MAX_YAW = .24;
-const MAX_PITCH = .09;
+export const MAX_YAW = .24;
+export const MAX_PITCH = .09;
 
 /** Input lives with the room, so grabbing during GLB loading cancels the entrance offset too. */
-export function installGarageEntryInteraction(motion: EntryMotion, interactivePreview: () => boolean) {
-  let pointer: { id: number; x: number; y: number } | null = null;
+export function installGarageEntryInteraction(motion: EntryMotion, interactivePreview: () => boolean, getActor?: () => ActorInput | undefined) {
+  let pointer: { id: number; x: number; y: number; actor?: ActorInput } | null = null;
   let idleTimer = 0;
   let lastActivity = 0;
   let wakePointer: number | undefined;
@@ -46,7 +48,12 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     const target = event.target as Element;
     if (login ? target.closest(".garage-entry-card,.garage-entry-header,.garage-notices,.text-keyboard-overlay")
         : !target.closest(".garage-orbit-surface")) return;
-    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY };
+    const actor = getActor?.();
+    const hit = actor?.hit(event.clientX, event.clientY) ? actor : undefined;
+    pointer = { id: event.pointerId, x: event.clientX, y: event.clientY, actor: hit };
+    root.setPointerCapture(event.pointerId);
+    event.preventDefault();
+    if (hit) return;
     motion.dragging = true;
     motion.dragStarted = performance.now();
     motion.lastInput = motion.dragStarted;
@@ -54,14 +61,17 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
       motion.yaw = 0; motion.pitch = 0;
     }
     motion.targetYaw = motion.yaw; motion.targetPitch = motion.pitch;
-    root.setPointerCapture(event.pointerId);
     motion.invalidate?.();
-    event.preventDefault();
   }, capture);
   document.addEventListener("pointermove", event => {
     if (root.dataset.garageUiIdle === "true") wake();
     else if (idleTimer) lastActivity = performance.now();
     if (!pointer || pointer.id !== event.pointerId) return;
+    if (pointer.actor) {
+      if (pointer.actor === getActor?.()) pointer.actor.turn((event.clientX - pointer.x) * .008);
+      pointer.x = event.clientX;
+      return;
+    }
     const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * .0014));
     const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, (motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * .0009));
     pointer.x = event.clientX; pointer.y = event.clientY;

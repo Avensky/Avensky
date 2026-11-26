@@ -88,8 +88,8 @@ html[data-high-contrast="true"] {
   position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap;
 }
 .garage-field input,.garage-credentials .garage-sign-in {
-  box-sizing: border-box; width: 100%; min-height: 44px; border: 1px solid var(--app-line);
-  border-radius: 0; font: inherit; color: var(--app-text); background: var(--app-panel);
+  box-sizing: border-box; width: 100%; min-height: 44px; border: 0;
+  border-radius: 0; font: inherit; color: var(--garage-menu-ink);
 }
 .garage-field input { min-width: 0; padding: .38rem .65rem .38rem 2.5rem; }
 .garage-field input::placeholder { color: var(--garage-menu-muted); opacity: 1; }
@@ -104,15 +104,8 @@ html[data-high-contrast="true"] {
 }
 .garage-eye::after { content:""; position:absolute; inset:0; margin:auto; width:1.3rem; height:1.3rem; background:currentColor; mask-position:66.667% center; }
 .garage-password:has(input[type="text"]) .garage-eye::after { mask-position:right center; }
-.garage-credentials :is(.garage-sign-in,.garage-field input) {
-  background:var(--garage-menu-row); color:var(--garage-menu-ink); border-color:var(--garage-menu-line);
-}
-.garage-credentials .garage-sign-in { border-inline-start:3px solid var(--garage-menu-accent); font-weight:750; cursor:pointer; }
-.garage-credentials :is(.garage-sign-in,.garage-field input):focus-visible {
-  outline:2px solid var(--garage-menu-accent); outline-offset:-2px;
-}
-.garage-entry-card :is(input,button,a,summary):focus-visible,
-.garage-entry-card[data-gamepad] :focus { outline:2px solid var(--app-accent); outline-offset:2px; }
+.garage-entry-card :is(input,button,a,summary):focus-visible:where(:not(.garage-credentials *)),
+.garage-entry-card[data-gamepad] :focus:where(:not(.garage-credentials *)) { outline:2px solid var(--app-accent); outline-offset:2px; }
 .garage-gamepad-controls > .controller-shortcuts { display: none; }
 [data-gamepad] > .garage-gamepad-controls > .controller-shortcuts {
   display: flex; justify-content: center; gap: 1rem; margin-top: .5rem;
@@ -186,7 +179,7 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 }
 .garage-credentials .garage-field { padding:1px; }
 .garage-credentials .garage-field input {
-  border:0; background:transparent; color:var(--garage-menu-ink); caret-color:var(--garage-menu-ink);
+  appearance:none; background:transparent; caret-color:var(--garage-menu-ink);
 }
 .garage-credentials .garage-field input:is(:autofill, :-webkit-autofill) {
   -webkit-text-fill-color:var(--garage-menu-ink); caret-color:var(--garage-menu-ink);
@@ -199,7 +192,7 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
   clip-path:polygon(7px 0,calc(100% - 7px) 0,100% 7px,100% 100%,0 100%,0 7px);
 }
 .garage-credentials .garage-sign-in {
-  display:flex; align-items:center; justify-content:center; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; font-weight:750; cursor:pointer;
   clip-path:polygon(0 0,100% 0,100% calc(100% - 8px),calc(100% - 8px) 100%,8px 100%,0 calc(100% - 8px));
 }
 /* Continue each 1px border along the chamfered corner. */
@@ -221,13 +214,35 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
   right:0; bottom:8px; transform:rotate(-45deg); transform-origin:top right;
 }
 .garage-credentials .garage-field:is(:focus-within,[data-selected="true"]),
-.garage-credentials .garage-sign-in:is(:hover,:focus-visible,[data-selected="true"]) {
+.garage-credentials .garage-sign-in:is(:hover,:focus,[data-selected="true"]) {
   --login-current-border:var(--garage-menu-accent);
   background:var(--login-active-fill);
 }
-.garage-entry-card .garage-credentials :is(input,.garage-sign-in):focus { outline-offset:-3px; }
+/* The bar owns the focus stroke and its chamfers, including while its input is autofilled. */
+.garage-credentials :is(input,.garage-sign-in,.garage-eye):focus { outline:none; }
+.garage-credentials .garage-eye:is(:focus,[data-selected="true"]) {
+  color:var(--garage-menu-accent);
+  background:color-mix(in srgb,var(--garage-menu-accent) 15%,transparent);
+}
 html[data-high-contrast="true"] .garage-credentials {
   --login-bar-fill:#141414; --login-active-fill:#242424; --login-bar-border:#e9e9e9;
+}
+@media (forced-colors: active) {
+  /* System contrast suppresses inset shadows. Use the same single edge in system colors. */
+  .garage-credentials {
+    --login-bar-border: ButtonText;
+    --garage-menu-accent: Highlight;
+  }
+  .garage-credentials :is(.garage-field,.garage-sign-in) {
+    outline: 1px solid var(--login-current-border);
+    outline-offset: -1px;
+  }
+  .garage-credentials .garage-sign-in:focus { outline: 1px solid Highlight; }
+  .garage-credentials .garage-field-icon, .garage-credentials .garage-eye::after {
+    forced-color-adjust: none;
+    background-color: ButtonText;
+  }
+  .garage-credentials .garage-eye:is(:focus,[data-selected="true"])::after { background-color: Highlight; }
 }
 
 /* The room introduces the interface only after its first completed frame. */
@@ -278,7 +293,7 @@ body.garage-entry .garage-entry-card:not(.garage-entry-account)::before { conten
 .garage-entry-card form:not(.garage-credentials) [role="button"] {
   display:flex; align-items:center; justify-content:center; cursor:pointer;
 }
-.garage-entry-card [role="button"]:focus-visible {
+.garage-entry-card [role="button"]:focus-visible:where(:not(.garage-credentials *)) {
   outline:2px solid var(--garage-menu-accent); outline-offset:-3px;
 }
 

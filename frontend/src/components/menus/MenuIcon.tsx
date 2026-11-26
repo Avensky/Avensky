@@ -4,6 +4,7 @@ const car = "M3 14h18l-2-5a2 2 0 0 0-2-1H7a2 2 0 0 0-2 1zm1 0v5m16-5v5M7 17h10M7
 const globe = "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0c-5 4-5 14 0 18 5-4 5-14 0-18ZM3 12h18";
 
 const paths = {
+  add: "M12 4v16M4 12h16",
   back: "m11 5-7 7 7 7m-7-7h16",
   play,
   resume: play,

@@ -61,3 +61,57 @@ test('every MakeHuman pose can be held and sequenced by both character rigs', as
     await vite.close();
   }
 });
+
+test('selection poses hold, restore the resting rig and remain available to pose sequences', async () => {
+  const vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
+  try {
+    const { SELECTION_POSES, holdCharacterPose } = await vite.ssrLoadModule('/src/game/characters/selectionPoses.ts');
+    const { CHARACTER_POSE_GROUPS, POSE_SEQUENCE_ID, posePackEmote } = await vite.ssrLoadModule('/src/game/characters/posePack.ts');
+    const { buildEmoteClips } = await vite.ssrLoadModule('/src/game/characters/garageEmotes.ts');
+    for (const model of ['female', 'male']) {
+      const data = await readFile(`tests/fixtures/villager-${model}-rig.json`, 'utf8');
+      const { scene } = await new GLTFLoader().parseAsync(data, '');
+      scene.userData.fittedClothing = model === 'male';
+      if (model === 'female') scene.userData.skirtHandRoom = .12;
+      const at = name => scene.getObjectByName(name).getWorldPosition(new Vector3());
+      const restHand = at('hand_l'), restFoot = at('foot_r');
+      for (const [index, pose] of SELECTION_POSES.entries()) {
+        assert(CHARACTER_POSE_GROUPS[0].poses.includes(pose));
+        const held = holdCharacterPose(pose);
+        assert.deepEqual(posePackEmote(pose.id), held);
+        const next = SELECTION_POSES[(index + 1) % SELECTION_POSES.length];
+        const sequence = posePackEmote(POSE_SEQUENCE_ID, { from: pose.id, motion: '010', to: next.id });
+        assert.deepEqual(sequence.keys[0][1], pose.pose);
+        assert.deepEqual(sequence.keys.at(-1)[1], next.pose);
+        const [clip] = buildEmoteClips(scene, [held]);
+        assert(clip.validate());
+        const mixer = new AnimationMixer(scene);
+        mixer.clipAction(clip).play();
+        mixer.update(0);
+        const left = at('hand_l'), right = at('hand_r'), hips = at('pelvis');
+        switch (pose.id) {
+          case 'pose-pocket-stance':
+            assert(left.z > hips.z + .10 && right.z > hips.z + .10, `${model}: wrists sit along front pocket seams`);
+            assert(Math.abs(left.y - right.y) < .04);
+            break;
+          case 'pose-hand-on-hip':
+            assert(left.y - right.y > .10 && at('lowerarm_l').x > left.x + .095,
+              `${model}: one elbow projects while the free arm hangs by the hip`);
+            break;
+          case 'pose-crossed-ankles':
+            assert(left.z < hips.z && right.z < hips.z);
+            assert(at('foot_r').x > at('foot_l').x && at('foot_r').z > at('foot_l').z + .1);
+            assert(Math.abs(at('foot_r').y - restFoot.y) < .008, `${model}: shoes remain planted`);
+            break;
+        }
+        mixer.update(.35);
+        assert(at('hand_l').distanceTo(left) < .00001, `${model}: holding the pose does not drift`);
+        mixer.uncacheRoot(scene);
+        assert(at('hand_l').distanceTo(restHand) < .00001 && at('foot_r').distanceTo(restFoot) < .00001,
+          `${model}: switching poses starts from the same character rest rig`);
+      }
+    }
+  } finally {
+    await vite.close();
+  }
+});

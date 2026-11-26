@@ -5,6 +5,24 @@ import { createRequire } from 'node:module';
 const { DefaultLoadingManager } = createRequire(import.meta.url)('three');
 import { useProgress } from '@react-three/drei';
 import { isAssetLoadingComplete } from '../src/game/tools/assetLoading.ts';
+import { embeddedTextureImages } from '../src/assets/embeddedTextureImages.ts';
+import { TextureLoader } from 'three';
+
+test('embedded character textures use the document image loader while URI and compressed textures retain their loaders', t => {
+  const prior = globalThis.document;
+  globalThis.document = {};
+  t.after(() => { if (prior === undefined) delete globalThis.document; else globalThis.document = prior; });
+  const bitmap = { isImageBitmapLoader: true };
+  const custom = {};
+  const parser = {
+    json: { images: [{ bufferView: 0 }, { uri: 'fabric.webp' }] }, options: {},
+    textureLoader: bitmap, loadImageSource: (_index, loader) => loader,
+  };
+  embeddedTextureImages(parser).beforeRoot();
+  assert.ok(parser.loadImageSource(0, bitmap) instanceof TextureLoader);
+  assert.equal(parser.loadImageSource(1, bitmap), bitmap);
+  assert.equal(parser.loadImageSource(0, custom), custom);
+});
 
 test('collider setup completes from Drei’s untouched, zero-file loading state', () => {
   const initial = useProgress.getState();

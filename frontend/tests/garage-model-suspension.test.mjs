@@ -26,16 +26,17 @@ test('the fitting room detaches the car and resumes the same garage model and re
     vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error',
       plugins: [{
         name: 'garage-model-test-asset', enforce: 'pre',
-        transform(source, id) {
-          if (id.endsWith('/VehiclePreviewModel.tsx')) return source.replace('@react-three/drei', 'virtual:garage-model-test-asset');
+        resolveId(id, importer) {
+          if (id === '../../assets/useAssetGLTF' && importer?.endsWith('/VehiclePreviewModel.tsx'))
+            return '\0garage-model-test-asset';
         },
-        resolveId(id) { if (id === 'virtual:garage-model-test-asset') return '\0garage-model-test-asset'; },
         load(id) {
           if (id === '\0garage-model-test-asset') return `
             import { BoxGeometry, Group, Mesh, MeshStandardMaterial } from 'three';
             const scene = new Group(), chassis = new Mesh(new BoxGeometry(2, 1, 4), new MeshStandardMaterial());
             scene.name = 'test-car'; chassis.position.y = .5; scene.add(chassis);
-            export const useGLTF = () => ({ scene });
+            const model = { scene, animations: [] };
+            export const useAssetGLTF = () => model;
           `;
         },
       }],
