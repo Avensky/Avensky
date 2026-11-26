@@ -12,7 +12,6 @@ import { AlphaAccountPanel } from "../characters/AlphaAccountPanel";
 import { CharacterRoster } from "./CharacterRoster";
 import { RosterGaragePreview } from "../preview/RosterGaragePreview";
 import { SELECTION_POSES, type SelectionPoseId } from "../characters/selectionPoses";
-import { enterSelectedWorld } from "./enterSelectedWorld";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
@@ -250,7 +249,7 @@ export function WelcomeScreen() {
     if (useSocialStore.getState().view?.profile.id !== owner) throw new Error("Your profile is reconnecting. Try again.");
     useSocialStore.getState().acknowledgeCharacter(savedProfile);
     if (action === "character_select") {
-      await enterSelectedWorld();
+      useUIStore.getState().setScreen("main");
     } else {
       setPreview({ owner, slotId: savedProfile.active_character_id });
       setStep("characters");
