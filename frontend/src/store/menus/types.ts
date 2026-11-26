@@ -52,8 +52,6 @@ export type MenuId =
   | "settings"
   | "sandbox_setup";
 
-export type WelcomeSection = "account" | "world_editor";
-
 // Only Sandbox owns driving controls and the in-game pause stack.
 export const isDrivingScreen = (screen: MenuScreen) => screen === "sandbox";
 
@@ -73,8 +71,8 @@ export type UIState = {
   setCockpitTab: (tab: CockpitTab) => void;
   openCockpit: (tab?: CockpitTab) => void;
   screen: MenuScreen;
-  welcomeSection: WelcomeSection | null;
-  setScreen: { (screen: MenuScreen): void; (screen: "welcome", section: WelcomeSection): void };
+  welcomeSection: "account" | null;
+  setScreen: { (screen: MenuScreen): void; (screen: "welcome", section: "account"): void };
 
   overlay: UIOverlay;
   setOverlay: (overlay: UIOverlay) => void;

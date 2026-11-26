@@ -28,10 +28,8 @@ export function SessionMenu() {
         // instead receives the server's reconnect reservation.
         if (useSocialStore.getState().available)
           await requestSocial("mode_cancel");
-        const ui = useUIStore.getState();
-        const destination = ui.welcomeSection === "world_editor" ? "world_builder" : "main";
         disconnectRustServer();
-        ui.setScreen(destination);
+        useUIStore.getState().setScreen("main");
         connectRustServer();
       } catch (reason) {
         setError((reason as Error).message);
