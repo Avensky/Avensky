@@ -7,6 +7,8 @@ on:
       - "scripts/wardrobe/inspect_outerwear_assets.py"
       - "scripts/wardrobe/tests/test_outerwear_intake.py"
       - "frontend/tests/wardrobe-outerwear-intake.test.mjs"
+      - "frontend/tests/wardrobe-fit-recipes.test.mjs"
+      - "packages/wardrobe-catalog/garment-fit-recipes.v1.json"
       - "frontend/src/game/characters/DressingRoom.tsx"
       - "frontend/tests/wardrobe-layer-inspector-ui.test.mjs"
   workflow_dispatch:
@@ -29,8 +31,8 @@ jobs:
           node-version: "24"
       - name: Test read-only binary FBX scanner with synthetic file
         run: python -m unittest discover -s scripts/wardrobe/tests -p 'test_outerwear_intake.py' -v
-      - name: Validate W-07 private candidate manifest
-        run: node --test frontend/tests/wardrobe-outerwear-intake.test.mjs
+      - name: Validate W-07 candidate manifest and conservative fit recipe
+        run: node --test frontend/tests/wardrobe-outerwear-intake.test.mjs frontend/tests/wardrobe-fit-recipes.test.mjs
       - name: State private asset validation boundary
         run: |
           echo 'This CI tests the scanner and manifest with synthetic data.'
