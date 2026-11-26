@@ -110,6 +110,10 @@ async fn account_survives_a_restart_with_named_characters_and_separate_careers()
     let next = s.handle(&a, create("Track Fox","night-shift","male")).await.unwrap();
     let second = next["profile"]["active_character_id"].as_str().unwrap();
     assert_ne!(second,root);
+    assert_eq!(next["profile"]["account_display_name"], "Racer");
+    let renamed = s.handle(&a, json!({"action":"rename","name":"  Nightdriver  "})).await.unwrap();
+    assert_eq!(renamed["account_display_name"], "Nightdriver");
+    assert!(s.handle(&a, json!({"action":"rename","name":"bad\nname"})).await.is_err());
     assert_eq!(next["profile"]["progression"]["career"]["summary"]["sessions"],0);
     assert!(s.handle(&b,select(second)).await.is_err());
     assert!(s.handle(&a,json!({"action":"character_equip","character":{"id":"mara-vega","outfit":"shop-crew"}})).await.is_err());
@@ -126,6 +130,9 @@ async fn account_survives_a_restart_with_named_characters_and_separate_careers()
     assert!(matches["matches"].as_array().unwrap().iter().all(|row| row["match_id"] != "legacy-road-run"));
     let restarted = database::load_or_import(&s.path.with_extension("sqlite3"),&s.path).unwrap();
     assert_eq!(restarted.profiles[root].career_id(),second);
+    assert_eq!(restarted.profiles[root].name, "Nightdriver");
+    assert_eq!(restarted.profiles[root].display_name(), "Track Fox");
+    assert_eq!(restarted.profiles[root].characters[root].name, "Left Lane");
     assert_eq!(restarted.profiles[root].characters[root].inactive.as_ref().unwrap().career.summary.totals.kills,4);
     let linked = s.staging_account(&json!({"action":"check","login":"restart_racer","password":"a stable multi character passphrase"})).await.unwrap();
     assert_eq!(linked, json!({"profile_id":root}));

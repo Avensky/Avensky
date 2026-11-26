@@ -148,8 +148,11 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await poseButton('Hold start pose');
     assert.equal(preview.getState().emote.id, 'pose-attentive');
     await select('Animation', 'walk-casual');
-    assert.equal(find('select[aria-label="Start pose"]').options.length, 121);
-    assert.equal(find('select[aria-label="End pose"]').options.length, 121);
+    const { CHARACTER_POSE_GROUPS } = await load('game/characters/posePack.ts');
+    const availablePoses = CHARACTER_POSE_GROUPS.flatMap(group => group.poses.map(pose => pose.id));
+    for (const label of ['Start pose', 'End pose']) {
+      assert.deepEqual([...find(`select[aria-label="${label}"]`).options].map(option => option.value), availablePoses);
+    }
     const importedPose = 'pose-mh-poses03-anrico_standing10';
     await select('End pose', importedPose);
     await poseButton('Play sequence');
@@ -160,6 +163,13 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(preview.getState().emote, null);
     await chooseEmoteGroup('Garage');
     assert(![...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Side step and glance'));
+    for (const id of ['stance-pockets', 'stance-hand-on-hip', 'stance-crossed-ankles']) {
+      const selector = `.character-emotes [data-emote-id="${id}"]`;
+      assert.equal(document.querySelectorAll(selector).length, 1);
+      await click(selector);
+      assert.equal(preview.getState().emote.id, id, 'selecting a gallery row starts its animation');
+      await click('.character-emote-back');
+    }
     await playEmote('.character-emotes .character-emote-row:first-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '005');
     await chooseEmoteGroup('Best');
@@ -917,7 +927,8 @@ test('all emote batches return to rest and keep planted and lifted feet distinct
     const ids = clips.map(clip => clip.name.split(' ')[0]);
     const numbered = [...ids.filter(id => /^\d+$/.test(id)), ...COCKPIT_TAKES.filter(take => /^\d+$/.test(take.id)).map(take => take.id)].sort();
     assert.deepEqual(numbered, Array.from({length: 200}, (_, i) => String(i + 1).padStart(3, '0')));
-    assert.deepEqual(AUTOMATIC_GARAGE_EMOTE_IDS, ['035', '002', '005', '009', '010']);
+    const stanceIds = ['stance-pockets', 'stance-hand-on-hip', 'stance-crossed-ankles'];
+    assert.deepEqual(AUTOMATIC_GARAGE_EMOTE_IDS, ['035', '002', '005', '009', '010', ...stanceIds]);
     assert(COCKPIT_TAKES.every(({ id }) => !ids.includes(id)));
     assert.equal(findGaragePreviewEmote('151', true).id, '151');
     const { keepHeldProp } = await vite.ssrLoadModule('/src/game/characters/emotePropNotes.ts');
@@ -925,7 +936,9 @@ test('all emote batches return to rest and keep planted and lifted feet distinct
     assert.equal(keepHeldProp('013'), false, 'applause stows the prop');
     assert.equal(keepHeldProp('bag-lift', true), false, 'driving always stows handheld props');
     assert.deepEqual(ids.filter(id => id.startsWith('walk-')), ['walk-casual']);
-    assert.deepEqual(buildGarageEmotes(model.root).map(clip => clip.name.split(' ')[0]), ['001', '002', '005', '009', '010', '035']);
+    assert.deepEqual(buildGarageEmotes(model.root).map(clip => clip.name.split(' ')[0]), ['001', '002', '005', '009', '010', '035', ...stanceIds]);
+    const carrying = buildGarageEmotes(model.root, true).map(clip => clip.name.split(' ')[0]);
+    assert(stanceIds.every(id => !carrying.includes(id) && !keepHeldProp(id)), 'two-hand stances stow the bag on request and skip automatic carrying rotations');
     assert(buildGarageEmotes(model.root, true).some(clip => clip.name.startsWith('035 ')), 'bag idle rotation includes both-handed gestures with temporary stowing');
     const leanFit = { offset: .15, distance: .06 };
     const [lean] = buildEmoteClips(model.root, [garageLeanPose(leanFit)]);

@@ -16,6 +16,7 @@
   --angled-header-height: var(--menu-angled-header-height, 41px);
   --angled-tabs-height: calc(var(--angled-header-height) / var(--angled-title-scale));
   --angled-title-shape: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height), calc(100% - var(--angled-title-cut) - var(--angled-title-chamfer)) 100%, 0 100%);
+  --angled-title-fill: color-mix(in srgb, var(--app-panel) 92%, var(--app-raised));
   --angled-tab-surface: color-mix(in srgb, var(--app-background) 62%, var(--app-panel));
 }
 
@@ -58,7 +59,7 @@
   z-index: -1;
   inset: 0 1px 1px;
   pointer-events: none;
-  background: color-mix(in srgb, var(--app-panel) 92%, var(--app-raised));
+  background: var(--angled-title-fill);
   clip-path: var(--angled-title-shape);
 }
 .menu-frame-header.angled-tab-header > div:first-child > h1,

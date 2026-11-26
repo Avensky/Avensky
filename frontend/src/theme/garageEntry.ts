@@ -13,11 +13,14 @@ export function garageBackdrop() {
   return '<div class="garage-entry-scene" data-live-garage aria-hidden="true"></div>';
 }
 
-export function garageBrandHeader(assets: "/images" | "/__alpha/entry") {
-  return `<header class="garage-entry-header angled-tab-header">
-    <div class="garage-entry-brand"><img src="${assets}/logo.svg" width="26" height="26" alt="" draggable="false">
-    <span>${escapeText(APP_BRANDING.productName)}</span></div>
-  </header>`;
+type EntryAssets = "/images" | "/__alpha/entry";
+
+export function garageBrandContents(assets: EntryAssets) {
+  return `<img src="${assets}/logo.svg" width="26" height="26" alt="" draggable="false"><span>${escapeText(APP_BRANDING.productName)}</span>`;
+}
+
+export function garageBrandHeader(assets: EntryAssets) {
+  return `<header class="garage-entry-header angled-tab-header"><div class="garage-entry-brand">${garageBrandContents(assets)}</div></header>`;
 }
 
 export function garageCredentials(portal: boolean) {

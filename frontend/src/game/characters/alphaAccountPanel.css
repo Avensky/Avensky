@@ -51,3 +51,7 @@
 .alpha-setting form, .alpha-setting-body { padding: .25rem .85rem .85rem; }
 .alpha-account-panel :is(input, .menu-control) { min-height: 44px; }
 .alpha-setting[data-setting="trash"] { margin-top: .6rem; }
+.account-submit.menu-control {
+  display: inline-flex; align-items: center; justify-content: center; padding: .4rem .7rem;
+  min-height: 44px; border: 1px solid var(--app-line); color: var(--app-text); background: var(--app-raised);
+}

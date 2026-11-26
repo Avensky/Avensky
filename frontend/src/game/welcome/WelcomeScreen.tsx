@@ -1,29 +1,26 @@
 import { GarageCredentialFields } from "./GarageCredentialFields";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { characterLook } from "../characters/characterCatalog";
 import { attitudeName, CHARACTER_STYLES, styleLook, type CharacterBody } from "../characters/characterStyles";
-import { AlphaAccountPanel } from "../characters/AlphaAccountPanel";
 import { CharacterRoster } from "./CharacterRoster";
 import { RosterGaragePreview } from "../preview/RosterGaragePreview";
-import { SELECTION_POSES, type SelectionPoseId } from "../characters/selectionPoses";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
-import { garageBrandHeader } from "../../theme/garageEntry";
+import { GarageEntryHeader } from "./GarageEntryHeader";
 import { retryEntryConnection } from "../../net/rustSocket";
 import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
-import { entryAssets, stagingAccountPortal } from "./config";
+import { stagingAccountPortal } from "./config";
 import "./welcomeScreen.css";
 
-const chrome = { __html: garageBrandHeader(entryAssets) };
-
 type Step = "welcome" | "create" | "register" | "characters";
+const GarageProfilePanel = lazy(() => import("../characters/GarageProfilePanel").then(module => ({ default: module.GarageProfilePanel })));
 type Draft = { name: string; body: CharacterBody; style: string };
 
 async function waitForProfile(owner: string) {
@@ -66,13 +63,13 @@ export function WelcomeScreen() {
   const [body, setBody] = useState<CharacterBody>("female");
   const [style, setStyle] = useState<string>();
   const [preview, setPreview] = useState<{ owner: string; slotId: string }>();
-  const [pose, setPose] = useState<SelectionPoseId>(SELECTION_POSES[0].id);
   const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
   const [connectionSlow, setConnectionSlow] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
+  const wasProfileOpen = useRef(false);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
   const signedIn = Boolean(profile && (stagingSignIn || (!stagingAccountPortal && registered)));
   const rememberedPlayer = step === "welcome" && (signedIn || (!stagingAccountPortal && !showAccountEntry && profile?.characters?.length)) ? profile : undefined;
@@ -96,7 +93,7 @@ export function WelcomeScreen() {
   const busy = working || restoring;
   const sessionPending = screen === "welcome" && Boolean(entryIssue || !connected || restoring || stagingSignIn || stagingAccountPortal);
   const accountRoot = signedIn && screen === "characters";
-  const accountOpen = accountRoot && stagingSignIn && (showSettings || openedFromMenu);
+  const accountOpen = accountRoot && (showSettings || openedFromMenu);
   const unconfirmedSignIn = stagingAccountPortal && connected && !stagingSignIn;
   const signInReason = entryIssue?.kind === "session-replaced" || entryIssue?.kind === "session-expired" ? entryIssue.kind : undefined;
   const showRecovery = sessionPending && Boolean(entryIssue || connectionSlow || unconfirmedSignIn || restoreError);
@@ -122,11 +119,17 @@ export function WelcomeScreen() {
     retryEntryConnection();
   }
 
+  function leaveProfile() {
+    if (openedFromMenu) useUIStore.getState().setScreen("main");
+    else setShowSettings(false);
+  }
+
   function back() {
     if (pending.current || restoring) return;
     if (accountOpen) {
-      if (openedFromMenu) useUIStore.getState().setScreen("main");
-      else setShowSettings(false);
+      const profileBack = root.current?.querySelector<HTMLElement>("[data-profile-back]");
+      if (profileBack) profileBack.click();
+      else leaveProfile();
       return;
     }
     // Never log out via Escape or controller Back. The explicit Log out
@@ -145,13 +148,15 @@ export function WelcomeScreen() {
   }
 
   useEffect(() => {
+    const returningFromProfile = wasProfileOpen.current && !accountOpen;
+    wasProfileOpen.current = accountOpen;
     if (screen === "welcome") return;
-    if (busy || root.current?.contains(document.activeElement)) return;
+    if (busy || (!returningFromProfile && root.current?.contains(document.activeElement))) return;
     if (!accountOpen && screen === "characters") {
       const initial = root.current?.querySelector<HTMLElement>('[data-character-id][aria-pressed=true], [data-roster-create]:only-child');
       initial?.focus({ preventScroll: true });
     } else if (!window.matchMedia?.("(pointer: coarse)")?.matches) {
-      root.current?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled), [role=button]:not([aria-disabled=true])")?.focus({ preventScroll: true });
+      root.current?.querySelector(".welcome-panel")?.querySelector<HTMLElement>("input:not(:disabled), button:not(:disabled), [role=button]:not([aria-disabled=true])")?.focus({ preventScroll: true });
     }
   }, [screen, busy, connected, accountOpen]);
 
@@ -198,9 +203,10 @@ export function WelcomeScreen() {
           // The D-pad already previews the focused character. A confirms entry.
           root.current.querySelector<HTMLElement>(".roster-enter:not([aria-disabled=true])")?.click();
         } else if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), summary, a[href]")) active.click();
-        else if (active instanceof HTMLInputElement)
-          openFieldKeyboard(active, active.name === "characterName" ? changeName : undefined);
-        else if (isTypingTarget(active)) active.focus();
+        else if (active instanceof HTMLInputElement) {
+          if (active.readOnly) active.select();
+          else openFieldKeyboard(active, active.name === "characterName" ? changeName : undefined);
+        } else if (isTypingTarget(active)) active.focus();
       } else if (["up","down","left","right"].includes(action)) {
         navigateFormRows(root.current, active, action, remembered.current);
       }
@@ -310,17 +316,19 @@ export function WelcomeScreen() {
         navigateFormRows(root.current!, (root.current!.contains(document.activeElement) ? document.activeElement : root.current!.querySelector(".garage-field[data-selected=true] input")) as HTMLElement, event.key.slice(5).toLowerCase() as MenuAction, remembered.current);
       }
     }}>
-      <div className="welcome-chrome" dangerouslySetInnerHTML={chrome} />
+      <GarageEntryHeader account={accountRoot ? {
+        profileOpen: accountOpen, busy, onLogOut: () => void run(logOut),
+        onProfile: () => { if (accountOpen) leaveProfile(); else setShowSettings(true); },
+      } : undefined} />
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
-      {!accountOpen && (sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
-      {!accountOpen && (screen === "create" || screen === "characters") && previewChoice && <RosterGaragePreview choice={previewChoice} pose={pose} creating={screen === "create"} />}
-      {!sessionPending && <section className={screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Account" : label}>
+      {(sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
+      {(screen === "create" || screen === "characters") && previewChoice && <RosterGaragePreview choice={previewChoice} mode={accountOpen ? "profile" : screen === "create" ? "create" : "roster"} />}
+      {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
         {!accountOpen && screen !== "welcome" && screen !== "characters" && <h1>{label}</h1>}
-        {accountOpen ? <>
-          <div data-controller-row><MenuBackButton label="Back" onClick={back} /></div>
-          <AlphaAccountPanel key={player?.id} tab="account" />
-        </> : screen === "create" ? <form key="new-character" onSubmit={event => {
+        {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
+          <GarageProfilePanel key={player?.id} onBack={leaveProfile} />
+        </Suspense> : screen === "create" ? <form key="new-character" onSubmit={event => {
             event.preventDefault();
             createDraft();
           }}>
@@ -352,14 +360,12 @@ export function WelcomeScreen() {
                 onPress={createDraft}>{player ? "Create character" : "Continue"}</GameButton>
             </div>
           </form> : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
-            busy={busy} connected={connected} pose={pose} onPose={setPose}
+            busy={busy} connected={connected}
             onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setError(""); }}
             onCreate={openCreation} onEnter={() => {
               if (selectedSlot) void run(() => saveCharacter(player.id, "character_select", { character_id: selectedSlot.id }));
             }}
-            onAccount={stagingSignIn ? () => setShowSettings(true) : undefined}
-            onBack={accountRoot ? undefined : back}
-            onLogOut={accountRoot ? () => void run(logOut) : undefined} /> : screen === "register" ? (
+            onBack={accountRoot ? undefined : back} /> : screen === "register" ? (
           <form key={screen} method="post" onSubmit={authenticate}>
               <label data-controller-row>Email
                 <input name="login" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false}

@@ -1,7 +1,7 @@
 import { returnToStagingSignIn } from "./stagingAccount";
 import { stagingAccountPortal } from "../game/welcome/config";
 import { usePresenceStore } from "../store/chat/presenceStore";
-import { useSocialStore } from "../store/social/socialStore";
+import { playerDisplayName, useSocialStore } from "../store/social/socialStore";
 import { useChatStore } from "../store/chat/chatStore";
 import { useNetworkStore } from "../store/session/networkStore";
 
@@ -234,14 +234,16 @@ export function receiveSocialState(value: unknown) {
   const profile = useSocialStore.getState().view?.profile;
   const saved = readIdentity();
   const identity = pageIdentity ?? saved?.identity;
+  const accountName = playerDisplayName(profile);
   if (
     profile &&
     identity &&
     profile.id === identity.id &&
-    profile.name !== identity.name
+    typeof accountName === "string" &&
+    accountName !== identity.name
   ) {
     pageIdentityScope = pageIdentity ? pageIdentityScope : saved?.scope ?? "device";
-    pageIdentity = { ...identity, name: profile.name };
+    pageIdentity = { ...identity, name: accountName };
     saveIdentity(pageIdentity,pageIdentityScope);
   }
 }

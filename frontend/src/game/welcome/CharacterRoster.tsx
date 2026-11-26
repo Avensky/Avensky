@@ -6,41 +6,30 @@ import { useMobilePortrait } from "../../controls/useMobilePortrait";
 import { savedCharacterAppearance, type CharacterSlot, type PlayerProfile } from "../../store/social/socialStore";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
 import { styleName } from "../characters/characterStyles";
-import { SELECTION_POSES, type SelectionPoseId } from "../characters/selectionPoses";
 
 type Props = {
   profile: PlayerProfile;
   selected?: CharacterSlot;
   limit: number;
-  pose: SelectionPoseId;
   busy: boolean;
   connected: boolean;
   onChoose: (slot: CharacterSlot) => void;
   onCreate: () => void;
   onEnter: () => void;
-  onPose: (pose: SelectionPoseId) => void;
-  onAccount?: () => void;
-  onLogOut?: () => void;
   onBack?: () => void;
 };
 
-export function CharacterRoster({ profile, selected, limit, pose, busy, connected, onChoose,
-  onCreate, onEnter, onPose, onAccount, onLogOut, onBack }: Props) {
+export function CharacterRoster({ profile, selected, limit, busy, connected, onChoose,
+  onCreate, onEnter, onBack }: Props) {
   const portrait = useMobilePortrait();
   const device = useMenuInputDevice();
   const slots = profile.characters;
-  const poseIndex = SELECTION_POSES.findIndex(item => item.id === pose);
-  const poseName = SELECTION_POSES[poseIndex]?.name;
   const selectedAppearance = selected && savedCharacterAppearance(profile, selected);
   return <div className="character-roster" data-input-device={device} data-portrait={portrait || undefined}>
-    <div className="roster-tools" data-controller-row data-controller-header-action>
-      {onBack && <GameButton variant="menu" className="menu-panel-frame roster-tool" aria-label="Back"
-        title="Back" disabled={busy} onPress={onBack}><MenuIcon name="back" /></GameButton>}
-      {onLogOut && <GameButton variant="menu" className="menu-panel-frame roster-tool" aria-label="Log out"
-        title="Log out" disabled={busy} onPress={onLogOut}><MenuIcon name="leave_game" /></GameButton>}
-      {onAccount && <GameButton variant="menu" className="menu-panel-frame roster-tool" aria-label="Account"
-        title="Account" disabled={busy} onPress={onAccount}><MenuIcon name="profile" /></GameButton>}
-    </div>
+    {onBack && <div className="roster-tools" data-controller-row data-controller-header-action>
+      <GameButton variant="menu" className="menu-panel-frame roster-tool" aria-label="Back"
+        title="Back" disabled={busy} onPress={onBack}><MenuIcon name="back" /></GameButton>
+    </div>}
     <div className="roster-choices">
       {slots ? <>
         <div className="roster-caption">
@@ -66,12 +55,9 @@ export function CharacterRoster({ profile, selected, limit, pose, busy, connecte
         </div>
       </> : <p role="status" className="welcome-help">Character selection needs the updated game server.</p>}
     </div>
-    {selectedAppearance && <div className="roster-preview-tools" data-controller-row>
+    {selectedAppearance && <div className="roster-preview-tools">
       <span className="roster-rotate" aria-hidden="true">{device === "controller"
         ? <><ControllerButton button="LS" /> Look <ControllerButton button="RS" /> Rotate</> : "Drag to rotate"}</span>
-      <GameButton variant="menu" className="menu-panel-frame roster-tool roster-pose" aria-label={`Pose: ${poseName}. Change pose`}
-        title={`Pose: ${poseName}. Change pose`} onPress={() => onPose(SELECTION_POSES[(poseIndex + 1) % SELECTION_POSES.length].id)}>
-        <MenuIcon name="accessibility" /></GameButton>
     </div>}
     <div className="roster-entry" data-controller-row>
       <GameButton variant="menu" className="menu-panel-frame roster-enter" aria-label="Enter world"

@@ -56,7 +56,7 @@ export type WorldInvitation = {
 };
 export type CharacterSlot = { id: string; name: string; style: string; level: number; appearance?: CharacterChoice | null };
 export type PlayerProfile = {
-  id: string; name: string; progression?: Progression;
+  id: string; name: string; account_display_name?: string; progression?: Progression;
   active_character_id?: string | null; characters?: CharacterSlot[];
 };
 
@@ -97,6 +97,11 @@ type Cosmetics = Pick<Progression, "character" | "character_presets" | "characte
 
 export function selectEquippedCharacter(state: { view: SocialView | null; cachedCosmetics: Cosmetics | null }) {
   return state.view ? state.view.profile.progression?.character : state.cachedCosmetics?.character;
+}
+
+/** Older servers send the character name once a career is active. */
+export function playerDisplayName(profile?: PlayerProfile | null): string | undefined {
+  return profile?.account_display_name ?? (profile?.active_character_id ? undefined : profile?.name);
 }
 
 /** The active career's progression can already contain a newer wardrobe edit. */
@@ -183,6 +188,7 @@ export const useSocialStore = create<{
     if (
       typeof view.profile?.id !== "string" ||
       typeof view.profile.name !== "string" ||
+      (view.profile.account_display_name !== undefined && typeof view.profile.account_display_name !== "string") ||
       !view.limits ||
       !Number.isSafeInteger(view.limits.max_active_worlds)
     )

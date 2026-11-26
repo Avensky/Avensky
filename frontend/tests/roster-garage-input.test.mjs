@@ -49,6 +49,36 @@ test("both rigs fit the selector framing across orientation and garage orbit", (
   }
 });
 
+test("Profile frames the fitted rig's eyes above the settings sheet and preserves the landscape shot", () => {
+  // Heights from the shipped female and male rigs in metres including the eye and waist offsets.
+  const rigs = [{ eyes: 1.569, waist: 1.095 }, { eyes: 1.711, waist: 1.164 }];
+  for (const rig of rigs) {
+    const profile = rosterCamera("profile"), roster = rosterCamera();
+    const camera = new PerspectiveCamera(), original = new PerspectiveCamera();
+    profile.frame(camera, 393, 852);
+    profile.fitPortrait(rig.eyes, rig.waist); // Also works when geometry arrives after the camera.
+    const y = height => (1 - new Vector3(0, height, 0).project(camera).y) / 2;
+    for (const [width, height] of [[393, 852], [320, 568], [768, 1024], [844, 390], [1600, 900]]) {
+      profile.frame(camera, width, height);
+      roster.frame(original, width, height);
+      for (const yaw of [-.24, .24]) for (const pitch of [-.09, .09]) {
+        profile.orbit(camera, yaw, pitch);
+        camera.updateMatrixWorld();
+        if (width < height) {
+          assert.ok(Math.abs(y(rig.eyes) - .16) < .000001);
+          assert.ok(y(rig.waist) > .49 && y(rig.waist) < .55);
+          assert.ok(y(rig.eyes + .125) > .055, "hair clears the top of the display");
+        } else {
+          roster.orbit(original, yaw, pitch);
+          assert.ok(original.position.distanceTo(camera.position) < 1e-10);
+          assert.ok(original.quaternion.angleTo(camera.quaternion) < 1e-6);
+          assert.ok(original.projectionMatrix.equals(camera.projectionMatrix));
+        }
+      }
+    }
+  }
+});
+
 test("only the initial hit chooses the actor and UI presses are ignored", () => {
   const dom = new JSDOM('<div class="garage-orbit-surface"></div><div role="button">Play</div>');
   const { window } = dom;

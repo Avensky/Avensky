@@ -48,6 +48,14 @@ test('tab players preserve main credentials and Quickplay waits for a confirmed 
   await t.test('reload restores only this tab identity; an inherited duplicate can recover without changing the main player',async()=>{
    client.setSocialConnection(socket);client.beginSocialSession('server-one');assert.equal(sent.at(-1).token,tab.token);
    reply(sent.at(-1),{profile_id:tab.id,token:null});await flush();client.receiveSocialState(view(tab.id));
+   const career=view(tab.id,'Left Lane');
+   career.profile.active_character_id='career-two';
+   career.profile.account_display_name='Nightdriver';
+   client.receiveSocialState(career);
+   assert.equal(JSON.parse(dom.window.sessionStorage.getItem(key+':tab')).name,'Nightdriver');
+   delete career.profile.account_display_name;
+   client.receiveSocialState(career);
+   assert.equal(JSON.parse(dom.window.sessionStorage.getItem(key+':tab')).name,'Nightdriver','older servers only send the active character name');
    client.setSocialConnection(socket);client.beginSocialSession('server-one');reply(sent.at(-1),{},false,'This player profile is already connected in another tab.');await flush();
    const before=dom.window.sessionStorage.getItem(key+':tab'),failed=client.createTabProfile();reply(sent.at(-1),{},false,'The server has reached its profile limit.');await assert.rejects(failed,/profile limit/);
    assert.equal(dom.window.sessionStorage.getItem(key+':tab'),before);assert.equal(JSON.parse(localStorage.getItem(key)).token,main.token);
