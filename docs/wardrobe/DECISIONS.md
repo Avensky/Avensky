@@ -122,6 +122,13 @@
 - **Correctness rule:** only material color, roughness, normal map, metallic and dye parameters are non-geometric. A true cloth-thickness change, underlayer change, source topology change, bind rig change, or closure geometry change **requires** fit invalidation and new measurements.
 - **Next executable engineering action:** obtain a usable real `vesper-body.glb` plus actor bind/pose references in a private fitting workspace; implement an automated rig+landmark **dry-run** reporting exact mismatch and missing assets before moving vertices. Then fit Coat 01 over one thin top, inspect side/arm/pocket/cuff evidence, and refine the regional solver with Vesper data. Retain source-license and public-asset gates.
 
+## 2026-11-25 — W-07 automated fit recipe contracts verified (no actual mesh fit)
+
+- [W-07 private intake CI](https://github.com/Avensky/Avensky/actions/runs/45779656624) on source commit `47446964` passed **4/4 Python synthetic FBX scanner tests** and **8/8 Node intake/fit-recipe tests**, 0 failed. The subsequent [W-07 run](https://github.com/Avensky/Avensky/actions/runs/45779732204) also passed; stage/agent documentation-only commits were made afterward.
+- Automated checks establish **only** source metadata parsing, stable IDs, semantic gate ordering, conservative corset/outerwear protected classes, deterministic cache separation and non-equippable private candidate records. They do **not** execute Blender, rig anything, generate GLBs, run real asset collision/poses, approve materials, or verify licensing/mobile rendering.
+- W-06 inspector and Cloud asset streaming workflows are independent and may still be running; do not declare those checks green based on W-07's focused test. Full repo lint baseline remains separately tracked.
+- Next implementation dependency: real Vesper body donor + rig in a private fitting environment and measured source-to-actor transform, followed by automated skin-weight transfer validation. Only after this dependency passes may an initial Coat 01 over-top pose-fitted GLB be produced for review.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.

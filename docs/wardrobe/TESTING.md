@@ -63,7 +63,9 @@ python -m unittest discover -s scripts/wardrobe/tests -p 'test_outerwear_intake.
 node --test frontend/tests/wardrobe-outerwear-intake.test.mjs frontend/tests/wardrobe-fit-recipes.test.mjs
 ```
 
-The Python test creates a tiny synthetic FBX, checks reference-only bounds, missing rig, UVs, source hashes, bad input and byte immutability. The Node tests guard stable ID/public-catalog isolation and conservative [fitting recipe](../../packages/wardrobe-catalog/garment-fit-recipes.v1.json) semantics (corset rigid panels, underlayer composite surfaces, pose blocks, material-only changes not forcing a fit). These are design contract checks, **not** actual fitted-mesh or pose tests. The actual source-hash and 9-FBX audit run is separate and private:
+The Python test creates a tiny synthetic FBX, checks reference-only bounds, missing rig, UVs, source hashes, bad input and byte immutability. The Node tests guard stable ID/public-catalog isolation and conservative [fitting recipe](../../packages/wardrobe-catalog/garment-fit-recipes.v1.json) semantics (corset rigid panels, underlayer composite surfaces, pose blocks, material-only changes not forcing a fit). These are design contract checks, **not** actual fitted-mesh or pose tests.
+
+**W-07 source/recipe contract evidence:** [2026-11-25 PT CI](https://github.com/Avensky/Avensky/actions/runs/45779656624) passed **4 Python and 8 Node tests**, no failures. [Follow-up W-07 run](https://github.com/Avensky/Avensky/actions/runs/45779732204) also completed successfully. No original private FBX, actor donor, GLB, pose collision or mobile screenshot QA was executed in public CI. The actual source-hash and 9-FBX audit run is separate and private:
 
 ```sh
 python scripts/wardrobe/inspect_outerwear_assets.py --directory "<private-input-directory>" --expected packages/wardrobe-catalog/outerwear-candidates.json --json "<private-output-directory>/w07-intake-report.json"
