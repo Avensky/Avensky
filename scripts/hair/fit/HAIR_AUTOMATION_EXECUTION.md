@@ -15,6 +15,12 @@ The Curly Mane iterations repeatedly improved overall scalp coverage while leavi
 5. **Use one correction and one focused follow-up as a starting budget.** If the same area still looks wrong, or the next option requires changing the silhouette, pause for a private side-by-side review at the exact problem angles. Say what improved and what remains visible. The user can choose whether to keep the fit, try a fuller shape, or revisit the fit strategy. An explicit request for more passes can extend the budget. Record pass count, render time, and reused captures to compare the effort across hairstyles.
 6. **Keep finish checks together.** When the static look is accepted, run the relevant game head turns, facial expressions, and collar checks on that candidate. Use a targeted motion check earlier when a specific placement needs it. Record visual acceptance and runtime results separately. Keep the candidate and licensed assets private through review. Approval to release remains a separate step.
 
+### Current Curly Mane continuation checkpoint
+
+Private visual approval is pending. The current fuller front-hairline fit preserves the original scalp texture and forward curl. The next candidate should make a visible shape change at the front and crown. Baseline masks have been captured at the garage’s 20° raised height and 45° Crown height, with matching cameras for comparison. Resume from the current private fit and reuse those masks. The next candidate has no placement plan or after captures yet.
+
+Use one private side-by-side comparison at both heights to review the shape. The existing fitting and review steps are scoped to Vesper and Curly Mane. Automatic placement and visual approval remain separate checkpoints.
+
 ## Prepare the private source workbench
 
 ~~~powershell
@@ -27,7 +33,8 @@ $private = "C:/AvenskyPrivate/curly"
 
 - High confidence: original-source inspection, global-fit candidates, root/surface measurements, safe prototype adjustments, reproducible PNG comparison, scripted QA in normal ChatGPT.
 - Moderate confidence: reaching a convincing static match to the original vendor's rounded, dense spiral bob without Work, provided the real crown gaps and face-overlapping strands are corrected.
-- Not yet demonstrated: a one-click arbitrary hairstyle fitter, reliable automatic donor root identification, Blender rig/pose integration, alpha-aware gap maps, and actual phone/game acceptance.
+- Demonstrated for Vesper and Curly Mane: alpha-aware gap maps, neutral garage orbit review, and private head-turn, expression, and collar checks on selected candidates.
+- Still open: reliable automatic donor root identification, hands-off fitting for arbitrary styles, and production or phone acceptance.
 
 A root touching the head is not the same thing as a hairstyle covering the scalp. Geometry contact, alpha-visible coverage, and runtime behavior MUST be separate acceptance gates.
 
@@ -130,7 +137,7 @@ If the Blender workbench already contains an empty AV_RootWeight group, the expl
 - [ ] Review intended part lines, open crown/back patches and face overlap with the user.
 - [ ] Position extra interior root clumps conservatively, preserving donor UVs and spiral shape.
 - [ ] No eye/nose/mouth-obscuring cards. Rounded, glossy vendor-like bob required.
-- [ ] Human approval of PNG before any GLB output; user cannot open GLB links.
+- [ ] Secure visual approval using visible PNG or orbit GIF comparisons before release. A private GLB may drive the garage review.
 
 ### Gate D: game and mobile
 - [ ] Attach to actual Vesper head bone/skin, verify animations, expressions, bonnet and high collars.
@@ -142,4 +149,4 @@ If the Blender workbench already contains an empty AV_RootWeight group, the expl
 
 After calibrating Vesper once, a NEW female hairstyle should: inventory original FBX and atlas, suggest roots, propose a global transform, write immutable source checksums, produce exact root contact CSV and six source-textured PNGs, and stop for human approval if root identities, coverage or collisions are ambiguous.
 
-Do not promise full unattended fitting yet. Resume at review of the six-view PNGs, original scalp mask approval, and root classification. Use the Blender coverage report to agree which areas need correction before moving cards. Male hair/clothing remains deferred.
+For Curly Mane, resume from the private continuation checkpoint above. For a new style, review the baseline cameras and scalp mask and confirm the source roots before fitting. Male hair/clothing remains deferred.
