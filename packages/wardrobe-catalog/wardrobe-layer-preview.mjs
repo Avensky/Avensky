@@ -67,9 +67,13 @@ export function buildWardrobeLayerPreview(choice,{catalog=[],rules}={}) {
       fitEvidence:[],visibilityEvidence:[]
     },rules);
     const membership=new Map(resolved.membership.map(x=>[x.id,x]));
-    base.saved=base.saved.map(x=>({...x,
-      reviewStatus:x.status==="candidate"?membership.get(x.id)?.status ?? "unverified":"unverified"
-    }));
+    base.saved=base.saved.map(x=>{
+      const graphStatus=x.status==="candidate"?membership.get(x.id)?.status:null;
+      // A solo node or a pair with no conflict is graph-compatible only.
+      // In this read-only UI there is no authenticated geometry/pose evidence.
+      const reviewStatus=graphStatus==="allowed"?"unverified":graphStatus ?? "unverified";
+      return {...x,reviewStatus};
+    });
     const groups=new Map();
     for(const problem of resolved.issues) {
       const groupKey=problem.code+":"+problem.garmentIds.join("|");
