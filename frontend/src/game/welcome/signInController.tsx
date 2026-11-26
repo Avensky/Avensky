@@ -86,7 +86,7 @@ function attachController(form: HTMLElement) {
   form.append(controls);
   const root = createRoot(controls);
   root.render(<MenuInputDeviceContext.Provider value="controller">
-    <MenuShortcuts back={false} tabs={false} directions="both" selectLabel="Select" />
+    <MenuShortcuts back={Boolean(form.querySelector("[data-portal-cancel]"))} tabs={false} directions="both" selectLabel="Select" />
     <OnScreenKeyboard />
   </MenuInputDeviceContext.Provider>);
 
@@ -118,7 +118,7 @@ function attachController(form: HTMLElement) {
       if (active instanceof HTMLInputElement) openFieldKeyboard(active);
       else if (active?.matches('button:enabled, a[href], [role="button"]:not([aria-disabled="true"])')) active.click();
     } else if (action === "back") {
-      form.querySelector<HTMLElement>(".portal-back")?.click();
+      form.querySelector<HTMLElement>("[data-portal-cancel] [role=button], .portal-back")?.click();
     } else if (action === "up" || action === "down" || action === "left" || action === "right") {
       navigateFormRows(form, active && form.contains(active) ? active :
         form.querySelector<HTMLElement>(".garage-field[data-selected=true] input"), action, remembered);
@@ -165,6 +165,11 @@ function attachController(form: HTMLElement) {
   window.addEventListener("keydown", event => {
     if (event.key === "Tab") { event.preventDefault(); event.stopImmediatePropagation(); return; }
     if (useTextKeyboardStore.getState().session) return;
+    if (event.key === "Escape" && form.querySelector("[data-portal-cancel]")) {
+      event.preventDefault(); event.stopImmediatePropagation();
+      act("back");
+      return;
+    }
     if (event.key === "ArrowUp" || event.key === "ArrowDown") {
       event.preventDefault(); event.stopImmediatePropagation();
       const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;

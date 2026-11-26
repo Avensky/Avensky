@@ -15,6 +15,8 @@ import { prepareVillageShoes } from "./wardrobeShoes";
 import { prepareNeckBows } from "./neckBowFit";
 import { prepareVillageBonnet } from "./villageBonnet";
 import { prepareWardrobeGarments, type WardrobeGarmentSource } from "./wardrobeGarmentFit";
+import { prepareHairDye } from "./fittedWardrobe/hairDye";
+import { DEFAULT_HAIR_PALETTE } from "./fittedWardrobe/hairColors";
 import { bindFittedHair } from "./fittedHair";
 import { prepareStandaloneCorset, type StandaloneCorsetSource } from "./standaloneCorset";
 import { smoothUnderarmSkin } from "./villagerUnderarm";
@@ -94,6 +96,7 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const vertex = new Vector3();
   let skirtRadius: number | undefined;
   const skeletons = new Set<Skeleton>();
+  const hairDyes = new Map<MeshStandardMaterial, ReturnType<typeof prepareHairDye>>();
   for (const part of [root, detachedCorset?.group]) part?.traverse(object => {
     if (!(object instanceof Mesh)) return;
     if (object instanceof SkinnedMesh) skeletons.add(object.skeleton);
@@ -114,6 +117,9 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
       if (existing) return existing;
       const copy = material.clone();
       if (detachedCorset?.authoredLacedBodice && part === detachedCorset.group) copy.userData.rebuiltLacedBodice = true;
+      if (copy.map && (copy.name === "MAT_Hair" || object === fittedHair)) {
+        hairDyes.set(copy, prepareHairDye(copy, object.geometry, false, undefined, !female));
+      }
       palette.set(material, copy);
       return copy;
     };
@@ -192,7 +198,7 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   if (grounded) root.position.y = -new Box3().setFromObject(grounded, true).min.y;
   const applyTattoo = prepareBodyTattoo(getWardrobeActorBody(root) ?? actorBody);
   return {
-    root, materials, pieceMaterials, crop, scalpCap, applyFaceColors, faceAccessories, wardrobe, trialGarments, detachedCorset,
+    root, materials, pieceMaterials, crop, scalpCap, hairDyes, applyFaceColors, faceAccessories, wardrobe, trialGarments, detachedCorset,
     hat, bonnet, neckBows, bundledWaist, applyTattoo, fittedHair,
     longHair: root.getObjectByName("HAIR_HAIR20"),
     bow: root.getObjectByName("ACC_BOW"),
@@ -292,6 +298,11 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
       const materials = Array.isArray(model.fittedHair.material) ? model.fittedHair.material : [model.fittedHair.material];
       for (const material of materials) if (material instanceof MeshStandardMaterial) material.color.set(look.hair);
     }
+  }
+  for (const [material, setPalette] of model.hairDyes) {
+    const palette = look.appearance.hair_palette;
+    if (palette) material.color.set(0xffffff);
+    setPalette(palette ?? DEFAULT_HAIR_PALETTE, !palette);
   }
   if (model.longHair) model.longHair.visible = !model.fittedHair && !cropped && !tucksHair;
   if (model.bow) model.bow.visible = !look.removedClothing.includes("bow")

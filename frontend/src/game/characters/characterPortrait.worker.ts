@@ -1,6 +1,6 @@
 import { assetUrl } from "../../assets/runtimeAssets";
 import {
-  ACESFilmicToneMapping, DirectionalLight, HemisphereLight, LoadingManager, OrthographicCamera,
+  ACESFilmicToneMapping, Box3, DirectionalLight, HemisphereLight, LoadingManager, Mesh, OrthographicCamera,
   Scene, Vector3, WebGLRenderer, type Object3D,
 } from "three";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -76,8 +76,27 @@ async function renderPortrait({ look, modelUrl, dress }: CharacterPortraitJob) {
     scene.add(model.root, keyLight, new HemisphereLight(0xe5eeff, 0x73685e, 1.25));
 
     model.root.updateMatrixWorld(true);
-    const center = head.getWorldPosition(new Vector3()).add(new Vector3(0, -.035, .018));
-    const camera = new OrthographicCamera(-.245, .245, .245, -.245, .1, 10);
+    const center = head.getWorldPosition(new Vector3());
+    // The anchor is near the jaw. Use the authored bounds of visible headwear
+    // and hair, including fitted hair, to leave space above the actual crown.
+    const bounds = new Box3();
+    let crown = center.y + .16;
+    const fittedHair = model.fittedHair;
+    model.root.traverseVisible(object => {
+      if (!(object instanceof Mesh)) return;
+      if (object !== fittedHair && !/hair|hat|bonnet|head_face/i.test(object.name)) return;
+      if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
+      if (object.geometry.boundingBox) {
+        bounds.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
+        crown = Math.max(crown, bounds.max.y);
+      }
+    });
+    const bottom = center.y - .23;
+    const top = crown + .05;
+    const half = (top - bottom) / 2;
+    center.y = (top + bottom) / 2;
+    center.z += .018;
+    const camera = new OrthographicCamera(-half, half, half, -half, .1, 10);
     camera.position.copy(center).add(new Vector3(.4, .08, 2));
     camera.lookAt(center);
 

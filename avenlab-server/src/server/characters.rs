@@ -1,12 +1,7 @@
 use super::*;
-use crate::alpha::character::CharacterChoice;
-use std::sync::LazyLock;
+use crate::alpha::character::{CharacterChoice, STARTER_STYLES};
 
 const MAX_CHARACTERS: usize = 4;
-static STYLES: LazyLock<Value> = LazyLock::new(|| {
-    serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/character-styles.json"))
-        .expect("valid starter character styles")
-});
 
 fn character_name(raw: &str) -> Result<String, String> {
     let name = raw.split(' ').filter(|part| !part.is_empty()).collect::<Vec<_>>().join(" ");
@@ -26,7 +21,7 @@ fn style_choice(style: &str, body: &str) -> Result<CharacterChoice, String> {
         "male" => "jules-okafor",
         _ => return Err("Choose a body for your character.".into()),
     };
-    let entry = STYLES.as_array().and_then(|styles| styles.iter().find(|entry| entry["id"] == style))
+    let entry = STARTER_STYLES.iter().find(|entry| entry["id"] == style)
         .ok_or("Choose a starter style.")?;
     let outfit = &entry[body];
     let choice: CharacterChoice = serde_json::from_value(json!({

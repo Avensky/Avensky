@@ -54,7 +54,7 @@ export function driverAppearance(choice: CharacterChoice | null | undefined): Dr
   return {
     body: female ? "female" : "male",
     skin: optionColor("skin", female ? "#d49673" : "#95553d"),
-    hair: optionColor("hair_color", female ? "#7c573c" : "#2b2127"),
+    hair: appearance?.hair_palette?.base ?? optionColor("hair_color", female ? "#7c573c" : "#2b2127"),
     hairStyle: female && appearance?.hair !== "cropped" ? "long" : "short",
     headwear: hat ? "hat" : "none",
     headwearColor: pieceColor("hat", "#e7cda0"),

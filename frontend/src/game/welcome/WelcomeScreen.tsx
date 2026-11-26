@@ -7,7 +7,7 @@ import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/so
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { CHARACTERS, characterAppearance, characterLook, ROOK_ID, type CharacterChoice } from "../characters/characterCatalog";
-import { CHARACTER_STYLES, creatorChoice, type CharacterBody } from "../characters/characterStyles";
+import { CHARACTER_STYLES, applyCreatorWardrobe, creatorChoice, type CharacterBody } from "../characters/characterStyles";
 import { CharacterCreator, CREATOR_STEPS } from "./CharacterCreator";
 import { CharacterRoster } from "./CharacterRoster";
 import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
@@ -106,18 +106,16 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const originalLook = useMemo(() => {
     if (!original || original.id !== creation.choice.id) return undefined;
     if (creation.style === "original") return creation.choice;
-    const { skin, hair_color, makeup } = characterAppearance(creation.choice);
-    return { ...original, appearance: { ...characterAppearance(original), skin, hair_color, makeup } };
+    return applyCreatorWardrobe(original, creation.choice);
   }, [original, creation]);
   const facePreview = useMemo<CharacterChoice>(() => {
     const { choice } = creation;
     const rig = CHARACTERS.find(item => item.id === choice.id);
     const face = characterAppearance(choice);
-    // The first five steps need only the base rig and the chosen face colors.
-    // An outfit or fitted hairstyle is requested when its class is actually shown.
+    // Use the bundled outfit for face editing. Only the selected hairstyle
+    // is mounted, so browsing the swatches never preloads other styles.
     return { id: choice.id, identity: choice.identity, outfit: rig?.outfits[0].id ?? choice.outfit,
-      appearance: { hair: "natural", headwear: "none", color: "original", skin: face.skin, hair_color: face.hair_color,
-        makeup: face.makeup, eye_color: face.eye_color, brow_color: face.brow_color } };
+      appearance: { ...face, headwear: "none", color: "original", accent: undefined, item_colors: undefined } };
   }, [creation]);
   const draftLook = useMemo(() => {
     if (creatorStep !== "personality") return facePreview;
@@ -272,7 +270,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
 
   useEffect(() => {
     function navigate(event: Event) {
-      if (!root.current || root.current.inert || (busy && !sessionPending)) return;
+      if (screen === "create" || !root.current || root.current.inert || (busy && !sessionPending)) return;
       const action = (event as CustomEvent<MenuAction>).detail;
       const active = root.current.contains(document.activeElement) ? document.activeElement :
         root.current.querySelector(".garage-field[data-selected=true] input") ?? document.activeElement;
@@ -282,7 +280,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
         if (active.matches("button:enabled, [role=button]:not([aria-disabled=true]), [role=tab]:not([aria-disabled=true]), summary, a[href]")) active.click();
         else if (active instanceof HTMLInputElement) {
           if (active.readOnly) active.select();
-          else openFieldKeyboard(active, active.name === "characterName" ? changeName : undefined);
+          else openFieldKeyboard(active);
         } else if (isTypingTarget(active)) active.focus();
       } else if (["up","down","left","right"].includes(action)) {
         navigateFormRows(root.current, active, action, remembered.current);
@@ -429,6 +427,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   return <>
     <main className="welcome-screen garage-entry" ref={root} data-logging-out={leavingPlayer ? true : undefined} data-controller-rows data-controller-form onKeyDown={event => {
       if (event.key === "Tab") { event.preventDefault(); return; }
+      if (screen === "create") return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (!event.repeat) back();
@@ -451,7 +450,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
         {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
           <GarageProfilePanel key={player?.id} onBack={leaveProfile} />
         </Suspense> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
-          choice={creation.choice} facePreview={facePreview} previewStyle={previewStyle} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
+          choice={creation.choice} facePreview={facePreview} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
           style={creation.style} onStyle={chooseStyle} onPreviewStyle={setPreviewStyle} onBody={chooseBody}
           name={name} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}
           onBack={() => back(true)} onSubmit={createDraft}

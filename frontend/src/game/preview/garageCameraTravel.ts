@@ -35,6 +35,7 @@ export type GarageShotPhase = "waiting" | "framing" | "framed";
 /** Sample the camera that is actually being drawn, including the player's orbit and lens shift. */
 export class GarageCameraTravel {
   private shot?: GarageEntryShot;
+  private framingRevision = 0;
   private width = 0;
   private height = 0;
   private dpr = 0;
@@ -60,7 +61,10 @@ export class GarageCameraTravel {
     const missing = requested?.subject === "unavailable";
     const shot = waiting || (firstFrame && !reducedMotion) ? this.shot : missing ? undefined : requested;
     const resized = width !== this.width || height !== this.height;
-    const changed = this.shot !== shot;
+    // A late head/waist measurement is a new destination even for the same
+    // shot. Start that adjustment from the lens currently on screen.
+    const revision = shot?.framingRevision ?? 0;
+    const changed = this.shot !== shot || this.framingRevision !== revision;
     if (changed || resized || this.dpr !== dpr) {
       if (changed || resized && this.time < TRAVEL_MS) {
         this.sourcePosition.copy(camera.position);
@@ -73,6 +77,7 @@ export class GarageCameraTravel {
       this.height = height;
       this.dpr = dpr;
       this.shot = shot;
+      this.framingRevision = revision;
       if (shot) shot.frame(camera, width, height);
       else {
         const portrait = width < height;
@@ -110,7 +115,7 @@ export class GarageCameraTravel {
     }
     this.lastFrame = now;
     if (this.time < TRAVEL_MS) {
-      const t = MathUtils.smoothstep(this.time, 0, TRAVEL_MS);
+      const t = MathUtils.smootherstep(this.time, 0, TRAVEL_MS);
       camera.position.lerpVectors(this.sourcePosition, camera.position, t);
       camera.quaternion.slerp(this.sourceOrientation, 1 - t);
       applyLens(camera, width, height, MathUtils.lerp(this.sourceLens.fov, lens.fov, t),

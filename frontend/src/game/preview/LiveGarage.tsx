@@ -21,6 +21,7 @@ const decoder = new DRACOLoader().setDecoderPath("/draco/");
 const configure = (loader: GLTFLoader) => { loader.setDRACOLoader(decoder).register(embeddedTextureImages); };
 export type GarageEntryShot = {
   subject?: "loading" | "ready" | "unavailable";
+  framingRevision?: number;
   frame(camera: PerspectiveCamera, width: number, height: number): void;
   orbit(camera: PerspectiveCamera, yaw: number, pitch: number): void;
   actor?: ActorInput;

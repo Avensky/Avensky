@@ -1,4 +1,5 @@
 import type { MirrorCheckFit } from "./mirrorCheck";
+import { RosterRigHandoff } from "./RosterRigHandoff";
 import { CharacterTurntable } from "./CharacterTurntable";
 import { usesFittedAnimation } from "./animationFit";
 import { clothingColors } from "./clothingPieces";
@@ -34,7 +35,8 @@ type WardrobeAssetListener = (url: string, scene: Object3D | null) => void;
 type VillagerPlayback = {
   bag: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit;
   victory?: VictoryPlayback; cockpit?: GarageCockpit; paused: boolean; upright: boolean; rosterPreview?: boolean;
-  onSettled?: (available: boolean) => void;
+  creating?: boolean; coverage?: { value: number };
+  onSettled?: (available: boolean, rigId?: string) => void;
 };
 
 function WardrobeAsset({ url, onReady }: { url: string; onReady: WardrobeAssetListener }) {
@@ -75,9 +77,16 @@ function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, 
     preferredUrl, look, kind, villageKind, sources, previous: active, allowStockHair: playback.rosterPreview,
   }), [preferredUrl, look, kind, villageKind, sources, active, playback.rosterPreview]);
   if (preview !== active) setActive(preview);
+  const failedRig = scene === null && active && active.look.character.id !== look.character.id;
+  useLayoutEffect(() => {
+    if (failedRig) playback.onSettled?.(false);
+  }, [failedRig, playback.onSettled]);
 
   const status = scene === null ? "Character model unavailable"
     : pendingUrls.length ? "Loading garments" : unavailable ? "Garment unavailable" : undefined;
+  const renderActor = (shown: WardrobePreview, coverage?: { value: number }) => <AssetBoundary key={shown.scene.uuid} fallback={fallback}>
+    <ReadyVillager preview={shown} {...playback} coverage={coverage} />
+  </AssetBoundary>;
   return <>
     {optionalHairUrl && <AssetBoundary key={optionalHairUrl} fallback={<MissingRosterHair url={optionalHairUrl} />}>
       <Suspense fallback={null}><WardrobeAsset url={optionalHairUrl} onReady={onReady} /></Suspense>
@@ -86,10 +95,10 @@ function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, 
       <Suspense fallback={null}><WardrobeAsset url={asset} onReady={onReady} /></Suspense>
     </AssetBoundary>)}
     {active ? <>
-      <AssetBoundary key={active.scene.uuid} fallback={fallback}>
-        <ReadyVillager preview={active} {...playback} />
-      </AssetBoundary>
-      {status && <PreviewLoadingStatus label={status} />}
+      {playback.rosterPreview ? <RosterRigHandoff preview={active} requested={look.character.id} creating={Boolean(playback.creating)}>
+        {renderActor}
+      </RosterRigHandoff> : renderActor(active)}
+      {status && !(playback.rosterPreview && pendingUrls.length) && <PreviewLoadingStatus label={status} />}
     </> : scene === null ? fallback : playback.victory ? <CharacterLoadingEffect />
       : <PreviewLoadingStatus label={scene ? "Loading garments" : "Loading driver"} />}
   </>;
@@ -101,7 +110,7 @@ function HighCollarMotion({ update }: { update: () => void }) {
   return null;
 }
 
-function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, onSettled }: VillagerPlayback & { preview: WardrobePreview }) {
+function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, onSettled, coverage }: VillagerPlayback & { preview: WardrobePreview }) {
   const { look, scene, garments, garmentBody, corsetScene, corsetSet, hairSource } = preview;
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
@@ -114,11 +123,11 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
       female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, removedClothing,
       corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
     });
-    if (rosterPreview) prepareGaragePointLights(model.root, "subject");
+    if (rosterPreview) prepareGaragePointLights(model.root, "subject", coverage);
     return model;
-  }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, rosterPreview]);
+  }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, rosterPreview, coverage]);
   const model = useCommittedResource(createModel);
-  useLayoutEffect(() => { if (model) onSettled?.(true); }, [model, onSettled]);
+  useLayoutEffect(() => { if (model) onSettled?.(true, look.character.id); }, [model, onSettled, look.character.id]);
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
@@ -185,8 +194,8 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
   </group>;
 }
 
-export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview, onSettled }: {
-  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; rosterPreview?: boolean;
+export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview, creating, onSettled }: {
+  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; rosterPreview?: boolean; creating?: boolean;
   onSettled?: VillagerPlayback["onSettled"];
 }) {
   const look = useMemo(() => characterLook(choice), [choice]);
@@ -202,9 +211,9 @@ export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory
   return (
     <CharacterTurntable enabled={Boolean(previewPacks)}>
       {url
-        ? <VillagerDriver key={choice.id} url={url} look={look} kind={kind} villageKind={villageKind} fallback={fallback} bag={bag}
+        ? <VillagerDriver key={rosterPreview ? "roster" : choice.id} url={url} look={look} kind={kind} villageKind={villageKind} fallback={fallback} bag={bag}
             previewPacks={previewPacks} leanFit={coatFitsLean ? leanFit : undefined} mirrorFit={mirrorFit}
-            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} onSettled={onSettled} />
+            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creating={creating} onSettled={onSettled} />
         : fallback}
     </CharacterTurntable>
   );

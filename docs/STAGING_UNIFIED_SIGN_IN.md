@@ -30,6 +30,8 @@ With the staging gate enabled, Rust requires an admission for all game sockets, 
 - A manager issues an expiring, single-use invite and sends its link privately. The invite approves the intended account for staging.
 - Each player accepts the invite using their email and one password. A new email creates a game account. Use the existing game password if the email already has an account to keep its profile and saves. Returning players go straight to character selection.
 - Sign-in starts with email and password. A password visibility button lets players check their typing on mobile. Accounts with two-factor authentication enabled receive a separate authenticator or recovery-code prompt after their password is verified. The prompt expires after five minutes. Staging currently uses authenticator apps and one-use recovery codes for 2FA.
+- After credential verification, a player who already has a signed-in session on another device can choose **Sign out other device and continue** or **Cancel**. Confirmation revokes the earlier browser grant and disconnects its game socket. The other device returns to sign-in with an explanation. Cancel keeps that device connected. A switch request expires after five minutes and is valid only for the session shown. A disconnected device with an unexpired browser session can also trigger the prompt.
+- A returning browser resumes its own session. Tabs in the same browser share that session. If two tabs try to play at once, the second tab offers **Reconnect** after the first one closes. Self-hosted development servers using standalone game credentials retain their existing one-active-connection rule.
 - Open the invite in the original browser to retain a saved guest profile. The invite can upgrade an available guest profile to the invited email.
 - An operator can preserve a legacy username by specifying it in **Alpha testers** when creating the invite or by passing `--game-login EXISTING_USERNAME` to `invite-admin`. The tester still enters only their email and game password.
 - The staging signup path requires an invite. Revoking alpha access blocks new sessions and private model requests and disconnects the active game session. The player profile and saves are retained.
@@ -38,7 +40,7 @@ The portal unit binds the named game volume’s staging directory into its priva
 
 ## Refresh the installed staging portal
 
-Wait for the main-branch staging publisher to finish. It builds and activates the Rust game when its inputs change, checks the game, then publishes the frontend. During rollout the updated game accepts the older portal’s admission proofs. Session takeover becomes available after the operator updates the portal and its socket verifier together.
+Wait for the main-branch staging publisher to finish. It builds and activates the Rust game when its inputs change, checks the game, then publishes the frontend. The operator then refreshes the portal to enable the other-device confirmation. The new portal adds the short-lived switch requests to the existing SQLite database at startup.
 
 From a root shell on the staging host, refresh the portal from the same commit as the published frontend.
 
@@ -53,6 +55,8 @@ From a root shell on the staging host, refresh the portal from the same commit a
   bash "$script" --portal-only
 )
 ```
+
+To check the installed portal from a signed-out browser or terminal, request `GET /__alpha/sign-in/transfer` without following redirects. The confirmation-aware portal returns `303` with `Location: /sign-in`. An older portal returns `404`. This check can be run without an account.
 
 The installer checks the running game’s authenticated metadata for admission version 2 before changing any live files. It backs up the installed modules, installs the matching portal, account, verifier, and theme files, then restarts the portal. It checks sign-in HTML, controller assets, the signed-out verifier response, and the public garage model. A failed check restores the previous portal files. The refresh uses the existing game database and leaves Caddy and the game service in place. On first startup the new portal keeps the newest valid legacy session per account. Existing players, characters, invitations, and account settings are preserved. The earlier `--ui-only` flag is an alias for this version-matched refresh.
 

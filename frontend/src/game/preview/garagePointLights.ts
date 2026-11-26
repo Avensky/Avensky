@@ -26,7 +26,7 @@ const subjectLighting = `#include <lights_fragment_maps>
   #endif`;
 const prepared = new WeakSet<MeshStandardMaterial>();
 
-export function prepareGaragePointLights(room: Object3D, mode: "room" | "subject" = "room") {
+export function prepareGaragePointLights(room: Object3D, mode: "room" | "subject" = "room", coverage?: { value: number }) {
   const materials = new Set<MeshStandardMaterial>();
   const collect = (node: Object3D) => {
     if (!(node instanceof Mesh)) return;
@@ -45,8 +45,17 @@ export function prepareGaragePointLights(room: Object3D, mode: "room" | "subject
     material.onBeforeCompile = function (shader, renderer) {
       prepare.call(this, shader, renderer);
       shader.fragmentShader = shader.fragmentShader.replace("#include <lights_fragment_begin>", garageLighting);
+      if (coverage) {
+        shader.uniforms.rigCoverage = coverage;
+        // A screen-door dissolve keeps opaque geometry in the depth pass and
+        // retains hair alpha masks. All outfit materials share one uniform.
+        shader.fragmentShader = "uniform float rigCoverage;\n" + shader.fragmentShader.replace("#include <alphatest_fragment>", `
+          #include <alphatest_fragment>
+          if (rigCoverage < 1.0 && fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(.06711056, .00583715)))) > rigCoverage) discard;
+        `);
+      }
       if (mode === "subject") shader.fragmentShader = shader.fragmentShader.replace("#include <lights_fragment_maps>", subjectLighting);
     };
-    material.customProgramCacheKey = () => key + "|garage-point-lights-" + mode;
+    material.customProgramCacheKey = () => key + "|garage-point-lights-" + mode + (coverage ? "-handoff" : "");
   }
 }

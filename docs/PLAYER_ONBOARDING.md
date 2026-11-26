@@ -8,11 +8,15 @@ Drag the character to turn them, or drag the exposed garage to move the camera. 
 
 ## Create a character
 
-The left header opens **Gender**, **Looks**, **Skin tone**, **Hair color**, **Makeup**, and **Personality**. Players can revisit any step before saving. The Avensky back tab returns to the roster. The compact action in the lower-right advances the current step.
+The angled header opens **Gender**, **Looks**, **Skin tone**, **Hair color**, **Makeup**, and **Personality**. Tap a tab, use **LB/RB** on a controller, or press **Q/E** on a keyboard. Left and right move through the current step’s choices. Up and down leave the selection in place. The Avensky back tab returns to the roster.
 
-Looks shows the installed face for the chosen rig. Skin tone, hair color, and lip makeup preview on that face. The same garage camera eases from the body view into a close-up, stays there across those steps, and widens for the starter outfit. Switching steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
+Gender and Looks show portraits of the available rigs. The garage camera eases into a close-up for skin, hair, and makeup, then widens for the outfit. Changing steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
 
-Personality previews the starting hairstyle and wardrobe with the chosen skin tone, hair color, and makeup. Enter a character name on this step to finish. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) supplies the starting outfits. The creator saves the name and appearance together and opens the saved slot on the roster after the server confirms it. Duplicate names can be corrected in the same draft.
+Hair color uses the fitting room’s dye presets and lets players adjust the base, roots, highlights, and tips on supported hairstyles. Makeup has separate lipstick, eyeshadow, and eyeliner choices. Each follows the character into the roster.
+
+The personality tiles choose a starting outfit and idle emotes. Neutral is available from the start. Players keep the hairstyle, hair colors, skin tone, and makeup they picked. The [starter style catalog](../packages/wardrobe-catalog/character-styles.json) supplies the outfits for each rig.
+
+Players choose their own character name on the final step. With a controller, confirm the personality with **A** to open the name keyboard. **B** cancels the edit, and **Done** returns to character creation. A physical keyboard uses **Esc** to cancel. Confirm **Create character** to save. The game checks name availability across characters on the server, ignoring capitalization. If a name is taken, players can try another with their draft still open.
 
 ## How the save works
 

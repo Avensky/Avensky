@@ -7,7 +7,7 @@ import {CollapsibleMenuPanel} from '../../components/menus/CollapsibleMenuPanel'
 import {SceneTabHeader} from '../../components/menus/SceneTabHeader';
 import {HeroPortrait} from '../alpha/HeroPortrait';
 import {CharacterPortrait} from '../characters/CharacterPortrait';
-import {CHARACTERS} from '../characters/characterCatalog';
+import {selectActiveCharacterName,useSocialStore} from '../../store/social/socialStore';
 import {usePlayerCharacter} from '../characters/localOutfits';
 import {HERO_CONCEPT_TAB} from '../alpha/heroRoleFilters';
 import {SelectionFooter} from '../alpha/SelectionChrome';
@@ -34,7 +34,7 @@ export function HeroAbilityDetails({heroId}:{heroId:string}){
  const fireKey=usePreferencesStore(s=>s.bindings.fire);
  const secondaryKey=usePreferencesStore(s=>s.bindings.secondaryFire);
  const driver=usePlayerCharacter();
- const driverName=CHARACTERS.find(character=>character.id===driver.id)?.name??'Driver';
+ const driverName=useSocialStore(selectActiveCharacterName)??'Your character';
  const keyLabel=(key:string)=>key.replace(/^Key|^Digit/,'');
  if(!hero)return null;
  const guide=getHeroAbilityGuide(hero.id);
@@ -42,7 +42,7 @@ export function HeroAbilityDetails({heroId}:{heroId:string}){
     <aside className="hero-guide-overview">
       <CollapsibleMenuPanel title={hero.name} summary={`${guide.role} · ${guide.hp.toLocaleString()} HP`}>
         <div className="hero-guide-showcase" aria-label={`${hero.name} overview`}>
-          <div className="hero-guide-portraits">
+          <div className="hero-guide-portraits" role="group" aria-label={hero.name+" and "+driverName}>
             <HeroPortrait hero={hero.id} cacheOnly showStyleStatus={false}/>
             <CharacterPortrait choice={driver} label={driverName}/>
           </div>

@@ -98,7 +98,7 @@ export function TeamLineup() {
               <TeamPortraitBadge player={player} />
               <small className="team-lineup-vehicle" title={hero.name}>{hero.name}</small>
               <div className="team-lineup-identity">
-                {character && <CharacterPortrait choice={player.character} label={character.name} />}
+                {character && <CharacterPortrait choice={player.character} label={player.name} />}
                 <strong title={player.name}>{player.name}</strong>
               </div>
             </article>

@@ -19,6 +19,16 @@ const origin = "https://staging.avensky.com";
 const password = "a separate staging passphrase for QA";
 const newPassword = "a new separate staging passphrase for QA";
 
+async function handoffProof(response) {
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("set-cookie"), null);
+  const html = await response.text();
+  assert.match(html, /Sign out other device and continue/);
+  assert.match(html, /data-portal-cancel/);
+  assert.doesNotMatch(html, /name="password"|name="email"/);
+  return html.match(/name="handoff" value="([a-f0-9]{64})"/)[1];
+}
+
 test("the installed standalone sign-in uses the palette shipped with the app", async t => {
   const dir = await mkdtemp(join(tmpdir(), "avensky-portal-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
@@ -243,7 +253,8 @@ test("authenticator enrollment requires the password and recovery codes are one-
   });
   const invite = accounts.issueInvite("mfa@example.net");
   const value = await accounts.enroll(invite.email, invite.code, password);
-  const secondDevice = (await accounts.beginSignIn(invite.email, password)).session;
+  const beforeMfa = await accounts.beginSignIn(invite.email, password);
+  const secondDevice = accounts.resolveHandoff(beforeMfa.handoff, true);
   assert.equal(accounts.viewer(value), undefined);
   const viewer = accounts.viewer(secondDevice);
   await assert.rejects(accounts.beginMfa(viewer, "a different passphrase"));
@@ -270,7 +281,10 @@ test("authenticator enrollment requires the password and recovery codes are one-
   assert.equal(rejected.status, 400);
   assert.match(await rejected.text(), /The authentication code is incorrect/);
   assert.equal(accounts.viewer(secondDevice).email, invite.email);
-  const completed = await post("../sign-in", { challenge, code: codes[0] });
+  const handoff = await handoffProof(await post("../sign-in", { challenge, code: codes[0] }));
+  assert.equal(accounts.viewer(secondDevice).email, invite.email);
+  assert.equal(accounts.viewer(handoff), undefined);
+  const completed = await post("sign-in/transfer", { handoff, decision: "continue" });
   assert.equal(accounts.viewer(secondDevice), undefined);
   assert.equal(completed.status, 303);
   const cookie = completed.headers.get("set-cookie").split(";")[0];
@@ -389,7 +403,9 @@ test("one invitation form signs in by email and gates sockets and assets", async
   assert.equal(await wrongPassword.text(), await unknownEmail.text());
   assert.equal(calls.filter(call => call[0] === "session_changed").length, 1);
   assert.equal((await fetch(socket, { headers: { origin, cookie: enrolledCookie } })).status, 204);
-  const reauth = await post("../sign-in", { email: admin.email, password });
+  const handoff = await handoffProof(await post("../sign-in", { email: admin.email, password }));
+  assert.equal(calls.filter(call => call[0] === "session_changed").length, 1);
+  const reauth = await post("sign-in/transfer", { handoff, decision: "continue" });
   assert.equal(reauth.status, 303);
   const adminCookie = reauth.headers.get("set-cookie").split(";")[0];
   assert.equal((await fetch(socket, { headers: { origin, cookie: enrolledCookie } })).status, 401);
@@ -459,10 +475,14 @@ test("delayed login and logout acknowledgments cannot replace a newer cookie", a
     holding.resolve();
     await release.promise;
   };
-  const late = post("/sign-in");
+  const signInElsewhere = async () => {
+    const handoff = await handoffProof(await post("/sign-in"));
+    return post("/__alpha/sign-in/transfer", "", { handoff, decision: "continue" });
+  };
+  const late = signInElsewhere();
   await holding.promise;
   assert.equal(accounts.viewer(original), undefined);
-  const winner = (await post("/sign-in")).headers.get("set-cookie").split(";")[0];
+  const winner = (await signInElsewhere()).headers.get("set-cookie").split(";")[0];
   release.resolve();
   const stale = await late;
   assert.equal(stale.status, 409);
@@ -485,11 +505,50 @@ test("delayed login and logout acknowledgments cannot replace a newer cookie", a
   assert.equal(accounts.viewer(nextCookie.split("=")[1]).game_profile, profile);
   const pendingInvite = post("/__alpha/testers/invite", nextCookie, { email: "invited@example.net" });
   await sending.promise;
-  assert.equal((await post("/sign-in")).status, 303);
+  assert.equal((await signInElsewhere()).status, 303);
   delivered.resolve();
   const retiredResponse = await pendingInvite;
   assert.equal(retiredResponse.status, 403);
   assert.equal(await retiredResponse.text(), "");
+});
+
+test("pending device switches follow one live grant, expire, and respect new MFA settings", async t => {
+  const dir = await mkdtemp(join(tmpdir(), "avensky-session-switch-"));
+  const path = join(dir, "social.sqlite3");
+  const accountId = "c".repeat(32);
+  const game = { async enroll() { return accountId; }, async authenticate() { return accountId; } };
+  const accounts = testerAccounts(path, randomBytes(32), game);
+  const db = new DatabaseSync(path);
+  t.after(async () => { db.close(); accounts.close(); await rm(dir, { recursive: true }); });
+  const { email, code } = accounts.issueInvite("transfer@example.net");
+  const original = await accounts.enroll(email, code, password);
+  assert.deepEqual(await accounts.beginSignIn(email, password, original), { current: true });
+  const attempt = () => accounts.beginSignIn(email, password);
+  const first = await attempt();
+  const latest = await attempt();
+  assert.equal(accounts.resolveHandoff(first.handoff, true), undefined);
+  assert.ok(accounts.viewer(original));
+  db.exec("UPDATE session_handoffs SET expires=0");
+  assert.equal(accounts.resolveHandoff(latest.handoff, true), undefined);
+  assert.ok(accounts.viewer(original));
+  const stale = await attempt();
+  accounts.end(accounts.viewer(original));
+  assert.equal(accounts.resolveHandoff(stale.handoff, true), undefined);
+  const next = await attempt();
+  assert.ok(accounts.viewer(next.session));
+  const beforeMfa = await attempt();
+  const viewer = accounts.viewer(next.session);
+  const encoded = await accounts.beginMfa(viewer, password);
+  const bits = [...encoded].map(c => "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567".indexOf(c).toString(2).padStart(5, "0")).join("");
+  const seed = Buffer.from(bits.match(/.{8}/g).map(byte => parseInt(byte, 2)));
+  accounts.enableMfa(viewer, totp(seed, Math.floor(Date.now() / 30_000) - 1));
+  assert.equal(accounts.resolveHandoff(beforeMfa.handoff, true), undefined);
+  const { challenge } = await attempt();
+  const fromTotp = accounts.completeSignIn(challenge, totp(seed, Math.floor(Date.now() / 30_000)));
+  assert.ok(fromTotp.handoff);
+  assert.ok(accounts.viewer(next.session));
+  assert.ok(accounts.viewer(accounts.resolveHandoff(fromTotp.handoff, true)));
+  assert.equal(accounts.viewer(next.session), undefined);
 });
 
 test("a moderator can preserve a legacy profile without presenting a second login form", async t => {
@@ -506,7 +565,7 @@ test("a moderator can preserve a legacy profile without presenting a second logi
   const invite = accounts.issueInvite("legacy@example.net", true, "legacy_racer");
   const session = await accounts.enroll(invite.email, invite.code, password);
   assert.equal(accounts.viewer(session).game_profile, profile);
-  const returning = (await accounts.beginSignIn(invite.email, password)).session;
+  const returning = accounts.resolveHandoff((await accounts.beginSignIn(invite.email, password)).handoff, true);
   assert.equal(accounts.viewer(returning).game_profile, profile);
 });
 
@@ -639,7 +698,7 @@ test("access migration shares the player's SQLite file and preserves invites, se
     assert.equal(current.viewer(olderCookie), undefined);
     assert.equal(db.prepare("SELECT login_protocol FROM sessions WHERE email=?").get(player.account.login).login_protocol, 1);
     const { challenge } = await current.beginSignIn(admin.email, password);
-    const latest = current.completeSignIn(challenge, codes[0]).session;
+    const latest = current.resolveHandoff(current.completeSignIn(challenge, codes[0]).handoff, true);
     assert.ok(current.viewer(latest));
     assert.equal(db.prepare("SELECT login_protocol FROM sessions WHERE email=?").get(player.account.login).login_protocol, 2);
     assert.equal(current.viewer(cookie), undefined);

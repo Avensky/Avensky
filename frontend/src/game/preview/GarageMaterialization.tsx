@@ -62,15 +62,18 @@ const sparkFragment = /* glsl */ `
   }
 `;
 
-/** Two small draws around the replacement vehicle, with no lights or textures. */
-export function VehicleMaterialization({ progress, footprint, offset }: {
+/** One floor glyph and one batch of sparks, shared by the vehicle and character previews. */
+export function GarageMaterialization({ progress, footprint, offset, subject, active = true }: {
+  active?: boolean;
+  subject: "vehicle" | "character";
   progress: RefObject<number>;
   footprint: readonly [number, number];
   offset: readonly [number, number];
 }) {
   const theme = usePreferencesStore(state => state.theme);
-  const width = footprint[0] + 1.15;
-  const length = footprint[1] + 1.15;
+  const margin = subject === "vehicle" ? 1.15 : .24;
+  const width = footprint[0] + margin;
+  const length = footprint[1] + margin;
   const uniforms = useMemo(() => ({
     progress: { value: 0 },
     accent: { value: new Color(UI_THEMES[theme].accent) },
@@ -80,10 +83,11 @@ export function VehicleMaterialization({ progress, footprint, offset }: {
   const sparks = useMemo(() => Float32Array.from({ length: 144 }, (_, index) =>
     ((Math.floor(index / 3) + 1) * [.61803399, .75487767, .56984029][index % 3]) % 1), []);
   useFrame(({ gl }) => {
+    if (!active) return;
     uniforms.progress.value = progress.current;
     uniforms.pixelRatio.value = Math.min(gl.getPixelRatio(), 2);
   }, -.6);
-  return <group name="vehicle-materialization" position={[offset[0], .037, offset[1]]}>
+  return <group name={subject + "-materialization"} visible={active} position={[offset[0], .037, offset[1]]}>
     <mesh rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
       <planeGeometry args={[width, length]} />
       <shaderMaterial vertexShader={circleVertex} fragmentShader={circleFragment} uniforms={uniforms}

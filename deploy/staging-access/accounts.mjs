@@ -86,6 +86,11 @@ export function initializeAccessTables(db) {
       email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL UNIQUE,
       expires INTEGER NOT NULL, attempts INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS session_handoffs (
+      digest TEXT PRIMARY KEY,
+      prior_session TEXT NOT NULL UNIQUE REFERENCES sessions(digest) ON DELETE CASCADE,
+      expires INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS password_resets (
       email TEXT PRIMARY KEY REFERENCES testers(email), digest TEXT NOT NULL, expires INTEGER NOT NULL
     );
@@ -168,6 +173,18 @@ export function testerAccounts(path, key, game) {
     const value = token();
     run("INSERT INTO sessions (digest, email, expires, login_protocol) VALUES (?, ?, ?, 2)", hash(value), email, now() + SESSION_AGE);
     return value;
+  }
+  // Called only after all required credentials are verified, inside the same
+  // write transaction. Hold the new grant until the player accepts the switch.
+  function verifiedSignIn(email, browserToken) {
+    const prior = get("SELECT digest FROM sessions WHERE email = ? AND expires > ?", email, now());
+    if (!prior) return { session: session(email) };
+    if (browserToken && prior.digest === hash(browserToken)) return { current: true };
+    const handoff = token();
+    run("DELETE FROM session_handoffs WHERE expires <= ?", now());
+    run("INSERT OR REPLACE INTO session_handoffs (digest, prior_session, expires) VALUES (?, ?, ?)",
+      hash(handoff), prior.digest, now() + SIGN_IN_AGE);
+    return { handoff };
   }
   async function validPassword(record, password) {
     if (typeof password !== "string" || password.length > 256) return false;
@@ -301,7 +318,7 @@ export function testerAccounts(path, key, game) {
         });
       });
     },
-    async beginSignIn(raw, password) {
+    async beginSignIn(raw, password, browserToken) {
       const email = emailAddress(raw);
       return withCredentials(email, async () => {
         const record = tester(email);
@@ -310,7 +327,7 @@ export function testerAccounts(path, key, game) {
         return transaction(() => {
           const current = tester(email);
           if (!current || current.revoked || current.password !== record.password) throw denied();
-          if (!current.mfa) return { session: session(email) };
+          if (!current.mfa) return verifiedSignIn(email, browserToken);
           const challenge = token();
           run("DELETE FROM sign_in_challenges WHERE expires <= ?", now());
           const pending = get(`INSERT INTO sign_in_challenges (email, digest, expires, attempts) VALUES (?, ?, ?, ?)
@@ -320,7 +337,7 @@ export function testerAccounts(path, key, game) {
         });
       });
     },
-    completeSignIn(challenge, code) {
+    completeSignIn(challenge, code, browserToken) {
       if (!/^[0-9a-f]{64}$/.test(challenge)) return {};
       const digest = hash(challenge);
       return transaction(() => {
@@ -331,13 +348,23 @@ export function testerAccounts(path, key, game) {
         if (record?.mfa && !record.revoked) {
           if (verifySecondFactor(record, code)) {
             run("DELETE FROM sign_in_challenges WHERE digest = ?", digest);
-            return { session: session(record.email) };
+            return verifiedSignIn(record.email, browserToken);
           }
           run("UPDATE sign_in_challenges SET attempts = attempts - 1 WHERE digest = ?", digest);
           return pending.attempts > 1 ? { challenge } : { locked: true };
         }
         run("DELETE FROM sign_in_challenges WHERE digest = ?", digest);
         return {};
+      });
+    },
+    resolveHandoff(proof, confirm) {
+      if (!/^[0-9a-f]{64}$/.test(proof)) return;
+      return transaction(() => {
+        const digest = hash(proof);
+        const pending = get(`SELECT s.email FROM session_handoffs h JOIN sessions s ON h.prior_session = s.digest
+          JOIN testers t ON t.email = s.email WHERE h.digest = ? AND h.expires > ? AND t.revoked = 0`, digest, now());
+        run("DELETE FROM session_handoffs WHERE digest = ?", digest);
+        if (confirm && pending) return session(pending.email);
       });
     },
     requestPasswordReset(raw) {
@@ -462,6 +489,7 @@ export function testerAccounts(path, key, game) {
         const step = matchingStep(unseal(pending.pending_mfa), code, -1);
         if (step === undefined) throw Error("The authentication code is incorrect.");
         run("UPDATE testers SET mfa = ?, last_step = ? WHERE email = ?", pending.pending_mfa, step, viewer.email);
+        run("DELETE FROM session_handoffs WHERE prior_session = ?", viewer.digest);
         run("DELETE FROM sessions WHERE email = ? AND digest <> ?", viewer.email, viewer.digest);
         run("UPDATE sessions SET pending_mfa = NULL, pending_until = NULL WHERE digest = ?", viewer.digest);
         const codes = Array.from({ length: 8 }, () => randomBytes(16).toString("hex"));

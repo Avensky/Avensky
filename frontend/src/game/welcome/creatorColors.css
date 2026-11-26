@@ -1,0 +1,29 @@
+.creator-color-channels, .creator-panel .creator-color-options {
+  display: flex; flex-wrap: wrap; align-content: start; gap: 4px;
+}
+.creator-color-channels { pointer-events: auto; }
+.creator-color-channels .creator-channel {
+  min-height: 44px; padding: 0 8px; border: 0; border-bottom: 2px solid transparent;
+  color: var(--garage-menu-muted); background: var(--garage-menu-row); font: inherit;
+}
+.creator-channel:is([aria-pressed="true"],:focus-visible) {
+  border-bottom-color: var(--garage-menu-accent); color: var(--garage-menu-ink);
+}
+.creator-panel .creator-color-options.creator-swatches .creator-option {
+  flex: 0 0 clamp(44px, 4.2vw, 58px); aspect-ratio: 1; min-height: 44px;
+}
+.creator-preset-stripes { display: flex; height: 100%; width: 100%; }
+.creator-preset-stripes i { flex: 1; }
+.creator-style-options .creator-option { min-width: 64px; padding: 6px 12px; }
+.creator-style-options svg { width: 32px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; }
+.creator-style-options .creator-check { font-size: .7rem; top: 2px; right: 4px; }
+
+.creator-mix, .creator-mix-direction { display: flex; align-items: center; gap: 4px; pointer-events: auto; }
+.creator-mix > span { color: var(--garage-menu-muted); font-size: .88rem; margin-inline-end: auto; }
+.creator-mix output { min-width: 3em; text-align: center; font-variant-numeric: tabular-nums; }
+.creator-mix-button {
+  display: grid; place-items: center; min-width: 44px; min-height: 44px;
+  --frame-line-color: var(--garage-menu-line); --frame-top-cut: 5px; --frame-bottom-cut: 5px;
+  border: 0; background: var(--garage-menu-row); color: var(--garage-menu-ink); font-size: 1.2rem;
+}
+.creator-mix-button:focus-visible { --frame-line-color: var(--garage-menu-accent); }

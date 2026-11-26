@@ -1,8 +1,8 @@
 import type { ComponentPropsWithRef, ReactNode } from "react";
 import { ProgressBadge } from "../alpha/ProgressBadge";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { useSocialStore } from "../../store/social/socialStore";
-import { characterLook, type CharacterChoice } from "./characterCatalog";
+import { selectActiveCharacterName, useSocialStore } from "../../store/social/socialStore";
+import type { CharacterChoice } from "./characterCatalog";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { useSavedPlayerCharacter } from "./localOutfits";
 
@@ -41,11 +41,8 @@ export function CharacterHeaderProfile({ onOpen, leadingAction, active, showProg
   const stagingSignIn = useSocialStore(state => state.stagingSignIn);
   const choice = useSavedPlayerCharacter(!stagingSignIn);
   const editingAllowed = useUIStore(canEditCharacter);
-  const activeName = useSocialStore(state => {
-    const profile = state.view?.profile;
-    return profile?.characters?.find(slot => slot.id === profile.active_character_id)?.name;
-  });
-  const name = activeName ?? characterLook(choice)?.character.name ?? "Choose character";
+  const activeName = useSocialStore(selectActiveCharacterName);
+  const name = activeName ?? (choice ? "Your character" : "Choose character");
   if (editingAllowed && onOpen && !readOnly) return (
     <div className="character-header-action" data-controller-row data-controller-header-action
       role={leadingAction ? "group" : undefined} aria-label={leadingAction ? "Customization" : undefined}>

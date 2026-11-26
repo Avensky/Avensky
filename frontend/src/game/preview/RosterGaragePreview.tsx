@@ -17,18 +17,19 @@ function UnavailableRosterActor({ settled }: { settled: (available: boolean) => 
   return null;
 }
 
-function RosterActor({ choice, mode, shot }: GarageCharacterSelection & { shot: CharacterGarageShot }) {
+function RosterActor({ choice, mode, creatorFrame, shot }: GarageCharacterSelection & { shot: CharacterGarageShot }) {
   const pivot = useRef<Group>(null);
   const portraitRig = useRef<{ shot: CharacterGarageShot; id: string } | null>(null);
   const gl = useThree(s => s.gl);
   const camera = useThree(s => s.camera);
   const invalidate = useThree(s => s.invalidate);
-  const settled = useCallback((available: boolean) => {
+  const settled = useCallback((available: boolean, rigId?: string) => {
+    if (available && rigId !== choice.id) return;
     shot.subject = available ? "ready" : "unavailable";
     invalidate();
-  }, [shot, invalidate]);
+  }, [shot, choice.id, invalidate]);
   useFrame(() => {
-    if ((mode !== "profile" && mode !== "create") || !pivot.current) return;
+    if ((mode !== "profile" && mode !== "create") || shot.subject !== "ready" || !pivot.current) return;
     if (portraitRig.current?.shot === shot && portraitRig.current.id === choice.id) return;
     // The starter rigs have different proportions. Measure once on the dressed
     // actor after loading, before the shared camera applies its view for this frame.
@@ -69,9 +70,9 @@ function RosterActor({ choice, mode, shot }: GarageCharacterSelection & { shot: 
   }, [gl, camera, invalidate, shot]);
   return <group name="roster-character-pivot" ref={pivot} rotation-y={ROSTER_HEADING}>
     <PreviewContactShadow footprint={[.52, .46]} />
-    <AssetBoundary key={choice.id} fallback={<UnavailableRosterActor settled={settled} />}>
-      <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview
-        paused={mode === "profile" || mode === "create"} onSettled={settled} /></Suspense>
+    <AssetBoundary resetKey={choice.id} fallback={<UnavailableRosterActor settled={settled} />}>
+      <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview creating={mode === "create"}
+        paused={mode === "profile" || (mode === "create" && creatorFrame !== "outfit")} onSettled={settled} /></Suspense>
     </AssetBoundary>
   </group>;
 }
@@ -83,8 +84,8 @@ export function RosterGaragePreview({ choice, mode, creatorFrame }: GarageCharac
   const creatorRig = mode === "create" ? choice.id : undefined;
   const shot = useMemo(() => rosterCamera(mode, creatorFrame), [mode, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
-    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} /> });
-  }, [choice, mode, shot]);
+    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} creatorFrame={creatorFrame} /> });
+  }, [choice, mode, creatorFrame, shot]);
   // Reframe the same actor when switching panels. Release the scene only on leaving this preview.
   useLayoutEffect(() => () => setGaragePreview(null), []);
   useLayoutEffect(() => {

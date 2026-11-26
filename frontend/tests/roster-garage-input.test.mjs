@@ -28,6 +28,27 @@ test("character fill is applied once to saved wardrobe materials using the exist
   }
 });
 
+test("cosmetic and garage shader hooks share the actor dissolve without recompiling each frame", () => {
+  const material = new MeshStandardMaterial(), actor = new Group();
+  const facePigment = { value: .84 }, coverage = { value: 1 };
+  material.onBeforeCompile = shader => { shader.uniforms.lipStrength = facePigment; };
+  material.customProgramCacheKey = () => "face";
+  const mesh = new Mesh(undefined, material);
+  actor.add(mesh);
+  prepareGaragePointLights(actor, "subject", coverage);
+  const key = material.customProgramCacheKey();
+  const shader = { uniforms: {}, fragmentShader: "#include <alphatest_fragment>\n#include <lights_fragment_maps>" };
+  material.onBeforeCompile(shader);
+  assert.equal(shader.uniforms.lipStrength, facePigment);
+  assert.equal(shader.uniforms.rigCoverage, coverage);
+  assert.match(shader.fragmentShader, /rigCoverage < 1.0/);
+  coverage.value = .1;
+  assert.equal(material.customProgramCacheKey(), key);
+  assert.equal(material.transparent, false);
+  material.dispose();
+  mesh.geometry.dispose();
+});
+
 test("both rigs fit the selector framing across orientation and garage orbit", () => {
   for (const [width, height] of [[1280, 720], [844, 390], [390, 844], [768, 1024]]) {
     const camera = new PerspectiveCamera(), shot = rosterCamera();
@@ -179,6 +200,26 @@ test("creator frames both rigs above the controls and can reverse an unfinished 
       assert.ok(screenY(waist) - screenY(eyes) > outfitSize * 1.7, "makeup and colors use a visibly closer face shot");
     }
   }
+});
+
+test("late rig landmarks ease from the settled camera without moving the first displayed frame", () => {
+  const shot = rosterCamera("create", "face"), camera = new PerspectiveCamera();
+  const travel = new GarageCameraTravel();
+  shot.subject = "ready";
+  const frame = (now, reduced = false) => travel.frame(camera, shot, 400, 800, 1, .08, 0, now, reduced);
+  frame(0, true);
+  const before = camera.clone();
+  shot.fitPortrait(1.711, 1.164);
+  frame(80);
+  assert.equal(travel.phase, "framing");
+  assert.ok(before.position.equals(camera.position));
+  assert.ok(before.projectionMatrix.equals(camera.projectionMatrix));
+  for (let t = 180; t <= 1080; t += 100) frame(t);
+  assert.equal(travel.phase, "framed");
+  assert.ok(before.position.distanceTo(camera.position) > .1);
+  shot.fitPortrait(1.711, 1.164);
+  frame(1100);
+  assert.equal(travel.phase, "framed", "sampling identical anchors cannot restart travel");
 });
 
 test("failed, interrupted, and reduced-motion handoffs release the camera", () => {

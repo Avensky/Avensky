@@ -49,7 +49,8 @@ impl CharacterChoice {
         Some(DriverAppearance {
             body: if female { "female" } else { "male" }.into(),
             skin: option_color("skin", appearance.map(|a| a.skin.as_str()), if female { "#d49673" } else { "#95553d" }),
-            hair: option_color("hair_color", appearance.map(|a| a.hair_color.as_str()), if female { "#7c573c" } else { "#2b2127" }),
+            hair: appearance.and_then(|a| a.hair_palette.as_ref()).map(|p| p.base.clone()).unwrap_or_else(||
+                option_color("hair_color", appearance.map(|a| a.hair_color.as_str()), if female { "#7c573c" } else { "#2b2127" })),
             hair_style: if female && !appearance.is_some_and(|a| a.hair == "cropped") { "long" } else { "short" }.into(),
             headwear: if hat { "hat" } else { "none" }.into(),
             headwear_color: piece_color("hat", "#e7cda0"),

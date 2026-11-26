@@ -1,3 +1,4 @@
+import type { HairPalette } from "./fittedWardrobe/hairColors";
 import type { PieceColors } from "./clothingPieces";
 import type { BriefsStyle } from "./wardrobeUnderwear";
 import type { AnimationFit, CharacterPersonality } from "./characterPersonality";
@@ -12,10 +13,10 @@ import { findVehicleDriver, type VehicleDriver } from "./driverRoster";
 export const CHARACTERS = catalog.filter(item => item.id !== "niko-park");
 export const CHARACTER_APPEARANCE_OPTIONS = appearanceOptions;
 export type CharacterStyleField = keyof typeof appearanceOptions;
-type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup";
+type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup" | "eyeshadow" | "eyeliner";
 export type CharacterAppearance = Record<Exclude<CharacterStyleField, OptionalAppearanceField>, string>
   & Partial<Record<OptionalAppearanceField, string>> & {
-    accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;
+    hair_palette?: HairPalette; accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;
     bra_style?: "push-up";
     briefs_style?: BriefsStyle;
   };
@@ -137,11 +138,13 @@ export function characterLook(choice: CharacterChoice | null | undefined) {
     garments: wearsOutfitGarment ? { ...trials, dress: outfitGarment.id } : trials,
     fabric: /^#[\da-f]{6}$/i.test(appearance.color) ? appearance.color : color("color") ?? outfit.jacket,
     trim: appearance.accent ?? outfit.trim,
-    hair: color("hair_color") ?? (female ? "#7c573c" : "#2b2127"),
+    hair: appearance.hair_palette?.base ?? color("hair_color") ?? (female ? "#7c573c" : "#2b2127"),
     skin: color("skin") ?? (female ? "#d49673" : "#95553d"),
     iris: color("eye_color") ?? (female ? "#8a7347" : "#68422b"),
     brow: color("brow_color"),
+    // A legacy “none” appearance keeps its original texture. New characters start with Rose.
     lipstick: appearanceOptions.makeup.find(option => option.id === appearance.makeup)?.color,
+    eyeshadow: appearanceOptions.eyeshadow.find(option => option.id === appearance.eyeshadow)?.color,
   };
 }
 

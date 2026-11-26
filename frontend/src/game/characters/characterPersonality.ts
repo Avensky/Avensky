@@ -1,4 +1,5 @@
 export const CHARACTER_PERSONALITIES = [
+  { id: "neutral", label: "Neutral", emotes: ["002", "035", "005", "010"] },
   { id: "friendly", label: "Friendly", emotes: ["005", "010", "035", "009"] },
   { id: "playful", label: "Playful", emotes: ["021", "023", "026", "robot-dance"] },
   { id: "shy", label: "Shy", emotes: ["035", "036", "037", "038"] },
@@ -7,6 +8,8 @@ export const CHARACTER_PERSONALITIES = [
   { id: "elegant", label: "Elegant", emotes: ["113", "114", "115", "116"] },
   { id: "racer", label: "Racer", emotes: ["081", "082", "083", "084"] },
   { id: "scientist", label: "Scientist", emotes: ["157", "158", "159", "160"] },
+  { id: "explorer", label: "Explorer", emotes: ["141", "145", "147", "150"] },
+  { id: "performer", label: "Performer", emotes: ["121", "122", "126", "128"] },
 ] as const;
 export type CharacterPersonality = typeof CHARACTER_PERSONALITIES[number]["id"];
 export type AnimationFit = "auto" | "full" | "fitted";

@@ -10,6 +10,7 @@ export type TextSession = {
   secret: boolean;
   onChange: (value: string) => void;
   returnFocus: HTMLElement | null;
+  acceptFocus?: HTMLElement | null;
 };
 export function keyboardNeeded(
   mode: KeyboardAssist,
@@ -72,8 +73,9 @@ export const useTextKeyboardStore = create<{
     if (cancel) session.onChange(session.initial);
     set({ session: null });
     queueMicrotask(() => {
-      if (session.returnFocus?.isConnected)
-        session.returnFocus.focus({ preventScroll: true });
+      const target = !cancel && session.acceptFocus?.isConnected && session.acceptFocus.getAttribute("aria-disabled") !== "true"
+        ? session.acceptFocus : session.returnFocus;
+      if (target?.isConnected) target.focus({ preventScroll: true });
     });
   },
 }));
