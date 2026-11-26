@@ -78,6 +78,12 @@
 - **No live behavior changed:** `setWardrobeGarment`, `wornClothing`, `SavedOutfits` and Rust equip restrictions remain unchanged. Existing browser and server records are never rewritten en masse.
 - **Next:** W-06 should use W-05 projections read-only, then add explicit mode editing and exposure diagnostics with validated actual coat assets; never connect the resolver before staged regression review.
 
+## 2026-11-25 — W-05 browser test runner correction
+
+- The initial browser-storage CI failed before loading saved data because Vite was launched with the repository root, so `/src/game/characters/localOutfits.ts` did not resolve. This is a **test runner path/configuration issue**, not a measured save-format defect.
+- Corrected the GitHub Actions browser job to use `working-directory: frontend` and updated the documented verification command. Rust and pure Node save contract tests passed separately.
+- Browser rerun status: pending; record actual result after GitHub Actions completes.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.

@@ -55,4 +55,5 @@ jobs:
       - name: Install frontend dependencies
         run: npm --prefix frontend ci
       - name: Verify actual browser storage round trips
-        run: node --test frontend/tests/wardrobe-layer-save-ui.test.mjs
+        working-directory: frontend
+        run: node --test tests/wardrobe-layer-save-ui.test.mjs

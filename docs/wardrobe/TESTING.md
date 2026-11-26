@@ -22,10 +22,10 @@ The single [cross-language fixture](../../frontend/tests/fixtures/wardrobe-layer
 npm run wardrobe:layers:check
 npm run wardrobe:legacy:check
 cargo test --locked --manifest-path avenlab-server/Cargo.toml layered_wardrobe_
-node --test frontend/tests/wardrobe-layer-save-ui.test.mjs
+(cd frontend && node --test tests/wardrobe-layer-save-ui.test.mjs)
 ```
 
-The last command requires `npm --prefix frontend ci` first. Dedicated [CI workflow](../../.github/workflows/wardrobe-legacy-save.yml) checks the Node adapter, browser storage via Vite/JSDOM, and Rust saved-character/profile persistence. The old profile payload is tested independently, not simply by stripping a field from the same object.
+The final browser-storage command requires `npm --prefix frontend ci` first, and Vite MUST run with `frontend` as the working directory. Dedicated [CI workflow](../../.github/workflows/wardrobe-legacy-save.yml) checks the Node adapter, browser storage via Vite/JSDOM, and Rust saved-character/profile persistence. The old profile payload is tested independently, not simply by stripping a field from the same object.
 
 **Safety acceptance:** read old localStorage unmodified; explicit opt-in conversion preserves all original keys and dyes; revert drops only sidecar; duplicate/stale IDs or unknown modes are rejected; existing outfit-save endpoint persists both legacy and layered profiles; neither format bypasses old equipment restrictions; no GLB collision, real coat, or mobile claims from these contract tests. Rust's historical normalization of obsolete `shirt` codes is a pre-existing documented behavior.
 
