@@ -76,7 +76,7 @@
         "straps"
       ],
       "modes": {
-        "bodyFit": {
+        "body-fit": {
           "choices": [
             "direct",
             "over-top",
@@ -486,7 +486,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "over-top"
+          "body-fit": "over-top"
         }
       },
       "outcome": "needs-fitting",
@@ -502,7 +502,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "direct"
+          "body-fit": "direct"
         }
       },
       "outcome": "blocked",
@@ -518,7 +518,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "over-dress"
+          "body-fit": "over-dress"
         }
       },
       "outcome": "blocked",
@@ -655,7 +655,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "over-dress"
+          "body-fit": "over-dress"
         }
       },
       "outcome": "needs-fitting",
@@ -671,7 +671,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "direct"
+          "body-fit": "direct"
         }
       },
       "outcome": "blocked",
@@ -687,7 +687,7 @@
       ],
       "when": {
         "corset": {
-          "bodyFit": "over-top"
+          "body-fit": "over-top"
         }
       },
       "outcome": "blocked",
