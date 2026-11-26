@@ -60,7 +60,9 @@ function matchingPolicies(entry, other, region, overrides) {
   }));
 }
 function evidenceMatches(report, a, b, region, input) {
-  if (!asObject(report) || report.status !== "passed" || report.reviewed !== true ||
+  if (typeof input.bodyProfileId !== "string" || !input.bodyProfileId ||
+      typeof input.tier !== "string" || !input.tier ||
+      !asObject(report) || report.status !== "passed" || report.reviewed !== true ||
       typeof report.reportId !== "string" || !report.reportId ||
       report.bodyProfileId !== input.bodyProfileId || report.tier !== input.tier ||
       !Array.isArray(report.garmentIds) || report.garmentIds.length !== 2 ||
@@ -72,12 +74,20 @@ function evidenceMatches(report, a, b, region, input) {
   return stable(report.modes?.[a.id]) === stable(a.modes) &&
          stable(report.modes?.[b.id]) === stable(b.modes);
 }
+/** Complete outfit state, including every layer's mode/revision, to prevent stale coverage reuse. */
+export function outfitSignature(equipped) {
+  return stable(equipped.map(x => ({
+    id: x.id, classId: x.classId, sourceRevision: x.sourceRevision ?? null, modes: x.modes ?? {},
+  })).sort((a, b) => compare(a.id, b.id))) ?? "";
+}
 function regionVisibilityEvidenceMatches(record, entry, region, input) {
   return asObject(record) && record.garmentId === entry.id && record.region === region &&
     typeof record.visible === "boolean" && record.reviewed === true &&
     typeof record.reportId === "string" && record.reportId.length > 0 &&
     record.sourceRevision === entry.sourceRevision && entry.sourceRevision &&
     record.bodyProfileId === input.bodyProfileId && record.tier === input.tier &&
+    record.outfitSignature === outfitSignature(input.equipped) &&
+    record.poseId === input.poseId && typeof input.poseId === "string" && input.poseId &&
     stable(record.modes) === stable(entry.modes);
 }
 
@@ -125,6 +135,10 @@ export function resolveWardrobeLayers(input, rules) {
     throw new TypeError("Supply validated wardrobe layer rules v1");
 
   const overrides = new Map(rules.itemOverrides.map(x => [x.garmentId, x]));
+  if (input.fitEvidence !== undefined && !Array.isArray(input.fitEvidence))
+    throw new TypeError("fitEvidence must be an array");
+  if (input.visibilityEvidence !== undefined && !Array.isArray(input.visibilityEvidence))
+    throw new TypeError("visibilityEvidence must be an array");
   const members = input.equipped.map(raw => {
     const id = typeof raw?.id === "string" ? raw.id : "";
     const classId = typeof raw?.classId === "string" ? raw.classId : "";
@@ -256,9 +270,15 @@ export function resolveWardrobeLayers(input, rules) {
   });
 
   const visibility = [];
+  const normalizedSignature = outfitSignature(members.map(m => ({
+    id: m.id, classId: m.classId, sourceRevision: m.sourceRevision, modes: m.modes,
+  })));
+  const visibilityInput = { ...input, equipped: members.map(m => ({
+    id: m.id, classId: m.classId, sourceRevision: m.sourceRevision, modes: m.modes,
+  })) };
   for (const member of members) for (const region of member.regions) {
     const matches = (input.visibilityEvidence ?? []).filter(item =>
-      regionVisibilityEvidenceMatches(item, member, region, input));
+      regionVisibilityEvidenceMatches(item, member, region, visibilityInput));
     const unique = [...new Set(matches.map(x => x.visible))];
     const state = unique.length === 1 ? (unique[0] ? "visible" : "hidden") : "unverified";
     visibility.push({ garmentId: member.id, region, state });

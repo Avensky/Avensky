@@ -1171,6 +1171,22 @@
       "activation": "explicit",
       "onParentAbsent": "deactivate-preserve-selection",
       "reason": "A manually selected gown underlayer remains saved when its supported outer garment is removed."
+    },
+    {
+      "id": "petticoat-with-skirt",
+      "parent": "skirt",
+      "child": "petticoat",
+      "activation": "explicit",
+      "onParentAbsent": "deactivate-preserve-selection",
+      "reason": "Explicitly selected petticoat stays saved beneath a skirt when the skirt changes."
+    },
+    {
+      "id": "petticoat-follows-gown",
+      "parent": "dress",
+      "child": "petticoat",
+      "activation": "derived",
+      "onParentAbsent": "remove-derived-only",
+      "reason": "Bundled gown petticoat follows its parent without deleting separately selected items."
     }
   ]
 }

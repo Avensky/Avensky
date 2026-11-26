@@ -45,6 +45,14 @@
 - **Correction recorded:** initial CI failed due to camelCase `bodyFit` violating the canonical kebab-case ID convention. Commit `d497ab3ea2df276628fa29ed0aacc23598835976` renamed the mode consistently to `body-fit`; the follow-up run passed.
 - Next: W-04 pure deterministic resolver with class-to-garment mapping, conflict/review output and explicit saved-selection preservation. W-05 must migrate historical saves before changing runtime equipment behavior.
 
+## 2026-11-25 — W-04 pure resolver review implementation
+
+- Branch: `feat/wardrobe-layer-resolver-w04` based on W-03's review branch, **not** on merged main.
+- Created pure ESM layer resolver and catalog piece-to-class adapter. Inputs are normalized selection records, not legacy saved-look data; no existing live wardrobe functions changed.
+- Mode-dependent region ordering, block/review status, dependency disposition, unverified visibility defaults and stale fit/visibility evidence rejection are implementation targets for this branch.
+- No GLB fit, material appearance or mobile QA is claimed by these synthetic tests. Evidence must be sourced and reviewed before publication. W-05 still owns legacy-save migration.
+- CI status: pending validation at branch creation. Record actual run and corrections in a following note.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.
