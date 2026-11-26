@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::LazyLock;
 
 mod driver;
@@ -22,6 +22,9 @@ pub struct CharacterChoice {
     pub wardrobe: Option<WardrobeChoice>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub garments: Option<BTreeMap<String, String>>,
+    /// Optional W-05 sidecar. Existing garment/wardrobe fields remain authoritative.
+    #[serde(rename = "wardrobeLayers", default, skip_serializing_if = "Option::is_none")]
+    pub wardrobe_layers: Option<WardrobeLayerSaveV1>,
     #[serde(rename = "wardrobeTrial", default, skip_serializing_if = "Option::is_none")]
     pub wardrobe_trial: Option<WardrobeChoice>,
     #[serde(rename = "wardrobeEase", default, skip_serializing_if = "Option::is_none")]
@@ -30,6 +33,27 @@ pub struct CharacterChoice {
     pub removed_clothing: Option<Vec<WardrobeRemoval>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub bra: Option<bool>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct WardrobeLayerSaveV1 {
+    #[serde(rename = "schemaVersion")]
+    schema_version: u8,
+    entries: Vec<WardrobeLayerEntry>,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum WardrobeLayerSource { Garments, Wardrobe, WardrobeTrial }
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct WardrobeLayerEntry {
+    source: WardrobeLayerSource,
+    slot: String,
+    id: String,
+    modes: BTreeMap<String, String>,
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -110,6 +134,93 @@ static GARMENTS: LazyLock<Vec<Garment>> = LazyLock::new(|| {
     garments.extend(discovered);
     garments
 });
+
+// The same mode choices drive Node and Rust validation. New metadata is not a
+// permission to skip the existing outfit / garment availability checks.
+static LAYER_RULES: LazyLock<serde_json::Value> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/layer-rules.json"))
+        .expect("the shared wardrobe layer manifest must be valid")
+});
+
+fn garment_layer_class(garment: &Garment) -> Option<&'static str> {
+    match garment.piece.as_str() {
+        "shirt" => Some("top"),
+        "corset" => Some("corset"),
+        "armor" => Some("armor"),
+        "coat" => Some("coat"),
+        "dress" => Some("dress"),
+        "skirt" => Some("skirt"),
+        "underskirt" => Some("petticoat"),
+        "pants" => Some("pants"),
+        "socks" => Some("socks"),
+        "shoes" => Some("shoe"),
+        "belt" => Some("belt"),
+        "harness" => Some("harness"),
+        "gloves" => Some("gloves"),
+        "hat" if garment.id.starts_with("hood-") => Some("hood"),
+        _ => None, // Old bows, ordinary hats and bracers remain saved, not guessed.
+    }
+}
+
+impl WardrobeLayerSaveV1 {
+    fn valid_for(&self, choice: &CharacterChoice) -> bool {
+        if self.schema_version != 1 || self.entries.len() > 32 {
+            return false;
+        }
+        let mut keys = BTreeSet::new();
+        self.entries.iter().all(|entry| {
+            if entry.id.is_empty() || entry.id.len() > 128
+                || entry.slot.is_empty() || entry.slot.len() > 64
+                || entry.id.chars().any(char::is_control)
+                || entry.slot.chars().any(char::is_control)
+                || !keys.insert(format!("{:?}:{}", entry.source, entry.slot)) {
+                return false;
+            }
+            let class = match entry.source {
+                WardrobeLayerSource::Garments => {
+                    if choice.garments.as_ref().and_then(|items| items.get(&entry.slot))
+                        != Some(&entry.id) {
+                        return false;
+                    }
+                    GARMENTS.iter().find(|garment| garment.id == entry.id
+                        && garment.slot == entry.slot).and_then(garment_layer_class)
+                },
+                WardrobeLayerSource::Wardrobe | WardrobeLayerSource::WardrobeTrial => {
+                    if entry.slot != "corset" {
+                        return false;
+                    }
+                    let stored = match entry.source {
+                        WardrobeLayerSource::Wardrobe => choice.wardrobe.as_ref(),
+                        WardrobeLayerSource::WardrobeTrial => choice.wardrobe_trial.as_ref(),
+                        WardrobeLayerSource::Garments => unreachable!(),
+                    };
+                    let Some(stored) = stored else { return false; };
+                    if stored.set != entry.id
+                        || entry.modes.get("waist").is_some_and(|mode| {
+                            mode != match stored.waist {
+                                WaistLayer::Tucked => "tucked", WaistLayer::Over => "over"
+                            }
+                        }) {
+                        return false;
+                    }
+                    Some("corset")
+                },
+            };
+            entry.modes.iter().all(|(group, value)| {
+                if group.is_empty() || group.len() > 64 || value.is_empty()
+                    || value.len() > 64 { return false; }
+                let Some(class) = class else { return false; };
+                LAYER_RULES.get("classes")
+                    .and_then(|classes| classes.get(class))
+                    .and_then(|details| details.get("modes"))
+                    .and_then(|modes| modes.get(group))
+                    .and_then(|mode| mode.get("choices"))
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|choices| choices.iter().any(|candidate| candidate.as_str() == Some(value)))
+            })
+        })
+    }
+}
 
 #[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -263,7 +374,8 @@ impl CharacterChoice {
     }
 
     pub fn is_equippable(&self) -> bool {
-        self.garments.is_none() && self.wardrobe_trial.is_none() && self.wardrobe_ease.is_none()
+        self.garments.is_none() && self.wardrobe_layers.is_none() &&
+            self.wardrobe_trial.is_none() && self.wardrobe_ease.is_none()
             && self.removed_clothing.is_none() && self.bra.is_none() && self.is_available()
     }
 
@@ -319,7 +431,9 @@ impl CharacterChoice {
                     .any(|outfit| outfit.id == self.outfit)
         }) && self.wardrobe.as_ref().is_none_or(|wardrobe| {
             self.id == "mara-vega" && wardrobe.has_valid_cut() && WARDROBE.iter().any(|set| set.id == wardrobe.set)
-        }) && (self.bra.is_none() || self.id == "mara-vega") && self.has_valid_garments() && self.appearance.as_ref().is_none_or(|appearance| {
+        }) && (self.bra.is_none() || self.id == "mara-vega") && self.has_valid_garments() &&
+            self.wardrobe_layers.as_ref().is_none_or(|layers| layers.valid_for(self)) &&
+            self.appearance.as_ref().is_none_or(|appearance| {
             if (appearance.bra_style.is_some() || appearance.briefs_style.is_some()) && self.id != "mara-vega" {
                 return false;
             }
@@ -377,6 +491,56 @@ impl CharacterChoice {
 mod wardrobe_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn layered_wardrobe_save_roundtrips_and_preserves_legacy_fields() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../frontend/tests/fixtures/wardrobe-layer-save-v1.json"
+        )).unwrap();
+        for name in ["legacy", "layered"] {
+            let source = fixture[name].clone();
+            let saved: CharacterChoice = serde_json::from_value(source.clone()).unwrap();
+            assert!(saved.is_available(), "{name} save must remain available");
+            assert!(!saved.is_equippable(), "Fitting-room selections remain preview-only");
+            assert_eq!(serde_json::to_value(&saved).unwrap(), source,
+                "{name} serialized fields, old colors and IDs must be unchanged");
+            assert_eq!(serde_json::from_value::<CharacterChoice>(source).unwrap(), saved);
+        }
+        let mut restored = fixture["layered"].clone();
+        restored.as_object_mut().unwrap().remove("wardrobeLayers");
+        assert_eq!(restored, fixture["legacy"]);
+        let old: CharacterChoice = serde_json::from_value(fixture["legacy"].clone()).unwrap();
+        assert!(old.wardrobe_layers.is_none());
+    }
+
+    #[test]
+    fn layered_wardrobe_save_rejects_stale_modes_and_tampered_slots() {
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../frontend/tests/fixtures/wardrobe-layer-save-v1.json"
+        )).unwrap();
+        let good = fixture["layered"].clone();
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["schemaVersion"] = json!(2);
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"][0]["id"] = json!("other-bow");
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"][0]["modes"] = json!({"closure":"closed"});
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"][6]["modes"]["body-fit"] = json!("imagined");
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"][6]["modes"]["waist"] = json!("tucked");
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"].as_array_mut().unwrap().push(good["wardrobeLayers"]["entries"][0].clone());
+        assert!(!serde_json::from_value::<CharacterChoice>(invalid).unwrap().is_available());
+        let mut invalid = good.clone();
+        invalid["wardrobeLayers"]["entries"][0]["future"] = json!(true);
+        assert!(serde_json::from_value::<CharacterChoice>(invalid).is_err());
+    }
 
     #[test]
     fn fitted_hair_saves_only_on_vespers_rig() {
