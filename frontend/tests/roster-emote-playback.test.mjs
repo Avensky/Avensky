@@ -26,22 +26,35 @@ test("rapid personality changes crossfade the displayed bones and props, includi
     return clip;
   });
   function select(index) { playback.select(gestures[index]); playback.update(0); }
+  function frames(count, seconds) { for (let i = 0; i < count; i++) playback.update(seconds / count); }
   function interrupt(index) {
     const before = [relativeAngle(), root.position.x, prop.scale.x];
     select(index);
     [relativeAngle(), root.position.x, prop.scale.x].forEach((v, i) => close(v, before[i], "first frame matches preceding pose"));
   }
-  select(0); playback.update(.6);
+  select(0); frames(36, .6);
   close(relativeAngle(), -1, "first signature reaches its pose");
-  interrupt(1); playback.update(.26);
+  interrupt(1); frames(16, .26);
   assert.ok(relativeAngle() > -.95 && relativeAngle() < -.02, "new gesture moves during the outgoing gesture");
   close(prop.scale.x, .5, "the old prop fades with its original hand");
   interrupt(2); playback.update(.07);
-  interrupt(0); playback.update(.6);
+  interrupt(0); frames(36, .6);
   close(relativeAngle(), -1, "a reselected gesture resumes");
   assert.equal(built.length, 3);
   assert.equal(mixer.stats.actions.inUse, 2, "only active and idle keep sampling after interruptions");
-  interrupt(2); playback.update(.6);
+  interrupt(2);
+  const stalled = 2.295;
+  let lastAngle = relativeAngle();
+  for (let i = 0; i < 4; i++) {
+    assert.equal(playback.update(stalled), false);
+    assert(relativeAngle() > lastAngle && relativeAngle() < 1.2, "slow frames show intermediate poses");
+    assert(playback.active.time < .53, "the GPU stall cannot consume the arriving gesture");
+    lastAngle = relativeAngle();
+  }
+  playback.update(stalled);
+  const settledTime = playback.active.time;
+  playback.update(.8);
+  close(playback.active.time - settledTime, .8, "settled clips resume wall-clock playback");
   close(relativeAngle(), 1.2, "latest preview wins");
   close(prop.scale.x, 0, "previous prop disappears");
   assert.equal(playback.update(3), true, "only current gesture completes");

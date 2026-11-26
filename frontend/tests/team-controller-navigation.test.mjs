@@ -71,8 +71,9 @@ test('team filters and Heroes respect controller ownership',async t=>{
       panel.innerHTML = '<div role="tab" data-creator-channel="roots"></div>';
       await press(7, true); await poll(); await press(7, false);
       await press(6, true); await press(6, false);
-      await press(5, true); await press(5, false);
-      assert.deepEqual(actions.splice(0), ["next_option", "previous_option", "next_tab"]);
+      await press(5, true); await poll(); await press(5, false);
+      await press(4, true); await poll(); await press(4, false);
+      assert.deepEqual(actions.splice(0), ["next_option", "previous_option", "next_tab", "previous_tab"]);
       unbindPanel();
       pad.axes = [0, 1, .8, 0];
       await poll();

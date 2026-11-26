@@ -38,6 +38,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>(button.getAttribute("aria-label") ?? button.textContent.trim()) === label);
     const disabled=control=>control.matches(":disabled,[aria-disabled=true]");
     const panelAction=detail=>window.dispatchEvent(new CustomEvent("avenlab:panel-action",{detail}));
+    const pressKey = (key, code) => act(async () => document.activeElement.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key, code, bubbles: true, cancelable: true })
+    ));
     const submit=()=>document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
     const typeName=name=>{
       const input=document.querySelector('[name="characterName"]');
@@ -223,6 +226,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     await act(async () => nameTarget().focus());
     await act(async () => panelAction("activate"));
     assert.ok(keyboard.getState().session);
+    await act(async () => panelAction("next_tab"));
+    assert.equal(activeStep(), "Personality", "shoulders cannot take focus from the name editor");
+    assert.ok(keyboard.getState().session);
     await act(async () => { keyboard.getState().edit("Track"); keyboard.getState().close(true); });
     assert.equal(nameField().value, "Track", "controller B keeps the typed name");
     assert.equal(document.activeElement, nameTarget(), "exiting returns navigation to the name row");
@@ -230,6 +236,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.ok(keyboard.getState().session, "controller can re-enter the name");
     await act(async () => { keyboard.getState().edit("Track Fox"); keyboard.getState().close(); });
     await act(async () => { nameField().focus(); typeName("Track Fox II"); });
+    await pressKey("q", "KeyQ");
+    await pressKey("e", "KeyE");
+    assert.equal(document.activeElement, nameField(), "Q/E remain typing keys inside the native name field");
     await act(async () => nameField().dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
     assert.equal(nameField().value, "Track Fox II", "Escape exits typing without undoing edits");
     assert.equal(document.activeElement, nameTarget());
@@ -351,6 +360,38 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.ok(document.querySelector(".welcome-character-details"), "profile details accompany a larger portrait");
     assert.ok(button("Log out"));
     assert.ok(button("Create character"));
+    const requestsBeforeBack = sent.length;
+    const controllerAction = action => act(async () => panelAction(action));
+    for (const [previousTab, nextTab, confirm] of [
+      [() => pressKey("q", "KeyQ"), () => pressKey("e", "KeyE"), () => pressKey("Enter", "Enter")],
+      [() => controllerAction("previous_tab"), () => controllerAction("next_tab"), () => controllerAction("activate")],
+    ]) {
+      await act(async () => button("Create character").click());
+      assert.equal(activeStep(), "Gender");
+      const backTab = button("Back to character selection");
+      await previousTab();
+      assert.equal(document.activeElement, backTab);
+      assert.equal(activeStep(), "Gender", "highlighting Avensky keeps the current editor open");
+      await nextTab();
+      assert.equal(activeStep(), "Gender");
+      const selectedGender = document.querySelector('[data-creator-option][aria-pressed="true"]');
+      assert.equal(document.activeElement, selectedGender, "returning to Gender restores the selected option");
+      await previousTab();
+      await controllerAction("down");
+      assert.equal(document.activeElement, selectedGender, "D-pad leaves the brand without changing the preview");
+      await previousTab();
+      await jumpTo("Gender");
+      assert.equal(document.activeElement, selectedGender, "tapping the current step returns focus to the panel");
+      await previousTab();
+      await previousTab();
+      assert.equal(activeStep(), "Personality", "the header order wraps through Avensky in both directions");
+      await nextTab();
+      assert.equal(document.activeElement, backTab);
+      assert.equal(activeStep(), "Personality");
+      await confirm();
+      assert.ok(document.querySelector(".character-roster"), "confirming Avensky returns to the roster");
+      assert.equal(sent.length, requestsBeforeBack, "header navigation and Back keep the account and its characters intact");
+    }
     const stopInput=listenForMenuInput();
     try {
       await act(async()=>reportMenuDevice("controller"));

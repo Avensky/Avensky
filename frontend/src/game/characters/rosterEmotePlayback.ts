@@ -60,6 +60,10 @@ export class RosterEmotePlayback {
   update(step: number) {
     const active = this.active;
     if (!active) return false;
+    // Even a stalled GPU must present intermediate poses. Advance both sides
+    // of a handoff by at most one fifth of its duration per rendered frame.
+    // Once it settles, the clip uses real elapsed time again.
+    if (this.outgoing.size) step = Math.min(step, EMOTE_FADE_SECONDS / 5);
     this.elapsed += step;
     const blend = MathUtils.smoothstep(this.elapsed, 0, EMOTE_FADE_SECONDS);
     let outgoingWeight = 0;

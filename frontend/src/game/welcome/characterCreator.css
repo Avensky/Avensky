@@ -30,7 +30,14 @@
   }
 }
 .creator-header .creator-back .menu-icon { flex: none; width: 18px; height: 18px; }
-.creator-header .creator-back:focus-visible { --angled-title-fill: var(--app-raised); }
+/* Programmatic gamepad focus must remain visible after the last input was touch. */
+.creator-header.angled-tab-header > .creator-back:focus {
+  --angled-title-fill: var(--app-accent); color: var(--app-background);
+}
+.creator-header.angled-tab-header > .creator-back:focus > span { color: inherit; }
+.creator-header .creator-back:focus + .creator-tab-scroll .angled-header-tab[aria-selected="true"] {
+  color: var(--app-text); background: var(--angled-tab-surface);
+}
 @media (hover:hover) {
   .creator-header .creator-back:hover { --angled-title-fill: var(--app-raised); }
 }

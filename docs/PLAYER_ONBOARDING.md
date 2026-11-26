@@ -8,7 +8,7 @@ Drag the character to turn them, or drag the exposed garage to move the camera. 
 
 ## Create a character
 
-The angled header follows the game’s shared menu scale. Its steps are **Gender**, **Looks**, **Skin tone**, **Hairstyle**, **Hair color**, **Eyes**, **Makeup**, and **Personality**. Tap a tab, use **LB/RB**, or press **Q/E**. Within Hair color and Makeup, use **LT/RT** or **1/3** to switch between channels. The D-pad, left stick, arrow keys, and **WASD** move through the choices in the visible grid. The Avensky back tab returns to the roster.
+The angled header follows the game’s shared menu scale. Its steps are **Gender**, **Looks**, **Skin tone**, **Hairstyle**, **Hair color**, **Eyes**, **Makeup**, and **Personality**. Tap a tab, use **LB/RB**, or press **Q/E**. Moving left from Gender or right from Personality highlights **Avensky**. Press **A** or **Enter** there to return to character selection. You can also tap **Avensky** directly. Within Hair color and Makeup, use **LT/RT** or **1/3** to switch between channels. The D-pad, left stick, arrow keys, and **WASD** move through the choices in the visible grid.
 
 Gender and Looks show portraits of the available rigs. The garage camera eases into a close-up for skin, hair, eyes, and makeup, then widens for the outfit. Changing steps mid-move continues from the current camera position. Reduced motion uses the settled framing immediately.
 
