@@ -71,9 +71,13 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
                 float sweep = 0.0038 + 0.0044 * t * t;
                 wing = (1.0 - smoothstep(0.0004, 0.0024 - 0.0016 * t, abs(y - sweep))) * outer;
                 if (linerStyle > 2.0) {
-                  float second = 1.0 - smoothstep(0.0004, 0.0013, abs(y - (0.0002 + 0.0030 * t)));
-                  float crease = (1.0 - smoothstep(0.00035, 0.0011, abs(lid - 0.0060))) * outerLid * fade;
-                  wing = max(wing, max(second * outer, crease));
+                  // Extend the lower lash into a second flick below the upper wing.
+                  // The exposed lid keeps the two strokes legible beneath the stock fringe.
+                  float lowerLid = -0.0050 * arch + 0.0016 * u;
+                  float lowerFlick = mix(lowerLid, 0.0016 + 0.0024 * t, smoothstep(0.85, 1.04, u));
+                  float stroke = 1.0 - smoothstep(0.00095, 0.0021, abs(y - lowerFlick));
+                  float taper = smoothstep(-0.34, 0.35, u) * (1.0 - smoothstep(1.50, 1.68, u));
+                  wing = max(wing, stroke * taper);
                 }
               }
               diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.010, 0.006, 0.010), 0.92 * max(upper, wing));
