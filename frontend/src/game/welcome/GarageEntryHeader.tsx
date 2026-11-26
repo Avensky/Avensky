@@ -24,20 +24,22 @@ function useRosterTabFade(visible: boolean) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const tabs = ref.current;
-    if (!visible || !tabs || !tabs.animate) return;
+    const header = tabs?.parentElement;
+    if (!visible || !tabs || !header?.animate) return;
     const previous = document.getElementById(retiredHeader);
     const from = previous ? Number(getComputedStyle(previous).opacity) : 0;
     previous?.remove();
     // Sign-in already fades the entire incoming header in time with the camera.
     const reveal = motionEnabled() && !document.documentElement.hasAttribute("data-entry-handoff")
-      ? tabs.animate([{ opacity: from }, { opacity: 1 }], { duration: 220, easing: "ease-out" }) : null;
+      ? header.animate([{ opacity: from }, { opacity: 1 }], { duration: 220, easing: "ease-out" }) : null;
     return () => {
-      const opacity = Number(getComputedStyle(tabs).opacity || 1);
+      const opacity = Number(getComputedStyle(header).opacity || 1);
       reveal?.cancel();
       queueMicrotask(() => {
         // React can replay this effect or restore the roster within the same commit.
         // On logout, the public sign-in page takes ownership of its own header.
         if (tabs.isConnected || document.querySelector(".welcome-screen .garage-entry-actions") ||
+            document.documentElement.hasAttribute("data-logout-handoff") ||
             document.body.classList.contains("garage-entry") || !motionEnabled() || opacity === 0) return;
         const shell = document.createElement("header");
         shell.id = retiredHeader;
@@ -52,6 +54,8 @@ function useRosterTabFade(visible: boolean) {
           action.removeAttribute("tabindex");
         }
         document.getElementById(retiredHeader)?.remove();
+        const wordmark = tabs.previousElementSibling;
+        if (wordmark?.classList.contains("garage-entry-brand")) shell.append(wordmark);
         shell.append(tabs);
         document.body.append(shell);
         const exit = shell.animate([{ opacity }, { opacity: 0 }], { duration: 180, easing: "ease-in" });
@@ -62,11 +66,11 @@ function useRosterTabFade(visible: boolean) {
   return ref;
 }
 
-export function GarageEntryHeader({ loginEntry, account }: { loginEntry: boolean; account?: AccountActions }) {
+export function GarageEntryHeader({ showBrand, account }: { showBrand: boolean; account?: AccountActions }) {
   const tabs = useRosterTabFade(Boolean(account));
-  if (!loginEntry && !account) return null;
+  if (!showBrand && !account) return null;
   return <header className="garage-entry-header angled-tab-header">
-    {loginEntry && <div className="garage-entry-brand" dangerouslySetInnerHTML={brand} />}
+    {showBrand && <div className="garage-entry-brand" dangerouslySetInnerHTML={brand} />}
     {account && <nav ref={tabs} className="garage-entry-actions" aria-label="Account actions" data-controller-row data-controller-header-action>
       <GameButton variant="custom" className="garage-entry-action garage-entry-action--logout joined-header-action" aria-label="Log out" title="Log out"
         onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>

@@ -5,6 +5,7 @@
   const gameStyles = new Set();
   let pending = false;
   let handoff;
+  let finishLogout;
   function finishHandoff() {
     if (!handoff) return;
     clearTimeout(handoff.timer);
@@ -84,6 +85,7 @@
     return face;
   }
   function beginHandoff(main, header) {
+    finishLogout?.();
     finishHandoff();
     const layer = document.createElement("div");
     layer.id = "garage-entry-handoff";
@@ -142,6 +144,7 @@
     window.dispatchEvent(new Event("avensky:portal-notice"));
   }
   function showPortalForm(page, next, main) {
+    finishLogout?.();
     window.dispatchEvent(new Event("avensky:leave-portal-form"));
     main.querySelectorAll("script").forEach(script => script.remove());
     document.querySelector("main.garage-entry-body").replaceWith(main);
@@ -169,9 +172,102 @@
       }
     }
   }
+  // Capture only references to the visible menu. They remain React's until the
+  // confirmed logout removes them. The live room, inputs and account forms are
+  // never copied into the outgoing presentation.
+  function captureLogout() {
+    if (reduceMotion()) return;
+    const roster = document.querySelector(".welcome-screen .character-roster");
+    const tabs = document.querySelector(".welcome-screen .garage-entry-actions");
+    const menu = document.querySelector(".main-menu");
+    if (!roster && !tabs && !menu) return;
+    const bounds = roster?.getBoundingClientRect();
+    const sharedBrand = Boolean(document.querySelector(".welcome-screen .garage-entry-brand"));
+    return function revealSignIn(onFinish) {
+      finishHandoff();
+      finishLogout?.();
+      const incoming = document.querySelector("body > main.garage-entry-body, .welcome-screen .garage-entry-body");
+      if (!incoming || reduceMotion()) { onFinish?.(); return; }
+      const layer = document.createElement("div");
+      layer.id = "garage-logout-handoff";
+      layer.inert = true;
+      layer.setAttribute("aria-hidden", "true");
+      if (roster && !roster.isConnected) {
+        // Keep the actual portraits and the current scroll position.
+        Object.assign(roster.style, { inset: "auto", top: bounds.top + "px", left: bounds.left + "px",
+          width: bounds.width + "px", height: bounds.height + "px" });
+        layer.append(roster);
+      }
+      if (tabs && !tabs.isConnected) {
+        const header = document.createElement("header");
+        header.className = "garage-entry-header angled-tab-header";
+        header.append(tabs);
+        layer.append(header);
+      }
+      if (menu && !menu.isConnected && !menu.querySelector("input,textarea,form,canvas")) layer.append(menu);
+      if (!layer.childElementCount) { onFinish?.(); return; }
+      document.documentElement.dataset.logoutHandoff = "waiting";
+      document.getElementById("garage-roster-header-exit")?.remove();
+      document.body.append(layer);
+      const header = document.querySelector("body > .garage-entry-header, .welcome-screen > .garage-entry-header");
+      incoming.dataset.warmSignIn = "";
+      if (header) header.dataset.warmSignIn = "";
+      let observer, timer, frame;
+      const finish = () => {
+        if (finishLogout !== finish) return;
+        clearTimeout(timer);
+        if (frame) cancelAnimationFrame(frame);
+        observer?.disconnect();
+        document.removeEventListener("visibilitychange", hidden);
+        layer.remove();
+        incoming.classList.remove("garage-entry-incoming");
+        if (header) header.classList.remove("garage-entry-incoming");
+        delete document.documentElement.dataset.logoutHandoff;
+        finishLogout = undefined;
+        onFinish?.();
+        // Keep cold-load transitions suppressed through stylesheet retirement and
+        // one settled paint, then restore the usual idle/wake fade on this form.
+        const restoreIdleFade = () => {
+          delete incoming.dataset.warmSignIn;
+          if (header) delete header.dataset.warmSignIn;
+        };
+        if (document.hidden || !incoming.isConnected || !window.requestAnimationFrame) restoreIdleFade();
+        else requestAnimationFrame(() => requestAnimationFrame(restoreIdleFade));
+      };
+      function hidden() { if (document.hidden) finish(); }
+      function fade() {
+        if (reduceMotion()) { finish(); return; }
+        document.documentElement.dataset.logoutHandoff = "fading";
+        incoming.classList.add("garage-entry-incoming");
+        if (header && !sharedBrand) header.classList.add("garage-entry-incoming");
+        layer.classList.add("garage-entry-outgoing");
+        layer.addEventListener("animationend", event => { if (event.target === layer) finish(); });
+        timer = setTimeout(finish, 550);
+      }
+      function controlsReady() {
+        clearTimeout(timer);
+        observer?.disconnect();
+        // Give form layout and the first camera frame a paint before starting the blend.
+        if (reduceMotion() || !window.requestAnimationFrame) fade();
+        else frame = requestAnimationFrame(() => { frame = requestAnimationFrame(fade); });
+      }
+      finishLogout = finish;
+      document.addEventListener("visibilitychange", hidden);
+      const card = document.body.classList.contains("garage-entry") && incoming.querySelector(".garage-entry-card");
+      if (card && card.dataset.controlsReady !== "true") {
+        // The restored form can still be mounting its controller/touch rows.
+        observer = new MutationObserver(() => { if (card.dataset.controlsReady === "true") controlsReady(); });
+        observer.observe(card, { attributes: true, attributeFilter: ["data-controls-ready"] });
+        // The server-rendered form remains usable if its enhancement is delayed.
+        timer = setTimeout(() => { card.dataset.controlsReady = "true"; controlsReady(); }, 500);
+      } else controlsReady();
+    };
+  }
   // The protected game can also be opened directly with an existing cookie.
   // In either direction only the interface changes ownership. Keep the room.
   async function showSignIn(signOut, notice) {
+    // Rust can close this player's socket before the revocation response arrives.
+    const reveal = signOut ? captureLogout() : undefined;
     const request = (path, options) => fetch(path, {
       credentials: "same-origin", mode: "same-origin", cache: "no-store", ...options,
     });
@@ -213,7 +309,7 @@
     }
     for (const link of page.querySelectorAll('link[rel=stylesheet]')) includeLink(link, next);
     window.dispatchEvent(new Event("avensky:leave-game"));
-    suspendGameStyles();
+    if (!reveal) suspendGameStyles();
     document.body.classList.add("garage-entry");
     document.body.append(room, header, main);
     history.replaceState(null, "", next.pathname);
@@ -224,8 +320,9 @@
       document.head.append(script);
     }
     window.dispatchEvent(new Event("avensky:portal-form"));
+    reveal?.(suspendGameStyles);
   }
-  window.avenskyPortalNavigation = { showSignIn, beginHandoff };
+  window.avenskyPortalNavigation = { showSignIn, beginHandoff, captureLogout };
   async function navigate(url, options) {
     if (pending) return;
     pending = true;
@@ -249,7 +346,7 @@
       if (!modules.length || modules.some(src => src.origin !== next.origin || !src.pathname.startsWith("/assets/")))
         throw Error("The game entry is unavailable.");
       const outgoing = document.querySelector("main.garage-entry-body");
-      const previousHeader = document.querySelector(".garage-entry-header");
+      const previousHeader = document.querySelector("body > .garage-entry-header");
       outgoing.inert = true;
       document.activeElement?.blur?.();
       // Only the verified game document reaches this point. A later module

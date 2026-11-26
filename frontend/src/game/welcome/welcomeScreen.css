@@ -9,10 +9,27 @@
   touch-action: pan-y;
 }
 .welcome-screen.garage-entry { display:flex; flex-direction:column; }
+.welcome-screen[data-logging-out] :is(.garage-entry-action,.roster-tile)[aria-disabled="true"] { opacity: 1; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduce-motion="true"]) .welcome-screen[data-logging-out] .welcome-notices [role="status"] {
+    animation: garage-entry-reveal 120ms 450ms both;
+  }
+}
 .welcome-screen .garage-entry-body { min-height:100%; }
 /* The compact inner tab and the outer title follow the same slant as the
    brand in the opposite direction. Painted height and hit height are independent. */
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
+/* Both screens share the corner badge. Swap it in place as the controls crossfade. */
+html[data-entry-handoff="fading"]:has(#garage-entry-handoff .garage-entry-brand)
+.welcome-screen > .garage-entry-header:has(> .garage-entry-brand) {
+  opacity: 1; animation: none; transition: none;
+}
+html[data-entry-handoff="fading"]:has(#garage-entry-handoff .garage-entry-brand)
+.welcome-screen .garage-entry-brand + .garage-entry-actions {
+  animation: garage-entry-reveal var(--garage-entry-crossfade-duration) ease-out both;
+}
+html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .garage-entry-brand)
+#garage-entry-handoff .garage-entry-brand { visibility: hidden; }
 #garage-roster-header-exit { right: 0; z-index: 31; }
 .garage-entry-actions {
   grid-column: -2 / -1; justify-self: end; display: flex; align-items: flex-start;

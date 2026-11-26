@@ -1,6 +1,9 @@
 import { entryAssets, stagingAccountPortal } from "./config";
 
-type EntryNavigation = { beginHandoff(main: HTMLElement, header: HTMLElement | null): void };
+type EntryNavigation = {
+  beginHandoff(main: HTMLElement, header: HTMLElement | null): void;
+  captureLogout?(): (() => void) | undefined;
+};
 let loading = false;
 
 function installedNavigation() {
@@ -23,4 +26,10 @@ export function prepareLocalEntryHandoff() {
 
 export function beginLocalEntryHandoff(main: HTMLElement) {
   installedNavigation()?.beginHandoff?.(main, main.querySelector(".garage-entry-header"));
+}
+
+export function captureLocalLogout(main: HTMLElement) {
+  const navigation = installedNavigation();
+  if (navigation?.captureLogout) return navigation.captureLogout();
+  return () => main.querySelector(".garage-entry-body")?.classList.add("garage-entry-incoming");
 }

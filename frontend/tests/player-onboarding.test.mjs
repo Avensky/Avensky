@@ -57,7 +57,8 @@ test("welcome picks a personality and gender before registration and lets return
     });
     const header=document.querySelector(".garage-entry-header");
     assert.ok(header);
-    assert.equal(document.querySelector(".garage-entry-brand img").getAttribute("src"),"/images/logo.svg");
+    const signInBrand = header.querySelector(".garage-entry-brand").innerHTML;
+    assert.equal(header.querySelector(".garage-entry-brand img").getAttribute("src"),"/images/logo.svg");
     assert.equal(document.querySelector("video,canvas"),null);
     assert.ok(button("Sign in"));
     assert.equal(button("Play as guest"),undefined);
@@ -285,7 +286,8 @@ test("welcome picks a personality and gender before registration and lets return
     await act(async()=>button("Back").click());
     assert.ok(button("Log out"));
     const headerActions=document.querySelector(".garage-entry-header nav[data-controller-row]");
-    assert.equal(document.querySelector(".garage-entry-brand"),null,"the signed-in roster uses the account tabs only");
+    assert.equal(headerActions.previousElementSibling?.innerHTML,signInBrand,"the roster uses the same logo and wordmark as sign-in");
+    assert.equal(headerActions.previousElementSibling.querySelector("button, [role=button], [tabindex], a"), null);
     assert.deepEqual([...headerActions.querySelectorAll("[role=button]")].map(tab=>tab.getAttribute("aria-label")),["Log out","Profile"]);
     assert.equal(headerActions.querySelector("button"),null);
     assert.equal(button("Profile").getAttribute("aria-pressed"),"false");
@@ -302,7 +304,7 @@ test("welcome picks a personality and gender before registration and lets return
         await vite.ssrLoadModule("/src/game/characters/GarageProfilePanel.tsx");
       });
       assert.equal(document.querySelector(".garage-entry-header nav"),headerActions);
-      assert.equal(document.querySelector(".garage-entry-brand"),null,"opening the profile preserves the unbranded header");
+      assert.equal(document.querySelector(".garage-entry-brand"),null,"the profile sheet keeps the account tabs");
       assert.equal(button("Profile").getAttribute("aria-pressed"),"true");
       assert.equal(document.querySelectorAll('[aria-label="Log out"]').length,1);
       const settings = document.querySelector('[aria-label="Account settings"]');
@@ -356,6 +358,30 @@ test("welcome picks a personality and gender before registration and lets return
     assert.ok(document.querySelector(".character-roster.garage-entry-incoming"));
     assert.ok(button("Create character"));
     assert.equal(document.querySelector("#garage-entry-handoff"), null);
+
+    const roster = document.querySelector(".character-roster");
+    const logoutFrames = [];
+    window.avenskyPortalNavigation = { captureLogout() {
+      assert.equal(document.querySelector(".character-roster"), roster);
+      logoutFrames.push("capture");
+      return () => {
+        assert.ok(document.querySelector("form.garage-credentials"));
+        assert.equal(roster.isConnected, false);
+        logoutFrames.push("reveal");
+      };
+    } };
+    await act(async () => button("Log out").click());
+    assert.equal(sent.at(-1).action, "account_logout");
+    await act(async () => reply(sent.at(-1), {}, false, "Could not log out."));
+    assert.deepEqual(logoutFrames, ["capture"]);
+    assert.ok(roster.isConnected, "a failed logout keeps the roster usable");
+    await act(async () => button("Log out").click());
+    await act(async () => social.setState({ registeredProfile: false, view: null }));
+    assert.ok(roster.isConnected, "the roster stays visible while the logout response is in flight");
+    assert.equal(document.querySelector("form.garage-credentials"), null, "the sign-in form never flashes before its fade");
+    await act(async () => reply(sent.at(-1), {}));
+    assert.deepEqual(logoutFrames, ["capture", "capture", "reveal"]);
+    assert.ok(button("Sign in"));
 
   } finally {
     await act(async()=>root.unmount());

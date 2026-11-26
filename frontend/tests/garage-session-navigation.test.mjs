@@ -64,6 +64,79 @@ const credentials = '<main class="garage-entry-body"><section class="garage-entr
 const protectedPage = '<div id="root"></div><script type="module" src="/assets/game.js"></script>';
 const portalScript = await readFile(new URL("../public/images/sign-in-navigation.js", import.meta.url), "utf8");
 
+test("a fast sign-in interrupts the logout dissolve without retiring the next login", async () => {
+  const { window, document, canvas } = entryFixture();
+  try {
+    const main = document.querySelector("main");
+    const source = document.createElement("main");
+    source.className = "welcome-screen";
+    source.innerHTML = '<div class="character-roster"></div>';
+    document.body.append(source);
+    const navigation = window.avenskyPortalNavigation;
+    const reveal = navigation.captureLogout();
+    source.remove();
+    main.querySelector(".garage-entry-card").dataset.controlsReady = "true";
+    reveal();
+    await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+    const retired = document.querySelector("#garage-logout-handoff");
+    assert.ok(main.classList.contains("garage-entry-incoming"));
+    navigation.beginHandoff(main, document.querySelector("body > header"));
+    assert.equal(retired.isConnected, false);
+    assert.equal(main.classList.contains("garage-entry-incoming"), false);
+    assert.equal(document.documentElement.hasAttribute("data-logout-handoff"), false);
+    retired.dispatchEvent(new window.Event("animationend"));
+    assert.equal(document.documentElement.dataset.entryHandoff, "waiting");
+    assert.ok(document.querySelector("#garage-entry-handoff"));
+    assert.equal(document.querySelector("canvas"), canvas);
+  } finally { window.close(); }
+});
+
+test("confirmed logout retires the original UI over the unchanged room, including an early socket close", async () => {
+  const dom = new JSDOM('<link rel="stylesheet" href="/assets/game.css"><div id="root">' + garageBackdrop() +
+    '<main class="welcome-screen">' + garageBrandHeader("/__alpha/entry") +
+    '<div class="character-roster"><img alt="Driver"><div role="button">Driver</div></div></main></div>',
+    { url: base, runScripts: "outside-only", pretendToBeVisual: true });
+  const { window } = dom, { document } = window;
+  const room = document.querySelector("[data-live-garage]"), canvas = room.appendChild(document.createElement("canvas"));
+  const roster = document.querySelector(".character-roster");
+  const header = document.querySelector(".garage-entry-header"), tabs = document.createElement("nav");
+  tabs.className = "garage-entry-actions"; header.append(tabs);
+  const style = document.querySelector('link[rel="stylesheet"]');
+  window.addEventListener("avensky:leave-game", () => document.querySelector("#root").remove());
+  try {
+    window.eval(portalScript);
+    window.fetch = async () => { throw Error("offline"); };
+    await assert.rejects(window.avenskyPortalNavigation.showSignIn(true), /offline/);
+    assert.ok(roster.isConnected && !roster.inert, "a failed logout leaves the actual menu available");
+    assert.equal(document.querySelector("#garage-logout-handoff"), null);
+    window.fetch = async () => {
+      document.querySelector(".welcome-screen").remove();
+      return { ok: true, url: base + "/sign-in", text: async () => garageBrandHeader("/__alpha/entry") + credentials };
+    };
+    await window.avenskyPortalNavigation.showSignIn(true);
+    const layer = document.querySelector("#garage-logout-handoff");
+    assert.equal(document.documentElement.dataset.logoutHandoff, "waiting");
+    assert.ok(layer.inert && layer.getAttribute("aria-hidden") === "true");
+    assert.equal(layer.querySelector(".character-roster"), roster);
+    assert.equal(layer.querySelector(".garage-entry-actions"), tabs);
+    assert.equal(layer.querySelector("canvas, form, input, .garage-entry-brand"), null);
+    assert.equal(document.querySelectorAll(".garage-entry-brand").length, 1);
+    assert.equal(document.body.querySelector("canvas"), canvas);
+    assert.equal(style.disabled === true, false, "the retired UI keeps its styling during the blend");
+    document.querySelector(".garage-entry-card").dataset.controlsReady = "true";
+    await Promise.resolve();
+    await new Promise(resolve => window.requestAnimationFrame(() => window.requestAnimationFrame(resolve)));
+    const form = document.querySelector("main.garage-entry-body");
+    assert.ok(form.classList.contains("garage-entry-incoming") && layer.classList.contains("garage-entry-outgoing"));
+    layer.dispatchEvent(new window.Event("animationend"));
+    assert.equal(document.querySelector("#garage-logout-handoff"), null);
+    assert.equal(document.documentElement.hasAttribute("data-logout-handoff"), false);
+    assert.equal(style.disabled, true);
+    assert.equal(document.body.querySelector("canvas"), canvas);
+    assert.equal(document.querySelectorAll("canvas").length, 1);
+  } finally { dom.window.close(); }
+});
+
 function entryFixture() {
   const dom = new JSDOM('<body class="garage-entry">' + garageBackdrop() + garageBrandHeader("/__alpha/entry") + credentials +
     '</body>', { url: base + "/sign-in", runScripts: "outside-only", pretendToBeVisual: true });
