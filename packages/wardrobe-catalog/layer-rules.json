@@ -1154,5 +1154,23 @@
       "reason": "External harness requires coat-compatible anchors and buckle clearance."
     }
   ],
-  "itemOverrides": []
+  "itemOverrides": [],
+  "dependencies": [
+    {
+      "id": "petticoat-follows-skirt",
+      "parent": "skirt",
+      "child": "petticoat",
+      "activation": "derived",
+      "onParentAbsent": "remove-derived-only",
+      "reason": "A bundled or auto-equipped petticoat follows its skirt, without deleting independent selections."
+    },
+    {
+      "id": "petticoat-with-gown",
+      "parent": "dress",
+      "child": "petticoat",
+      "activation": "explicit",
+      "onParentAbsent": "deactivate-preserve-selection",
+      "reason": "A manually selected gown underlayer remains saved when its supported outer garment is removed."
+    }
+  ]
 }

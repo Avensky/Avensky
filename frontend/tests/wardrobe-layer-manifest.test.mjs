@@ -91,6 +91,25 @@ test("item overrides allow reviewed specifications, never implicit acceptance", 
   assert(errors(d,"SELF_RELATION").length);
 });
 
+test("dependent garment lifecycle never deletes an explicit saved selection", () => {
+  const skirt = original.dependencies.find(x => x.id === "petticoat-follows-skirt");
+  const gown = original.dependencies.find(x => x.id === "petticoat-with-gown");
+  assert.equal(skirt.parent, "skirt");
+  assert.equal(skirt.activation, "derived");
+  assert.equal(skirt.onParentAbsent, "remove-derived-only");
+  assert.equal(gown.activation, "explicit");
+  assert.equal(gown.onParentAbsent, "deactivate-preserve-selection");
+  const wrong = copy();
+  wrong.dependencies[1].onParentAbsent = "remove-derived-only";
+  assert(errors(wrong, "DEPENDENCY_POLICY").length);
+  const unknown = copy();
+  unknown.dependencies[0].child = "not-a-garment";
+  assert(errors(unknown, "UNKNOWN_CLASS").length);
+  const duplicate = copy();
+  duplicate.dependencies.push({ ...duplicate.dependencies[0] });
+  assert(errors(duplicate, "DUPLICATE_ID").length);
+});
+
 test("manifest validator is deterministic, does not mutate input or saved garment IDs", () => {
   const input = copy(), before = JSON.stringify(input);
   const saved = Object.freeze({garments:Object.freeze({top:"top-03",skirt:"gothic-skirt-02",coat:"coat-01"})});

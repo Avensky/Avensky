@@ -9,7 +9,8 @@
     "schemaVersion",
     "classes",
     "relationships",
-    "itemOverrides"
+    "itemOverrides",
+    "dependencies"
   ],
   "properties": {
     "schemaVersion": {
@@ -35,6 +36,12 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/itemOverride"
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/dependency"
       }
     }
   },
@@ -271,6 +278,46 @@
           "items": {
             "$ref": "#/$defs/pairPolicy"
           }
+        }
+      }
+    },
+    "dependency": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parent",
+        "child",
+        "activation",
+        "onParentAbsent",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "parent": {
+          "type": "string"
+        },
+        "child": {
+          "type": "string"
+        },
+        "activation": {
+          "enum": [
+            "explicit",
+            "derived"
+          ]
+        },
+        "onParentAbsent": {
+          "enum": [
+            "deactivate-preserve-selection",
+            "remove-derived-only"
+          ]
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
         }
       }
     }

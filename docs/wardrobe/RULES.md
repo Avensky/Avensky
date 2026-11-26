@@ -72,6 +72,10 @@ Legend: **A** = allowed in principle but requires profile evidence before Hero/N
 
 Item-specific asset metadata may override the default **only** after fit evidence, e.g. a coat authored for a wide skirt. Do not infer fitting from filenames such as "loose" or "gothic".
 
+## 3a. Dependent garment lifecycle
+
+The machine-readable manifest also describes **parent/child dependency lifetimes**. A dependent underlayer may be derived from an outfit (such as a bundled petticoat following a skirt) or explicitly chosen by the player. On parent removal, only a derived selection can be automatically removed; an explicit selection remains saved but may become inactive until supported by another equipped parent. With several potential parents (e.g. skirt and gown), a child should become inactive only when **no eligible active parent remains**. This schema does not activate that runtime behavior until W-04/W-05.
+
 ## 4. Mode semantics and visibility
 
 ### Coats / jackets

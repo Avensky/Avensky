@@ -48,8 +48,8 @@ export function validateLayerRules(data) {
   const features = (v, path) => {
     if (arr(v, path, 0, true)) v.forEach((f, i) => string(f, path + "[" + i + "]", { id: true }));
   };
-  if (!keys(data, "$", ["schemaVersion", "classes", "relationships", "itemOverrides"],
-    ["schemaVersion", "classes", "relationships", "itemOverrides"])) return { valid: false, errors };
+  if (!keys(data, "$", ["schemaVersion", "classes", "relationships", "itemOverrides", "dependencies"],
+    ["schemaVersion", "classes", "relationships", "itemOverrides", "dependencies"])) return { valid: false, errors };
   if (data.schemaVersion !== 1) fail("SCHEMA_VERSION", "$.schemaVersion", "Unsupported version");
   const classes = obj(data.classes, "$.classes") ? data.classes : {};
   if (!Object.keys(classes).length) fail("REQUIRED", "$.classes", "No garment classes");
@@ -85,6 +85,30 @@ export function validateLayerRules(data) {
       }
     }
   };
+
+  const dependencies = arr(data.dependencies, "$.dependencies") ? data.dependencies : [];
+  const seenDependencies = new Set();
+  for (const [i, dep] of dependencies.entries()) {
+    const at = "$.dependencies[" + i + "]";
+    if (!keys(dep, at, ["id", "parent", "child", "activation", "onParentAbsent", "reason"],
+      ["id", "parent", "child", "activation", "onParentAbsent", "reason"])) continue;
+    if (string(dep.id, at + ".id", { id: true })) {
+      if (seenDependencies.has(dep.id)) fail("DUPLICATE_ID", at + ".id", "Repeated dependency ID");
+      seenDependencies.add(dep.id);
+    }
+    for (const role of ["parent", "child"]) if (!classes[dep[role]]) {
+      fail("UNKNOWN_CLASS", at + "." + role, "Unknown dependent garment class");
+    }
+    if (dep.parent === dep.child) fail("SELF_RELATION", at, "Dependency cannot point to itself");
+    if (!["explicit", "derived"].includes(dep.activation)) fail("DEPENDENCY_POLICY", at + ".activation", "Invalid dependent activation");
+    if (!["deactivate-preserve-selection", "remove-derived-only"].includes(dep.onParentAbsent))
+      fail("DEPENDENCY_POLICY", at + ".onParentAbsent", "Unknown dependent-removal behavior");
+    if (dep.activation === "explicit" && dep.onParentAbsent !== "deactivate-preserve-selection")
+      fail("DEPENDENCY_POLICY", at, "Explicit selection cannot be automatically removed");
+    if (dep.activation === "derived" && dep.onParentAbsent !== "remove-derived-only")
+      fail("DEPENDENCY_POLICY", at, "Derived layers must clear their derived selection on parent removal");
+    string(dep.reason, at + ".reason", { min: 15 });
+  }
 
   const relations = arr(data.relationships, "$.relationships") ? data.relationships : [];
   const ids = new Set();

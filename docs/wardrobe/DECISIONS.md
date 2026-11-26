@@ -37,6 +37,7 @@
 
 - Branch: `feat/wardrobe-layer-manifest-w03` based on `docs/wardrobe-foundation-20261125`; `main` remains unchanged.
 - Added `packages/wardrobe-catalog/layer-rules.json` with 20 garment classes, 47 provisional class relationships and no auto-approved item overrides. The draft rules include closed/open coats, corset direct/over-top/over-dress, tucked/over waistlines, belt placement, glove cuffs, scarf placement and boot cuff modes.
+- Added parent/child dependency lifecycle policies, distinguishing derived petticoats from explicitly selected underlayers; only derived selections can be automatically removed when no valid parent remains.
 - Added JSON Schema `layer-rules.schema.json`, standalone Node semantic validation `validate-layer-rules.mjs` and focused pure tests in `frontend/tests/wardrobe-layer-manifest.test.mjs`.
 - Added `npm run wardrobe:layers:check` to run the validator/tests and wired it into `check:frontend`. A dedicated PR workflow runs the check with Node 24 and no LFS assets.
 - **Important:** This provides a **class-level validation contract only**, not the W-04 resolver, saved-look migration, model fitting or per-asset approvals. No registered GLB is newly certified.
