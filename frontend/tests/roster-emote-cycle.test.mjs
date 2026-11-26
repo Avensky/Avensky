@@ -35,6 +35,8 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
     const { availableFinderEmotes } = await vite.ssrLoadModule("/src/game/characters/emoteFinder.ts");
     for (const carrying of [false, true]) {
       const available = new Set(availableFinderEmotes(carrying).map(item => item.id));
+      const neutral = CHARACTER_PERSONALITIES.find(style => style.id === "neutral");
+      assert.ok(neutral.emotes.every(id => automaticGarageEmoteIds(carrying).includes(id)), "the common gestures stay in every rotation");
       for (const style of CHARACTER_PERSONALITIES) {
         const pool = rosterGarageEmotes(style.id, carrying);
         const expected = new Set([...automaticGarageEmoteIds(carrying), ...style.emotes.filter(id => available.has(id))]);

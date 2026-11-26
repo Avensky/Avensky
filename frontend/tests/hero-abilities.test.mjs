@@ -62,7 +62,7 @@ test('hero guide explains shipped actions and returns without equipping or repla
    await click(highAngle);
    assert.equal(document.querySelector(highAngle).getAttribute('aria-pressed'),'true');
    assert(document.querySelector('.hero-guide-showcase p').textContent.trim());
-   assert(document.querySelector('.hero-guide-portraits [aria-label="Mara Vega"]'));
+   assert(document.querySelector('.hero-guide-portraits[aria-label="BRZ and Your character"]'));
    assert.deepEqual([...document.querySelectorAll('.hero-guide-details [aria-expanded]')].map(button=>button.getAttribute('aria-expanded')),['false','false','false','false']);
    assert.equal(ui.getState().overlay,null);
    await act(async()=>route('next_tab'));

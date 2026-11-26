@@ -104,6 +104,13 @@ export function playerDisplayName(profile?: PlayerProfile | null): string | unde
   return profile?.account_display_name ?? (profile?.active_character_id ? undefined : profile?.name);
 }
 
+/** Use the player's saved slot name on all character surfaces, including older named careers. */
+export function selectActiveCharacterName(state: { view: SocialView | null }): string | undefined {
+  const profile = state.view?.profile;
+  if (!profile?.active_character_id) return undefined;
+  return profile.characters?.find(slot => slot.id === profile.active_character_id)?.name ?? profile.name;
+}
+
 /** The active career's progression can already contain a newer wardrobe edit. */
 export function savedCharacterAppearance(profile: PlayerProfile, slot: CharacterSlot): CharacterChoice | null {
   const active = slot.id === (profile.active_character_id ?? profile.id);

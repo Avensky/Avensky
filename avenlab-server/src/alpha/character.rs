@@ -85,6 +85,11 @@ struct WardrobeSet {
 #[derive(Deserialize)]
 struct GameplayColors { top: String, bottom: String }
 
+pub(crate) static STARTER_STYLES: LazyLock<Vec<serde_json::Value>> = LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/character-styles.json"))
+        .expect("valid starter character styles")
+});
+
 static WARDROBE: LazyLock<Vec<WardrobeSet>> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/character-wardrobe.json"))
         .expect("the built-in wardrobe catalog is valid")
@@ -166,6 +171,31 @@ pub struct CharacterAppearance {
     tattoo: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     makeup: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    eyeshadow: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    eyeliner: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hair_palette: Option<HairPalette>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct HairPalette {
+    base: String,
+    roots: String,
+    highlights: String,
+    tips: String,
+    highlight_strength: serde_json::Number,
+    tip_blend: serde_json::Number,
+}
+
+impl HairPalette {
+    fn is_valid(&self) -> bool {
+        [&self.base, &self.roots, &self.highlights, &self.tips].into_iter().all(|value| hex_color(value))
+            && [&self.highlight_strength, &self.tip_blend].into_iter()
+                .all(|value| value.as_f64().is_some_and(|value| (0.0..=1.0).contains(&value)))
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -332,7 +362,7 @@ impl CharacterChoice {
             if (appearance.bra_style.is_some() || appearance.briefs_style.is_some()) && self.id != "mara-vega" {
                 return false;
             }
-            if !appearance.personality.as_deref().is_none_or(|value| ["friendly", "playful", "shy", "tsundere", "stoic", "elegant", "racer", "scientist"].contains(&value))
+            if !appearance.personality.as_deref().is_none_or(|value| STARTER_STYLES.iter().any(|entry| entry["attitude"] == value))
                 || !appearance.animation_fit.as_deref().is_none_or(|value| ["auto", "full", "fitted"].contains(&value)) {
                 return false;
             }
@@ -356,7 +386,7 @@ impl CharacterChoice {
                         .all(|(field, group)| group.as_deref().is_none_or(|color| supports(field) && hex_color(color)))
                     && (colors.finish.is_none() || supports("finish"))
             })) { return false; }
-            if !appearance.accent.as_deref().is_none_or(hex_color) {
+            if !appearance.accent.as_deref().is_none_or(hex_color) || !appearance.hair_palette.as_ref().is_none_or(HairPalette::is_valid) {
                 return false;
             }
             [
@@ -370,6 +400,8 @@ impl CharacterChoice {
                 ("glasses", appearance.glasses.as_deref()),
                 ("tattoo", appearance.tattoo.as_deref()),
                 ("makeup", appearance.makeup.as_deref()),
+                ("eyeshadow", appearance.eyeshadow.as_deref()),
+                ("eyeliner", appearance.eyeliner.as_deref()),
             ]
             .into_iter()
             .all(|(field, value)| value.is_none_or(|value| {
@@ -387,6 +419,32 @@ impl CharacterChoice {
 mod wardrobe_tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn cosmetics_and_hair_zones_validate_and_round_trip() {
+        let palette = json!({"base":"#38261b","roots":"#110f15","highlights":"#b08c43","tips":"#a84c69",
+            "highlightStrength":0.42,"tipBlend":0.77});
+        for (body, outfit) in [("mara-vega", "dockwear"), ("jules-okafor", "race-crew")] {
+            let entry = json!({"id":body,"outfit":outfit,"appearance":{
+                "hair":"natural","hair_color":"original","skin":"mahogany","headwear":"none","color":"original",
+                "makeup":"black","eyeshadow":"smoke","eyeliner":"cat-eye","hair_palette":palette
+            }});
+            let saved: CharacterChoice = serde_json::from_value(entry.clone()).unwrap();
+            assert!(saved.is_equippable());
+            assert_eq!(saved.driver_appearance().unwrap().hair, "#38261b");
+            assert_eq!(serde_json::to_value(&saved).unwrap()["appearance"], entry["appearance"]);
+            for (field, invalid) in [("eyeshadow", json!("unknown")), ("eyeliner", json!("unknown")), ("makeup", json!("unknown"))] {
+                let mut bad = entry.clone();
+                bad["appearance"][field] = invalid;
+                assert!(!serde_json::from_value::<CharacterChoice>(bad).unwrap().is_equippable());
+            }
+            for (field, invalid) in [("highlights", json!("yellow")), ("highlightStrength", json!(-0.1)), ("tipBlend", json!(1.1))] {
+                let mut bad = entry.clone();
+                bad["appearance"]["hair_palette"][field] = invalid;
+                assert!(!serde_json::from_value::<CharacterChoice>(bad).unwrap().is_equippable());
+            }
+        }
+    }
 
     #[test]
     fn fitted_hair_saves_only_on_vespers_rig() {

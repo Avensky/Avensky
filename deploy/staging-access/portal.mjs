@@ -10,6 +10,7 @@ import { cookieName, gameBridge, gameSocketGate, sessionCookie } from "./game-br
 
 const base = "/__alpha";
 const signInPath = "/sign-in";
+const handoffPath = base + "/sign-in/transfer";
 const oldSignInPath = base + signInPath;
 const cookieFlags = "Path=/; HttpOnly; Secure; SameSite=Lax";
 const sourcePalettes = new URL("../../frontend/src/theme/palettes.json", import.meta.url);
@@ -168,6 +169,17 @@ export function createPortal({ origin, accounts, mailInvite, game, garageManifes
       ${backToSignIn}`, message, true);
   }
 
+  function handoffPage(proof) {
+    const field = `<input type="hidden" name="handoff" value="${escape(proof)}">`;
+    // Separate forms keep the selected action intact when a native submit is
+    // upgraded to a controller button and when JavaScript is unavailable.
+    return page("Already signed in", `<p>Another device is signed in to this account. Continuing here will sign it out.</p>
+      <form method="post" action="${handoffPath}" data-controller-row>${field}
+        <input type="hidden" name="decision" value="continue"><button>Sign out other device and continue</button></form>
+      <form method="post" action="${handoffPath}" data-controller-row data-portal-cancel>${field}
+        <input type="hidden" name="decision" value="cancel"><button>Cancel</button></form>`, "", true);
+  }
+
   function forgotPasswordPage(message) {
     return page("Forgot password?", "<p>Use the email from your staging invitation. The staging operator sends reset links privately.</p>"
       + form("forgot-password", emailField, "Request password reset")
@@ -302,6 +314,7 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
         catch { return send(503); }
       }
       if (path === oldSignInPath) return redirect(viewer ? "/" : signInPath);
+      if (path === handoffPath) return redirect(viewer ? "/" : signInPath);
       if (path === signInPath) return viewer ? redirect("/") : send(200, signInPage());
       if (path === base + "/session") return viewer
         ? json(200, { email: viewer.email, admin: Boolean(viewer.admin), hasMfa: Boolean(viewer.has_mfa) })
@@ -323,13 +336,25 @@ ${deletionRequests.length ? `<h2>Pending profile deletion requests</h2><ul>${del
     let resetInput;
     try {
       const value = await readForm(req);
+      if (path === handoffPath) {
+        const decision = value("decision");
+        if (decision !== "continue" && decision !== "cancel") return send(400, signInPage("Choose how to continue."));
+        const next = accounts.resolveHandoff(value("handoff"), decision === "continue");
+        if (decision === "cancel") return redirect(signInPath);
+        return next ? await finishSignIn("/", next)
+          : send(409, signInPage("This sign-in request ended. Sign in again to continue."));
+      }
       if (path === signInPath && !value("challenge")) {
-        const result = await accounts.beginSignIn(value("email"), value("password"));
+        const result = await accounts.beginSignIn(value("email"), value("password"), sessionCookie(req));
         if (result.locked) return factorRateLimited();
+        if (result.handoff) return send(200, handoffPage(result.handoff));
+        if (result.current) return redirect("/");
         return result.challenge ? send(200, factorPage(result.challenge)) : await finishSignIn("/", result.session);
       }
       if (path === signInPath || path === base + "/sign-in/code") {
-        const result = accounts.completeSignIn(value("challenge"), value("code").trim());
+        const result = accounts.completeSignIn(value("challenge"), value("code").trim(), sessionCookie(req));
+        if (result.handoff) return send(200, handoffPage(result.handoff));
+        if (result.current) return redirect("/");
         if (result.session) return await finishSignIn("/", result.session);
         if (result.locked) return factorRateLimited();
         if (result.challenge) return send(400, factorPage(result.challenge, "The authentication code is incorrect."));
@@ -407,7 +432,7 @@ ${form("mfa/enable", '<label>Six-digit code<input name="code" inputmode="numeric
     } catch (error) {
       // Database, filesystem and mail failures are private to the operator.
       const message = error?.name === "Error" && !error.code ? error.message : "The request could not be completed.";
-      if (path === signInPath || path === base + "/sign-in/code" || path === base + "/enroll")
+      if (path === signInPath || path === handoffPath || path === base + "/sign-in/code" || path === base + "/enroll")
         return send(400, signInPage(message, path.endsWith("/enroll")));
       if (path === base + "/forgot-password") return send(400, forgotPasswordPage(message));
       if (path === base + "/reset" || path === base + "/reset/verify") {

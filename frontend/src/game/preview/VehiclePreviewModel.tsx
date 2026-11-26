@@ -32,7 +32,7 @@ import { prepareGarageDashboard } from "./garageDashboard";
 import { GarageVehicleDiagnosticsScene } from "./GarageVehicleDiagnosticsScene";
 import { garageMounts, useGarageDiagnostics } from "./garageDiagnosticsStore";
 import { prepareGarageHeadlightGlass } from "./garageHeadlightGlass";
-import { VehicleMaterialization } from "./VehicleMaterialization";
+import { GarageMaterialization } from "./GarageMaterialization";
 import { batchStaticVehicleMeshes } from "../../vehicles/tools/staticVehicleBatches";
 import { BRZ_GARAGE_ENABLED, prepareBrzCabin } from "./brzCabin";
 import { fitBrzEngineBay } from "./brzEngineBay";
@@ -424,7 +424,7 @@ export function VehiclePreviewModel({children,platform,model,showroomPath,driver
           {active && diagnostics && garageOpen && vehicleSystems(model) === "road" && <GarageVehicleDiagnosticsScene vehicle={model} popup={popup} />}
         </group>
       </group>
-      {active && revealActive && <VehicleMaterialization progress={revealProgress}
+      {active && revealActive && <GarageMaterialization subject="vehicle" progress={revealProgress}
         footprint={display.footprint} offset={display.shadowOffset} />}
       {garageCameraAnchors && <group position={display.position} scale={display.scale}>
         {cameraRig.map(shot => <group key={shot.name} name={`garage-view-${shot.name}`}

@@ -13,15 +13,43 @@
   ],
   "skin": [
     { "id": "original", "label": "Original", "color": "#ffffff" },
+    { "id": "porcelain", "label": "Porcelain", "color": "#f5d9c9" },
     { "id": "fair", "label": "Fair", "color": "#efb495" },
+    { "id": "sand", "label": "Sand", "color": "#e1b69a" },
+    { "id": "beige", "label": "Beige", "color": "#d2a183" },
+    { "id": "olive", "label": "Olive", "color": "#ba946c" },
+    { "id": "golden", "label": "Golden", "color": "#c18d5d" },
     { "id": "warm", "label": "Warm", "color": "#bb7953" },
-    { "id": "deep", "label": "Deep", "color": "#85513c" }
+    { "id": "umber", "label": "Umber", "color": "#985f47" },
+    { "id": "deep", "label": "Deep", "color": "#85513c" },
+    { "id": "mahogany", "label": "Mahogany", "color": "#754537" },
+    { "id": "espresso", "label": "Espresso", "color": "#623d33" },
+    { "id": "ebony", "label": "Ebony", "color": "#4b302b" }
   ],
   "makeup": [
-    { "id": "none", "label": "None" },
-    { "id": "rose", "label": "Rose", "color": "#ad6068" },
+    { "id": "rose", "label": "No makeup", "color": "#ad6068" },
+    { "id": "red", "label": "Red", "color": "#c1373e" },
+    { "id": "brick", "label": "Brick", "color": "#993f37" },
+    { "id": "coral", "label": "Coral", "color": "#ce776d" },
     { "id": "berry", "label": "Berry", "color": "#8c354f" },
-    { "id": "plum", "label": "Plum", "color": "#69415e" }
+    { "id": "plum", "label": "Plum", "color": "#69415e" },
+    { "id": "black", "label": "Black", "color": "#1c151e" },
+    { "id": "none", "label": "Original", "legacy": true }
+  ],
+  "eyeshadow": [
+    { "id": "none", "label": "Bare" },
+    { "id": "taupe", "label": "Taupe", "color": "#917268" },
+    { "id": "copper", "label": "Copper", "color": "#ac6948" },
+    { "id": "plum", "label": "Plum", "color": "#865777" },
+    { "id": "moss", "label": "Moss", "color": "#73724d" },
+    { "id": "slate", "label": "Slate", "color": "#576a85" },
+    { "id": "smoke", "label": "Smoke", "color": "#3a343e" }
+  ],
+  "eyeliner": [
+    { "id": "none", "label": "Bare" },
+    { "id": "classic", "label": "Classic" },
+    { "id": "cat-eye", "label": "Cat eye" },
+    { "id": "graphic", "label": "Double wing" }
   ],
   "tattoo": [
     { "id": "none", "label": "None" },

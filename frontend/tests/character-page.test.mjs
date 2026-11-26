@@ -293,7 +293,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('#character-editor-tab-details');
     assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
     assert.deepEqual([...document.querySelectorAll('[aria-label="Character model"] button')].map(node => node.textContent),
-      ['Mara Vega', 'Rook Okafor']);
+      ['Female body', 'Male body']);
     await click('#character-editor-tab-emotes');
     assert.equal(find(identityTab), identityControl);
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));
@@ -565,7 +565,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(title(), 'HEROES');
     assert.equal(characterViews.at(-1), null);
     assert.equal(drafts.at(-1), null);
-    assert.match(find('[data-open-character]').textContent, /Rook Okafor/);
+    assert.match(find('[data-open-character]').textContent, /Your character/);
     await click('[data-hero=camaro]');
     assert.equal(title(), 'GARAGE');
     assert.equal(headerPortrait().dataset.cacheOnly, 'false', 'the full garage can prepare a custom vehicle portrait');

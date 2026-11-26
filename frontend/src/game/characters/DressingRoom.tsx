@@ -93,8 +93,8 @@ function alphaStatus(pieces: Item["pieces"]): AlphaStatus | undefined {
 
 const OUTFIT_DESCRIPTIONS: Record<string, string> = {
   dockwear: "A fitted bodice with a full skirt, petticoat and bonnet.",
-  "night-run": "Rook’s hill-run outfit pairs a dark coat and trousers with gloves and belt pouches.",
-  "race-crew": "Rook’s race-crew outfit uses warm brown fabric and gold trim on his coat and accessories.",
+  "night-run": "The hill-run outfit pairs a dark coat and trousers with gloves and belt pouches.",
+  "race-crew": "The race-crew outfit uses warm brown fabric and gold trim on the coat and accessories.",
 };
 const CORSET_PREVIEW_WAISTS: Partial<Record<string, WardrobeChoice["waist"]>> = {
   "gothic-02": "tucked",
@@ -110,9 +110,9 @@ function inspectWardrobe(focus: WardrobeFocus) {
 }
 
 /** One live scene; browsing the catalog never changes or saves the equipped look. */
-export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
+export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
   equipPreview, onDiscardPreview, onEndPreview, cameraTools, onColors = onChange }: {
-  choice: CharacterChoice; onChange: (choice: CharacterChoice) => void;
+  choice: CharacterChoice; characterName?: string; onChange: (choice: CharacterChoice) => void;
   onPreviewOutfit?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
   equipPreview?: { disabled: boolean; hint?: string; onEquip: () => void };
   onDiscardPreview?: () => void;
@@ -548,7 +548,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     <div className="dressing-camera-block">
       <header className="dressing-room-title">
         <small>Fitting room</small>
-        <h2>{character.name}</h2>
+        <h2>{characterName ?? "Your character"}</h2>
       </header>
       <aside className="dressing-camera-shortcuts fitting-camera-toolbar" aria-label="Fitting room camera shortcuts">
         <FittingCameraSelect views={["Full body", "Face", "Hands"] as const} vertical allowReselect

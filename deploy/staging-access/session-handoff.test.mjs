@@ -21,7 +21,7 @@ async function listen(server) {
   return server.address().port;
 }
 
-test("a verified second device takes over the real game and the first one cannot sign it out", {
+test("a verified second device can cancel or explicitly transfer the real game", {
   skip: !binary && "Set AVENSKY_TEST_GAME_BIN to a built staging-capable game server",
   timeout: 30_000,
 }, async () => {
@@ -91,8 +91,23 @@ test("a verified second device takes over the real game and the first one cannot
     assert.equal(failed.status, 400);
     assert.equal((await verify(cookieA)).status, 204);
 
+    async function requestTransfer() {
+      const prompt = await post("/sign-in", { email, password });
+      assert.equal(prompt.status, 200);
+      assert.equal(prompt.headers.get("set-cookie"), null);
+      return (await prompt.text()).match(/name="handoff" value="([a-f0-9]{64})"/)[1];
+    }
+    const transfer = (handoff, decision) => post("/__alpha/sign-in/transfer", { handoff, decision });
+    const cancelled = await requestTransfer();
+    assert.equal((await transfer(cancelled, "cancel")).headers.get("location"), "/sign-in");
+    assert.equal((await transfer(cancelled, "continue")).status, 409);
+    const approved = await requestTransfer();
+    assert.equal((await verify(cookieA)).status, 204);
+    assert.equal(deviceA.readyState, WebSocket.OPEN);
     const displaced = once(deviceA, "close", { signal: AbortSignal.timeout(5000) });
-    const signedIn = await post("/sign-in", { email, password });
+    const results = await Promise.all([transfer(approved, "continue"), transfer(approved, "continue")]);
+    assert.deepEqual(results.map(r => r.status).sort(), [303, 409]);
+    const signedIn = results.find(r => r.status === 303);
     assert.equal(signedIn.status, 303);
     const cookieB = signedIn.headers.get("set-cookie").split(";")[0];
     assert.equal((await displaced)[0].code, 4001);

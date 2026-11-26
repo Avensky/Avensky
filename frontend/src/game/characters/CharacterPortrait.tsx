@@ -96,12 +96,12 @@ function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) 
 }
 
 function portraitKey(look: CharacterLook, url: string, outfitUrl?: string) {
-  const { hair, hair_color, skin, headwear, color, eye_color, brow_color, glasses, accent, tattoo, makeup, item_colors } = look.appearance;
+  const { hair, hair_color, skin, headwear, color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, hair_palette, item_colors } = look.appearance;
   const colors = Object.entries(item_colors ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([key, values]) => [key, Object.entries(values).sort(([a], [b]) => a.localeCompare(b))]);
   const { wardrobe } = look;
   return JSON.stringify([look.character.id, look.outfit.id, url, outfitUrl ?? null, hair, hair_color, skin, headwear,
-    color, eye_color, brow_color, glasses, accent, tattoo, makeup, colors, wardrobe && [wardrobe.set, wardrobe.shirt, wardrobe.waist]]);
+    color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, hair_palette, colors, wardrobe && [wardrobe.set, wardrobe.shirt, wardrobe.waist]]);
 }
 
 /** Render the saved look from its authored model while the menus are idle. */

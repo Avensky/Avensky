@@ -18,6 +18,11 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
   const irisDarkness = { value: 0 };
   const browColor = { value: new Color() };
   const browStrength = { value: 0 };
+  const shadowPigment = { value: new Color() };
+  const shadowStrength = { value: 0 };
+  const linerStyle = { value: 0 };
+  // Upper-lid boundaries measured on each rig's authored face, in bind-space meters.
+  const lidShape = { value: new Vector4(fit.x + .0015, fit.y + (female ? -.0009 : -.0042), .0142, female ? .0054 : .0058) };
   const lipPigment = { value: new Color() };
   const lipStrength = { value: 0 };
   // Mouth seam height, half-width, upper and lower lip heights in the authored bind pose.
@@ -28,18 +33,52 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
       corneas.push({ material, opacity: material.opacity, env: material.envMapIntensity });
     }
     if (material.name === "MAT_SkinFace") {
-      material.customProgramCacheKey = () => "villager-lip-pigment";
+      material.customProgramCacheKey = () => "villager-face-makeup-v2";
       material.onBeforeCompile = shader => {
-        Object.assign(shader.uniforms, { lipPigment, lipStrength, lipShape, lipFront: { value: fit.z - .015 } });
+        Object.assign(shader.uniforms, { shadowPigment, shadowStrength, linerStyle, lidShape, lipPigment, lipStrength, lipShape, lipFront: { value: fit.z - .015 } });
         shader.vertexShader = "varying vec3 vLipBind;\n" + shader.vertexShader.replace(
           "#include <begin_vertex>", "#include <begin_vertex>\nvLipBind = position;",
         );
         shader.fragmentShader = `varying vec3 vLipBind;
-          uniform vec3 lipPigment;
+          uniform vec3 lipPigment, shadowPigment;
+          uniform float shadowStrength, linerStyle;
+          uniform vec4 lidShape;
           uniform float lipStrength, lipFront;
           uniform vec4 lipShape;
         ` + shader.fragmentShader.replace("#include <map_fragment>", `
           #include <map_fragment>
+          if ((shadowStrength > 0.0 || linerStyle > 0.0) && vLipBind.z > lipFront - 0.023) {
+            float u = (abs(vLipBind.x) - lidShape.x) / lidShape.z;
+            float y = vLipBind.y - lidShape.y;
+            float arch = max(0.0, 1.0 - u * u);
+            float lineY = lidShape.w * arch + 0.0021 * u;
+            float lid = y - lineY;
+            float fade = 1.0 - smoothstep(0.83, 1.22, abs(u));
+            float shadow = smoothstep(-0.0015, 0.001, lid)
+                         * (1.0 - smoothstep(0.0025, 0.012, lid)) * fade;
+            float detail = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+            diffuseColor.rgb = mix(diffuseColor.rgb, shadowPigment * (0.48 + sqrt(detail)), shadow * shadowStrength);
+            if (linerStyle > 0.0) {
+              float outerLid = smoothstep(-0.85, 0.60, u);
+              float thickness = 0.0011 + 0.0010 * outerLid;
+              // Cat eye starts on the lid, so its silhouette still reads under a fringe.
+              if (linerStyle >= 2.0) thickness += 0.0028 * outerLid;
+              float upper = (1.0 - smoothstep(thickness * 0.45, thickness, abs(lid - thickness * 0.45))) * fade;
+              float wing = 0.0;
+              if (linerStyle >= 2.0) {
+                float t = clamp((u - 0.78) / 0.86, 0.0, 1.0);
+                float outer = smoothstep(0.72, 0.94, u) * (1.0 - smoothstep(1.52, 1.66, u));
+                float sweep = 0.0038 + 0.0044 * t * t;
+                wing = (1.0 - smoothstep(0.0004, 0.0024 - 0.0016 * t, abs(y - sweep))) * outer;
+                if (linerStyle > 2.0) {
+                  float second = 1.0 - smoothstep(0.0004, 0.0013, abs(y - (0.0002 + 0.0030 * t)));
+                  float crease = (1.0 - smoothstep(0.00035, 0.0011, abs(lid - 0.0060))) * outerLid * fade;
+                  wing = max(wing, max(second * outer, crease));
+                }
+              }
+              diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.010, 0.006, 0.010), 0.92 * max(upper, wing));
+            }
+          }
           if (lipStrength > 0.0 && vLipBind.z > lipFront) {
             float side = abs(vLipBind.x) / lipShape.y;
             float seam = vLipBind.y - lipShape.x;
@@ -99,6 +138,10 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
     };
   }
   return (look: CharacterLook) => {
+    shadowStrength.value = look.eyeshadow ? .75 : 0;
+    if (look.eyeshadow) shadowPigment.value.set(look.eyeshadow);
+    const liner = look.appearance.eyeliner;
+    linerStyle.value = liner === "graphic" ? 3 : liner === "cat-eye" ? 2 : liner === "classic" ? 1 : 0;
     lipStrength.value = look.lipstick ? .84 : 0;
     if (look.lipstick) lipPigment.value.set(look.lipstick);
     irisColor.value.set(look.iris);

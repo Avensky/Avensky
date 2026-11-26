@@ -118,6 +118,32 @@ test('item close-ups ignore hidden layers, fit both axes, and transition around 
   } finally { await vite.close(); }
 });
 
+test('personality kits change the wardrobe and base emotes while keeping personal appearance', async () => {
+  const vite = await server();
+  try {
+    const { CHARACTER_STYLES, applyCreatorWardrobe, creatorChoice } = await vite.ssrLoadModule('/src/game/characters/characterStyles.ts');
+    const { CHARACTER_PERSONALITIES } = await vite.ssrLoadModule('/src/game/characters/characterPersonality.ts');
+    assert.deepEqual(new Set(CHARACTER_STYLES.map(style => style.attitude)), new Set(CHARACTER_PERSONALITIES.map(personality => personality.id)));
+    const fresh = creatorChoice(CHARACTER_STYLES[0].id, 'female');
+    assert.equal(fresh.appearance.personality, 'neutral');
+    assert.equal(fresh.appearance.makeup, 'rose');
+    const edits = { hair: 'hair-07', hair_color: 'copper', skin: 'deep', makeup: 'berry', hair_palette: { base: '#ad714c', roots: '#69412e', highlights: '#e0bd88', tips: '#b87f5e', highlightStrength: .6, tipBlend: .4 },
+      eye_color: 'blue', brow_color: 'brown', eyeshadow: 'plum', eyeliner: 'cat-eye' };
+    const edited = { ...fresh, appearance: { ...fresh.appearance, ...edits } };
+    const racer = creatorChoice('street', 'female', edited);
+    assert.equal(racer.appearance.personality, 'racer');
+    assert.notEqual(racer.outfit, edited.outfit);
+    for (const [field, value] of Object.entries(edits)) assert.deepEqual(racer.appearance[field], value, field);
+    const restored = applyCreatorWardrobe(fresh, racer);
+    assert.equal(restored.outfit, fresh.outfit);
+    for (const [field, value] of Object.entries(edits)) assert.deepEqual(restored.appearance[field], value, field);
+    const other = creatorChoice('trailhead', 'male', edited);
+    assert.equal(other.appearance.hair, 'natural');
+    assert.deepEqual(other.appearance.hair_palette, edits.hair_palette);
+    assert.equal(other.appearance.makeup, 'berry');
+  } finally { await vite.close(); }
+});
+
 test('every personality has playable varied emotes; fitted and full poses keep complete valid animation clips', async () => {
   const vite = await server();
   try {

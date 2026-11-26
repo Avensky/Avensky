@@ -1,6 +1,6 @@
 import styles from "../../../../packages/wardrobe-catalog/character-styles.json";
 import { CHARACTER_PERSONALITIES, type CharacterPersonality } from "./characterPersonality";
-import { ROOK_ID, VILLAGER_ID, installedHairStyles, type CharacterChoice } from "./characterCatalog";
+import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterAppearance, type CharacterChoice } from "./characterCatalog";
 
 export type CharacterBody = "female" | "male";
 
@@ -21,26 +21,21 @@ export function styleLook(style: typeof styles[number], body: CharacterBody) {
       color: outfit.color, accent: outfit.accent, personality: style.attitude as CharacterPersonality } } satisfies CharacterChoice;
 }
 
-type StarterStyle = typeof styles[number];
-
-function starterHair(style: StarterStyle, body: CharacterBody) {
-  const id = style[body].hair;
-  return body === "female" ? installedHairStyles(VILLAGER_ID).find(hair => hair.id === id) : undefined;
+/** Starter kits own the outfit and its emotes. Appearance choices belong to the player. */
+export function applyCreatorWardrobe(starter: CharacterChoice, previous?: CharacterChoice): CharacterChoice {
+  const kit = starter.appearance ?? characterAppearance(starter);
+  if (!previous) return { ...starter, appearance: { ...kit, makeup: "rose" } };
+  const previousLook = previous.appearance ?? characterAppearance(previous);
+  // The fitted hairstyles currently exist on the female rig. Both rigs support the stock cuts.
+  const stockHair = CHARACTER_APPEARANCE_OPTIONS.hair.some(option => option.id === previousLook.hair);
+  const hair = starter.id === previous.id || stockHair ? previousLook.hair : "natural";
+  return { ...starter, appearance: {
+    ...previousLook, hair, color: kit.color, accent: kit.accent, headwear: kit.headwear,
+    item_colors: kit.item_colors, bra_style: kit.bra_style, briefs_style: kit.briefs_style, personality: kit.personality,
+  } };
 }
 
-export function creatorStarterHairLabel(styleId: string, body: CharacterBody) {
-  const style = styles.find(entry => entry.id === styleId) ?? styles[0];
-  return starterHair(style, body)?.label ?? (body === "female" ? "Village braid" : "Short cut");
-}
-
-/** Replace the personality's starter kit while retaining the player's individual face colors. */
 export function creatorChoice(styleId: string, body: CharacterBody, previous?: CharacterChoice): CharacterChoice {
   const style = styles.find(entry => entry.id === styleId) ?? styles[0];
-  const choice = styleLook(style, body);
-  const appearance = previous?.appearance;
-  return { ...choice, appearance: {
-    ...choice.appearance, hair: starterHair(style, body)?.id ?? "natural",
-    skin: appearance?.skin ?? "original", hair_color: appearance?.hair_color ?? "original",
-    makeup: appearance?.makeup ?? "none", eye_color: appearance?.eye_color, brow_color: appearance?.brow_color,
-  } };
+  return applyCreatorWardrobe(styleLook(style, body), previous);
 }

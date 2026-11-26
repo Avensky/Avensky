@@ -40,9 +40,10 @@ export function rosterCamera(view: CharacterGarageView = "roster", creatorFrame?
     camera.lookAt(target);
   }
   return {
-    subject: "loading",
+    subject: "loading", framingRevision: 0,
     fitPortrait(eyeHeight, waistHeight) {
-      if (eyeHeight <= waistHeight) return;
+      if (eyeHeight <= waistHeight || (eyeHeight === eye && waistHeight === waist)) return;
+      this.framingRevision = (this.framingRevision ?? 0) + 1;
       eye = eyeHeight;
       waist = waistHeight;
       if (torsoSpan) framePortrait();

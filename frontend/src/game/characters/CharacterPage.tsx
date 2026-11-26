@@ -7,7 +7,7 @@ import { readLocalCharacter, writeLocalCharacter } from "./localOutfits";
 import { ControllerAction } from "../../components/controller";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { requestSocial } from "../../net/socialClient";
-import { selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
+import { selectActiveCharacterName, selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
 import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, installedHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
@@ -46,7 +46,7 @@ export const CHARACTER_TABS = [
 ] as const;
 export type CharacterTab = typeof CHARACTER_TABS[number]["id"];
 
-const PREVIEW_CAST = CHARACTERS.map(item => ({ name: item.name, gender: item.gender, choice: { id: item.id, outfit: item.outfits[0].id } }));
+const PREVIEW_CAST = CHARACTERS.map(item => ({ gender: item.gender, choice: { id: item.id, outfit: item.outfits[0].id } }));
 const COCKPIT_CAMERAS = ["Full body", "Whole car"] as const;
 const BODY_STYLE = [
   ["Hair", [["hair", "Hairstyle"], ["hair_color", "Hair color"]]],
@@ -86,7 +86,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
   const fittedHair = useLocalHairstyle(state => hairOptions.some(style => style.id === state.id));
   const owner = useSocialStore(state => state.view?.profile.id ?? state.profileOwner);
   const connectedOwner = useSocialStore(state => state.view?.profile.id);
-  const characterSlot = useSocialStore(state => state.view?.profile.active_character_id ? state.view.profile : undefined);
+  const characterName = useSocialStore(selectActiveCharacterName);
   const bodyTattoosAvailable = useSocialStore(state => state.bodyTattoosAvailable);
   const saved = useSocialStore(selectEquippedCharacter);
   // Null is a supported profile awaiting setup. Older servers omit the field.
@@ -391,7 +391,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
 
   const modelPicker = <div className={locked ? "character-outfits" : "character-cast"} role="group"
     aria-label={locked ? "Character model" : "Gender"} data-controller-row>
-    {PREVIEW_CAST.map(({ name, gender, choice: next }) => <button key={next.id} type="button" className="menu-control"
+    {PREVIEW_CAST.map(({ gender, choice: next }) => <button key={next.id} type="button" className="menu-control"
       disabled={!locked && status === "saving"} data-character-option={next.id} aria-pressed={choice.id === next.id}
       onClick={() => {
         if (next.id === choice.id) return;
@@ -403,7 +403,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
         update({ ...(preset && characterLook(preset) ? preset : next), identity: choice.identity });
       }}>
       {!locked && <CharacterPortrait choice={next} />}
-      <span>{locked ? name : gender === "female" ? "Female" : "Male"}</span>
+      <span>{gender === "female" ? "Female" : "Male"}{locked ? " body" : ""}</span>
     </button>)}
   </div>;
   const bag = Boolean(previewChoice.prop);
@@ -655,8 +655,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       role="tabpanel" id="character-editor-panel" aria-labelledby={"character-editor-tab-" + tab}
       onFocus={revealCharacterControl}>
       <div className="character-stage" data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
-        aria-label={`Preview of ${characterSlot?.name ?? character.name}`} />
-      {fitting && <DressingRoom choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
+        aria-label={`Preview of ${characterName ?? "Your character"}`} />
+      {fitting && <DressingRoom characterName={characterName} choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
         onColors={saveClothingColors} />}
@@ -684,8 +684,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
       </section>}
       {(tab === "details" || tab === "emotes") && <section className={`character-controls menu-panel-frame ${tab === "details" ? "character-details" : "character-controls--left"}`} aria-label={tab === "details" ? "Character details" : "Emote filters"}>
         {tab === "details" && <>
-          <header className="character-description"><h2>{characterSlot?.name ?? character.name}</h2>{!characterSlot && <p>{character.title}</p>}</header>
-          {!PLAYER_ONBOARDING && !characterSlot && modelPicker}
+          <header className="character-description"><h2>{characterName ?? "Your character"}</h2></header>
+          {!PLAYER_ONBOARDING && !characterName && modelPicker}
           <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
             {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
               aria-pressed={(choice.identity ?? character.gender) === item.id}

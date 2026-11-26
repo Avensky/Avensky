@@ -1,58 +1,79 @@
 [
   {
+    "id": "everyday",
+    "name": "Everyday",
+    "attitude": "neutral",
+    "female": { "outfit": "dockwear", "color": "original", "accent": "#e7ab62" },
+    "male": { "outfit": "night-run", "color": "original", "accent": "#dfa9ea" }
+  },
+  {
     "id": "street",
     "name": "Street",
     "attitude": "racer",
-    "female": { "outfit": "shop-crew", "color": "#2c5066", "accent": "#a0e2d4", "hair": "hair-03" },
-    "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4", "hair": "natural" }
+    "female": { "outfit": "shop-crew", "color": "#2c5066", "accent": "#a0e2d4" },
+    "male": { "outfit": "race-crew", "color": "#304d64", "accent": "#a0e2d4" }
   },
   {
     "id": "workshop",
     "name": "Workshop",
     "attitude": "friendly",
-    "female": { "outfit": "dockwear", "color": "#5e5949", "accent": "#dfb879", "hair": "hair-02" },
-    "male": { "outfit": "race-crew", "color": "#505d4d", "accent": "#dfb879", "hair": "natural" }
+    "female": { "outfit": "dockwear", "color": "#5e5949", "accent": "#dfb879" },
+    "male": { "outfit": "race-crew", "color": "#505d4d", "accent": "#dfb879" }
   },
   {
     "id": "night-shift",
     "name": "Night Shift",
     "attitude": "stoic",
-    "female": { "outfit": "shop-crew", "color": "#373146", "accent": "#c9a7e6", "hair": "hair-09" },
-    "male": { "outfit": "night-run", "color": "#38334c", "accent": "#c9a7e6", "hair": "natural" }
+    "female": { "outfit": "shop-crew", "color": "#373146", "accent": "#c9a7e6" },
+    "male": { "outfit": "night-run", "color": "#38334c", "accent": "#c9a7e6" }
   },
   {
     "id": "boardwalk",
     "name": "Boardwalk",
     "attitude": "playful",
-    "female": { "outfit": "dockwear", "color": "#624358", "accent": "#e5ac7a", "hair": "hair-11" },
-    "male": { "outfit": "race-crew", "color": "#564453", "accent": "#e5ac7a", "hair": "natural" }
+    "female": { "outfit": "dockwear", "color": "#624358", "accent": "#e5ac7a" },
+    "male": { "outfit": "race-crew", "color": "#564453", "accent": "#e5ac7a" }
   },
   {
     "id": "quiet-hours",
     "name": "Quiet Hours",
     "attitude": "shy",
-    "female": { "outfit": "dockwear", "color": "#585666", "accent": "#c0adae", "hair": "hair-06" },
-    "male": { "outfit": "night-run", "color": "#555663", "accent": "#c0adae", "hair": "natural" }
+    "female": { "outfit": "dockwear", "color": "#585666", "accent": "#c0adae" },
+    "male": { "outfit": "night-run", "color": "#555663", "accent": "#c0adae" }
   },
   {
     "id": "backstreet",
     "name": "Backstreet",
     "attitude": "tsundere",
-    "female": { "outfit": "shop-crew", "color": "#542d38", "accent": "#cf8381", "hair": "hair-10" },
-    "male": { "outfit": "night-run", "color": "#4d333e", "accent": "#cf8381", "hair": "natural" }
+    "female": { "outfit": "shop-crew", "color": "#542d38", "accent": "#cf8381" },
+    "male": { "outfit": "night-run", "color": "#4d333e", "accent": "#cf8381" }
   },
   {
     "id": "evening",
     "name": "Evening",
     "attitude": "elegant",
-    "female": { "outfit": "dockwear", "color": "#342c45", "accent": "#d5bc88", "hair": "hair-07" },
-    "male": { "outfit": "night-run", "color": "#302d42", "accent": "#d5bc88", "hair": "natural" }
+    "female": { "outfit": "dockwear", "color": "#342c45", "accent": "#d5bc88" },
+    "male": { "outfit": "night-run", "color": "#302d42", "accent": "#d5bc88" }
   },
   {
     "id": "fieldwork",
     "name": "Fieldwork",
     "attitude": "scientist",
-    "female": { "outfit": "shop-crew", "color": "#52665e", "accent": "#d2dec4", "hair": "hair-04" },
-    "male": { "outfit": "race-crew", "color": "#405b57", "accent": "#d2dec4", "hair": "natural" }
+    "female": { "outfit": "shop-crew", "color": "#52665e", "accent": "#d2dec4" },
+    "male": { "outfit": "race-crew", "color": "#405b57", "accent": "#d2dec4" }
+  },
+  {
+    "id": "trailhead",
+    "name": "Trailhead",
+    "attitude": "explorer",
+    "female": { "outfit": "shop-crew", "color": "#484d36", "accent": "#d7a56d" },
+    "male": { "outfit": "race-crew", "color": "#464d3a", "accent": "#d7a56d" }
+  },
+  {
+    "id": "spotlight",
+    "name": "Spotlight",
+    "attitude": "performer",
+    "female": { "outfit": "dockwear", "color": "#512d50", "accent": "#ebc87d" },
+    "male": { "outfit": "night-run", "color": "#433345", "accent": "#ebc87d" }
   }
 ]
