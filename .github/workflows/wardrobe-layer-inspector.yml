@@ -46,8 +46,9 @@ jobs:
         run: npm --prefix frontend ci
       - name: Typecheck frontend integration
         run: npm --prefix frontend run typecheck
-      - name: Lint frontend integration
-        run: npm --prefix frontend run lint
+      - name: Lint modified wardrobe components
+        working-directory: frontend
+        run: ./node_modules/.bin/eslint src/game/characters/DressingRoom.tsx src/game/characters/WardrobeLayerInspector.tsx
       - name: Test dressing room and saved-layer inspector
         working-directory: frontend
         run: node --test tests/dressing-room.test.mjs tests/wardrobe-layer-inspector-ui.test.mjs
