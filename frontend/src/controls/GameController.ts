@@ -22,7 +22,7 @@ import { VehicleFlags, PlayerFlags } from "../store/input/protocol/inputMasks";
 import {
   canDrive,
   canNavigateMenu,
-  creatorUsesMenuStick,
+  welcomeUsesMenuStick,
   hasSecondaryMenuControls,
   isTypingTarget,
   routeMenuAction,
@@ -334,7 +334,7 @@ export function GameController() {
         if ((ui.screen === "welcome" || ui.screen === "main") && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
           const deadzone = usePreferencesStore.getState().controllerDeadzone;
           const turn = axis(pad.axes[2], deadzone);
-          if (ui.screen === "welcome" && creatorUsesMenuStick()) {
+          if (ui.screen === "welcome" && welcomeUsesMenuStick()) {
             readRosterSticks(0, 0, turn, now);
             navigationSticks = "left";
           } else if (ui.screen === "welcome")

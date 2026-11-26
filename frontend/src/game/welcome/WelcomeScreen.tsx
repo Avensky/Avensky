@@ -2,7 +2,7 @@ import { GarageCredentialFields } from "./GarageCredentialFields";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
 import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
+import { isTypingTarget, menuActionForKey, type MenuAction } from "../../controls/inputRouting";
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
@@ -16,6 +16,7 @@ import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { GarageEntryHeader } from "./GarageEntryHeader";
+import type { GarageProfileHandle } from "../characters/GarageProfilePanel";
 import { retryEntryConnection } from "../../net/rustSocket";
 import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
 import { stagingAccountPortal } from "./config";
@@ -86,7 +87,9 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const root = useRef<HTMLElement>(null);
   const logoutReveal = useRef<() => void>(undefined);
   const wasProfileOpen = useRef(false);
+  const profilePanel = useRef<GarageProfileHandle>(null);
   const remembered = useRef(new WeakMap<HTMLElement, number>());
+  const lastProfileSetting = useRef<HTMLElement | null>(null);
   // Revoking a session can close the socket before its HTTP response arrives.
   // Keep the outgoing roster visible with its controls disabled until sign-in takes over.
   const leavingPlayer = pendingAction?.kind === "logout" ? pendingAction.player : undefined;
@@ -141,7 +144,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     reveal();
   }, [busy, sessionPending, screen]);
   const accountOpen = accountRoot && (showSettings || openedFromMenu);
-  const showBrand = screen === "characters" && !accountOpen ||
+  const showBrand = screen === "characters" ||
     !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
   const creatorFrame = garageMode === "create" ? creatorStepFrames[creatorStep] : undefined;
@@ -199,8 +202,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   function back(leaveCreator = false) {
     if (pending.current || restoring) return;
     if (accountOpen) {
-      const profileBack = root.current?.querySelector<HTMLElement>("[data-profile-back]");
-      if (profileBack) profileBack.click();
+      if (profilePanel.current) profilePanel.current.back();
       else leaveProfile();
       return;
     }
@@ -224,6 +226,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   useEffect(() => {
     const returningFromProfile = wasProfileOpen.current && !accountOpen;
     wasProfileOpen.current = accountOpen;
+    if (!accountOpen) lastProfileSetting.current = null;
     function focusEntry() {
       if (root.current?.inert) return;
       if (screen === "welcome") return;
@@ -270,10 +273,35 @@ export function WelcomeScreen({ onGarageCharacter }: {
     };
   }, []);
 
+  function moveProfileFocus(action: MenuAction) {
+    const container = root.current;
+    if (!accountOpen || !container) return false;
+    const settings = container.querySelector<HTMLElement>(".garage-profile-panel");
+    const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    if (action === "previous_tab" || action === "next_tab") {
+      const tabs = [...container.querySelectorAll<HTMLElement>('[data-profile-header-tab]:not([aria-disabled="true"])')];
+      if (!tabs.length) return true;
+      if (active && settings?.contains(active)) lastProfileSetting.current = active;
+      const current = tabs.findIndex(tab => tab === active);
+      const start = current < 0 ? tabs.findIndex(tab => tab.getAttribute("aria-pressed") === "true") : current;
+      const direction = action === "next_tab" ? 1 : -1;
+      tabs[(start + direction + tabs.length) % tabs.length].focus({ preventScroll: true });
+      return true;
+    }
+    if (!["up", "down", "left", "right"].includes(action)) return false;
+    const previous = lastProfileSetting.current;
+    if (settings && previous && active?.hasAttribute("data-profile-header-tab") && settings.contains(previous)
+        && !previous.matches(":disabled, [aria-disabled=true]") && !previous.closest("[hidden],[inert]")) {
+      previous.focus({ preventScroll: true });
+    } else if (settings) navigateFormRows(settings, active, action, remembered.current);
+    return true;
+  }
+
   useEffect(() => {
     function navigate(event: Event) {
       if (screen === "create" || !root.current || root.current.inert || (busy && !sessionPending)) return;
       const action = (event as CustomEvent<MenuAction>).detail;
+      if (moveProfileFocus(action)) return;
       const active = root.current.contains(document.activeElement) ? document.activeElement :
         root.current.querySelector(".garage-field[data-selected=true] input") ?? document.activeElement;
       if (!(active instanceof HTMLElement)) return;
@@ -428,11 +456,18 @@ export function WelcomeScreen({ onGarageCharacter }: {
 
   return <>
     <main className="welcome-screen garage-entry" ref={root} data-logging-out={leavingPlayer ? true : undefined} data-controller-rows data-controller-form onKeyDown={event => {
+      if (event.defaultPrevented || event.nativeEvent.isComposing) return;
       if (event.key === "Tab") { event.preventDefault(); return; }
       if (screen === "create") return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (!event.repeat) back();
+        return;
+      }
+      if (accountOpen) {
+        if (isTypingTarget(event.target) || event.ctrlKey || event.metaKey || event.altKey) return;
+        const action = menuActionForKey(event);
+        if (action && !event.repeat && !busy && moveProfileFocus(action)) event.preventDefault();
         return;
       }
       if ((["ArrowUp","ArrowDown"].includes(event.key) || !isTypingTarget(event.target) && ["ArrowLeft","ArrowRight"].includes(event.key))) {
@@ -441,7 +476,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
       }
     }}>
       <GarageEntryHeader showBrand={showBrand} account={accountRoot && player ? {
-        profileOpen: accountOpen, busy, onLogOut: () => void run(logOut, { kind: "logout", player }),
+        profileOpen: accountOpen, busy, onBack: () => back(), onLogOut: () => void run(logOut, { kind: "logout", player }),
         onProfile: () => { if (accountOpen) leaveProfile(); else setShowSettings(true); },
       } : undefined} />
       <div className="welcome-scroll">
@@ -450,7 +485,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
       {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : screen === "create" ? "welcome-creator" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
         {!accountOpen && screen === "register" && <h1>{label}</h1>}
         {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
-          <GarageProfilePanel key={player?.id} onBack={leaveProfile} />
+          <GarageProfilePanel ref={profilePanel} key={player?.id} onBack={leaveProfile} />
         </Suspense> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
           choice={creation.choice} facePreview={facePreview} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
           style={creation.style} onStyle={chooseStyle} onPreviewStyle={setPreviewStyle} onBody={chooseBody}

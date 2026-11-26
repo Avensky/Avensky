@@ -1,4 +1,5 @@
-import { useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type FormEvent, type ReactNode, type Ref } from "react";
+import { bindWelcomeMenuPanel } from "../../controls/inputRouting";
 import { GameButton } from "../../components/GameButton";
 import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
 import { requestSocial } from "../../net/socialClient";
@@ -8,7 +9,9 @@ import "./garageProfilePanel.css";
 
 type Setting = "name" | "email" | "security" | "invite" | "delete";
 
-export function GarageProfilePanel({ onBack }: { onBack: () => void }) {
+export type GarageProfileHandle = { back: () => void };
+
+export function GarageProfilePanel({ ref, onBack }: { ref?: Ref<GarageProfileHandle>; onBack: () => void }) {
   const player = useSocialStore(s => s.view?.profile);
   const connected = useSocialStore(s => s.available);
   const settings = useAccountSettings();
@@ -17,6 +20,10 @@ export function GarageProfilePanel({ onBack }: { onBack: () => void }) {
   const panel = useRef<HTMLElement>(null);
   const id = useId();
   const name = playerDisplayName(player);
+
+  useLayoutEffect(() => {
+    if (panel.current) return bindWelcomeMenuPanel(panel.current);
+  }, []);
 
   useEffect(() => {
     panel.current?.querySelector<HTMLElement>('[data-profile-setting="name"]')?.focus({ preventScroll: true });
@@ -33,6 +40,7 @@ export function GarageProfilePanel({ onBack }: { onBack: () => void }) {
     if (!expanded) { onBack(); return; }
     toggle(expanded);
   }
+  useImperativeHandle(ref, () => ({ back }));
   function saveName(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (name === undefined || !connected) return;
@@ -58,13 +66,9 @@ export function GarageProfilePanel({ onBack }: { onBack: () => void }) {
       <div id={id + key} className="garage-profile-editor" hidden={!open}>{open && children}</div>
     </div>;
   }
-  return <section ref={panel} className="garage-profile-panel menu-panel-frame" aria-label="Account settings"
+  return <section ref={panel} className="garage-profile-panel menu-panel-frame" data-controller-rows aria-label="Account settings" aria-busy={busy}
     onFocusCapture={event => event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
-    <header className="garage-profile-heading">
-      <GameButton variant="custom" className="garage-profile-back" aria-label="Back" title="Back"
-        data-profile-back data-controller-row disabled={busy} onPress={back}><MenuIcon name="chevron" /></GameButton>
-      <h2>Profile</h2>
-    </header>
+    <h2 className="garage-profile-heading">Profile</h2>
     {row("name", "Display name", "profile", name !== undefined ? <AccountEditForm onSubmit={saveName} busy={busy}>
       <label data-controller-row>Account display name
         <input name="displayName" autoComplete="nickname" defaultValue={name} maxLength={48} required disabled={busy} />

@@ -36,7 +36,7 @@ import {
   canNavigateMenu,
   isTypingTarget,
   routeMenuAction,
-  type MenuAction,
+  menuActionForKey,
 } from "./inputRouting";
 import { togglePerformanceCapture } from "../performance/captureActions";
 import {
@@ -46,31 +46,6 @@ import {
   usePerformanceOverlayStore,
 } from "../performance/performanceOverlayStore";
 
-const MENU_KEYS: Record<string, MenuAction> = {
-  ArrowUp: "up",
-  Numpad8: "up",
-  KeyW: "up",
-  ArrowDown: "down",
-  Numpad2: "down",
-  KeyS: "down",
-  ArrowLeft: "left",
-  Numpad4: "left",
-  KeyA: "left",
-  ArrowRight: "right",
-  Numpad6: "right",
-  KeyD: "right",
-  Enter: "activate",
-  Space: "activate",
-  Escape: "back",
-  KeyQ: "previous_tab",
-  KeyE: "next_tab",
-  PageUp: "previous_tab",
-  PageDown: "next_tab",
-  Digit1: "previous_option",
-  Digit3: "next_option",
-  Numpad1: "previous_option",
-  Numpad3: "next_option",
-};
 const VEHICLE_TOGGLES: Record<string, number> = {
   KeyE: VehicleFlags.ENGINE_ON,
   KeyZ: VehicleFlags.BLINKER_LEFT,
@@ -296,7 +271,7 @@ export function Keyboard() {
         release();
         if (!canNavigateMenu())
           return;
-        const action = MENU_KEYS[event.code];
+        const action = menuActionForKey(event);
         if (action) {
           event.preventDefault();
           routeMenuAction(action);

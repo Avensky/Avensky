@@ -19,6 +19,38 @@
 /* The compact inner tab and the outer title follow the same slant as the
    brand in the opposite direction. Painted height and hit height are independent. */
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
+/* Paint the shared angled face at its normal height; extend only the touch
+   target below it. Keep the diagonal clear for the adjacent creator tab. */
+.welcome-screen .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
+  --brand-hit-height: max(44px, var(--angled-header-height));
+  height: var(--brand-hit-height);
+  padding-block-end: calc(var(--brand-hit-height) - var(--angled-header-height));
+  pointer-events: auto; border: 0; touch-action: manipulation; background: transparent;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height),
+    calc(100% - var(--angled-title-cut)) var(--angled-header-height), calc(100% - var(--angled-title-cut)) 100%, 0 100%);
+}
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child::before {
+  bottom: calc(var(--brand-hit-height) - var(--angled-header-height) + 1px);
+}
+.garage-entry-brand-back::after {
+  content: ""; position: absolute; inset: 0 0 auto; z-index: -2; height: var(--angled-header-height);
+  background: var(--app-accent); clip-path: var(--angled-title-shape); pointer-events: none;
+}
+.garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; }
+@media (orientation: landscape) and (pointer: coarse) {
+  .welcome-screen .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
+    padding-left: max(calc(2 * var(--angled-brand-padding)), env(safe-area-inset-left, 0px));
+  }
+}
+/* Controller focus remains visible even when the previous input was touch. */
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:focus {
+  --angled-title-fill: var(--app-accent); color: var(--app-background);
+}
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child:focus > span { color: inherit; }
+@media (hover: hover) {
+  .garage-entry-header .garage-entry-brand-back:hover { --angled-title-fill: var(--app-raised); }
+}
+.garage-entry-header .garage-entry-brand-back:is(:hover,:focus-visible)::before { box-shadow: inset 0 -2px var(--app-accent); }
 /* Both screens share the corner badge. Swap it in place as the controls crossfade. */
 html[data-entry-handoff="fading"]:has(#garage-entry-handoff .garage-entry-brand)
 .welcome-screen > .garage-entry-header:has(> .garage-entry-brand) {
@@ -86,6 +118,10 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 }
 .garage-entry-action .menu-icon { width: var(--action-icon-size); height: var(--action-icon-size); }
 .garage-entry-action:focus { outline: 0; }
+.garage-entry-header:has([data-profile-header-tab]:focus) .garage-entry-action[aria-pressed="true"]:not(:focus) {
+  --joined-action-fill: var(--angled-tab-surface);
+  --joined-action-rule: 1px;
+}
 @media (forced-colors: active) {
   .garage-entry-action::before { forced-color-adjust: none; background: ButtonFace; border-color: ButtonText; }
   .garage-entry-action:is(:focus,[aria-pressed="true"])::before { border-color: Highlight; }
