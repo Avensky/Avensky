@@ -93,6 +93,15 @@ test("the creator preserves an eight-step appearance through registration, name 
     const next = () => document.querySelector("[data-creator-continue]");
     const secondaryTabs = () => [...document.querySelectorAll(".creator-color-channels [role=tab]")];
     const activeChannel = () => secondaryTabs().find(tab => tab.getAttribute("aria-selected") === "true")?.textContent;
+    const assertPreviewCaption = label => {
+      const group = document.querySelector(".creator-panel .creator-options");
+      for (const tile of group.querySelectorAll("[data-creator-option]")) {
+        assert.ok(tile.getAttribute("aria-label"), "each image retains its accessible name");
+        assert.ok(!tile.textContent.includes(tile.getAttribute("aria-label")), "no label inside the tile");
+        assert.equal(tile.title, "", "hovering an unpreviewed tile cannot show its name");
+      }
+      assert.equal(group.nextElementSibling?.textContent, label, "the preview name is under the options");
+    };
     const select = async name => {
       const item = ["Continue", "Create character"].includes(name) ? next() : button(name) ?? secondaryTabs().find(tab => tab.textContent === name);
       assert.ok(item, name);
@@ -106,8 +115,11 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(activeStep(), "Gender");
     assert.equal(previews.at(-1).choice.appearance.hair, "natural");
     assert.equal(previews.at(-1).creatorFrame, "body");
+    assert.equal(previews.at(-1).creatorEmotes, "basic");
     await jumpTo("Hairstyle");
+    assertPreviewCaption("Natural");
     await select("Close crop");
+    assertPreviewCaption("Close crop");
     assert.equal(previews.at(-1).choice.appearance.hair, "cropped");
     await jumpTo("Hair color");
     assert.equal(secondaryTabs().length, 0, "close-cropped hair only has its base color");
@@ -164,6 +176,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(hair.hair_color, "copper");
     assert.ok(hair.hair_palette.highlights, "a separately selected highlight is part of the draft");
     assert.equal(previews.at(-1).creatorFrame, "face");
+    assert.equal(previews.at(-1).creatorEmotes, "basic");
     await select("Continue");
     assert.equal(activeStep(), "Eyes");
     assert.equal(secondaryTabs().length, 0);
@@ -181,7 +194,11 @@ test("the creator preserves an eight-step appearance through registration, name 
     await select("Eyeshadow");
     await select("Smoke");
     await select("Eyeliner");
+    assertPreviewCaption("Bare");
+    await act(async () => panelAction("right"));
+    assertPreviewCaption("Classic");
     await select("Cat eye");
+    assertPreviewCaption("Cat eye");
     await jumpTo("Personality");
     assert.equal(button("Neutral").getAttribute("aria-pressed"), "true");
     assert.equal(button("Rival"), undefined);
@@ -190,12 +207,15 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(previews.at(-1).choice.appearance.personality, "mechanic");
     await select("Stoic");
     assert.equal(previews.at(-1).creatorFrame, "outfit");
+    assert.equal(previews.at(-1).creatorEmotes, "personality");
     assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
     assert.doesNotMatch(document.querySelector('[role="tabpanel"]').textContent, /Starter hair|First wardrobe/);
     assert.equal(previews.at(-1).choice.appearance.hair, hair.hair);
     assert.deepEqual(previews.at(-1).choice.appearance.hair_palette, hair.hair_palette);
     await jumpTo("Skin tone");
     assert.equal(button("Deep").getAttribute("aria-pressed"), "true");
+    assert.equal(previews.at(-1).creatorEmotes, "basic", "revisiting skin keeps the saved personality and previews basic gestures");
+    assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
     await jumpTo("Personality");
     assert.equal(disabled(next()),true,"the final action requires a character name");
     const nameField = () => document.querySelector('[name="characterName"]');

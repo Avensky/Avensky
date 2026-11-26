@@ -144,9 +144,10 @@ export function WelcomeScreen({ onGarageCharacter }: {
     !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
   const creatorFrame = garageMode !== "create" ? undefined : creatorStep === "gender" ? "body" : creatorStep === "personality" ? "outfit" : "face";
+  const creatorEmotes = garageMode === "create" ? (creatorStep === "personality" ? "personality" : "basic") : undefined;
   useLayoutEffect(() => {
-    onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode, creatorFrame } : null);
-  }, [onGarageCharacter, previewChoice, garageMode, creatorFrame]);
+    onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode, creatorFrame, creatorEmotes } : null);
+  }, [onGarageCharacter, previewChoice, garageMode, creatorFrame, creatorEmotes]);
   // The parent takes ownership of the confirmed career when the roster closes.
   useLayoutEffect(() => () => onGarageCharacter?.(undefined), [onGarageCharacter]);
   const unconfirmedSignIn = stagingAccountPortal && connected && !stagingSignIn;

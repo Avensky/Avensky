@@ -16,17 +16,20 @@ export function CreatorHairstyles({ choice, facePreview = choice, onChoice, busy
     ...facePreview, appearance: { ...(facePreview.appearance ?? characterAppearance(facePreview)), hair: style.id },
   })), [facePreview, styles]);
 
-  return <div className="creator-options creator-hairstyles" role="group" aria-label="Hairstyles">
-    {styles.map((style, index) => {
-      const selected = appearance.hair === style.id;
-      const pick = () => {
-        if (!selected) onChoice({ ...choice, appearance: { ...appearance, hair: style.id } });
-      };
-      return <CreatorOption key={style.id} id={style.id} label={style.label} selected={selected}
-        busy={busy} onPick={pick} onFocusOption={pick} onConfirm={onContinue}>
-        <ProfilePortrait choice={portraits[index]} welcomePreview="roster" requireFittedHair={"mesh" in style} />
-        <span className="creator-hairstyle-label">{style.label}</span>
-      </CreatorOption>;
-    })}
+  const previewLabel = styles.find(style => style.id === appearance.hair)?.label;
+  return <div className="creator-preview-field">
+    <div className="creator-options creator-hairstyles" role="group" aria-label="Hairstyles">
+      {styles.map((style, index) => {
+        const selected = appearance.hair === style.id;
+        const pick = () => {
+          if (!selected) onChoice({ ...choice, appearance: { ...appearance, hair: style.id } });
+        };
+        return <CreatorOption key={style.id} id={style.id} label={style.label} selected={selected}
+          hideTooltip busy={busy} onPick={pick} onFocusOption={pick} onConfirm={onContinue}>
+          <ProfilePortrait choice={portraits[index]} welcomePreview="roster" requireFittedHair={"mesh" in style} />
+        </CreatorOption>;
+      })}
+    </div>
+    <span className="creator-preview-caption">{previewLabel}</span>
   </div>;
 }

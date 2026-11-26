@@ -634,11 +634,20 @@ export function findGaragePreviewEmote(id: string, bag: boolean): Emote | undefi
   }
 }
 
-/** Present ordinary garage and equipped-personality gestures between additional stances.
- * Carrying uses the same automatic bag actions and the pack's eligible personality motions. */
-export function rosterGarageEmotes(personality: CharacterPersonality, bag: boolean): Emote[] {
+export type CreatorEmoteMode = "basic" | "personality";
+
+// Small, front-facing gestures keep the face and its colors in view while editing.
+const creatorBasics = GARAGE_EMOTES.filter(({ id }) => ["001", "002", "003"].includes(id));
+const creatorBagBasics = [garageBreathing(true), ...creatorBasics.filter(({ id }) => id !== "001")];
+
+/** The creator previews each personality's signature gestures. The roster interleaves them
+ * with ordinary garage actions and stances, respecting any carried bag in both views. */
+export function rosterGarageEmotes(personality: CharacterPersonality, bag: boolean, creator?: CreatorEmoteMode): Emote[] {
+  const basic = bag ? creatorBagBasics : creatorBasics;
+  if (creator === "basic") return basic;
   const eligible = new Map(EMOTE_GROUPS.flatMap(group => emoteCollection(group, bag)).map(emote => [emote.id, emote]));
   const personal = personalityEmoteIds(personality).flatMap(id => eligible.get(id) ?? []);
+  if (creator === "personality") return personal.length ? personal : basic;
   const automatic = automaticGarageEmoteIds(bag).flatMap(id => findGaragePreviewEmote(id, bag) ?? []);
   const ordinary = automatic.filter(emote => !SELECTION_EMOTES.includes(emote));
   const stances = automatic.filter(emote => SELECTION_EMOTES.includes(emote));

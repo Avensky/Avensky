@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useLayoutEffect, useMemo, useRef } from "r
 import { useFrame, useThree } from "@react-three/fiber";
 import { Box3, Group, Mesh, Raycaster, Vector2, Vector3, type Intersection } from "three";
 import type { CharacterChoice } from "../characters/characterCatalog";
+import type { CreatorEmoteMode } from "../characters/garageEmotes";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { getGarageMotion, setGaragePreview } from "./LiveGarage";
 import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
@@ -10,14 +11,14 @@ import { bindRosterSticks } from "./rosterStickControls";
 import { ROSTER_HEADING, rosterCamera, type CharacterGarageShot, type CharacterGarageView, type CreatorFrame } from "./rosterCamera";
 
 const GarageDriver = lazy(() => import("../characters/GarageDriver").then(module => ({ default: module.GarageDriver })));
-export type GarageCharacterSelection = { choice: CharacterChoice; mode: CharacterGarageView; creatorFrame?: CreatorFrame };
+export type GarageCharacterSelection = { choice: CharacterChoice; mode: CharacterGarageView; creatorFrame?: CreatorFrame; creatorEmotes?: CreatorEmoteMode };
 
 function UnavailableRosterActor({ settled }: { settled: (available: boolean) => void }) {
   useLayoutEffect(() => settled(false), [settled]);
   return null;
 }
 
-function RosterActor({ choice, mode, creatorFrame, shot }: GarageCharacterSelection & { shot: CharacterGarageShot }) {
+function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelection & { shot: CharacterGarageShot }) {
   const pivot = useRef<Group>(null);
   const portraitRig = useRef<{ shot: CharacterGarageShot; id: string } | null>(null);
   const gl = useThree(s => s.gl);
@@ -71,21 +72,21 @@ function RosterActor({ choice, mode, creatorFrame, shot }: GarageCharacterSelect
   return <group name="roster-character-pivot" ref={pivot} rotation-y={ROSTER_HEADING}>
     <PreviewContactShadow footprint={[.52, .46]} />
     <AssetBoundary resetKey={choice.id} fallback={<UnavailableRosterActor settled={settled} />}>
-      <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview creating={mode === "create"}
-        paused={mode === "profile" || (mode === "create" && creatorFrame !== "outfit")} onSettled={settled} /></Suspense>
+      <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview creatorEmotes={creatorEmotes}
+        paused={mode === "profile"} onSettled={settled} /></Suspense>
     </AssetBoundary>
   </group>;
 }
 
 /** Install just the selected actor in the already-mounted room; row thumbnails have no scene. */
-export function RosterGaragePreview({ choice, mode, creatorFrame }: GarageCharacterSelection) {
+export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes }: GarageCharacterSelection) {
   // Changing rigs has a new measured endpoint. Color and makeup changes keep
   // the existing shot and in-flight interpolation.
   const creatorRig = mode === "create" ? choice.id : undefined;
   const shot = useMemo(() => rosterCamera(mode, creatorFrame), [mode, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
-    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} creatorFrame={creatorFrame} /> });
-  }, [choice, mode, creatorFrame, shot]);
+    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} /> });
+  }, [choice, mode, creatorEmotes, shot]);
   // Reframe the same actor when switching panels. Release the scene only on leaving this preview.
   useLayoutEffect(() => () => setGaragePreview(null), []);
   useLayoutEffect(() => {
