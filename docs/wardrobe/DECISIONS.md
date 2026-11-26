@@ -33,6 +33,16 @@
 - The catalog README previously referenced `docs/readiness/README.md`, not present at inspected GitHub path. Fix the link to canonical docs.
 - This branch is documentation-only; no tests or asset-fitting runs are claimed.
 
+## 2026-11-25 — W-03 layer manifest implementation (review branch)
+
+- Branch: `feat/wardrobe-layer-manifest-w03` based on `docs/wardrobe-foundation-20261125`; `main` remains unchanged.
+- Added `packages/wardrobe-catalog/layer-rules.json` with 20 garment classes, 47 provisional class relationships and no auto-approved item overrides. The draft rules include closed/open coats, corset direct/over-top/over-dress, tucked/over waistlines, belt placement, glove cuffs, scarf placement and boot cuff modes.
+- Added JSON Schema `layer-rules.schema.json`, standalone Node semantic validation `validate-layer-rules.mjs` and focused pure tests in `frontend/tests/wardrobe-layer-manifest.test.mjs`.
+- Added `npm run wardrobe:layers:check` to run the validator/tests and wired it into `check:frontend`. A dedicated PR workflow runs the check with Node 24 and no LFS assets.
+- **Important:** This provides a **class-level validation contract only**, not the W-04 resolver, saved-look migration, model fitting or per-asset approvals. No registered GLB is newly certified.
+- Test status: CI verification pending; record actual pass/fail/skip outcome from GitHub before claiming a tested milestone.
+- Next: W-04 pure deterministic resolver with class-to-garment mapping, conflict/review output and explicit saved-selection preservation. W-05 must migrate historical saves before changing runtime equipment behavior.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.

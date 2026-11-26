@@ -1,0 +1,26 @@
+name: Wardrobe layer manifest contract
+on:
+  pull_request:
+    paths:
+      - "packages/wardrobe-catalog/layer-rules*"
+      - "packages/wardrobe-catalog/validate-layer-rules.mjs"
+      - "frontend/tests/wardrobe-layer-manifest.test.mjs"
+      - "docs/wardrobe/**"
+      - ".github/workflows/wardrobe-layer-rules.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  layer-manifest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validate layer manifest and ordering rules
+        run: npm run wardrobe:layers:check
