@@ -2,10 +2,17 @@ import { useMemo } from "react";
 import type { CharacterChoice } from "./characterCatalog";
 import { importedWardrobeItems, villageWardrobeItems } from "./wardrobeGarments";
 import rules from "../../../../packages/wardrobe-catalog/layer-rules.json";
+import historicGarments from "../../../../packages/wardrobe-catalog/character-garments.json";
 import { buildWardrobeLayerPreview } from "../../../../packages/wardrobe-catalog/wardrobe-layer-preview.mjs";
 import "./wardrobeLayerInspector.css";
 
-const catalog = [...importedWardrobeItems, ...villageWardrobeItems];
+// Retired IDs remain readable for saved-look diagnostics, never equip candidates.
+const catalog = [
+  ...importedWardrobeItems, ...villageWardrobeItems,
+  ...historicGarments.filter(item => item.retired).map(item => ({
+    id: item.id, label: item.label, slot: item.slot, piece: item.piece, retired: true,
+  })),
+];
 const labels = {
   candidate: "Proposed",
   suspended: "Saved, not in current preview",
