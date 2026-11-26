@@ -7,7 +7,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, t
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
 import { AnimationMixer, type Object3D } from "three";
-import { buildEmoteClips } from "./garageEmotes";
+import { buildEmoteClips, type CreatorEmoteMode } from "./garageEmotes";
 import { useRosterEmoteCycle } from "../preview/useRosterEmoteCycle";
 import { DriverBag } from "./DriverBag";
 import { SELECTION_POSES, holdCharacterPose } from "./selectionPoses";
@@ -35,7 +35,7 @@ type WardrobeAssetListener = (url: string, scene: Object3D | null) => void;
 type VillagerPlayback = {
   bag: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit;
   victory?: VictoryPlayback; cockpit?: GarageCockpit; paused: boolean; upright: boolean; rosterPreview?: boolean;
-  creating?: boolean; coverage?: { value: number };
+  creatorEmotes?: CreatorEmoteMode; coverage?: { value: number };
   onSettled?: (available: boolean, rigId?: string) => void;
 };
 
@@ -95,7 +95,7 @@ function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, 
       <Suspense fallback={null}><WardrobeAsset url={asset} onReady={onReady} /></Suspense>
     </AssetBoundary>)}
     {active ? <>
-      {playback.rosterPreview ? <RosterRigHandoff preview={active} requested={look.character.id} creating={Boolean(playback.creating)}>
+      {playback.rosterPreview ? <RosterRigHandoff preview={active} requested={look.character.id} creating={Boolean(playback.creatorEmotes)}>
         {renderActor}
       </RosterRigHandoff> : renderActor(active)}
       {status && !(playback.rosterPreview && pendingUrls.length) && <PreviewLoadingStatus label={status} />}
@@ -110,7 +110,7 @@ function HighCollarMotion({ update }: { update: () => void }) {
   return null;
 }
 
-function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, onSettled, coverage }: VillagerPlayback & { preview: WardrobePreview }) {
+function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, creatorEmotes, onSettled, coverage }: VillagerPlayback & { preview: WardrobePreview }) {
   const { look, scene, garments, garmentBody, corsetScene, corsetSet, hairSource } = preview;
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
@@ -133,7 +133,7 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
     <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID} />
     <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
-      leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} />
+      leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creatorEmotes={creatorEmotes} />
   </> : null;
 }
 
@@ -152,8 +152,8 @@ function HeldSelectionPose({ root }: { root: Object3D }) {
   return <primitive object={root} dispose={null} />;
 }
 
-function RosterEmotePlayer({ root, look, bag, paused }: { root: Object3D; look: CharacterLook; bag: boolean; paused: boolean }) {
-  const cycle = useRosterEmoteCycle(root, paused, look.appearance.personality ?? "friendly", bag);
+function RosterEmotePlayer({ root, look, bag, paused, creatorEmotes }: { root: Object3D; look: CharacterLook; bag: boolean; paused: boolean; creatorEmotes?: CreatorEmoteMode }) {
+  const cycle = useRosterEmoteCycle(root, paused, look.appearance.personality ?? (creatorEmotes ? "neutral" : "friendly"), bag, creatorEmotes);
   const colors = clothingColors(look, "bag");
   if (cycle.paused) return <>
     <HeldSelectionPose root={root} />
@@ -162,7 +162,7 @@ function RosterEmotePlayer({ root, look, bag, paused }: { root: Object3D; look: 
   return <GarageEmotePlayer root={root} bag={bag} bagColors={colors} rosterEmote={cycle.emote} onSelectionEnd={cycle.onSelectionEnd} />;
 }
 
-function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview }:
+function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, creatorEmotes }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
   const previewHair = useLocalHairstyle(s => s.id);
@@ -189,13 +189,13 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
 
   return <group name="garage-driver" rotation={upright ? [0, 0, 0] : DRIVER_TILT}>
     {model.detachedCorset?.updateShoulders && <HighCollarMotion update={model.detachedCorset.updateShoulders} />}
-    {rosterPreview ? <RosterEmotePlayer root={model.root} look={look} bag={bag} paused={paused} />
+    {rosterPreview ? <RosterEmotePlayer root={model.root} look={look} bag={bag} paused={paused} creatorEmotes={creatorEmotes} />
       : <GarageEmotePlayer root={model.root} bag={bag} personality={look.appearance.personality} bagColors={clothingColors(look, "bag")} previewPacks={previewPacks} leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} />}
   </group>;
 }
 
-export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview, creating, onSettled }: {
-  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; rosterPreview?: boolean; creating?: boolean;
+export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory, cockpit, upright = false, paused = false, rosterPreview, creatorEmotes, onSettled }: {
+  choice: CharacterChoice; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; upright?: boolean; paused?: boolean; rosterPreview?: boolean; creatorEmotes?: CreatorEmoteMode;
   onSettled?: VillagerPlayback["onSettled"];
 }) {
   const look = useMemo(() => characterLook(choice), [choice]);
@@ -213,7 +213,7 @@ export function GarageDriver({ choice, previewPacks, leanFit, mirrorFit, victory
       {url
         ? <VillagerDriver key={rosterPreview ? "roster" : choice.id} url={url} look={look} kind={kind} villageKind={villageKind} fallback={fallback} bag={bag}
             previewPacks={previewPacks} leanFit={coatFitsLean ? leanFit : undefined} mirrorFit={mirrorFit}
-            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creating={creating} onSettled={onSettled} />
+            victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creatorEmotes={creatorEmotes} onSettled={onSettled} />
         : fallback}
     </CharacterTurntable>
   );

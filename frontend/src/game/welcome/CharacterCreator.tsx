@@ -18,6 +18,7 @@ import "./characterCreator.css";
 
 export const CREATOR_STEPS = ["gender", "looks", "skin", "hairstyle", "hair", "eyes", "makeup", "personality"] as const;
 export type CreatorStep = typeof CREATOR_STEPS[number];
+const headerStops = ["back", ...CREATOR_STEPS] as const;
 const labels: Record<CreatorStep, string> = {
   gender: "Gender", looks: "Looks", skin: "Skin tone", hairstyle: "Hairstyle", hair: "Hair color", eyes: "Eyes", makeup: "Makeup", personality: "Personality",
 };
@@ -45,6 +46,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
   const index = CREATOR_STEPS.indexOf(step);
   const final = step === "personality";
   const panel = useRef<HTMLDivElement>(null);
+  const backButton = useRef<HTMLDivElement>(null);
   const tabs = useRef<HTMLElement>(null);
   const field = useRef<HTMLInputElement>(null);
   const footerAction = useRef<HTMLDivElement>(null);
@@ -56,7 +58,11 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
   const visibleFaces = starterFaces.filter(({ character }) => step === "gender" || character.gender === body);
 
   function go(next: CreatorStep) {
-    if (busy || next === step) return;
+    if (busy) return;
+    if (next === step) {
+      if (document.activeElement === backButton.current) selectedOption()?.focus({ preventScroll: true });
+      return;
+    }
     setEditingName(false);
     onStep(next);
   }
@@ -95,11 +101,15 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
     }
     if (action === "previous_tab" || action === "next_tab") {
       const offset = action === "previous_tab" ? -1 : 1;
-      go(CREATOR_STEPS[(index + offset + CREATOR_STEPS.length) % CREATOR_STEPS.length]);
+      const from = active === backButton.current ? "back" : step;
+      const next = headerStops[(headerStops.indexOf(from) + offset + headerStops.length) % headerStops.length];
+      if (next === "back") backButton.current?.focus({ preventScroll: true });
+      else go(next);
     } else if (action === "left" || action === "right" || action === "up" || action === "down") {
       const controls = Array.from(panel.current?.querySelectorAll<HTMLElement>('[data-creator-option]:not([aria-disabled="true"]), [data-creator-name-nav]') ?? []);
-      const from = active instanceof HTMLElement && controls.includes(active) ? active : selectedOption();
-      if (from) nextCreatorControl(controls, from, action)?.focus({ preventScroll: true });
+      const current = active instanceof HTMLElement && controls.includes(active) ? active : selectedOption();
+      const next = active === backButton.current ? current : current && nextCreatorControl(controls, current, action);
+      next?.focus({ preventScroll: true });
     } else if (action === "activate") {
       if (nameRow.current && active === nameRow.current) beginName(true);
       else if (active instanceof HTMLElement && active.closest(".creator-controls")) active.click();
@@ -143,7 +153,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
 
   return <div className="creator-controls" onKeyDown={keyboard}>
     <header className="garage-entry-header angled-tab-header creator-header">
-      <GameButton variant="custom" className="garage-entry-brand creator-back"
+      <GameButton ref={backButton} variant="custom" className="garage-entry-brand creator-back"
         aria-label="Back to character selection" title="Back" disabled={busy} onPress={onBack}>
         <MenuIcon name="back" /><span>{APP_BRANDING.productName}</span>
       </GameButton>

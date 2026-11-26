@@ -112,23 +112,22 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
     </SecondaryTabRow>}
     <div id={id + "-colors"} role={channels.length > 1 ? "tabpanel" : "group"}
       aria-labelledby={channels.length > 1 ? id + channel : undefined} aria-label={channels.length === 1 ? labels[channel] : undefined}
-      className="creator-color-field" data-color-field={channel}>
+      className="creator-preview-field" data-color-field={channel}>
       <div ref={group} key={channel} className={"creator-options creator-color-options " + (channel === "eyeliner" ? "creator-style-options" : "creator-swatches")}
         data-controller-row role="group" aria-label={labels[channel] + " options"}>
         {values.map(option => {
           const color = option.id === "original" ? (channel === "eye_color" ? natural?.iris : channel === "skin" ? natural?.skin : natural?.hair) : option.color;
           const preset = channel === "presets" ? HAIR_COLOR_THEMES[option.id as ThemeName] : undefined;
           return <CreatorOption key={option.id} id={option.id} label={option.label} selected={active === option.id}
-            busy={busy} onFocusOption={() => { if (!movingToChannel.current) pick(option); }} onPick={() => pick(option)} onConfirm={onContinue}>
+            hideTooltip={channel === "eyeliner"} busy={busy} onFocusOption={() => { if (!movingToChannel.current) pick(option); }} onPick={() => pick(option)} onConfirm={onContinue}>
             {preset ? <span className="creator-preset-sample" aria-hidden="true" style={{
               "--roots": preset.roots, "--base": preset.base, "--highlights": preset.highlights, "--tips": preset.tips,
-            } as CSSProperties} /> : channel === "eyeliner" ? <>
+            } as CSSProperties} /> : channel === "eyeliner" ? (
               <svg viewBox="0 0 32 24" aria-hidden="true">
                 <path className="creator-eye-outline" d="M2 15 Q13 1 28 14 Q16 23 2 15 Z" />
                 {linerStrokes[option.id] && <path d={linerStrokes[option.id]} />}
               </svg>
-              <span>{option.label}</span>
-            </> : color ? <ColorSwatch color={color} /> : <span aria-hidden="true">∅</span>}
+            ) : color ? <ColorSwatch color={color} /> : <span aria-hidden="true">∅</span>}
           </CreatorOption>;
         })}
       </div>
@@ -148,7 +147,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
           </div>;
         })}
       </div>}
-      <span className="creator-color-label">{activeLabel}</span>
+      <span className="creator-preview-caption">{activeLabel}</span>
     </div>
   </>;
 }

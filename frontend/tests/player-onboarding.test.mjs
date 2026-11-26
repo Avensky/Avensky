@@ -38,6 +38,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     const button=label=>[...document.querySelectorAll("button,[role=button]")].find(button=>(button.getAttribute("aria-label") ?? button.textContent.trim()) === label);
     const disabled=control=>control.matches(":disabled,[aria-disabled=true]");
     const panelAction=detail=>window.dispatchEvent(new CustomEvent("avenlab:panel-action",{detail}));
+    const pressKey = (key, code) => act(async () => document.activeElement.dispatchEvent(
+      new window.KeyboardEvent("keydown", { key, code, bubbles: true, cancelable: true })
+    ));
     const submit=()=>document.querySelector("form").dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}));
     const typeName=name=>{
       const input=document.querySelector('[name="characterName"]');
@@ -93,6 +96,15 @@ test("the creator preserves an eight-step appearance through registration, name 
     const next = () => document.querySelector("[data-creator-continue]");
     const secondaryTabs = () => [...document.querySelectorAll(".creator-color-channels [role=tab]")];
     const activeChannel = () => secondaryTabs().find(tab => tab.getAttribute("aria-selected") === "true")?.textContent;
+    const assertPreviewCaption = label => {
+      const group = document.querySelector(".creator-panel .creator-options");
+      for (const tile of group.querySelectorAll("[data-creator-option]")) {
+        assert.ok(tile.getAttribute("aria-label"), "each image retains its accessible name");
+        assert.ok(!tile.textContent.includes(tile.getAttribute("aria-label")), "no label inside the tile");
+        assert.equal(tile.title, "", "hovering an unpreviewed tile cannot show its name");
+      }
+      assert.equal(group.nextElementSibling?.textContent, label, "the preview name is under the options");
+    };
     const select = async name => {
       const item = ["Continue", "Create character"].includes(name) ? next() : button(name) ?? secondaryTabs().find(tab => tab.textContent === name);
       assert.ok(item, name);
@@ -106,8 +118,11 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(activeStep(), "Gender");
     assert.equal(previews.at(-1).choice.appearance.hair, "natural");
     assert.equal(previews.at(-1).creatorFrame, "body");
+    assert.equal(previews.at(-1).creatorEmotes, "basic");
     await jumpTo("Hairstyle");
+    assertPreviewCaption("Natural");
     await select("Close crop");
+    assertPreviewCaption("Close crop");
     assert.equal(previews.at(-1).choice.appearance.hair, "cropped");
     await jumpTo("Hair color");
     assert.equal(secondaryTabs().length, 0, "close-cropped hair only has its base color");
@@ -164,6 +179,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(hair.hair_color, "copper");
     assert.ok(hair.hair_palette.highlights, "a separately selected highlight is part of the draft");
     assert.equal(previews.at(-1).creatorFrame, "face");
+    assert.equal(previews.at(-1).creatorEmotes, "basic");
     await select("Continue");
     assert.equal(activeStep(), "Eyes");
     assert.equal(secondaryTabs().length, 0);
@@ -181,7 +197,11 @@ test("the creator preserves an eight-step appearance through registration, name 
     await select("Eyeshadow");
     await select("Smoke");
     await select("Eyeliner");
+    assertPreviewCaption("Bare");
+    await act(async () => panelAction("right"));
+    assertPreviewCaption("Classic");
     await select("Cat eye");
+    assertPreviewCaption("Cat eye");
     await jumpTo("Personality");
     assert.equal(button("Neutral").getAttribute("aria-pressed"), "true");
     assert.equal(button("Rival"), undefined);
@@ -190,18 +210,24 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(previews.at(-1).choice.appearance.personality, "mechanic");
     await select("Stoic");
     assert.equal(previews.at(-1).creatorFrame, "outfit");
+    assert.equal(previews.at(-1).creatorEmotes, "personality");
     assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
     assert.doesNotMatch(document.querySelector('[role="tabpanel"]').textContent, /Starter hair|First wardrobe/);
     assert.equal(previews.at(-1).choice.appearance.hair, hair.hair);
     assert.deepEqual(previews.at(-1).choice.appearance.hair_palette, hair.hair_palette);
     await jumpTo("Skin tone");
     assert.equal(button("Deep").getAttribute("aria-pressed"), "true");
+    assert.equal(previews.at(-1).creatorEmotes, "basic", "revisiting skin keeps the saved personality and previews basic gestures");
+    assert.equal(previews.at(-1).choice.appearance.personality, "stoic");
     await jumpTo("Personality");
     assert.equal(disabled(next()),true,"the final action requires a character name");
     const nameField = () => document.querySelector('[name="characterName"]');
     const nameTarget = () => document.querySelector("[data-creator-name-nav]");
     await act(async () => nameTarget().focus());
     await act(async () => panelAction("activate"));
+    assert.ok(keyboard.getState().session);
+    await act(async () => panelAction("next_tab"));
+    assert.equal(activeStep(), "Personality", "shoulders cannot take focus from the name editor");
     assert.ok(keyboard.getState().session);
     await act(async () => { keyboard.getState().edit("Track"); keyboard.getState().close(true); });
     assert.equal(nameField().value, "Track", "controller B keeps the typed name");
@@ -210,6 +236,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.ok(keyboard.getState().session, "controller can re-enter the name");
     await act(async () => { keyboard.getState().edit("Track Fox"); keyboard.getState().close(); });
     await act(async () => { nameField().focus(); typeName("Track Fox II"); });
+    await pressKey("q", "KeyQ");
+    await pressKey("e", "KeyE");
+    assert.equal(document.activeElement, nameField(), "Q/E remain typing keys inside the native name field");
     await act(async () => nameField().dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })));
     assert.equal(nameField().value, "Track Fox II", "Escape exits typing without undoing edits");
     assert.equal(document.activeElement, nameTarget());
@@ -331,6 +360,38 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.ok(document.querySelector(".welcome-character-details"), "profile details accompany a larger portrait");
     assert.ok(button("Log out"));
     assert.ok(button("Create character"));
+    const requestsBeforeBack = sent.length;
+    const controllerAction = action => act(async () => panelAction(action));
+    for (const [previousTab, nextTab, confirm] of [
+      [() => pressKey("q", "KeyQ"), () => pressKey("e", "KeyE"), () => pressKey("Enter", "Enter")],
+      [() => controllerAction("previous_tab"), () => controllerAction("next_tab"), () => controllerAction("activate")],
+    ]) {
+      await act(async () => button("Create character").click());
+      assert.equal(activeStep(), "Gender");
+      const backTab = button("Back to character selection");
+      await previousTab();
+      assert.equal(document.activeElement, backTab);
+      assert.equal(activeStep(), "Gender", "highlighting Avensky keeps the current editor open");
+      await nextTab();
+      assert.equal(activeStep(), "Gender");
+      const selectedGender = document.querySelector('[data-creator-option][aria-pressed="true"]');
+      assert.equal(document.activeElement, selectedGender, "returning to Gender restores the selected option");
+      await previousTab();
+      await controllerAction("down");
+      assert.equal(document.activeElement, selectedGender, "D-pad leaves the brand without changing the preview");
+      await previousTab();
+      await jumpTo("Gender");
+      assert.equal(document.activeElement, selectedGender, "tapping the current step returns focus to the panel");
+      await previousTab();
+      await previousTab();
+      assert.equal(activeStep(), "Personality", "the header order wraps through Avensky in both directions");
+      await nextTab();
+      assert.equal(document.activeElement, backTab);
+      assert.equal(activeStep(), "Personality");
+      await confirm();
+      assert.ok(document.querySelector(".character-roster"), "confirming Avensky returns to the roster");
+      assert.equal(sent.length, requestsBeforeBack, "header navigation and Back keep the account and its characters intact");
+    }
     const stopInput=listenForMenuInput();
     try {
       await act(async()=>reportMenuDevice("controller"));

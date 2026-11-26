@@ -44,8 +44,8 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
         assert.equal(pool.length, expected.size, "each emote occurs once per rotation");
       }
     }
-    let personality = "playful", bag = false;
-    function Sample({ rig, paused }) { view = useRosterEmoteCycle(rig, paused, personality, bag); return null; }
+    let personality = "playful", bag = false, creator;
+    function Sample({ rig, paused }) { view = useRosterEmoteCycle(rig, paused, personality, bag, creator); return null; }
     const show = (paused = false) => act(async () => root.render(createElement(StrictMode, null, createElement(Sample, { rig, paused }))));
     const finish = () => { view.onSelectionEnd(); view.onSelectionEnd(); assert.equal(timers.size, 1); };
     const advance = async () => {
@@ -54,6 +54,58 @@ test("only completed roster emotes queue the next visible rig's emote", async ()
       await act(async () => fn());
     };
 
+    await show();
+    creator = "basic";
+    await show();
+    const breathing = view.emote;
+    assert.equal(breathing.name, "Relaxed breathing");
+    personality = "racer";
+    await show();
+    assert.equal(view.emote, breathing, "appearance steps ignore a previously saved personality");
+    for (const id of ["002", "003", "001"]) {
+      finish();
+      await advance();
+      assert.equal(view.emote.id, id, "appearance keeps the hands and props clear of the face");
+    }
+    const oldEnd = view.onSelectionEnd;
+    finish();
+    const oldRest = [...timers.values()][0];
+    creator = "personality";
+    await show();
+    assert.equal(view.emote.id, "081");
+    const previousSignatureEnd = view.onSelectionEnd;
+    personality = "mechanic";
+    await show();
+    assert.equal(view.emote.id, "165", "previewing a personality replaces the previous cue immediately");
+    oldEnd(); previousSignatureEnd(); oldRest();
+    assert.equal(timers.size, 0, "interrupted previews cannot schedule a stale request");
+    for (const id of ["164", "163", "161", "165"]) {
+      finish();
+      await advance();
+      assert.equal(view.emote.id, id, "personality previews stay in the personality's own rotation");
+    }
+    finish();
+    creator = "basic";
+    await show();
+    assert.equal(view.emote.id, "001", "returning to appearance restores the basic gestures");
+    assert.equal(timers.size, 0);
+    finish();
+    await advance();
+    const shift = view.emote;
+    assert.equal(shift.id, "002");
+    finish();
+    personality = "neutral";
+    creator = "personality";
+    await show();
+    assert.equal(timers.size, 0);
+    assert.equal(view.emote.id, shift.id, "Neutral and the basic rotation both use the weight shift");
+    assert.notEqual(view.emote, shift, "a matching gesture gets a fresh playback request");
+    assert.equal(view.emote.keys, shift.keys, "both requests share their authored clip data");
+    finish();
+    await advance();
+    assert.equal(view.emote.id, "035", "a previously resting pose continues into the new rotation");
+    creator = undefined;
+    personality = "playful";
     await show();
     const rotation = rosterGarageEmotes(personality, bag).map(emote => emote.id);
     assert.equal(view.emote.id, "021", "a playful character opens with their personality gesture");
