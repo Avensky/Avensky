@@ -1,0 +1,156 @@
+{
+  "legacy": {
+    "id": "mara-vega",
+    "outfit": "shop-crew",
+    "wardrobe": {
+      "set": "gothic-05",
+      "shirt": "none",
+      "waist": "tucked"
+    },
+    "wardrobeTrial": {
+      "set": "gothic-04",
+      "shirt": "none",
+      "waist": "over"
+    },
+    "wardrobeEase": 2,
+    "garments": {
+      "top": "top-02",
+      "skirt": "gothic-skirt-04",
+      "underskirt": "village-petticoat",
+      "bow": "bowtie-03",
+      "socks": "socks-01"
+    },
+    "removedClothing": [
+      "shoes",
+      "bonnet-bow",
+      "outer-skirt"
+    ],
+    "appearance": {
+      "hair": "cropped",
+      "hair_color": "copper",
+      "skin": "warm",
+      "headwear": "hat",
+      "color": "original",
+      "item_colors": {
+        "top-02:shirt": {
+          "color": "#123456"
+        },
+        "gothic-skirt-04:skirt": {
+          "accent": "#abcdef"
+        },
+        "gothic-05:corset": {
+          "panel": "#225544",
+          "laces": "#ffeebb",
+          "lining": "#9999aa",
+          "hardware": "#887766"
+        },
+        "underwear:bra": {
+          "color": "#223355"
+        }
+      }
+    }
+  },
+  "layered": {
+    "id": "mara-vega",
+    "outfit": "shop-crew",
+    "wardrobe": {
+      "set": "gothic-05",
+      "shirt": "none",
+      "waist": "tucked"
+    },
+    "wardrobeTrial": {
+      "set": "gothic-04",
+      "shirt": "none",
+      "waist": "over"
+    },
+    "wardrobeEase": 2,
+    "garments": {
+      "top": "top-02",
+      "skirt": "gothic-skirt-04",
+      "underskirt": "village-petticoat",
+      "bow": "bowtie-03",
+      "socks": "socks-01"
+    },
+    "removedClothing": [
+      "shoes",
+      "bonnet-bow",
+      "outer-skirt"
+    ],
+    "appearance": {
+      "hair": "cropped",
+      "hair_color": "copper",
+      "skin": "warm",
+      "headwear": "hat",
+      "color": "original",
+      "item_colors": {
+        "top-02:shirt": {
+          "color": "#123456"
+        },
+        "gothic-skirt-04:skirt": {
+          "accent": "#abcdef"
+        },
+        "gothic-05:corset": {
+          "panel": "#225544",
+          "laces": "#ffeebb",
+          "lining": "#9999aa",
+          "hardware": "#887766"
+        },
+        "underwear:bra": {
+          "color": "#223355"
+        }
+      }
+    },
+    "wardrobeLayers": {
+      "schemaVersion": 1,
+      "entries": [
+        {
+          "source": "garments",
+          "slot": "bow",
+          "id": "bowtie-03",
+          "modes": {}
+        },
+        {
+          "source": "garments",
+          "slot": "skirt",
+          "id": "gothic-skirt-04",
+          "modes": {}
+        },
+        {
+          "source": "garments",
+          "slot": "socks",
+          "id": "socks-01",
+          "modes": {}
+        },
+        {
+          "source": "garments",
+          "slot": "top",
+          "id": "top-02",
+          "modes": {}
+        },
+        {
+          "source": "garments",
+          "slot": "underskirt",
+          "id": "village-petticoat",
+          "modes": {}
+        },
+        {
+          "source": "wardrobe",
+          "slot": "corset",
+          "id": "gothic-05",
+          "modes": {
+            "waist": "tucked"
+          }
+        },
+        {
+          "source": "wardrobeTrial",
+          "slot": "corset",
+          "id": "gothic-04",
+          "modes": {
+            "waist": "over",
+            "body-fit": "over-top"
+          }
+        }
+      ]
+    }
+  }
+}
