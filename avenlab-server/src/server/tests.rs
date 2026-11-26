@@ -971,6 +971,50 @@ async fn character_outfits_save_validated_fitting_room_combinations_to_the_ownin
 }
 
 #[tokio::test]
+async fn layered_wardrobe_profile_saves_round_trip_without_replacing_legacy_fields() {
+    let s = server(1, 10);
+    let (player, identity, _) = client(&s, "Wardrobe Tester").await;
+    let profile_id = identity["profile_id"].as_str().unwrap();
+    let examples: Value = serde_json::from_str(include_str!(
+        "../../../frontend/tests/fixtures/wardrobe-layer-save-v1.json"
+    )).unwrap();
+    let old = examples["legacy"].clone();
+    let migrated = examples["layered"].clone();
+    let save = |name: &str, outfit: &Value| json!({
+        "action": "character_outfit_save", "name": name, "character": outfit
+    });
+
+    let response = s.handle(&player, save("Versioned layers", &migrated)).await.unwrap();
+    assert_eq!(response["character_outfits"]["Versioned layers"], migrated);
+    assert_eq!(response["cosmetics_revision"], 1);
+    // Legacy clients and existing saved outfits still use their original structure.
+    let response = s.handle(&player, save("Existing style", &old)).await.unwrap();
+    assert_eq!(response["character_outfits"]["Existing style"], old);
+    assert!(response["character_outfits"]["Existing style"].get("wardrobeLayers").is_none());
+
+    // A sidecar is a saved planning intent; it must not permit unverified equipment.
+    assert!(s.handle(&player, json!({
+        "action": "character_equip", "character": migrated
+    })).await.is_err());
+
+    let mut stale = migrated.clone();
+    stale["wardrobeLayers"]["entries"][0]["id"] = json!("top-05");
+    assert!(s.handle(&player, save("Stale", &stale)).await.is_err());
+    let mut unknown = migrated.clone();
+    unknown["wardrobeLayers"]["entries"][6]["modes"]["body-fit"] = json!("force-fit");
+    assert!(s.handle(&player, save("Unknown", &unknown)).await.is_err());
+
+    let persisted: SocialData = serde_json::from_slice(
+        &tokio::fs::read(&s.path).await.unwrap()
+    ).unwrap();
+    let outfits = &persisted.profiles[profile_id].progression.character_outfits;
+    assert_eq!(serde_json::to_value(&outfits["Versioned layers"]).unwrap(), migrated);
+    assert_eq!(serde_json::to_value(&outfits["Existing style"]).unwrap(), old);
+    assert_eq!(outfits.len(), 2);
+    cleanup(s).await;
+}
+
+#[tokio::test]
 async fn roster_portraits_publish_only_equipped_styles_for_live_and_reserved_players() {
     use crate::alpha::{AlphaState, Member, Mode, Reservation};
     let server = server(1, 10);
