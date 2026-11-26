@@ -42,11 +42,24 @@ export const CHARACTER_IDENTITIES = [
   { id: "male", label: "Male" }, { id: "female", label: "Female" }, { id: "nonbinary", label: "Nonbinary" },
 ] as const;
 export type CharacterIdentity = typeof CHARACTER_IDENTITIES[number]["id"];
+/** W-05 saved-only metadata; the legacy fields remain the source of truth. */
+export type SavedWardrobeLayersV1 = {
+  schemaVersion: 1;
+  entries: Array<{
+    source: "garments" | "wardrobe" | "wardrobeTrial";
+    slot: string;
+    id: string;
+    modes: Record<string, string>;
+  }>;
+};
+
 export type CharacterChoice = {
   id: string; outfit: string; identity?: CharacterIdentity; appearance?: CharacterAppearance; prop?: "shop-bag"; wardrobe?: WardrobeChoice;
   driver_id?: string;
   /** Session-only fitting room selections. */
   garments?: WardrobeGarmentChoice;
+  /** Optional mode annotations for saved garment IDs; not read by the live renderer. */
+  wardrobeLayers?: SavedWardrobeLayersV1;
   wardrobeTrial?: WardrobeChoice;
   wardrobeEase?: Exclude<OverSkirtEase, 0>;
   removedClothing?: WardrobeRemoval[];
