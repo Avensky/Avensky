@@ -2,7 +2,8 @@ import { Color, Float32BufferAttribute, MathUtils, SkinnedMesh, Vector2, Vector4
 import type { CharacterLook } from "./characterCatalog";
 
 const FACE_SHAPES = ["smile", "brow", "blink"] as const;
-type FaceShape = typeof FACE_SHAPES[number];
+const VESPER_SOFT_CONTOUR = "vesper-soft-contour";
+type FaceShape = typeof FACE_SHAPES[number] | typeof VESPER_SOFT_CONTOUR;
 
 const softBand = (distance: number, inner: number, outer: number) => 1 - MathUtils.smoothstep(distance, inner, outer);
 export const VILLAGER_EYES = {
@@ -161,7 +162,7 @@ export function prepareVillagerFaceColors(materials: Iterable<MeshStandardMateri
 }
 
 /** Masks follow the two villagers' bind-pose coordinates in meters. */
-export function addVillagerFaceShapes(root: Object3D, female = true) {
+export function addVillagerFaceShapes(root: Object3D, female = true, animate = true) {
   const fit = VILLAGER_EYES[female ? "female" : "male"];
   const owned: BufferGeometry[] = [];
   faceMesh(root)?.traverse(mesh => {
@@ -171,15 +172,30 @@ export function addVillagerFaceShapes(root: Object3D, female = true) {
     const lash = material === "MAT_LashBrow";
     const eye = material === "MAT_Cornea" || material === "MAT_Eyes";
     const details = material === "MAT_Details";
+    const alternative = female && skin;
     const positions = mesh.geometry.getAttribute("position");
     if (!positions || !(skin || lash || eye || details) || mesh.geometry.morphAttributes.position?.length) return;
+    if (!animate && !alternative) return;
 
     const smile = new Float32Array(positions.count * 3);
     const brow = new Float32Array(positions.count * 3);
     const blink = new Float32Array(positions.count * 3);
+    const contour = alternative ? new Float32Array(positions.count * 3) : undefined;
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
       const side = Math.abs(x), offset = i * 3;
+      if (contour) {
+        const forward = MathUtils.smoothstep(z, .046, .078);
+        const jaw = softBand(Math.abs(y - 1.487), .007, .024) * softBand(Math.abs(side - .047), .013, .029)
+          * MathUtils.smoothstep(z, .025, .054);
+        const cheek = softBand(Math.abs(y - 1.532), .003, .017) * softBand(Math.abs(side - .049), .005, .018) * forward;
+        const nose = softBand(Math.abs(y - 1.533), .004, .017) * softBand(side, .006, .019) * MathUtils.smoothstep(z, .087, .106);
+        const chin = softBand(Math.abs(y - 1.478), .004, .014) * softBand(side, .009, .028) * forward;
+        contour[offset] = Math.sign(x) * (.0062 * cheek + .0015 * jaw) - .10 * x * nose;
+        contour[offset + 1] = .0015 * cheek - .0008 * chin;
+        contour[offset + 2] = .004 * cheek - .0055 * nose + .0025 * chin;
+      }
+      if (!animate) continue;
       const front = MathUtils.smoothstep(z, fit.z - .024, fit.z - .005);
       const eyeWidth = softBand(Math.abs(side - fit.x), .011, .027);
       if (skin || details) {
@@ -204,9 +220,11 @@ export function addVillagerFaceShapes(root: Object3D, female = true) {
 
     const geometry = mesh.geometry.clone();
     geometry.morphTargetsRelative = true;
-    geometry.morphAttributes.position = [smile, brow, blink].map((offsets, i) => {
+    const shapeNames = [...(animate ? FACE_SHAPES : []), ...(contour ? [VESPER_SOFT_CONTOUR] : [])];
+    const offsets = [...(animate ? [smile, brow, blink] : []), ...(contour ? [contour] : [])];
+    geometry.morphAttributes.position = offsets.map((offsets, i) => {
       const attribute = new Float32BufferAttribute(offsets, 3);
-      attribute.name = FACE_SHAPES[i];
+      attribute.name = shapeNames[i];
       return attribute;
     });
     mesh.geometry = geometry;
@@ -214,6 +232,13 @@ export function addVillagerFaceShapes(root: Object3D, female = true) {
     owned.push(geometry);
   });
   return owned;
+}
+
+export function prepareVillagerFaceLook(root: Object3D) {
+  const targets = driverFaceTargets(root, VESPER_SOFT_CONTOUR);
+  return (shape: string | undefined) => {
+    for (const { mesh, index } of targets) mesh.morphTargetInfluences![index] = shape === VESPER_SOFT_CONTOUR ? 1 : 0;
+  };
 }
 
 export function driverFaceTargets(root: Object3D, shape: FaceShape) {

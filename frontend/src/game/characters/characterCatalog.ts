@@ -13,7 +13,7 @@ import { findVehicleDriver, type VehicleDriver } from "./driverRoster";
 export const CHARACTERS = catalog.filter(item => item.id !== "niko-park");
 export const CHARACTER_APPEARANCE_OPTIONS = appearanceOptions;
 export type CharacterStyleField = keyof typeof appearanceOptions;
-type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup" | "eyeshadow" | "eyeliner";
+type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup" | "eyeshadow" | "eyeliner" | "face_shape";
 export type CharacterAppearance = Record<Exclude<CharacterStyleField, OptionalAppearanceField>, string>
   & Partial<Record<OptionalAppearanceField, string>> & {
     hair_palette?: HairPalette; accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;

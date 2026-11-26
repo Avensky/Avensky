@@ -3,6 +3,7 @@ declare const __FITTED_HAIR_STYLES__: Array<{ id: string; label: string; url: st
 
 const folder = "/models/characters/female/wardrobe/alpha";
 export const tennisFittingBodyUrl = `${folder}/vesper-tennis-fit-body.glb`;
+export const tennisDressBodyUrl = `${folder}/vesper-tennis-dress-body.glb`;
 export const fittedHairCatalog = [
   { id: "Space_Buns", label: "Space Buns & Loose Waves", url: `${folder}/space-buns.glb` },
   { id: "Mia_01", label: "Mia Braided Ponytail", url: `${folder}/mia-braided-ponytail.glb` },

@@ -176,6 +176,8 @@ pub struct CharacterAppearance {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     eyeliner: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    face_shape: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     hair_palette: Option<HairPalette>,
 }
 
@@ -402,9 +404,11 @@ impl CharacterChoice {
                 ("makeup", appearance.makeup.as_deref()),
                 ("eyeshadow", appearance.eyeshadow.as_deref()),
                 ("eyeliner", appearance.eyeliner.as_deref()),
+                ("face_shape", appearance.face_shape.as_deref()),
             ]
             .into_iter()
             .all(|(field, value)| value.is_none_or(|value| {
+                if field == "face_shape" && self.id != "mara-vega" && value != "original" { return false; }
                 (field == "color" && hex_color(value))
                     || (field == "hair" && self.id == "mara-vega" && FITTED_HAIR.iter().any(|style| style.id == value))
                     || APPEARANCES
@@ -461,6 +465,23 @@ mod wardrobe_tests {
         assert!(!equippable(value.clone()));
         value["appearance"]["hair"] = json!("natural");
         assert!(equippable(value));
+    }
+
+    #[test]
+    fn alternate_face_round_trips_only_on_vespers_rig() {
+        let mut value = json!({"id":"mara-vega","outfit":"dockwear","appearance":{
+            "hair":"natural","hair_color":"original","skin":"original","headwear":"none","color":"original",
+            "face_shape":"vesper-soft-contour"
+        }});
+        let saved: CharacterChoice = serde_json::from_value(value.clone()).unwrap();
+        assert!(saved.is_equippable());
+        assert_eq!(serde_json::to_value(saved).unwrap(), value);
+        value["appearance"]["face_shape"] = json!("invalid");
+        assert!(!serde_json::from_value::<CharacterChoice>(value.clone()).unwrap().is_equippable());
+        value["appearance"]["face_shape"] = json!("vesper-soft-contour");
+        value["id"] = json!("jules-okafor");
+        value["outfit"] = json!("night-run");
+        assert!(!serde_json::from_value::<CharacterChoice>(value).unwrap().is_equippable());
     }
 
     #[test]

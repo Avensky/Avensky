@@ -1,5 +1,6 @@
 import { BufferAttribute, BufferGeometry, Matrix4, Triangle, Vector3 } from 'three';
 import { MeshBVH } from 'three-mesh-bvh';
+import { contactPose } from './contactPose.mjs';
 
 const clearance = .0015;
 const shoulderClearance = .0042;
@@ -8,7 +9,7 @@ const smooth = (lo, hi, value) => {
   return t * t * (3 - 2 * t);
 };
 
-export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false) {
+export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false, baked) {
   const dress = root.getObjectByName('wardrobe-local-tennis-dress');
   const skin = root.getObjectByName('fitting-room-body');
   if (!dress || !skin || !bodySource?.index) return;
@@ -19,6 +20,55 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
   if (!opaque || !sheer) return;
 
   const source = opaque.geometry;
+  const skinPosition = skin.geometry.attributes.position;
+  const restoredSkin = new Float32Array(skinPosition.count * 3);
+  const fittedSkin = new Float32Array(restoredSkin.length);
+  const walkingSkin = new Float32Array(restoredSkin.length);
+  const seatedSkin = new Float32Array(restoredSkin.length);
+  const skirtSkin = [];
+  const { skinIndex, skinWeight } = skin.geometry.attributes;
+  const waistBones = skin.skeleton.bones.map(({ name }) => /^(pelvis$|spine_|thigh_)/.test(name));
+  if (roundedLeftCuff) for (let index = 0; index < skinPosition.count; index++) {
+    const x = skinPosition.getX(index), y = skinPosition.getY(index), z = skinPosition.getZ(index);
+    if (Math.abs(x) >= .22 || y < .63 || y > 1.165) continue;
+    let waistWeight = 0;
+    for (let influence = 0; influence < 4; influence++) {
+      if (waistBones[skinIndex.getComponent(index, influence)]) waistWeight += skinWeight.getComponent(index, influence);
+    }
+    if (waistWeight < .5) continue;
+    const hip = smooth(.862, .92, y) * (1 - smooth(.952, .986, y));
+    const bodiceSeam = smooth(1.024, 1.067, y) * (1 - smooth(1.119, 1.165, y));
+    const rearSeat = smooth(.780, .812, y) * (1 - smooth(.854, .884, y))
+      * (1 - smooth(-.043, -.015, z)) * (1 - smooth(.079, .119, Math.abs(x)));
+    const outerThigh = smooth(.725, .754, y) * (1 - smooth(.850, .884, y))
+      * smooth(.121, .156, Math.abs(x)) * smooth(.008, .045, z);
+    const lap = smooth(.692, .720, y) * (1 - smooth(.755, .790, y))
+      * smooth(.085, .120, Math.abs(x)) * smooth(.025, .056, z);
+    const pedalThigh = smooth(.654, .691, y) * (1 - smooth(.724, .762, y))
+      * smooth(.089, .118, x) * (1 - smooth(.158, .179, x)) * smooth(.031, .063, z);
+    const insideLap = smooth(.635, .661, y) * (1 - smooth(.744, .777, y))
+      * smooth(.051, .076, -x) * (1 - smooth(.111, .146, -x)) * smooth(.039, .071, z);
+    const step = smooth(.718, .739, y) * (1 - smooth(.748, .768, y))
+      * smooth(.115, .143, -x) * smooth(.047, .074, z);
+    if (!hip && !bodiceSeam && !rearSeat && !outerThigh && !lap && !pedalThigh && !insideLap && !step) continue;
+    skirtSkin.push(index);
+    restoredSkin.set([x, y, z], index * 3);
+    const fitX = x * (1 - .095 * hip - .035 * bodiceSeam);
+    const fitZ = z * (1 - .135 * hip - .065 * bodiceSeam);
+    fittedSkin.set([fitX, y, fitZ], index * 3);
+    walkingSkin.set([fitX, y, fitZ - .008 * step], index * 3);
+    seatedSkin.set([fitX - Math.sign(x) * .017 * outerThigh, y,
+      fitZ + .030 * rearSeat - .011 * outerThigh - .020 * lap - .016 * pedalThigh - .018 * insideLap], index * 3);
+  }
+  let skinMode;
+  function fitSkin(mode) {
+    if (skinMode === mode || !skirtSkin.length) return;
+    skinMode = mode;
+    const values = mode === 'seated' ? seatedSkin : mode === 'walk' ? walkingSkin : mode ? fittedSkin : restoredSkin;
+    for (const index of skirtSkin) skinPosition.setXYZ(index, values[index * 3], values[index * 3 + 1], values[index * 3 + 2]);
+    skinPosition.needsUpdate = true;
+  }
+  fitSkin('standing');
   const cloth = source.attributes.position;
   const protectedVertices = new Set(sheer.geometry.index.array);
   const panel = [];
@@ -59,11 +109,13 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
   }
   const leftSleeveEdges = [];
   const leftUnderarm = [];
+  const seatedLap = [];
   if (roundedLeftCuff) for (let i = 0; i < source.index.count; i += 3) {
     const triangle = [0, 1, 2].map(j => vertexToSite.get(source.index.getX(i + j)));
     if (triangle.every(({ rest }) => rest.x > .095 && rest.x < .205 && rest.y > 1.16 && rest.y < 1.263)) {
       leftUnderarm.push(triangle);
     }
+    if (triangle.every(({ rest }) => rest.z > .020 && rest.y > .882 && rest.y < .975)) seatedLap.push(triangle);
   }
   const underarmSites = [...new Set(leftUnderarm.flat())];
   const upperArm = root.getObjectByName('upperarm_l');
@@ -109,7 +161,73 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
   const midpoint = new Vector3(), edgeLift = new Vector3();
   const sleeveEdge = new Vector3(), sleeveTarget = new Vector3();
   const hit = { point: new Vector3(), distance: 0, faceIndex: 0 };
+  const seedPoint = new Vector3();
+  const seedTriangle = new Triangle();
+  // Seed the exact BVH search with a nearby query's face. Its distance is an
+  // upper bound, even after the skin deforms. Keep independent caches per fit mode.
+  const cellsByMode = new Map();
+  const poseNodes = [...new Set([...skin.skeleton.bones, ...opaque.skeleton.bones, skin, opaque])];
+  const morphMeshes = [skin, opaque];
+  const pose = new Float64Array(poseNodes.length * 16 + morphMeshes.reduce((sum, mesh) => sum + (mesh.morphTargetInfluences?.length ?? 0), 0));
+  let previousMode;
+  function changedPose(mode) {
+    let changed = mode !== previousMode;
+    previousMode = mode;
+    let index = 0;
+    for (const node of poseNodes) for (const value of node.matrix.elements) {
+      if (pose[index] !== value) changed = true;
+      pose[index++] = value;
+    }
+    for (const mesh of morphMeshes) for (const value of mesh.morphTargetInfluences ?? []) {
+      if (pose[index] !== value) changed = true;
+      pose[index++] = value;
+    }
+    return changed;
+  }
   let corrected = [];
+  const readPose = contactPose(root);
+  const features = [];
+  const bakedMoves = new Float32Array(cloth.count * 3);
+  const bakedIndices = new Set();
+
+  function applyBaked(takes) {
+    readPose(features);
+    let first, second, firstError = Infinity, secondError = Infinity;
+    for (const take of takes) {
+      let error = 0;
+      for (let i = 0; i < features.length; i++) error += (features[i] - take.pose[i]) ** 2;
+      if (error < firstError) {
+        second = first;
+        secondError = firstError;
+        first = take;
+        firstError = error;
+      } else if (error < secondError) {
+        second = take;
+        secondError = error;
+      }
+    }
+    const blend = firstError < 1e-12 || !second ? 0 : firstError / (firstError + secondError);
+    bakedIndices.clear();
+    function accumulate(take, weight) {
+      if (!weight) return;
+      for (let i = 0; i < take.moves.length; i += 4) {
+        const index = take.moves[i], offset = index * 3;
+        if (!bakedIndices.has(index)) {
+          bakedIndices.add(index);
+          bakedMoves[offset] = bakedMoves[offset + 1] = bakedMoves[offset + 2] = 0;
+        }
+        for (let axis = 0; axis < 3; axis++) bakedMoves[offset + axis] += take.moves[i + 1 + axis] * weight / 100000;
+      }
+    }
+    accumulate(first, 1 - blend);
+    accumulate(second, blend);
+    for (const index of bakedIndices) {
+      const offset = index * 3;
+      write(index, cloth.getX(index) + bakedMoves[offset], cloth.getY(index) + bakedMoves[offset + 1], cloth.getZ(index) + bakedMoves[offset + 2]);
+      corrected.push(index);
+    }
+    if (corrected.length) fit.needsUpdate = sheerFit.needsUpdate = true;
+  }
 
   function reset() {
     for (const index of corrected) write(index, cloth.getX(index), cloth.getY(index), cloth.getZ(index));
@@ -123,10 +241,20 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
   }
 
   function apply(mode) {
-    reset();
-    if (!mode) return;
+    fitSkin(mode);
+    if (!mode) {
+      previousMode = undefined;
+      reset();
+      return;
+    }
     root.updateWorldMatrix(true, false);
     root.updateMatrixWorld(true);
+    if (!changedPose(mode)) return;
+    reset();
+    if (baked?.[mode]?.length) {
+      applyBaked(baked[mode]);
+      return;
+    }
     worldToRoot.copy(root.matrixWorld).invert();
     bodyToRoot.multiplyMatrices(worldToRoot, skin.matrixWorld);
     clothToRoot.multiplyMatrices(worldToRoot, opaque.matrixWorld);
@@ -135,6 +263,9 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
       surface.setXYZ(index, point.x, point.y, point.z);
     }
     tree.refit();
+    let cells = cellsByMode.get(mode);
+    if (!cells) cellsByMode.set(mode, cells = new Map());
+    if (cells.size > 60000) cells.clear();
 
     const canMove = site => site.upper || (mode === 'seated' && site.lower)
       || (roundedLeftCuff && site.rest.y > .903 && site.rest.y < 1.16);
@@ -146,7 +277,19 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
     }
 
     function signedClearance(at) {
-      if (!tree.closestPointToPoint(at, hit, 0, .075) || hit.distance > .075) return .075;
+      const cell = ((Math.floor(at.x * 240) + 128) * 512 + Math.floor(at.y * 240)) * 512 + Math.floor(at.z * 240) + 256;
+      const seed = cells.get(cell);
+      let radius = .075;
+      if (seed !== undefined) {
+        const i = seed * 3;
+        seedTriangle.a.fromBufferAttribute(surface, indices[i]);
+        seedTriangle.b.fromBufferAttribute(surface, indices[i + 1]);
+        seedTriangle.c.fromBufferAttribute(surface, indices[i + 2]);
+        seedTriangle.closestPointToPoint(at, seedPoint);
+        radius = Math.min(radius, at.distanceTo(seedPoint) + 1e-7);
+      }
+      if (!tree.closestPointToPoint(at, hit, 0, radius) || hit.distance > .075) return .075;
+      cells.set(cell, hit.faceIndex);
       const k = hit.faceIndex * 3;
       Triangle.getNormal(a.fromBufferAttribute(surface, indices[k]), b.fromBufferAttribute(surface, indices[k + 1]),
         c.fromBufferAttribute(surface, indices[k + 2]), normal);
@@ -232,6 +375,21 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
               adjacent.add(site);
             }
           }
+        }
+      }
+    }
+    if (mode === 'seated') for (let pass = 0; pass < 2; pass++) {
+      for (const triangle of seatedLap) {
+        midpoint.set(0, 0, 0);
+        for (const site of triangle) midpoint.add(site.point).add(site.move);
+        midpoint.multiplyScalar(1 / 3);
+        const gap = signedClearance(midpoint);
+        if (gap > .0013 || gap < -.024) continue;
+        edgeLift.copy(normal).multiplyScalar(Math.min(.004, .0013 - gap));
+        for (const site of triangle) {
+          if (site.indices.some(index => protectedVertices.has(index))) continue;
+          site.move.add(edgeLift).clampLength(0, .018);
+          adjacent.add(site);
         }
       }
     }
@@ -322,5 +480,5 @@ export function prepareDressContactFit(root, bodySource, roundedLeftCuff = false
 
   }
 
-  return { apply, dispose() { opaque.geometry = source; sheer.geometry = sheerSource; geometry.dispose(); sheerGeometry.dispose(); posed.dispose(); } };
+  return { apply, dispose() { fitSkin(); opaque.geometry = source; sheer.geometry = sheerSource; geometry.dispose(); sheerGeometry.dispose(); posed.dispose(); } };
 }
