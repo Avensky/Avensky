@@ -113,24 +113,26 @@ type PortraitProps = {
   choice: CharacterChoice | null | undefined;
   label?: string;
   welcomePreview?: WelcomePreview;
-  requireFittedHair?: boolean;
+  hairstylePreview?: boolean;
 };
 
-export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, requireFittedHair }: PortraitProps & { cacheOnly?: boolean }) {
+export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, hairstylePreview }: PortraitProps & { cacheOnly?: boolean }) {
   const look = useMemo(() => characterLook(choice), [choice]);
   const canBake = typeof Worker !== "undefined" && typeof OffscreenCanvas !== "undefined";
   const url = canBake && look ? villagerModelUrl(look, "portrait") : null;
   const canRefresh = useUIStore(state => !cacheOnly && portraitMenuAllowsWork(state, welcomePreview));
-  const dress = look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
+  const dress = !hairstylePreview && look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
-  const key = look && url ? portraitKey(look, url, dressUrl) + (requireFittedHair ? "|fitted-hair" : "") : "";
+  const key = !look || !url ? "" : hairstylePreview
+    ? JSON.stringify(["hairstyle", look.character.id, url, look.appearance.hair, look.appearance.hair_color, look.hair, look.appearance.hair_palette])
+    : portraitKey(look, url, dressUrl);
   const cached = useSyncExternalStore(subscribeCharacterPortrait, () => key ? peekCharacterPortrait(key) : null, () => null);
   const [failedKey, setFailedKey] = useState<string>();
   const needsBake = canRefresh && Boolean(key) && !cached && failedKey !== key;
   const startBake = useEffectEvent(() => {
     const job = new AbortController();
     if (look && url) void bakeCharacterPortrait(key, {
-      look, modelUrl: url, dress: dress && dressUrl ? { item: dress, url: dressUrl } : undefined, requireFittedHair,
+      look, modelUrl: url, dress: dress && dressUrl ? { item: dress, url: dressUrl } : undefined, hairstylePreview,
     }, job.signal).catch(() => { if (!job.signal.aborted) setFailedKey(key); });
     return () => job.abort();
   });

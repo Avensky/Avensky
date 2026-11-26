@@ -33,5 +33,15 @@
     "name": "Rook hat and separated coat and trousers",
     "choice": {"id":"jules-okafor","outfit":"race-crew","appearance":{"hair":"natural","hair_color":"soft-black","skin":"original","headwear":"hat","color":"crimson","item_colors":{"race-crew:coat":{"color":"#123456"},"race-crew:pants":{"color":"#654321"}}}},
     "driver": {"body":"male","skin":"#95553d","hair":"#211d23","hairStyle":"short","headwear":"hat","headwearColor":"#e7cda0","top":"#123456","bottom":"#654321"}
+  },
+  {
+    "name": "saved red hair on the long style",
+    "choice": {"id":"mara-vega","outfit":"dockwear","appearance":{"hair":"natural","hair_color":"red","skin":"original","headwear":"none","color":"original"}},
+    "driver": {"body":"female","skin":"#d49673","hair":"#a32733","hairStyle":"long","headwear":"hat","headwearColor":"#e7cda0","top":"#46584b","bottom":"#46584b"}
+  },
+  {
+    "name": "saved dirty blonde hair on the short style",
+    "choice": {"id":"jules-okafor","outfit":"night-run","appearance":{"hair":"natural","hair_color":"dirty-blonde","skin":"original","headwear":"none","color":"original"}},
+    "driver": {"body":"male","skin":"#95553d","hair":"#897657","hairStyle":"short","headwear":"none","headwearColor":"#e7cda0","top":"#493851","bottom":"#493851"}
   }
 ]

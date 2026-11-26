@@ -11,6 +11,10 @@
     { "id": "original", "label": "Original", "color": "#ffffff" },
     { "id": "espresso", "label": "Espresso", "color": "#34262b" },
     { "id": "copper", "label": "Copper", "color": "#ae5837" },
+    { "id": "red", "label": "Red", "color": "#a32733",
+      "zones": { "roots": "#702329", "highlights": "#bd4249", "tips": "#a82e36", "highlightStrength": 0.34, "tipBlend": 0.46 } },
+    { "id": "dirty-blonde", "label": "Dirty Blonde", "color": "#897657",
+      "zones": { "roots": "#574b3e", "highlights": "#ab9676", "tips": "#978260", "highlightStrength": 0.32, "tipBlend": 0.5 } },
     { "id": "ash", "label": "Ash", "color": "#c0b3aa" },
     { "id": "soft-black", "label": "Soft black", "color": "#211d23" },
     { "id": "dark-auburn", "label": "Dark auburn", "color": "#582f26" }

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { JSDOM } from "jsdom";
 import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from "three";
-import { rosterCamera } from "../src/game/preview/rosterCamera.ts";
+import { creatorStepFrames, rosterCamera } from "../src/game/preview/rosterCamera.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
 import { installGarageEntryInteraction } from "../src/game/preview/garageEntryInteraction.ts";
 import { bindRosterSticks, readRosterSticks, releaseRosterSticks } from "../src/game/preview/rosterStickControls.ts";
@@ -199,6 +199,60 @@ test("creator frames both rigs above the controls and can reverse an unfinished 
       assert.ok(screenY(eyes) > .22 && screenY(eyes) < .45);
       assert.ok(screenY(waist) - screenY(eyes) > outfitSize * 1.7, "makeup and colors use a visibly closer face shot");
     }
+  }
+});
+
+test("Looks holds the whole face, Eyes enlarges the irises, and Makeup keeps the mouth visible on both rigs", () => {
+  const rigs = [{ y: 1.5583, z: .0895, waist: 1.095, lip: 1.501, radius: .006 },
+    { y: 1.7219, z: .1105, waist: 1.164, lip: 1.648, radius: .0066 }];
+  for (const rig of rigs) for (const [w, h] of [[1280, 720], [844, 390], [393, 852], [320, 568]]) {
+    const portrait = w < h;
+    // The midpoint is on the face, in front of the actor's pivot.
+    const eyes = new Vector3(Math.sin(.68) * rig.z, rig.y, Math.cos(.68) * rig.z);
+    const camera = new PerspectiveCamera(), travel = new GarageCameraTravel();
+    const frames = Object.fromEntries(["looks", "makeup", "eyes"].map(step => {
+      const shot = rosterCamera("create", creatorStepFrames[step]);
+      shot.fitPortrait(eyes.y, rig.waist, eyes.x, eyes.z);
+      shot.subject = "ready";
+      return [step, shot];
+    }));
+    const sizes = {};
+    let now = 0;
+    const draw = (step, delta, reduced = false) => {
+      travel.frame(camera, frames[step], w, h, 1, .08, -.025, now += delta, reduced);
+      camera.updateMatrixWorld();
+    };
+    for (const step of ["looks", "makeup", "eyes"]) {
+      draw(step, 16, true);
+      assert.equal(travel.phase, "framed");
+      const pixelY = y => (1 - new Vector3(eyes.x, y, eyes.z).project(camera).y) * h / 2;
+      const eyePixel = eyes.clone().project(camera);
+      assert.ok(Math.abs((1 + eyePixel.x) / 2 - (portrait ? .5 : .3)) < 1e-6, "iris midpoint stays in the free column");
+      const line = pixelY(rig.y) / h;
+      assert.ok(line > .24 && line < .50, "eyes are clear of the top header and palette");
+      sizes[step] = pixelY(rig.y - rig.radius) - pixelY(rig.y + rig.radius);
+      if (step === "looks") assert.ok(pixelY(rig.y + .12) / h >= .06, "full head fits above the Looks picker");
+      if (step === "makeup") assert.ok(pixelY(rig.lip) / h < (portrait ? .58 : .69), "lips remain inside the preview");
+    }
+    assert.ok(sizes.makeup > sizes.looks * 1.4);
+    assert.ok(sizes.eyes > sizes.makeup * 1.35);
+    assert.ok(sizes.eyes > sizes.looks * 2);
+    function switchWithoutCut(next) {
+      const before = camera.clone();
+      draw(next, 16);
+      assert.equal(travel.phase, "framing");
+      assert.ok(before.position.distanceTo(camera.position) < 1e-10);
+      assert.ok(before.quaternion.angleTo(camera.quaternion) < 1e-6);
+      assert.ok(before.projectionMatrix.equals(camera.projectionMatrix));
+    }
+    for (const next of ["looks", "eyes", "makeup", "looks"]) {
+      switchWithoutCut(next);
+      draw(next, 2400);
+      assert.ok(travel.moving, "an upload stall cannot skip the lens travel");
+      for (let i = 0; i < 4; i++) draw(next, 50);
+    }
+    for (let i = 0; i < 16; i++) draw("looks", 50);
+    assert.equal(travel.phase, "framed");
   }
 });
 

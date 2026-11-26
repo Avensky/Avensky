@@ -1,13 +1,19 @@
 .creator-panel .creator-hairstyles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(5.25rem, 100%), 1fr));
-  gap: 5px;
+  --hair-track: 5.25rem;
+  --hair-gap: 5px;
+  /* Span two of the original responsive tracks. On a narrow viewport the
+     pair shrinks together to keep the square tile completely on screen. */
+  grid-template-columns: repeat(auto-fill, minmax(min(var(--hair-track), calc((100% - var(--hair-gap)) / 2)), 1fr));
+  gap: var(--hair-gap);
   max-height: min(43dvh, 28rem);
   overflow: auto;
   align-content: start;
   touch-action: pan-y;
 }
 .creator-panel .creator-hairstyles .creator-option {
+  grid-column: span 2;
+  width: calc(100% - var(--hair-gap));
   aspect-ratio: 1;
   align-items: stretch;
   justify-items: stretch;
@@ -30,6 +36,6 @@
 @media (orientation: landscape) and (max-height: 480px) {
   .creator-panel .creator-hairstyles {
     max-height: 48dvh;
-    grid-template-columns: repeat(auto-fill, minmax(min(4.6rem, 100%), 1fr));
+    --hair-track: 4.6rem;
   }
 }

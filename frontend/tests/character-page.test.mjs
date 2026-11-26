@@ -37,7 +37,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   const { close } = characterTestDom();
   let vite, root;
   try {
-    vite = await createServer({ define: { __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01', 'medieval-05']) },
+    vite = await createServer({ define: { __FITTED_HAIR_IDS__: JSON.stringify(['hair-01']), __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01', 'medieval-05']) },
       server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error',
       plugins: [{
         name: 'count-fit-review-keys',
@@ -674,8 +674,9 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('button[aria-label="Gothic Pink"]');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95');
     await click('#character-editor-tab-body');
-    await select('Hairstyle', 'cropped');
-    assert.equal(drafts.at(-1).appearance.hair, 'cropped');
+    assert.equal(find('select[aria-label="Hairstyle"] option[value="cropped"]'), null);
+    await select('Hairstyle', 'hair-01');
+    assert.equal(drafts.at(-1).appearance.hair, 'hair-01');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95', 'identity edits preserve trial garment colors');
     await click('#character-editor-tab-emotes');
     assert.deepEqual(drafts.at(-1).garments, { skirt: 'gothic-skirt-04', top: 'top-01' });
@@ -704,7 +705,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       'medieval-05:hat': { color: '#4b79a4' },
     });
     assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
-    assert.equal(requests[4].character.appearance.hair, 'cropped');
+    assert.equal(requests[4].character.appearance.hair, 'hair-01');
     await acknowledge(requests[4], requests[4].character);
     await click('#character-editor-tab-details');
     await click('[aria-label="Character model"] [data-character-option="jules-okafor"]');
@@ -874,12 +875,28 @@ test('device character edits stay local when the connected profile has no charac
     await act(async () => button('Retry').click());
     assert.equal(readLocalCharacter().identity, 'female');
 
-    writeLocalOutfit('Race fit', { ...readLocalCharacter(), outfit: 'race-crew' });
+    const saved = readLocalCharacter();
+    const { characterAppearance } = await load('game/characters/characterCatalog.ts');
+    const { HAIR_COLOR_THEMES } = await load('game/characters/fittedWardrobe/hairColors.ts');
+    writeLocalOutfit('Race fit', { ...saved, outfit: 'race-crew',
+      appearance: { ...characterAppearance(saved), hair_palette: HAIR_COLOR_THEMES['Icy Blue'] } });
     await show('appearance');
     await click('[data-category=saved]');
     await click('[aria-label="Try on Race fit"]');
     assert(!document.querySelector('[aria-label="Clear saved outfit preview"]').disabled);
     await show('body');
+    const hairColor = document.querySelector('select[aria-label="Hair color"]');
+    assert.equal(hairColor.selectedOptions[0].textContent, 'Custom palette');
+    for (const id of ['red', 'dirty-blonde']) {
+      await act(async () => {
+        hairColor.value = id;
+        hairColor.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      assert.equal(hairColor.value, id);
+      await act(async () => t.mock.timers.tick(350));
+      assert.equal(readLocalCharacter().appearance.hair_color, id);
+      assert.equal(readLocalCharacter().appearance.hair_palette, undefined);
+    }
     t.mock.method(dom.window.Storage.prototype, 'setItem', () => { throw new Error('Storage unavailable'); });
     const eyeColor = document.querySelector('select[aria-label="Eye color"]');
     await act(async () => {

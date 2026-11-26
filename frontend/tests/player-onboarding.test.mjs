@@ -15,6 +15,7 @@ test("the creator preserves an eight-step appearance through registration, name 
   previous.set("IS_REACT_ACT_ENVIRONMENT",Object.getOwnPropertyDescriptor(globalThis,"IS_REACT_ACT_ENVIRONMENT"));
   Object.defineProperty(globalThis,"IS_REACT_ACT_ENVIRONMENT",{ configurable:true, value:true });
   const vite=await createServer({mode:process.env.VITE_DEPLOY_ENV || "development",
+    define:{__FITTED_HAIR_IDS__: JSON.stringify(["hair-01"])},
     server:{middlewareMode:true,hmr:false,ws:false},appType:"custom",logLevel:"error"});
   const { createRoot }=await import("react-dom/client");
   const root=createRoot(document.getElementById("root"));
@@ -121,13 +122,14 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(previews.at(-1).creatorEmotes, "basic");
     await jumpTo("Hairstyle");
     assertPreviewCaption("Natural");
-    await select("Close crop");
-    assertPreviewCaption("Close crop");
-    assert.equal(previews.at(-1).choice.appearance.hair, "cropped");
+    assert.equal(button("Close crop"), undefined, "the retired cap is never offered as a new cut");
+    await select("Side-swept short");
+    assertPreviewCaption("Side-swept short");
+    assert.equal(previews.at(-1).choice.appearance.hair, "hair-01");
     await jumpTo("Hair color");
-    assert.equal(secondaryTabs().length, 0, "close-cropped hair only has its base color");
+    assert.equal(activeChannel(), "Base");
     await jumpTo("Hairstyle");
-    assert.equal(button("Close crop").getAttribute("aria-pressed"), "true");
+    assert.equal(button("Side-swept short").getAttribute("aria-pressed"), "true");
     await select("Natural");
     await jumpTo("Gender");
     const focusedGender = document.activeElement;
@@ -148,6 +150,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(activeStep(), "Gender");
     await select("Continue");
     assert.equal(activeStep(), "Looks");
+    assert.equal(previews.at(-1).creatorFrame, "looks");
     assert.ok(button("Look 1"));
     assert.doesNotMatch(document.querySelector('[role="tabpanel"]').textContent, /Mara Vega|Rook Okafor/);
     await jumpTo("Skin tone");
@@ -182,11 +185,13 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(previews.at(-1).creatorEmotes, "basic");
     await select("Continue");
     assert.equal(activeStep(), "Eyes");
+    assert.equal(previews.at(-1).creatorFrame, "eyes");
     assert.equal(secondaryTabs().length, 0);
     await select("Hazel");
     assert.equal(previews.at(-1).choice.appearance.eye_color, "hazel");
     await select("Continue");
     assert.equal(activeStep(), "Makeup");
+    assert.equal(previews.at(-1).creatorFrame, "makeup");
     await act(async () => panelAction("previous_option"));
     assert.equal(activeChannel(), "Eyeliner");
     await act(async () => panelAction("next_option"));
@@ -583,6 +588,22 @@ test("the creator preserves an eight-step appearance through registration, name 
     await act(async () => reply(sent.at(-1), {}));
     assert.deepEqual(logoutFrames, ["capture", "capture", "reveal"]);
     assert.ok(button("Sign in"));
+
+    // The creator restores focus to the first available replacement for an old saved cut.
+    const { CreatorHairstyles } = await vite.ssrLoadModule("/src/game/welcome/CreatorHairstyles.tsx");
+    const savedCrop = { ...fox, appearance: { ...fox.appearance, hair: "cropped" } };
+    const replacements = [];
+    await act(async () => root.render(createElement(CreatorHairstyles, {
+      choice: { ...savedCrop, id: "mara-vega", outfit: "dockwear" }, onChoice: item => replacements.push(item),
+      onContinue() {}, busy: false,
+    })));
+    assert.equal(button("Close crop"), undefined);
+    await act(async () => button("Natural").focus());
+    assert.equal(document.querySelector(".creator-preview-caption").textContent, "Close crop");
+    assert.equal(replacements.length, 0, "default focus preserves the legacy style");
+    await select("Natural");
+    assert.equal(replacements.at(-1).appearance.hair, "natural");
+
 
   } finally {
     await act(async()=>root.unmount());

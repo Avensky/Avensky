@@ -10,7 +10,7 @@ Avensky is the canonical public game repository. This directory tracks source-sa
 
 ## Implementation gap on Avensky `main` (checked 2026-11-19)
 
-The base hair choices are Natural and Close crop. Private staging can additionally load twelve fitted Vesper styles from its verified release. Open **Heroes → Character → Body → Hair**. The curly intake candidates are separate assets.
+Natural is the base hairstyle on both rigs. Private staging can also load twelve fitted Vesper styles from its verified release. Open **Heroes → Character → Body → Hair**. The curly intake candidates are separate assets.
 
 The private Espresso GLBs use embedded strand textures. The public fitted-hair catalog records their digests and lengths. Each selected model binds to the existing Vesper skeleton. In-game color, headwear clearance, save/reload and physical-phone performance still need visual testing. See the [staging installation procedure](../CLOUD_ASSETS.md#fitted-vesper-hairstyles).
 

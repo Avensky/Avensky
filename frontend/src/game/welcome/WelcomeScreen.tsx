@@ -10,6 +10,7 @@ import { CHARACTERS, characterAppearance, characterLook, ROOK_ID, type Character
 import { CHARACTER_STYLES, applyCreatorWardrobe, creatorChoice, type CharacterBody } from "../characters/characterStyles";
 import { CharacterCreator, CREATOR_STEPS } from "./CharacterCreator";
 import { CharacterRoster } from "./CharacterRoster";
+import { creatorStepFrames } from "../preview/rosterCamera";
 import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
@@ -143,7 +144,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const showBrand = screen === "characters" && !accountOpen ||
     !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
-  const creatorFrame = garageMode !== "create" ? undefined : creatorStep === "gender" ? "body" : creatorStep === "personality" ? "outfit" : "face";
+  const creatorFrame = garageMode === "create" ? creatorStepFrames[creatorStep] : undefined;
   const creatorEmotes = garageMode === "create" ? (creatorStep === "personality" ? "personality" : "basic") : undefined;
   useLayoutEffect(() => {
     onGarageCharacter?.(previewChoice && garageMode ? { choice: previewChoice, mode: garageMode, creatorFrame, creatorEmotes } : null);
