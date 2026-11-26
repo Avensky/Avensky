@@ -22,6 +22,7 @@ import { useGarageDrive } from "../preview/garageDriveStore";
 import { personalityEmote, type CharacterPersonality } from "./characterPersonality";
 import type { PieceColors } from "./clothingPieces";
 import { keepHeldProp } from "./emotePropNotes";
+import { SELECTION_HOLD, selectionEmote, type SelectionPoseId } from "./selectionPoses";
 import { POSE_SEQUENCE_ID, POSE_START_HOLD_SECONDS, posePackEmote } from "./posePack";
 import { CREATED_EMOTE_ID, createdEmoteClip } from "./emoteAuthoring";
 import { CLOSE_DRIVER_DOOR, CLOSE_PASSENGER_DOOR, ENTER_DRIVER, ENTER_PASSENGER, GaragePanelTarget, InteractionChair, OPEN_DRIVER_DOOR, SIT_IN_CHAIR, chairSitClip,
@@ -60,8 +61,8 @@ function setBlinkWeight(targets: ReturnType<typeof driverFaceTargets>, weight: n
   for (const { mesh, index } of targets) mesh.morphTargetInfluences![index] = weight;
 }
 
-export function GarageEmotePlayer({ root, bag = false, previewPacks = false, leanFit, mirrorFit, victory, cockpit, personality = "friendly", bagColors, paused = false }: {
-  root: Object3D; personality?: CharacterPersonality; bagColors?: PieceColors; bag?: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; paused?: boolean;
+export function GarageEmotePlayer({ root, bag = false, previewPacks = false, leanFit, mirrorFit, victory, cockpit, personality = "friendly", bagColors, paused = false, selectionPose, onSelectionEnd }: {
+  root: Object3D; personality?: CharacterPersonality; bagColors?: PieceColors; bag?: boolean; previewPacks?: boolean; leanFit?: GarageLeanFit; mirrorFit?: MirrorCheckFit; victory?: VictoryPlayback; cockpit?: GarageCockpit; paused?: boolean; selectionPose?: SelectionPoseId; onSelectionEnd?: () => void;
 }) {
   const invalidate = useThree(s => s.invalidate);
   const contextFit = useRef("");
@@ -85,6 +86,10 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   }, [previewPacks]);
   const baseClips = useRef<{ root: Object3D; bag: boolean; clips: ReturnType<typeof buildGarageEmotes> }>(null);
   const reducedMotion = usePreferencesStore(state => state.reducedMotion);
+  const rosterEmote = selectionPose ? selectionEmote(selectionPose) : undefined;
+  const selection = Boolean(rosterEmote);
+  const held = useRef<{ wake: number; ready: boolean; until: number } | null>(null);
+  const rosterFrameAt = useRef<number | null>(null);
   const restSeconds = previewPacks ? 4.5 : 2.35;
   const player = useRef<CabinState & {
     mixer: AnimationMixer;
@@ -105,6 +110,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
   }, [root, previewPacks]);
 
   useLayoutEffect(() => () => {
+    if (selection) return;
     const current = player.current;
     const playback = panelPlayback.current;
     const view = useCharacterPreviewStore.getState();
@@ -121,7 +127,7 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     if (playback && !view.insideCar && view.brzExiting) useCharacterPreviewStore.setState({ brzExiting: false });
     panelPlayback.current = null;
     if (panel && current) current.idle.reset().setEffectiveWeight(1).play();
-  }, [root, panel, reducedMotion]);
+  }, [root, panel, reducedMotion, selection]);
   useLayoutEffect(() => () => {
     openDoorApproach.current?.stop();
     openDoorApproach.current = undefined;
@@ -167,7 +173,10 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     // These tracks bind to the prepared rig's UUIDs. A preview-mode change
     // resets playback and disposes temporary props, but can reuse the base tracks.
     let startupClips = baseClips.current?.clips;
-    if (victory) {
+    if (selection) {
+      // Between roster emotes the neutral rig is at rest, so it can stop drawing.
+      startupClips = buildEmoteClips(root, [{ id: "001", name: "Neutral", duration: 1, keys: [[0, {}], [1, {}]] }]);
+    } else if (victory) {
       startupClips = buildEmoteClips(root, celebration ? [garageBreathing(bag), celebration] : [garageBreathing(bag)]);
     } else if (!startupClips) {
       startupClips = buildGarageEmotes(root, bag);
@@ -180,11 +189,12 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     actions.set("001", mixer.clipAction(breathing.clone()).setLoop(LoopOnce, 1));
     const automatic = [...AUTOMATIC_GARAGE_EMOTE_IDS, ...(bag ? ["bag-lift", "bag-check"] : [])]
       .flatMap(id => actions.get(id) ?? []);
-    const blink = driverFaceTargets(root, "blink");
+    const blink = selection ? [] : driverFaceTargets(root, "blink");
     const active = celebration ? actions.get(celebration.id)!.reset().setEffectiveWeight(0).play() : null;
     const props = new Map<EmoteProp, EmotePropModel>();
     player.current = { mixer, idle, actions, props,
       automatic, active, release: null, cabin: null, doorOnly: false, driveSeconds: 0, take: null, rest: restSeconds, next: 0, clicked: null, blink, elapsed: 0, preview: null };
+    if (selection) invalidate();
     return () => {
       player.current?.cabin?.stop();
       player.current = null;
@@ -193,12 +203,34 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       props.forEach(prop => prop.dispose());
       setBlinkWeight(blink, 0);
     };
-  }, [reducedMotion, root, bag, victory, previewPacks, restSeconds]);
+  }, [reducedMotion, root, bag, victory, previewPacks, restSeconds, selection, invalidate]);
+
+  useLayoutEffect(() => {
+    if (!rosterEmote) return;
+    rosterFrameAt.current = null;
+    invalidate();
+    return () => {
+      if (held.current) window.clearTimeout(held.current.wake);
+      held.current = null;
+    };
+  }, [root, rosterEmote, paused, invalidate]);
 
   useFrame((_, delta) => {
     const current = player.current;
     if (paused || !current || (previewPacks && useCharacterPreviewStore.getState().playbackPaused)) return;
-    const step = Math.min(delta, .1);
+    if (rosterEmote && current.preview === rosterEmote && !current.active) return;
+    const hold = held.current;
+    if (hold && !hold.ready) return;
+    held.current = null;
+    let step = Math.min(delta, .1);
+    if (rosterEmote) {
+      // GPU stalls and demand-render sleeps are visible elapsed time. Start the
+      // clock on this request's first frame so the preceding neutral rest is free.
+      const now = performance.now();
+      step = rosterFrameAt.current === null ? 0 : (now - rosterFrameAt.current) / 1000;
+      rosterFrameAt.current = now;
+      if (hold && current.active) step = Math.max(step, hold.until - current.active.time);
+    }
     if (current.blink.length) {
       current.elapsed += step;
       const phase = current.elapsed % 8.2;
@@ -208,11 +240,11 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     }
     const view = useCharacterPreviewStore.getState();
     const drive = useGarageDrive.getState();
-    const garageStation = !previewPacks && drive.stage !== "idle";
+    const garageStation = !selection && !previewPacks && drive.stage !== "idle";
     const driveOut = garageStation && drive.stage !== "station";
-    const preview = previewPacks ? view.emote : garageStation ? drive.steering : current.clicked;
+    const preview = rosterEmote ?? (previewPacks ? view.emote : garageStation ? drive.steering : current.clicked);
     const driving = garageStation || (previewPacks && view.insideCar);
-    if (!view.insideCar && view.brzExitReady) useCharacterPreviewStore.setState({ brzExitReady: false });
+    if (!selection && !view.insideCar && view.brzExitReady) useCharacterPreviewStore.setState({ brzExitReady: false });
     if (!view.brzExiting) exitSeconds.current = 0;
     if (exteriorHandoff.current && !view.emote && !view.insideCar) {
       exteriorHandoff.current.stop();
@@ -473,13 +505,17 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
         current.idle.setEffectiveWeight(1);
         if (current.clicked === current.preview) current.clicked = null;
         victory?.onFinish();
+        if (rosterEmote && !release && current.preview === rosterEmote) {
+          if (heldProp.current) heldProp.current.visible = true;
+          onSelectionEnd?.();
+        }
       } else {
         const clipWeight = MathUtils.smoothstep(active.clampWhenFinished ? time : Math.min(time, duration - time), 0, FADE_SECONDS);
         const weight = release ? Math.min(clipWeight, release.weight * (1 - MathUtils.smoothstep(release.elapsed, 0, FADE_SECONDS))) : clipWeight;
         active.setEffectiveWeight(weight);
         current.idle.setEffectiveWeight(1 - weight);
       }
-    } else if (!victory && !inspectingFace && (!previewPacks || view.automaticEmotes)) {
+    } else if (!selection && !victory && !inspectingFace && (!previewPacks || view.automaticEmotes)) {
       current.rest -= step;
       if (current.rest <= 0) {
         const action = current.automatic[current.next];
@@ -489,13 +525,27 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
     }
     current.mixer.update(step);
     current.fitFlag?.();
+    if (rosterEmote && (current.active || current.preview !== rosterEmote)) {
+      const active = current.active;
+      const until = rosterEmote.duration * SELECTION_HOLD.to;
+      if (!current.release && current.preview === rosterEmote && active
+        && active.time >= rosterEmote.duration * SELECTION_HOLD.from && active.time < until) {
+        // Both hold keys are identical. Camera redraws leave the rig alone.
+        const wake = window.setTimeout(() => {
+          if (held.current?.wake !== wake) return;
+          held.current.ready = true;
+          invalidate();
+        }, (until - active.time) * 1000);
+        held.current = { wake, until, ready: false };
+      } else invalidate();
+    }
   }, cockpit ? -.5 : -.125);
 
   if (chairRequested) chairShown.current = true;
   return <group>
     {previewPacks && <InteractionChair visible={chairRequested || chairShown.current} seatRef={chairSeat} />}
     <primitive object={root} dispose={null} onClick={(event: import("@react-three/fiber").ThreeEvent<MouseEvent>) => {
-      if (paused || victory || reducedMotion || !player.current || player.current.cabin || useCharacterPreviewStore.getState().brzExiting
+      if (selection || paused || victory || reducedMotion || !player.current || player.current.cabin || useCharacterPreviewStore.getState().brzExiting
         || event.delta > 3 || performance.now() < useFittingTurnStore.getState().suppressClickUntil) return;
       event.stopPropagation();
       const id = personalityEmote(personality, lastInteraction.current);

@@ -70,10 +70,8 @@ impl SocialData {
         match action {
             SocialAction::Rename { name } => {
                 let profile = self.profiles.get_mut(actor).unwrap();
-                if profile.active_character.is_some() {
-                    return Err("The active character keeps its saved name.".into());
-                }
                 profile.name = valid_name(&name, 24)?;
+                return Ok(json!({ "account_display_name": profile.name }));
             }
             SocialAction::FriendRequest { target } => {
                 self.profile(&target)?;

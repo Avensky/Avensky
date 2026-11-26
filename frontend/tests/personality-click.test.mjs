@@ -26,11 +26,12 @@ test('character clicks play varied personality clips, resume held poses, and ign
       resolveId(source, importer) { if (source === 'virtual:fitting-fiber' || (source === '@react-three/fiber' && importer?.endsWith('/GarageEmotePlayer.tsx'))) return moduleId; },
       load(id) { if (id === moduleId) return `import { useLayoutEffect } from 'react'; export const frames = new Set(); export let invalidations = 0;
         export const DriverBag = () => null;
-        export function useThree(select) { return select({ invalidate: () => invalidations++ }); }
+        const invalidate = () => invalidations++; export function useThree(select) { return select({ invalidate }); }
         export function useFrame(callback) { useLayoutEffect(() => { frames.add(callback); return () => frames.delete(callback); }, [callback]); }`; }
     }], server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
     const { GarageEmotePlayer } = await vite.ssrLoadModule('/src/game/characters/GarageEmotePlayer.tsx');
-    const { frames } = await vite.ssrLoadModule('virtual:fitting-fiber');
+    const fiber = await vite.ssrLoadModule('virtual:fitting-fiber');
+    const { frames } = fiber;
     const { useCharacterPreviewStore: preview } = await vite.ssrLoadModule('/src/game/characters/characterPreviewStore.ts');
     const { useFittingTurnStore: turns } = await vite.ssrLoadModule('/src/game/characters/fittingControlsStore.ts');
     const { usePreferencesStore: preferences } = await vite.ssrLoadModule('/src/store/preferences/preferencesStore.ts');
@@ -126,6 +127,88 @@ test('character clicks play varied personality clips, resume held poses, and ign
       play(null);
       tick(1);
       assert(head.quaternion.angleTo(start) > .05, `${model}: returning to idle releases the hold`);
+
+      const { SELECTION_POSES, selectionEmote } = await vite.ssrLoadModule('/src/game/characters/selectionPoses.ts');
+      const { availableFinderEmotes, matchesEmote } = await vite.ssrLoadModule('/src/game/characters/emoteFinder.ts');
+      const { findGaragePreviewEmote, garagePreviewCollection } = await vite.ssrLoadModule('/src/game/characters/garageEmotes.ts');
+      const poses = new Map();
+      const capture = () => ['upperarm_l', 'lowerarm_l', 'upperarm_r', 'calf_r', 'head'].map(name => poseRig.getObjectByName(name).quaternion.clone());
+      const difference = (a, b) => Math.max(...a.map((joint, index) => joint.clone().normalize().angleTo(b[index].clone().normalize())));
+      for (const stance of SELECTION_POSES) {
+        const motion = selectionEmote(stance.id);
+        for (const bag of [false, true]) {
+          const matches = availableFinderEmotes(bag).filter(item => item.id === motion.id);
+          assert.equal(matches.length, 1, 'the motion has one gallery entry');
+          assert(matchesEmote(matches[0], ['rest', 'stance']));
+          assert.equal(findGaragePreviewEmote(motion.id, bag), motion, 'favorites replay the same motion');
+          assert.equal(garagePreviewCollection('Garage', bag).filter(item => item.id === motion.id).length, 1);
+        }
+        play({ id: motion.id });
+        tick(.2);
+        const entering = capture();
+        tick(1.2);
+        const holding = capture();
+        assert(difference(entering, holding) > .1, `${model}: ${stance.name} enters its stance`);
+        tick(.9);
+        assert(difference(capture(), holding) < .001, `${model}: ${stance.name} holds its stance (delta ${difference(capture(), holding)})`);
+        poses.set(stance.id, holding);
+        tick(2.2);
+        assert(difference(capture(), holding) > .1, `${model}: ${stance.name} exits the hold`);
+      }
+      let now = performance.now();
+      const clock = t.mock.method(performance, 'now', () => now);
+      const frameAfter = ms => {
+        now += ms;
+        // The fiber clock can include arbitrary demand-render idle intervals.
+        for (const frame of frames) frame({}, 5);
+      };
+      const timers = new Map();
+      let nextTimer = 0;
+      const setTimer = t.mock.method(dom.window, 'setTimeout', (callback, ms) => {
+        timers.set(++nextTimer, { callback, ms });
+        return nextTimer;
+      });
+      const clearTimer = t.mock.method(dom.window, 'clearTimeout', id => timers.delete(id));
+      let finished = 0;
+      const onSelectionEnd = () => finished++;
+      for (const [index, stance] of SELECTION_POSES.entries()) {
+        await render({ root: poseRig, previewPacks: false, selectionPose: stance.id, onSelectionEnd });
+        const rest = capture();
+        const before = fiber.invalidations;
+        frameAfter(10000);
+        assert.equal(finished, index, 'a new request starts at zero after a long idle');
+        frameAfter(410); frameAfter(490); frameAfter(400);
+        assert(difference(capture(), poses.get(stance.id)) < .001,
+          `${model}: selection and gallery show the same ${stance.name} skeleton`);
+        assert(fiber.invalidations > before, 'the roster requests frames while a clip plays');
+        assert.equal(timers.size, 1, 'the static hold schedules exactly one wake');
+        const [id, timer] = [...timers.entries()][0];
+        assert(Math.abs(timer.ms - 1500) < 1, `slow frames still leave 1.5 seconds of the hold, got ${timer.ms}`);
+        const heldDraws = fiber.invalidations;
+        frameAfter(550);
+        assert.equal(fiber.invalidations, heldDraws, 'camera redraws do not animate a stationary pose');
+        timers.delete(id);
+        now += index === 1 ? 2200 : 1150; // Resume at 4.05s or 3.00s, after the hold deadline.
+        timer.callback();
+        frameAfter(0);
+        if (index !== 1) {
+          frameAfter(970);
+          assert.equal(finished, index, 'the exit is still playing at 3.97s');
+          frameAfter(65);
+        }
+        assert.equal(finished, index + 1, 'one completion after the exit');
+        assert(difference(capture(), rest) < .001, 'the roster returns to its neutral rig');
+        const settled = fiber.invalidations;
+        frameAfter(6000);
+        assert.equal(fiber.invalidations, settled, 'the roster remains idle between authored emotes');
+        assert.equal(finished, index + 1);
+      }
+      await render({ root: poseRig, previewPacks: false, selectionPose: SELECTION_POSES[0].id, onSelectionEnd });
+      frameAfter(6000); frameAfter(1300);
+      assert.equal(timers.size, 1);
+      await render({ root: poseRig, previewPacks: false, selectionPose: SELECTION_POSES[1].id, onSelectionEnd });
+      assert.equal(timers.size, 0, 'replacing a held request cancels its wake');
+      setTimer.mock.restore(); clearTimer.mock.restore(); clock.mock.restore();
     }
   } finally {
     if (renderer) await act(async () => renderer.unmount()); await vite?.close(); dom.window.close();

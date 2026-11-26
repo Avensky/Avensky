@@ -92,7 +92,8 @@ impl Profile {
 
     pub fn player_view(&self, slots_enabled: bool) -> serde_json::Value {
         let mut view = serde_json::json!({
-            "id": self.id, "name": self.display_name(), "progression": self.progression.view()
+            "id": self.id, "name": self.display_name(), "account_display_name": self.name,
+            "progression": self.progression.view()
         });
         if slots_enabled {
             let characters: Vec<_> = self.characters.iter().map(|(id, slot)| {

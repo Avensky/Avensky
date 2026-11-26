@@ -6,6 +6,8 @@ const globe = "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0c-5 4-5 14 0 18 5-4 5-14 
 const paths = {
   add: "M12 4v16M4 12h16",
   back: "m11 5-7 7 7 7m-7-7h16",
+  chevron: "m9 5 7 7-7 7",
+  edit: "m4 16-1 5 5-1L20 8l-4-4ZM13 7l4 4",
   play,
   resume: play,
   open_world: globe,

@@ -1,0 +1,72 @@
+.garage-profile-panel {
+  --menu-panel-fill: var(--garage-menu-panel);
+  --profile-gutter: clamp(10px, 1.25vw, 21px);
+  display: grid;
+  gap: clamp(3px, .6vh, 7px);
+  min-width: 0;
+  padding: var(--profile-gutter);
+  color: var(--garage-menu-ink);
+}
+.garage-profile-panel::before { background: var(--garage-menu-line); }
+.garage-profile-heading { display: flex; align-items: center; gap: .5rem; margin-bottom: .2rem; }
+.garage-profile-heading h2 {
+  margin: 0; color: inherit; font: inherit; font-size: clamp(1.2rem, 2.25vw, 2rem);
+  line-height: 1.1; font-weight: 750;
+}
+.garage-profile-back {
+  display: grid; place-items: center; min-width: 44px; min-height: 44px;
+  border: 1px solid transparent; border-radius: 3px; color: var(--garage-menu-ink); background: transparent;
+}
+.garage-profile-back svg { width: 1.25rem; height: 1.25rem; transform: rotate(180deg); }
+.garage-profile-setting { min-width: 0; }
+.garage-profile-row.menu-control {
+  --menu-panel-fill: var(--garage-menu-row);
+  --menu-panel-edge: var(--garage-menu-line);
+  --menu-panel-cut: 5px;
+  display: grid; grid-template-columns: 1.3em minmax(0, 1fr) 1em;
+  align-items: center; gap: clamp(.55rem, 1vw, .9rem); width: 100%;
+  min-height: clamp(44px, 6.6vh, 67px); padding: .45rem var(--profile-gutter);
+  color: var(--garage-menu-ink); text-transform: none; font-size: clamp(.92rem, 1.35vw, 1.18rem); line-height: 1.13;
+}
+.garage-profile-row > .menu-icon, .garage-profile-trailing .menu-icon { width: 100%; height: 1.25em; }
+.garage-profile-trailing { display: grid; place-items: center; }
+.garage-profile-row[aria-expanded="true"] .garage-profile-trailing { transform: rotate(90deg); }
+.garage-profile-label { display: grid; gap: .12rem; min-width: 0; }
+.garage-profile-label strong, .garage-profile-label small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.garage-profile-label strong { font-weight: 700; }
+.garage-profile-label small { color: var(--garage-menu-muted); font-size: .84em; font-weight: 450; }
+.garage-profile-row.menu-control:is(:focus,[aria-expanded="true"]) {
+  --menu-panel-edge: var(--garage-menu-accent);
+  --menu-panel-fill: color-mix(in srgb, var(--garage-menu-row) 82%, var(--garage-menu-accent));
+  color: var(--garage-menu-ink);
+}
+.garage-profile-row[aria-disabled="true"] { opacity: .65; }
+.garage-profile-setting[data-setting="delete"] {
+  margin-top: clamp(.3rem, 1.5vh, 1.1rem); padding-top: clamp(.3rem, 1.5vh, 1.1rem); border-top: 1px solid var(--garage-menu-line);
+}
+.garage-profile-setting[data-setting="delete"] .garage-profile-row { color: var(--app-danger, #df968c); }
+.garage-profile-editor { padding: .2rem var(--profile-gutter) .55rem; background: var(--garage-menu-row); }
+.garage-profile-editor[hidden] { display: none; }
+.garage-profile-editor p, .garage-profile-panel .alpha-account-response, .garage-profile-service {
+  margin: .35rem 0; font-size: .9rem; line-height: 1.35;
+}
+.garage-profile-editor .account-action-form, .garage-profile-editor label, .garage-profile-panel .account-invite-result {
+  display: grid; gap: .35rem; min-width: 0;
+}
+.garage-profile-editor .account-action-form { padding-top: .45rem; gap: .55rem; }
+.garage-profile-editor label, .garage-profile-panel .account-invite-result { color: var(--garage-menu-muted); font-size: .85rem; }
+.garage-profile-panel input {
+  box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: .45rem .6rem; border-radius: 3px;
+  border: 1px solid var(--garage-menu-line); background: var(--app-background); color: var(--app-text);
+  font: inherit; font-size: max(16px, 1rem); user-select: text;
+}
+.garage-profile-panel .account-submit { color: var(--garage-menu-ink); background: var(--garage-menu-row); }
+.garage-profile-panel :is(input, [role="button"]):focus-visible {
+  outline: 2px solid var(--garage-menu-accent); outline-offset: -2px;
+}
+.garage-profile-panel .garage-profile-row:focus-visible { outline: none; }
+.garage-profile-panel [role="alert"] { color: var(--app-danger, #df968c); }
+@media (max-height: 480px) and (orientation: landscape) {
+  .garage-profile-panel { gap: 2px; padding-block: 5px; }
+  .garage-profile-setting[data-setting="delete"] { margin-top: 2px; padding-top: 4px; }
+}

@@ -10,6 +10,60 @@
 }
 .welcome-screen.garage-entry { display:flex; flex-direction:column; }
 .welcome-screen .garage-entry-body { min-height:100%; }
+/* The compact inner tab and the outer title follow the same slant as the
+   brand in the opposite direction. Painted height and hit height are independent. */
+.welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
+.garage-entry-actions {
+  grid-column: -2 / -1; justify-self: end; display: flex; align-items: flex-start;
+  pointer-events: none;
+}
+.garage-entry-actions .garage-entry-action {
+  box-sizing: border-box; position: relative; isolation: isolate;
+  display: grid; justify-items: center; align-items: start;
+  width: var(--action-width); height: max(44px,var(--action-face-height));
+  margin: 0; border: 0; border-radius: 0;
+  padding: calc((var(--action-face-height) - var(--action-icon-size)) / 2) var(--action-safe-end,0px) 0 var(--angled-tab-cut);
+  color: var(--app-text); background: transparent;
+  cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+}
+.garage-entry-action--logout {
+  --action-width: 44px;
+  --action-icon-size: 17px;
+  --action-face-height: var(--angled-tabs-height);
+  --action-end: calc(2px - var(--angled-tab-cut));
+  --action-shape: polygon(0 0,calc(100% - var(--angled-tab-cut)) 0,100% 100%,var(--angled-tab-cut) 100%);
+}
+.garage-entry-action--profile {
+  --action-safe-end: env(safe-area-inset-right,0px);
+  --action-width: calc(clamp(64px,6.5vw,88px) + var(--action-safe-end));
+  --action-icon-size: clamp(21px,1.9vw,26px);
+  --action-face-height: var(--angled-header-height);
+  --action-shape: var(--angled-title-shape);
+  --action-transform: scaleX(-1);
+  /* Between the diagonals, Log out owns its visible tip. Both controls have
+     a full-height touch target below the shorter paint on compact screens. */
+  clip-path: polygon(0 0,100% 0,100% 100%,var(--angled-title-cut) 100%,var(--angled-title-cut) var(--angled-header-height),var(--angled-tab-cut) var(--angled-tabs-height));
+}
+.garage-entry-action::before, .garage-entry-action::after {
+  content: ""; position: absolute; inset: 0 var(--action-end,0px) auto 0; z-index: -1;
+  height: var(--action-face-height); clip-path: var(--action-shape); transform: var(--action-transform,none);
+}
+.garage-entry-action::before { background: var(--app-accent); }
+.garage-entry-action::after {
+  inset: 1px calc(1px + var(--action-end,0px)) auto 1px; height: calc(var(--action-face-height) - 2px);
+  background: var(--angled-title-fill);
+}
+.garage-entry-action .menu-icon { width: var(--action-icon-size); height: var(--action-icon-size); }
+.garage-entry-action[aria-pressed="true"]::after,
+.garage-entry-action:focus-visible::after { background: var(--app-raised); }
+.garage-entry-action[aria-pressed="true"] .menu-icon { color: var(--app-accent); }
+.garage-entry-action:focus-visible { outline: 0; }
+.garage-entry-action:focus-visible .menu-icon { outline: 2px solid var(--app-accent); outline-offset: 2px; }
+@media (forced-colors: active) {
+  .garage-entry-action::before { background: ButtonText; }
+  .garage-entry-action::after { background: ButtonFace; }
+  .garage-entry-action:focus-visible .menu-icon { outline-color: Highlight; }
+}
 .welcome-scroll {
   position: relative;
   z-index: 1;
@@ -208,6 +262,22 @@
 }
 .welcome-connection-actions [role="button"]:focus-visible { outline: 2px solid var(--garage-menu-accent); outline-offset: -2px; }
 
-.welcome-layout[data-step="account"] { grid-template-columns: 1fr; }
-.welcome-layout[data-step="account"] .welcome-panel { display: grid; gap: .6rem; width: min(100%, 36rem); }
-.welcome-panel .alpha-account-panel { position: static; width: 100%; overflow: visible; }
+.welcome-layout[data-step="account"] {
+  --profile-top: calc(env(safe-area-inset-top, 0px) + max(44px, var(--menu-angled-header-height)) + 8px);
+  display: flex; flex-direction: column; align-items: flex-end; justify-content: center;
+  height: 100%; min-height: 0;
+  padding: var(--profile-top) max(2.4vw, env(safe-area-inset-right, 0px)) max(12px, env(safe-area-inset-bottom, 0px)) max(12px, env(safe-area-inset-left, 0px));
+}
+.welcome-profile {
+  position: relative; flex: 0 1 auto; min-width: 0; min-height: 0; max-height: 100%;
+  width: clamp(280px, 42%, 39rem); overflow-y: auto; overscroll-behavior: contain;
+  scrollbar-width: thin; color: var(--garage-menu-ink);
+}
+@media (orientation: portrait) {
+  .welcome-layout[data-step="account"] {
+    align-items: stretch; justify-content: flex-end;
+    padding-inline: max(3.5vw, env(safe-area-inset-left, 0px)) max(3.5vw, env(safe-area-inset-right, 0px));
+  }
+  .welcome-profile { width: 100%; max-height: max(54%, 18rem); }
+  .welcome-profile:focus-within:has(input:focus) { max-height: 90%; }
+}

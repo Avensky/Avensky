@@ -1,4 +1,4 @@
-import { HANDS_BEHIND_BACK as behind } from "./selectionPoses";
+import { HANDS_BEHIND_BACK as behind, SELECTION_EMOTES } from "./selectionPoses";
 import { fittedArmTarget, fittedElbowPole, fittedHandTarget, skirtArmTarget, skirtHandTarget } from "./animationFit";
 import {
   AnimationClip, Bone, BooleanKeyframeTrack, Euler, NumberKeyframeTrack, Quaternion, QuaternionKeyframeTrack, Vector3, VectorKeyframeTrack,
@@ -85,7 +85,7 @@ export const EMOTE_GROUPS = [
   "After Hours", "Showroom", "Elegant", "Performer", "Stoic", "Explorer", "Tech", "Workshop", "Starter", "Starter Comedy", "Race Reactions",
 ] as const;
 export type EmoteGroup = typeof EMOTE_GROUPS[number];
-export const AUTOMATIC_GARAGE_EMOTE_IDS = ["035", "002", "005", "009", "010"];
+export const AUTOMATIC_GARAGE_EMOTE_IDS = ["035", "002", "005", "009", "010", ...SELECTION_EMOTES.map(emote => emote.id)];
 const BEST_EMOTE_IDS = ["035", "090", "072", "051", "018", "094", "095", "100"];
 const GARAGE_PICK_IDS = ["005", "010", "002", "003", "009", "035", "090", "092", "093"];
 
@@ -606,8 +606,8 @@ export function emoteCollection(group: EmoteGroup, bag: boolean, includeWalks = 
   if (group === "Starter") return availableStarterEmotes(bag);
   if (group === "Starter Comedy") return STARTER_COMEDY_EMOTES;
   if (group === "Race Reactions") return availableRaceReactions(bag);
-  if (bag) return [garageBreathing(true), ...GARAGE_EMOTES.slice(1).filter(item => compatibleGarageEmotes(item.id)), ...BAG_EMOTES];
-  return includeWalks ? [...GARAGE_EMOTES, LOOK_AWAY_EMOTE, ...WALK_EMOTES] : GARAGE_EMOTES;
+  if (bag) return [garageBreathing(true), ...GARAGE_EMOTES.slice(1).filter(item => compatibleGarageEmotes(item.id)), ...BAG_EMOTES, ...SELECTION_EMOTES];
+  return [...GARAGE_EMOTES, ...SELECTION_EMOTES, ...(includeWalks ? [LOOK_AWAY_EMOTE, ...WALK_EMOTES] : [])];
 }
 
 export function garagePreviewCollection(group: EmoteGroup | "Best", bag: boolean): readonly Emote[] {
@@ -630,5 +630,5 @@ export function findGaragePreviewEmote(id: string, bag: boolean): Emote | undefi
 export function buildGarageEmotes(root: Object3D, bag = false, previewPacks = false) {
   if (previewPacks) return buildEmoteClips(root, EMOTE_GROUPS.flatMap(group => emoteCollection(group, bag)));
   const idle = GARAGE_EMOTES.filter(({ id }) => id !== "001" && (id === "010" || AUTOMATIC_GARAGE_EMOTE_IDS.includes(id)));
-  return buildEmoteClips(root, [garageBreathing(bag), ...idle, QUIET_THANK_YOU, ...(bag ? BAG_EMOTES : [])]);
+  return buildEmoteClips(root, [garageBreathing(bag), ...idle, QUIET_THANK_YOU, ...(bag ? BAG_EMOTES : SELECTION_EMOTES)]);
 }

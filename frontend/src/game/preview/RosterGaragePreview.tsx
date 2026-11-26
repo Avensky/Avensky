@@ -1,23 +1,35 @@
 import { lazy, Suspense, useLayoutEffect, useMemo, useRef } from "react";
-import { useThree } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Box3, Group, Mesh, Raycaster, Vector2, Vector3, type Intersection } from "three";
 import type { CharacterChoice } from "../characters/characterCatalog";
-import type { SelectionPoseId } from "../characters/selectionPoses";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
-import { getGarageMotion, setGaragePreview, type GarageEntryShot } from "./LiveGarage";
+import { getGarageMotion, setGaragePreview } from "./LiveGarage";
 import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { bindRosterSticks } from "./rosterStickControls";
-import { ROSTER_HEADING, rosterCamera } from "./rosterCamera";
+import { ROSTER_HEADING, rosterCamera, type CharacterGarageShot, type CharacterGarageView } from "./rosterCamera";
 
 const GarageDriver = lazy(() => import("../characters/GarageDriver").then(module => ({ default: module.GarageDriver })));
-type Selection = { choice: CharacterChoice; pose?: SelectionPoseId };
+type Selection = { choice: CharacterChoice; mode?: CharacterGarageView };
 
-function RosterActor({ choice, pose, shot }: Selection & { shot: GarageEntryShot }) {
+function RosterActor({ choice, mode, shot }: Selection & { shot: CharacterGarageShot }) {
   const pivot = useRef<Group>(null);
+  const portraitRig = useRef<{ shot: CharacterGarageShot; id: string } | null>(null);
   const gl = useThree(s => s.gl);
   const camera = useThree(s => s.camera);
   const invalidate = useThree(s => s.invalidate);
+  useFrame(() => {
+    if (mode !== "profile" || !pivot.current) return;
+    if (portraitRig.current?.shot === shot && portraitRig.current.id === choice.id) return;
+    // The starter rigs have different proportions. Measure once on the dressed
+    // actor after loading, before the shared camera applies its view for this frame.
+    const head = pivot.current.getObjectByName("head");
+    const waist = pivot.current.getObjectByName("spine_03");
+    if (!head || !waist) return;
+    const position = new Vector3();
+    shot.fitPortrait(head.getWorldPosition(position).y + .065, waist.getWorldPosition(position).y + .03);
+    portraitRig.current = { shot, id: choice.id };
+  }, -1.25);
   useLayoutEffect(() => {
     const turn = (radians: number) => {
       if (!radians || !pivot.current) return;
@@ -49,20 +61,22 @@ function RosterActor({ choice, pose, shot }: Selection & { shot: GarageEntryShot
   return <group name="roster-character-pivot" ref={pivot} rotation-y={ROSTER_HEADING}>
     <PreviewContactShadow footprint={[.52, .46]} />
     <AssetBoundary fallback={null}>
-      <Suspense fallback={null}><GarageDriver choice={choice} upright selectionPose={pose} /></Suspense>
+      <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview paused={mode !== "roster"} /></Suspense>
     </AssetBoundary>
   </group>;
 }
 
 /** Install just the selected actor in the already-mounted room; row thumbnails have no scene. */
-export function RosterGaragePreview({ choice, pose = "pose-pocket-stance", creating = false }: Selection & { creating?: boolean }) {
-  const shot = useMemo(() => rosterCamera(creating), [creating]);
+export function RosterGaragePreview({ choice, mode = "roster" }: Selection) {
+  const shot = useMemo(() => rosterCamera(mode), [mode]);
   useLayoutEffect(() => {
-    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} pose={pose} /> });
-  }, [choice, pose, shot]);
+    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} /> });
+  }, [choice, mode, shot]);
+  // Reframe the same actor when switching panels. Release the scene only on leaving this preview.
+  useLayoutEffect(() => () => setGaragePreview(null), []);
   useLayoutEffect(() => {
     const motion = getGarageMotion();
-    const unbind = bindRosterSticks((x, y, turn, elapsed) => {
+    return bindRosterSticks((x, y, turn, elapsed) => {
       const yaw = -x * MAX_YAW, pitch = y * MAX_PITCH;
       if (yaw !== (motion.stickYaw ?? 0) || pitch !== (motion.stickPitch ?? 0)) {
         if (!motion.stickYaw && !motion.stickPitch || !yaw && !pitch) motion.lastInput = performance.now();
@@ -72,10 +86,6 @@ export function RosterGaragePreview({ choice, pose = "pose-pocket-stance", creat
       }
       if (turn) shot.actor?.turn(turn * elapsed * 2.6);
     });
-    return () => {
-      unbind();
-      setGaragePreview(null);
-    };
   }, [shot]);
   return null;
 }

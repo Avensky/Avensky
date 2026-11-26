@@ -1,3 +1,4 @@
+import { SELECTION_EMOTES } from "./selectionPoses";
 import { CHARACTER_PERSONALITIES } from "./characterPersonality";
 import { EMOTE_GROUPS, emoteCollection } from "./garageEmotes";
 
@@ -21,6 +22,7 @@ function tag(ids: readonly string[], words: string) {
 
 for (const [action, ids] of Object.entries(actionIds)) tag(ids, action.toLowerCase());
 for (const personality of CHARACTER_PERSONALITIES) tag(personality.emotes, personality.label.toLowerCase());
+tag(SELECTION_EMOTES.map(motion => motion.id), "rest pose stance");
 tag(["010", "033", "058"], "hello hi greeting");
 tag(["035"], "thanks thank gratitude");
 tag(["040", "120"], "bye goodbye farewell");
