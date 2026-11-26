@@ -143,11 +143,17 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(login.action,"account_login");
     await act(async()=>{
       reply(login,{profile_id:"registered-player",name:"Track Fox II",token,account:true});
-      client.receiveSocialState({...view,profile:{...saved,characters:[
+      const hub = {
+        id:7, name:"Shared world", map:"road_precision", owner_id:null, listed:true, locked:false,
+        walkable:true, active:true, players:0, max_players:6, invite_code:null, members:[],
+      };
+      client.receiveSocialState({...view, main_world_id:hub.id, worlds:[hub], profile:{...saved,characters:[
         {...saved.characters[0],id:"second",name:"Nova"},
         saved.characters[0],
       ]}});
     });
+    const { currentOpenWorld } = await vite.ssrLoadModule("/src/game/social/openWorld.ts");
+    assert.equal(currentOpenWorld(social.getState().view)?.id, 7);
     assert.equal(document.querySelector('[name="characterName"]'),null);
     assert.match(document.querySelector('[data-character-id][aria-pressed=true]').textContent,/Track Fox/);
     assert.equal(document.querySelector("h1"), null, "saved character selection has no redundant heading");
@@ -187,7 +193,8 @@ test("welcome picks a personality and gender before registration and lets return
     assert.equal(select.character_id,"registered-player");
     assert.equal(ui.getState().screen,"welcome");
     await act(async()=>reply(select,{profile:saved}));
-    assert.equal(ui.getState().screen,"main");
+    assert.equal(ui.getState().screen,"main","confirming a character opens the menu even with a shared world available");
+    assert.equal(sent.some(request=>request.action==="world_join"),false);
     assert.deepEqual(selectEquippedCharacter(social.getState()),fox);
     const previouslySent = sent.length;
     await act(async () => {

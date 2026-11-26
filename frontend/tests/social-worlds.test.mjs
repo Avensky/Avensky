@@ -454,27 +454,6 @@ test("social requests, world transitions and assisted text have independent owne
       assert.deepEqual(calls,["world_join"]);
       assert.equal(ui.getState().screen, "hero_select");
       assert.equal(alpha.getState().mode, "sandbox", "a late lobby update cannot carry the previous match into the hub");
-
-      const { enterSelectedWorld } = await load("game/welcome/enterSelectedWorld.ts");
-      await render(null);
-      globalThis.fetch = async () => new Response(catalog);
-      try {
-        ui.setState({screen:"welcome"});
-        await act(async () => enterSelectedWorld());
-        assert.deepEqual(calls, ["world_join", "world_join"]);
-        assert.equal(ui.getState().screen, "hero_select");
-
-        social.setState(state => ({view:{...state.view, current_world_id:world.id}}));
-        ui.setState({screen:"welcome"});
-        await act(async () => enterSelectedWorld());
-        assert.equal(calls.length, 2, "an existing seat is reused");
-        assert.equal(ui.getState().screen, "hero_select");
-
-        social.setState(state => ({view:{...state.view, worlds:[], current_world_id:null}}));
-        ui.setState({screen:"welcome"});
-        await act(async () => enterSelectedWorld());
-        assert.equal(ui.getState().screen, "main", "a server without a hub still opens the game");
-      } finally { globalThis.fetch = originalFetch; }
     });
     await t.test(
       "switching locked world targets clears the previous password before sending a join",
