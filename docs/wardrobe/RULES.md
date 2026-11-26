@@ -159,7 +159,7 @@ Fit evidence may upgrade a `needs-fitting` relation to `allowed` only when the t
 
 **Visibility is not inferred from the layer graph.** Without a matching reviewed pose/geometry coverage report, each region stays `unverified`. The resolver supplies only candidate intent (such as `expose-opening` for the front of an open coat, or `may-cover` when closed). A visibility report must match the complete normalized outfit signature including every layer mode/revision, pose, body, tier, and garment revision to avoid reusing a stale hidden-surface mask. Actual pose-aware triangle masking remains W-13.
 
-Derived underlayers may be marked `remove-derived-only` when their parent disappears. Explicitly selected underlayers are never deleted; they may become `inactive` pending an eligible parent. Multiple valid potential parents count; the decision is a **suggested lifecycle action**, not a mutation. Only W-06 or a later reviewed integration may apply dependency actions after W-05 compatibility and legacy-save migration tests.
+Derived underlayers may be marked `remove-derived-only` when their parent disappears. Explicitly selected underlayers are never deleted; they may become `inactive` pending an eligible parent. Multiple valid potential parents count; the decision is a **suggested lifecycle action**, not a mutation. Only a later reviewed **runtime integration** may apply dependency actions after W-05 migration and W-07 geometry tests. The W-06 read-only inspector NEVER applies them.
 
 Run `npm run wardrobe:layers:check` (Node 24, no source GLBs required). Tests cover order inversion, blocked modes, 3-layer outfits, evidence freshness, orphaned layers, immutable saves, and deterministic output. See [TESTING.md](TESTING.md) for artifact/pose verification still needed.
 
@@ -191,3 +191,15 @@ Mode choice names/values come from [layer-rules.json](../../packages/wardrobe-ca
 - **Rendering:** W-05 does not connect the new resolver to current `wardrobeGarments.ts`, `clothingPieces.ts`, `SavedOutfits.tsx` or the garage. That requires W-06 and fit evidence. Future coat support must still wait for a non-retired catalog asset and correct rig/LOD testing.
 
 Code: [migration adapter](../../packages/wardrobe-catalog/migrate-legacy-wardrobe.mjs), [save schema](../../packages/wardrobe-catalog/wardrobe-layers-save.schema.json), [shared sample](../../frontend/tests/fixtures/wardrobe-layer-save-v1.json). Test steps belong in [TESTING.md](TESTING.md); this is the sole normative save contract.
+
+## 9. W-06 read-only layer inspector contract
+
+The existing `DressingRoom.tsx` Layers category MAY display the [pure projection](../../packages/wardrobe-catalog/wardrobe-layer-preview.mjs) behind an explicit **Inspect outfit stack** toggle, with the [React panel](../../frontend/src/game/characters/WardrobeLayerInspector.tsx). The panel MUST mount only when opened; opening, closing and browsing MUST NOT call `onChange`, `onTryOn`, networking, storage, camera setters, or mesh setters. The player's original `CharacterChoice` and colors are the source of truth, even when the new versioned metadata is invalid.
+
+The panel MUST distinguish these cases: a **saved selection** is persistent source data; a **suspended selection** is held by the W-05 legacy compatibility projection, not deleted; a **candidate selection** is merely eligible for W-04 relationship checks; **retired/unmapped** selections remain listed but cannot become layer-graph approvals. It MUST label region ordering, coat opening/coverage and compatibility warnings as **proposed**, and MUST NOT equate a no-conflict/single-item graph with verified physical fit or actual rendered visibility. It MUST disclose that bundled base-outfit pieces are not yet decomposed and that neither a mesh review nor a player phone audit was performed.
+
+A proposed garment mode may be displayed if already present in an explicit saved `wardrobeLayers` sidecar; reading legacy `shirt` values or inferring `body-fit` is forbidden. Invalid metadata MUST fall back to an error state while retaining visible raw legacy IDs. No automatic conversion/persist occurs on page load.
+
+The W-06 Outerwear section is currently inspection-only. `coat-01` remains **retired** in the installed catalog, and newly discovered coats MUST NOT gain equip/remove/clear actions until the W-07 per-item mesh and pose QA produces explicit acceptance. Browsing Outerwear MUST preserve the user's current camera. No changes to the old `wardrobeGarments.ts` saved-slot replacement behavior or Rust equippability are authorized by this panel.
+
+**Deferred** (needs separate review): interactive layer-mode controls, backing a draft mode with save/rollback, renderer swapping/occlusion, actual coat fit, mobile screenshot/landscape interaction verification and W-07/13 geometry evidence. See [TESTING.md](TESTING.md#w-06-layer-inspector-acceptance); avoid duplicating this rule in component README files.

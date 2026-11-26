@@ -84,6 +84,16 @@
 - Corrected the GitHub Actions browser job to use `working-directory: frontend` and updated the documented verification command. Rust and pure Node save contract tests passed separately.
 - Browser rerun **passed 1/1, with 0 failed and 0 skipped**, running from `frontend`. Node and Rust jobs in the same [run](https://github.com/Avensky/Avensky/actions/runs/45757119689) also passed. The Vite warning about multiple Three.js instances did not fail this test; it is not evidence of wardrobe rendering correctness.
 
+## 2026-11-25 — W-06 inspection-only layering UI (stacked review)
+
+- **Baseline:** W-05 review branch `feat/wardrobe-legacy-save-w05` at `124600c`. W-03/04/05 are still separate draft PRs targeting predecessor branches, not merged to `main`.
+- **Confirmed:** `DressingRoom.tsx` already has Layers and a horizontal, mobile-friendly left catalog rail. `coat-01` is currently **retired** in the catalog, so there is no approved coat to equip. Opening Layers presently focuses Full body; the new inspector toggle itself must not change the shot.
+- **Decision:** Use a pure read-only projection of the W-05 save format and W-04 region graph, rather than changing `setWardrobeGarment`, `characterLook`, saved storage, or the character scene. Any unknown source/class remains in the saved-selection list. Explicit retired and old suspended entries are not silently discarded.
+- **Changed files:** `wardrobe-layer-preview.mjs` and type declarations, `WardrobeLayerInspector.tsx` and landscape CSS, a Layers toggle and inspection-only Outerwear category, pure preview tests and real Vite/JSDOM fitting-room tests, CI workflow, and canonical docs. [Draft PR #97](https://github.com/Avensky/Avensky/pull/97).
+- **Verification at first commit:** new CI checks pending. Exact Node, TypeScript, lint and real UI pass/fail/skip results to be added after the workflow run. No screenshots, physical devices, GLB fit or FPS measurements have been claimed.
+- **Known limitations:** base outfits remain legacy bundles (not individually classified); the W-04 planner has no authenticated fit report in this UI; a proposed `body-fit: over-top` does NOT make today's renderer draw that top/corset combination. W-07 must provide reviewed coat asset evidence before any equip action.
+- **Next:** Review W-06 no-mutation and mobile layout tests, then W-07 actual coat fitting and W-06 phase 2 explicit mode editor with staging and rollback tests. Do not merge to main or deploy automatically.
+
 ## Explicitly unresolved
 
 1. Precise rig/body measurements and unit-scale verification from full installed GLBs.

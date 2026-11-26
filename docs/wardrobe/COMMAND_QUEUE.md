@@ -11,7 +11,7 @@
 - **W-03 — Shared layer schema (implemented on review branch).** Versioned `layer-rules.json`, JSON Schema, pure semantic validator, 9 passing Node24 contract tests and CI gate. **Not merged or integrated with runtime**; treat class relationships as unapproved fitting candidates. [Draft PR #90](https://github.com/Avensky/Avensky/pull/90).
 - **W-04 — Pure deterministic resolver (implemented, awaiting review).** [Draft PR #92](https://github.com/Avensky/Avensky/pull/92) adds deterministic region DAGs, modes, conflict/fit evidence and dependent/visibility outputs. [CI](https://github.com/Avensky/Avensky/actions/runs/45743026433) passed **26 tests, 0 failed, 0 skipped**. **Unmerged; do not connect live selection before W-05.**
 - **W-05 — Implemented and CI-verified; awaiting review.** [Draft PR #94](https://github.com/Avensky/Avensky/pull/94) adds optional reversible `wardrobeLayers` v1 sidecar, shared old/layered fixture, strict Rust validation, real browser-storage round trips. [CI run](https://github.com/Avensky/Avensky/actions/runs/45757119689): Node **7/7**, Rust **3/3**, browser **1/1**, all passing. Does **not** change live rendering, equip behavior, or stored legacy records without explicit opt-in.
-- **W-06 — NEXT after W-05 review: Fitting-room layer UI.** Present actual resolved layers and conflicts, Outerwear section, coat modes and local user decisions without camera resets or updating saved outfits during browsing.
+- **W-06 — Phase 1 implemented, awaiting review.** [Draft PR #97](https://github.com/Avensky/Avensky/pull/97) adds an opt-in read-only stack inspector in Layers, grouped compatibility diagnostics, and an inspection-only Outerwear section (retired `coat-01` cannot be equipped). CI to verify camera/save stability and mobile-safe styles. Phase 2: explicit mode controls and staging verification **after W-07 fit evidence**; no automatic equip/save behavior.
 
 ## Garment compatibility / geometry
 
@@ -33,9 +33,9 @@
 - **W-19 — Precompute/LOD/performance.** Bake repeatable garage/mobile fits and cheaper distant NPC tiers; benchmark cold/warm preparation and phone cost; reuse caching only when its input/output contract matches.
 - **W-20 — CI/staging/release gates.** Validate schema, pure resolver, historic saves, pose/fit/material tests, staged asset availability and rollback; deploy staging only when authorized; live manual and distribution rights-gated.
 
-## Next integration milestone: W-06 and W-07
+## Next integration milestone: W-07 coat fitting, then W-06 editable controls
 
-After the stacked W-03/W-04/W-05 changes pass review, connect the saved sidecar and resolver to the fitting-room preview behind an explicit opt-in. Add in-app outfit persistence and old-save recovery tests. Do not replace legacy garment deletion logic globally until W-06 identifies and tests each old removal/corset exception. Validate top + corset + coat against a non-retired source asset in W-07 before claiming in-game layering.
+The W-06 read-only inspector is now implemented on a review branch without changing live selections. First review its no-save/no-camera regressions and mobile layout. W-07 must obtain a non-retired, legal, rig-compatible coat candidate and check `top + corset + coat`, `gown + coat`, sleeve cuffs, collision/pose frames and open/closed coverage. Only then design W-06 phase 2 mode controls, versioned save actions and rollback. Do not replace old wardrobe deletion/equip logic until all legacy cases pass.
 
 ## Done means evidence, not words
 
