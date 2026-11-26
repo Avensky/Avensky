@@ -19,6 +19,10 @@ and profile persistence live in their respective frontend and server paths.
 
 The versioned [layer-rules.json](layer-rules.json) and [JSON Schema](layer-rules.schema.json) specify garment classes, per-region ordering, mutually exclusive fit modes, protected features, and optional item overrides. This contract is **not yet integrated with runtime outfit selection** and does not approve any particular GLB pairing. Use `npm run wardrobe:layers:check` from repository root (no installed GLBs required) to run the [semantic validator](validate-layer-rules.mjs) and independent tests. See [canonical layer rules](../../docs/wardrobe/RULES.md); avoid duplicating the specification here.
 
+## Standalone W-04 resolver (review-only)
+
+The pure [layer resolver](resolve-wardrobe-layers.mjs) accepts normalized equipped IDs/classes, explicit fit modes, and independently reviewed asset/visibility evidence. It produces per-body-region ordering, deterministic conflict codes, candidate visibility intents, dependency dispositions, and non-mutated saved selections. It **does not** alter the game renderer or certify geometry. No class-level rule is automatically approved. Run `npm run wardrobe:layers:check` for both schema and resolver tests. For usage and evidence-matching requirements, see [canonical resolver contract](../../docs/wardrobe/RULES.md#7-w-04-resolver-behavior-and-evidence-contract).
+
 ## Edit the catalog
 
 Keep IDs stable across relabeling, refits, and Garage or Mobile revisions.

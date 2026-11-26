@@ -148,3 +148,17 @@ Algorithm: validate schema and IDs; expand garment regions; merge class defaults
 Suggested reason codes: `UNKNOWN_RELATION`, `PAIR_FIT_UNVERIFIED`, `INCOMPATIBLE_CLASS`, `MODE_CONFLICT`, `ORDER_CYCLE`, `MISSING_ASSET`, `RIG_MISMATCH`, `FIT_FAILED`, `RELEASE_NOT_CLEARED`.
 
 **A resolved graph is not proof of physical fit.** Fit acceptance additionally requires [TESTING.md](TESTING.md).
+
+## 7. W-04 resolver behavior and evidence contract
+
+The pure `packages/wardrobe-catalog/resolve-wardrobe-layers.mjs` exports `resolveWardrobeLayers(input, validatedRules)`, `classifyWardrobeCatalogItem(record)`, and `outfitSignature(equipped)`. It does **not** read files, touch GLBs, mutate profile choices, or replace the active `wardrobeGarments.ts` logic. The caller supplies a normalized `equipped` array (stable IDs, class IDs, origin explicit/derived, optional mode choices and source revisions), optional reviewed evidence, the target body-profile ID, pose ID and geometry tier. Legacy saved JSON must not be passed directly until W-05 has a versioned adapter.
+
+The result contains sorted equipped records, per-item `membership` with `active` (no unresolved region relationships), per-region DAG ordering and edges, pairwise `blocked` / `needs-fitting` / `allowed` statuses, stable explanatory issue codes, dependent-layer actions, visibility-evidence states and candidate occlusion hints. **Active is only a pair-layer graph readiness result; it does not imply standalone asset quality, approved gameplay, verified render visibility, mobile testing or redistribution rights.** Any unrecognized garment pairing remains `UNKNOWN_RELATION` / pending review. Conflicts cannot silently unequip garments.
+
+Fit evidence may upgrade a `needs-fitting` relation to `allowed` only when the two stable garment IDs, each source revision, all effective class/item modes, overlapping region, body-profile ID and geometry tier match exactly; the record must include an approved/reviewed fit report ID. The resolver cannot authenticate its caller: integration and publication must independently verify report provenance, actual geometry, and licensing. A blocked class pairing is never overridden by generic evidence; a specifically documented item override first makes it `needs-fitting`, after which item-specific fit evidence is still required.
+
+**Visibility is not inferred from the layer graph.** Without a matching reviewed pose/geometry coverage report, each region stays `unverified`. The resolver supplies only candidate intent (such as `expose-opening` for the front of an open coat, or `may-cover` when closed). A visibility report must match the complete normalized outfit signature including every layer mode/revision, pose, body, tier, and garment revision to avoid reusing a stale hidden-surface mask. Actual pose-aware triangle masking remains W-13.
+
+Derived underlayers may be marked `remove-derived-only` when their parent disappears. Explicitly selected underlayers are never deleted; they may become `inactive` pending an eligible parent. Multiple valid potential parents count; the decision is a **suggested lifecycle action**, not a mutation. Only W-05 may apply actions after compatibility and legacy save migration tests.
+
+Run `npm run wardrobe:layers:check` (Node 24, no source GLBs required). Tests cover order inversion, blocked modes, 3-layer outfits, evidence freshness, orphaned layers, immutable saves, and deterministic output. See [TESTING.md](TESTING.md) for artifact/pose verification still needed.

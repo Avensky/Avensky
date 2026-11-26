@@ -481,6 +481,8 @@
       "regions": [
         "torsoFront",
         "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
         "waistFront",
         "waistBack"
       ],
@@ -498,7 +500,11 @@
       "outer": "corset",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack"
       ],
       "when": {
         "corset": {
@@ -514,7 +520,11 @@
       "outer": "corset",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack"
       ],
       "when": {
         "corset": {
@@ -553,7 +563,8 @@
         "leftShoulder",
         "rightShoulder",
         "waistFront",
-        "waistBack"
+        "waistBack",
+        "hips"
       ],
       "outcome": "needs-fitting",
       "reason": "Coat must clear cups, lacing, shoulder straps and the combined inner shell."
@@ -563,6 +574,7 @@
       "inner": "dress",
       "outer": "coat",
       "regions": [
+        "neck",
         "torsoFront",
         "torsoBack",
         "leftShoulder",
@@ -573,6 +585,7 @@
         "rightForearm",
         "waistFront",
         "waistBack",
+        "hips",
         "leftThigh",
         "rightThigh"
       ],
@@ -617,7 +630,8 @@
       "outer": "skirt",
       "regions": [
         "waistFront",
-        "waistBack"
+        "waistBack",
+        "hips"
       ],
       "when": {
         "corset": {
@@ -633,7 +647,8 @@
       "outer": "corset",
       "regions": [
         "waistFront",
-        "waistBack"
+        "waistBack",
+        "hips"
       ],
       "when": {
         "corset": {
@@ -650,8 +665,11 @@
       "regions": [
         "torsoFront",
         "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
         "waistFront",
-        "waistBack"
+        "waistBack",
+        "hips"
       ],
       "when": {
         "corset": {
@@ -667,7 +685,12 @@
       "outer": "corset",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack",
+        "hips"
       ],
       "when": {
         "corset": {
@@ -683,7 +706,12 @@
       "outer": "corset",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "waistFront",
+        "waistBack",
+        "hips"
       ],
       "when": {
         "corset": {
@@ -698,6 +726,8 @@
       "inner": "pants",
       "outer": "dress",
       "regions": [
+        "waistFront",
+        "waistBack",
         "hips",
         "leftThigh",
         "rightThigh",
@@ -719,9 +749,15 @@
       "inner": "pants",
       "outer": "dress",
       "regions": [
+        "waistFront",
+        "waistBack",
         "hips",
         "leftThigh",
-        "rightThigh"
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
       ],
       "when": {
         "dress": {
@@ -736,7 +772,15 @@
       "inner": "pants",
       "outer": "dress",
       "regions": [
-        "hips"
+        "waistFront",
+        "waistBack",
+        "hips",
+        "leftThigh",
+        "rightThigh",
+        "leftKnee",
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
       ],
       "when": {
         "dress": {
@@ -758,7 +802,9 @@
         "leftUpperArm",
         "rightUpperArm",
         "leftForearm",
-        "rightForearm"
+        "rightForearm",
+        "waistFront",
+        "waistBack"
       ],
       "when": {
         "dress": {
@@ -774,7 +820,15 @@
       "outer": "dress",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack"
       ],
       "when": {
         "dress": {
@@ -790,7 +844,15 @@
       "outer": "dress",
       "regions": [
         "torsoFront",
-        "torsoBack"
+        "torsoBack",
+        "leftShoulder",
+        "rightShoulder",
+        "leftUpperArm",
+        "rightUpperArm",
+        "leftForearm",
+        "rightForearm",
+        "waistFront",
+        "waistBack"
       ],
       "when": {
         "dress": {
@@ -805,11 +867,15 @@
       "inner": "pants",
       "outer": "skirt",
       "regions": [
+        "waistFront",
+        "waistBack",
         "hips",
         "leftThigh",
         "rightThigh",
         "leftKnee",
-        "rightKnee"
+        "rightKnee",
+        "leftCalf",
+        "rightCalf"
       ],
       "outcome": "needs-fitting",
       "reason": "Pants under skirt require fit review; do not treat as approved by default."
@@ -1019,6 +1085,8 @@
       "inner": "shoe",
       "outer": "boot",
       "regions": [
+        "leftAnkle",
+        "rightAnkle",
         "leftFoot",
         "rightFoot"
       ],
@@ -1105,10 +1173,12 @@
       "inner": "armor",
       "outer": "coat",
       "regions": [
+        "leftShoulder",
+        "rightShoulder",
         "torsoFront",
         "torsoBack",
-        "leftShoulder",
-        "rightShoulder"
+        "waistFront",
+        "waistBack"
       ],
       "outcome": "blocked",
       "reason": "Rigid shoulder/chest armor needs a purpose-built compatible outerwear profile."
@@ -1171,6 +1241,22 @@
       "activation": "explicit",
       "onParentAbsent": "deactivate-preserve-selection",
       "reason": "A manually selected gown underlayer remains saved when its supported outer garment is removed."
+    },
+    {
+      "id": "petticoat-with-skirt",
+      "parent": "skirt",
+      "child": "petticoat",
+      "activation": "explicit",
+      "onParentAbsent": "deactivate-preserve-selection",
+      "reason": "Explicitly selected petticoat stays saved beneath a skirt when the skirt changes."
+    },
+    {
+      "id": "petticoat-follows-gown",
+      "parent": "dress",
+      "child": "petticoat",
+      "activation": "derived",
+      "onParentAbsent": "remove-derived-only",
+      "reason": "Bundled gown petticoat follows its parent without deleting separately selected items."
     }
   ]
 }

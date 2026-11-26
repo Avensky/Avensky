@@ -5,6 +5,8 @@ on:
       - "packages/wardrobe-catalog/layer-rules*"
       - "packages/wardrobe-catalog/validate-layer-rules.mjs"
       - "frontend/tests/wardrobe-layer-manifest.test.mjs"
+      - "frontend/tests/wardrobe-layer-resolver.test.mjs"
+      - "packages/wardrobe-catalog/resolve-wardrobe-layers.mjs"
       - "docs/wardrobe/**"
       - ".github/workflows/wardrobe-layer-rules.yml"
   workflow_dispatch:

@@ -46,6 +46,21 @@ test("blocked conflict cases remain blocked", () => {
     "armor-conflicts-coat", "shoe-vs-boot"]) assert.equal(byId(id).outcome, "blocked");
 });
 
+test("intended outfit relations cover every shared region for active fit modes", () => {
+  const candidates = [
+    "top-under-corset","corset-under-coat","dress-under-coat",
+    "corset-tucked-below-skirt","corset-over-skirt",
+    "dress-over-pants-tunic","top-under-pinafore","pants-under-skirt"
+  ];
+  for (const id of candidates) {
+    const rule = original.relationships.find(item => item.id === id);
+    assert(rule, "Missing " + id);
+    const expected = original.classes[rule.inner].regions.filter(region =>
+      original.classes[rule.outer].regions.includes(region));
+    assert.deepEqual(rule.regions, expected, id + " omits an overlap and cannot be fully approved");
+  }
+});
+
 test("missing or unknown fields, IDs, modes, regions and classes fail closed", () => {
   const a = copy(); a.extra = "undocumented"; assert(errors(a,"UNKNOWN_FIELD").length);
   const b = copy(); b.relationships[0].id = b.relationships[1].id; assert(errors(b,"DUPLICATE_ID").length);
