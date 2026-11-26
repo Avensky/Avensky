@@ -1,14 +1,16 @@
 import { useLayoutEffect, useRef } from "react";
 import { GameButton } from "../../components/GameButton";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { garageBrandContents } from "../../theme/garageEntry";
+import { garageBrandIdentity } from "../../theme/garageEntry";
 import { entryAssets } from "./config";
 
-const brand = { __html: garageBrandContents(entryAssets) };
+const { logo, name } = garageBrandIdentity(entryAssets);
+const brand = <><img src={logo} width={26} height={26} alt="" draggable={false} /><span>{name}</span></>;
 
 type AccountActions = {
   profileOpen: boolean;
   busy: boolean;
+  onBack: () => void;
   onProfile: () => void;
   onLogOut: () => void;
 };
@@ -70,12 +72,17 @@ export function GarageEntryHeader({ showBrand, account }: { showBrand: boolean; 
   const tabs = useRosterTabFade(Boolean(account));
   if (!showBrand && !account) return null;
   return <header className="garage-entry-header angled-tab-header">
-    {showBrand && <div className="garage-entry-brand" dangerouslySetInnerHTML={brand} />}
-    {account && <nav ref={tabs} className="garage-entry-actions" aria-label="Account actions" data-controller-row data-controller-header-action>
+    {showBrand && (account?.profileOpen
+      ? <GameButton variant="custom" className="garage-entry-brand garage-entry-brand-back"
+        aria-label="Back" title="Back" data-profile-back data-profile-header-tab data-controller-header-action
+        disabled={account.busy} onPress={account.onBack}><MenuIcon name="back" />{brand}</GameButton>
+      : <div className="garage-entry-brand">{brand}</div>)}
+    {account && <nav ref={tabs} className="garage-entry-actions" aria-label="Account actions" data-controller-row
+      data-controller-header-action data-controller-tab-only={account.profileOpen || undefined}>
       <GameButton variant="custom" className="garage-entry-action garage-entry-action--logout joined-header-action" aria-label="Log out" title="Log out"
-        onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>
+        data-profile-header-tab={account.profileOpen || undefined} onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>
       <GameButton variant="custom" className="garage-entry-action garage-entry-action--profile joined-header-action" aria-label="Profile" title="Profile"
-        aria-pressed={account.profileOpen} onPress={account.onProfile} disabled={account.busy}><MenuIcon name="profile" /></GameButton>
+        aria-pressed={account.profileOpen} data-profile-header-tab={account.profileOpen || undefined} onPress={account.onProfile} disabled={account.busy}><MenuIcon name="profile" /></GameButton>
     </nav>}
   </header>;
 }

@@ -8,16 +8,10 @@
   color: var(--garage-menu-ink);
 }
 .garage-profile-panel::before { background: var(--garage-menu-line); }
-.garage-profile-heading { display: flex; align-items: center; gap: .5rem; margin-bottom: .2rem; }
-.garage-profile-heading h2 {
-  margin: 0; color: inherit; font: inherit; font-size: clamp(1.2rem, 2.25vw, 2rem);
+.garage-profile-heading {
+  margin: 0 0 .2rem; color: inherit; font: inherit; font-size: clamp(1.2rem, 2.25vw, 2rem);
   line-height: 1.1; font-weight: 750;
 }
-.garage-profile-back {
-  display: grid; place-items: center; min-width: 44px; min-height: 44px;
-  border: 1px solid transparent; border-radius: 3px; color: var(--garage-menu-ink); background: transparent;
-}
-.garage-profile-back svg { width: 1.25rem; height: 1.25rem; transform: rotate(180deg); }
 .garage-profile-setting { min-width: 0; }
 .garage-profile-row.menu-control {
   --menu-panel-fill: var(--garage-menu-row);

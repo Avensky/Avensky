@@ -4,7 +4,7 @@ import { ControlGlyph } from "../../components/controller/ControlGlyph";
 import { AngledGameTab } from "../../components/menus/MenuTabButton";
 import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
-import { bindCreatorPanel, routeMenuAction, type MenuAction } from "../../controls/inputRouting";
+import { bindWelcomeMenuPanel, routeMenuAction, type MenuAction } from "../../controls/inputRouting";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { APP_BRANDING } from "../../theme/branding";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
@@ -124,7 +124,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
     };
   }, [scope]);
   useLayoutEffect(() => {
-    if (panel.current) return bindCreatorPanel(panel.current);
+    if (panel.current) return bindWelcomeMenuPanel(panel.current);
   }, []);
   useLayoutEffect(() => {
     if (!panel.current?.contains(document.activeElement)) selectedOption()?.focus({ preventScroll: true });
@@ -151,7 +151,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
 
   return <div className="creator-controls" onKeyDown={keyboard}>
     <header className="garage-entry-header angled-tab-header creator-header">
-      <GameButton ref={backButton} variant="custom" className="garage-entry-brand creator-back"
+      <GameButton ref={backButton} variant="custom" className="garage-entry-brand garage-entry-brand-back creator-back"
         aria-label="Back to character selection" title="Back" disabled={busy} onPress={onBack}>
         <MenuIcon name="back" /><span>{APP_BRANDING.productName}</span>
       </GameButton>

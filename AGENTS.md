@@ -17,6 +17,7 @@ Build and validation
 - For performance changes, supply a reproducible baseline, measurements, parity checks and environmental limits.
 Garage presentation
 - Sign-in, character selection, Play and Heroes share the authored garage_special.glb and LiveGarage scene. Make garage edits there for all four screens.
+- For sign-in, character selection, creation, Profile, or their menu handoffs, read [the approved menu guide](docs/MENU_DESIGN.md). It records the shared controls, visual rules, scene ownership, and acceptance checks to carry into the final game.
 Characters and appearance
 - Mara Vega and Rook Okafor are the original starter rigs. Preserve save IDs, rigs, existing working animation and network compatibility.
 - Repaired 12-style hairstyles have provisional approval only; final approval requires checking actual in-game hair color and opacity.

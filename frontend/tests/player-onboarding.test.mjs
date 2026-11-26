@@ -510,7 +510,13 @@ test("the creator preserves an eight-step appearance through registration, name 
         await vite.ssrLoadModule("/src/game/characters/GarageProfilePanel.tsx");
       });
       assert.equal(document.querySelector(".garage-entry-header nav"),headerActions);
-      assert.equal(document.querySelector(".garage-entry-brand"),null,"the profile sheet keeps the account tabs");
+      const profileBack = document.querySelector(".garage-entry-header [data-profile-back]");
+      assert.ok(profileBack, "the Profile screen puts Back in the left header");
+      assert.equal(profileBack.getAttribute("aria-label"), "Back");
+      assert.ok(profileBack.querySelector("svg"), "the branded tab visibly indicates Back");
+      assert.ok(profileBack.querySelector('img[src="/images/logo.svg"]'));
+      assert.match(profileBack.textContent, /avensky/i);
+      assert.equal(document.querySelectorAll("[data-profile-back]").length, 1);
       assert.equal(button("Profile").getAttribute("aria-pressed"),"true");
       assert.equal(document.querySelectorAll('[aria-label="Log out"]').length,1);
       const settings = document.querySelector('[aria-label="Account settings"]');

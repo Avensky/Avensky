@@ -15,8 +15,13 @@ export function garageBackdrop() {
 
 type EntryAssets = "/images" | "/__alpha/entry";
 
+export function garageBrandIdentity(assets: EntryAssets) {
+  return { logo: `${assets}/logo.svg`, name: APP_BRANDING.productName };
+}
+
 export function garageBrandContents(assets: EntryAssets) {
-  return `<img src="${assets}/logo.svg" width="26" height="26" alt="" draggable="false"><span>${escapeText(APP_BRANDING.productName)}</span>`;
+  const { logo, name } = garageBrandIdentity(assets);
+  return `<img src="${logo}" width="26" height="26" alt="" draggable="false"><span>${escapeText(name)}</span>`;
 }
 
 export function garageBrandHeader(assets: EntryAssets) {

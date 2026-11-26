@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JSDOM } from "jsdom";
-import { act, createElement } from "react";
+import { act, createElement, createRef } from "react";
 import { createServer } from "vite";
 
 test("profile rows use verified account permissions, server actions and a single disposable editor", async () => {
@@ -36,7 +36,8 @@ test("profile rows use verified account permissions, server actions and a single
     const profile = { id: "owner", active_character_id: "slot", name: "Racing career", account_display_name: "Road Pilot" };
     social.setState({ view: { profile } });
     let backs = 0;
-    const render = key => act(async () => root.render(createElement(GarageProfilePanel, { key, onBack: () => { backs++; } })));
+    const panel = createRef();
+    const render = key => act(async () => root.render(createElement(GarageProfilePanel, { key, ref: panel, onBack: () => { backs++; } })));
     const row = key => document.querySelector(`[data-profile-setting="${key}"]`);
     const action = text => [...document.querySelectorAll('[role="button"]')].find(button => button.textContent === text);
     const click = element => act(async () => element.click());
@@ -83,12 +84,11 @@ test("profile rows use verified account permissions, server actions and a single
     assert.equal(requests.at(-1).url, "/__alpha/account/delete-request");
     assert.deepEqual(requests.at(-1).fields, { confirmEmail:"private@example.test", password:"test-secret" });
     await act(async () => finishRequest({ message: "Request received for review." }));
-    const back = document.querySelector("[data-profile-back]");
-    await click(back);
+    await act(async () => panel.current.back());
     assert.equal(document.querySelector('[aria-expanded="true"]'), null);
     assert.equal(document.activeElement, row("delete"));
     assert.equal(backs, 0);
-    await click(back);
+    await act(async () => panel.current.back());
     assert.equal(backs, 1);
 
     admin = true;
