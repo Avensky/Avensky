@@ -72,6 +72,10 @@ Legend: **A** = allowed in principle but requires profile evidence before Hero/N
 
 Item-specific asset metadata may override the default **only** after fit evidence, e.g. a coat authored for a wide skirt. Do not infer fitting from filenames such as "loose" or "gothic".
 
+## 3a. Dependent garment lifecycle
+
+The machine-readable manifest also describes **parent/child dependency lifetimes**. A dependent underlayer may be derived from an outfit (such as a bundled petticoat following a skirt) or explicitly chosen by the player. On parent removal, only a derived selection can be automatically removed; an explicit selection remains saved but may become inactive until supported by another equipped parent. With several potential parents (e.g. skirt and gown), a child should become inactive only when **no eligible active parent remains**. This schema does not activate that runtime behavior until W-04/W-05.
+
 ## 4. Mode semantics and visibility
 
 ### Coats / jackets
@@ -125,6 +129,10 @@ Candidate acceptance: visible skin/waist/armhole exterior exposure >1 mm fails t
 Preserve edge lengths: proposed fabric soft 2% / hard 4%; structured corset soft 1% / hard 2%. No inverted triangles, UV tearing or broken stitches. Existing accepted authored fits with wider motions remain **versioned exceptions** until revalidated; do not overwrite accepted shape because the new default is smaller.
 
 Existing skirt fit algorithms contain different numbers (e.g. high-waist ceilings and hem extensions). New generic rules must not silently supersede accepted fixture behavior. See [DECISIONS.md](DECISIONS.md).
+
+## W-03 shared manifest representation
+
+The [machine-readable class defaults](../../packages/wardrobe-catalog/layer-rules.json), [schema](../../packages/wardrobe-catalog/layer-rules.schema.json), and [validator](../../packages/wardrobe-catalog/validate-layer-rules.mjs) implement structural checks, known modes, and conditional per-region order cycles. They do **not** implement runtime outfit resolution or imply a passed visual/physics fit. Class IDs are distinct from existing saved garment slots; mapping and evidence-gated item overrides belong to W-04/W-05.
 
 ## 6. Deterministic resolution contract
 

@@ -13,6 +13,10 @@ This is the **single entry point** for human contributors and AI coding agents. 
 | [DECISIONS.md](DECISIONS.md) | Dated decisions, verified baseline, assumptions, exceptions and remaining unknowns |
 | [COMMAND_QUEUE.md](COMMAND_QUEUE.md) | Small, dependency-ordered prompts for future implementation sessions |
 
+## W-03 machine-readable contract (not live integration)
+
+See [layer-rules.json](../../packages/wardrobe-catalog/layer-rules.json), [JSON Schema](../../packages/wardrobe-catalog/layer-rules.schema.json), and [strict validator](../../packages/wardrobe-catalog/validate-layer-rules.mjs). Run `npm run wardrobe:layers:check`. Class rules remain proposed `needs-fitting` or `blocked`, not approved geometry; W-04/W-05 must integrate resolution and save migration.
+
 ## Current architecture; not the intended future behavior
 
 - Shared catalog: `packages/wardrobe-catalog/`, including curated `character-garments.json` and generated `discovered-wardrobe-garments.json`.

@@ -15,6 +15,10 @@ and profile persistence live in their respective frontend and server paths.
 | [`character-garments.json`](character-garments.json) | Curated standalone garments with slots and asset paths |
 | [`discovered-wardrobe-garments.json`](discovered-wardrobe-garments.json) | Generated manifest for compatible loose GLBs |
 
+## Layer manifest: W-03 contract
+
+The versioned [layer-rules.json](layer-rules.json) and [JSON Schema](layer-rules.schema.json) specify garment classes, per-region ordering, mutually exclusive fit modes, protected features, and optional item overrides. This contract is **not yet integrated with runtime outfit selection** and does not approve any particular GLB pairing. Use `npm run wardrobe:layers:check` from repository root (no installed GLBs required) to run the [semantic validator](validate-layer-rules.mjs) and independent tests. See [canonical layer rules](../../docs/wardrobe/RULES.md); avoid duplicating the specification here.
+
 ## Edit the catalog
 
 Keep IDs stable across relabeling, refits, and Garage or Mobile revisions.
