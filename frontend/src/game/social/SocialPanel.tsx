@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import {MenuTabButton} from "../../components/menus/MenuTabButton";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { GameButton } from "../../components/GameButton";
@@ -49,7 +50,7 @@ function ProfilePage({
     <div className="social-grid">
       <section className="social-card">
         <h2>YOUR PLAYER PROFILE</h2>
-        {namedCharacter ? <p>{name}</p> : <form
+        {namedCharacter ? <p>{formatCharacterName(name)}</p> : <form
           onSubmit={(event) => {
             event.preventDefault();
             onSave(draft);

@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {ControllerAction,ControlGlyph} from '../../components/controller';
 import {MenuFooter,MenuHeaderBack} from '../../components/menus/MenuFrame';
@@ -24,7 +25,7 @@ function AwardCard({award,player,record}:{award:CareerAward;player:CareerPartici
  const metric=player?award==='top_support'?`${formatStat(player.stats.healing_done)} HP RESTORED`:award==='play_of_the_game'&&play?`${resultDuration(play.start_s)} – ${resultDuration(play.end_s)}`:`${formatStat(player.stats.kills)} KILLS · ${formatStat(player.stats.assists)} ASSISTS`:null;
  return <article className="result-award" data-award={award} data-team={player?.team??'unknown'} data-empty={!player}>
   <header><span className="result-award-mark" aria-hidden="true">{award==='mvp'?'★':award==='svp'?'☆':award==='top_support'?'+':'▶'}</span><h2>{AWARD_LABELS[award]}</h2></header>
-  {player?<><HeroPortrait hero={player.hero} appearance={player.appearance} className="result-award-portrait"/><div className="result-award-identity"><h3>{player.name}</h3><p>{hero?.name??player.hero} · {hero?.role.toUpperCase()??'VEHICLE'}{player.level!==undefined?` · LV ${player.level}`:''}</p></div><strong>{metric}</strong><small>{award==='mvp'?'WINNING TEAM':award==='svp'?'LOSING TEAM':award==='top_support'?'EFFECTIVE TEAM SUPPORT':'SERVER CONFIRMED HIGHLIGHT'}</small></>:<div className="result-award-empty"><strong>—</strong><p>{award==='svp'&&record.winner===null?'NO LOSING TEAM':record.training?'NO COMPETITIVE AWARD':'NO AWARD RECORDED'}</p></div>}
+  {player?<><HeroPortrait hero={player.hero} appearance={player.appearance} className="result-award-portrait"/><div className="result-award-identity"><h3>{formatCharacterName(player.name)}</h3><p>{hero?.name??player.hero} · {hero?.role.toUpperCase()??'VEHICLE'}{player.level!==undefined?` · LV ${player.level}`:''}</p></div><strong>{metric}</strong><small>{award==='mvp'?'WINNING TEAM':award==='svp'?'LOSING TEAM':award==='top_support'?'EFFECTIVE TEAM SUPPORT':'SERVER CONFIRMED HIGHLIGHT'}</small></>:<div className="result-award-empty"><strong>—</strong><p>{award==='svp'&&record.winner===null?'NO LOSING TEAM':record.training?'NO COMPETITIVE AWARD':'NO AWARD RECORDED'}</p></div>}
  </article>;
 }
 function Awards({record,victoryChoice}:{record:CareerMatch;victoryChoice?:CharacterChoice}){
@@ -36,7 +37,7 @@ function Awards({record,victoryChoice}:{record:CareerMatch;victoryChoice?:Charac
  const model=HEROES.find(h=>h.id===performer?.hero)?.vehicle;
  const close=()=>{setShow(false);requestAnimationFrame(()=>trigger.current?.focus());};
  return <><div className="result-awards-grid">{(['mvp','svp','top_support','play_of_the_game'] as const).map(kind=><AwardCard key={kind} award={kind} player={kind==='play_of_the_game'?performer:award(kind)} record={record}/>)}</div>
-  <section className="result-highlight" aria-label="Play of the game summary"><div><small>MATCH HIGHLIGHT</small><h2>{performer?`${performer.name} · PLAY OF THE GAME`:'PLAY OF THE GAME'}</h2><p>{play?`${play.kills} killing blow${play.kills===1?'':'s'} · ${play.captures} capture${play.captures===1?'':'s'} · ${formatStat(play.damage)} damage during ${resultDuration(play.start_s)} – ${resultDuration(play.end_s)}.`:'No highlight was recorded for this session.'}</p></div>{model && !show && <button ref={trigger} type="button" onClick={()=>{setShowVictory(false);setShow(true);}}>Play extraction emote</button>}</section>
+  <section className="result-highlight" aria-label="Play of the game summary"><div><small>MATCH HIGHLIGHT</small><h2>{performer?`${formatCharacterName(performer.name)} · PLAY OF THE GAME`:'PLAY OF THE GAME'}</h2><p>{play?`${play.kills} killing blow${play.kills===1?'':'s'} · ${play.captures} capture${play.captures===1?'':'s'} · ${formatStat(play.damage)} damage during ${resultDuration(play.start_s)} – ${resultDuration(play.end_s)}.`:'No highlight was recorded for this session.'}</p></div>{model && !show && <button ref={trigger} type="button" onClick={()=>{setShowVictory(false);setShow(true);}}>Play extraction emote</button>}</section>
   {model && show && <Suspense fallback={<p role="status">Loading extraction…</p>}><RescueEmote model={model} onClose={close}/></Suspense>}
   {victoryChoice && <>
    <section className="result-highlight" aria-label="Victory celebration">
@@ -58,7 +59,8 @@ const DETAIL_STATS:readonly {key:keyof CareerStats;label:string;decimals?:number
 ];
 function PersonalStats({player,self}:{player:CareerParticipant|undefined;self:boolean}){
  if(!player)return <p className="result-empty">No participant statistics were included in this saved result.</p>;
- return <section className="result-personal" aria-label={`${player.name} final statistics`}><header><h2>{self?'YOUR MATCH':player.name.toUpperCase()}</h2><span>K / D {killDeathRatio(player.stats.kills,player.stats.deaths)} · {resultDuration(player.stats.play_time_s)} PLAYED{player.abandoned?' · LEFT EARLY':''}</span></header><dl>{DETAIL_STATS.map(stat=><div key={stat.key}><dt>{stat.label}</dt><dd>{formatStat(player.stats[stat.key],stat.decimals)}{stat.unit}</dd></div>)}<div><dt>MMR</dt><dd>— <small>PENDING RANKED SYSTEM</small></dd></div></dl><p>Healing includes self healing. Resurrections count teammate revivals; respawns are separate. Ranked rating remains pending.</p></section>;
+ const name=formatCharacterName(player.name);
+ return <section className="result-personal" aria-label={`${name} final statistics`}><header><h2>{self?'YOUR MATCH':name}</h2><span>K / D {killDeathRatio(player.stats.kills,player.stats.deaths)} · {resultDuration(player.stats.play_time_s)} PLAYED{player.abandoned?' · LEFT EARLY':''}</span></header><dl>{DETAIL_STATS.map(stat=><div key={stat.key}><dt>{stat.label}</dt><dd>{formatStat(player.stats[stat.key],stat.decimals)}{stat.unit}</dd></div>)}<div><dt>MMR</dt><dd>— <small>PENDING RANKED SYSTEM</small></dd></div></dl><p>Healing includes self healing. Resurrections count teammate revivals; respawns are separate. Ranked rating remains pending.</p></section>;
 }
 
 /** The same frozen server result powers the post-match overlay and Career

@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../../game/characters/characterName";
 import { HEROES, heroForVehicle, modeTeamSize } from '../../store/alpha/alphaStore';
 import { useNetworkStore } from '../../store/session/networkStore';
 import { useSocialStore } from '../../store/social/socialStore';
@@ -37,7 +38,9 @@ export function readTeammates(now = performance.now()): TeammateCard[] {
     const hero = heroForVehicle(entity.vehicle_id);
     const health = fresh ? combatHealth(entity) : null;
     if (health) {health.hp = Math.ceil(health.hp); health.protection = health.protection > 0 ? 1 : 0;}
-    rows.push({id: entity.id, profileId, name: member?.name ?? card?.name ?? 'UNKNOWN PLAYER', team: me.team,
+    const publicName = member?.name ?? card?.name;
+    const name = publicName && profileId ? formatCharacterName(publicName) : publicName ?? 'UNKNOWN PLAYER';
+    rows.push({id: entity.id, profileId, name, team: me.team,
       hero: hero?.id ?? null, appearance: entity.appearance ?? card?.appearance ?? null,
       waiting: false, status: card?.reconnecting ? 'reconnecting' : !fresh ? 'delayed' : health?.defeated ? 'defeated' : 'active', health});
   }
@@ -46,7 +49,7 @@ export function readTeammates(now = performance.now()): TeammateCard[] {
   for (const card of roster) {
     if (present.has(card.id)) continue;
     const hero = HEROES.find(hero => hero.id === (card.hero || card.showcase_hero));
-    rows.push({id: `profile:${card.id}`, profileId: card.id, name: card.name, team: me.team,
+    rows.push({id: `profile:${card.id}`, profileId: card.id, name: formatCharacterName(card.name), team: me.team,
       hero: hero?.id ?? null, appearance: card.appearance ?? null, waiting: true,
       status: card.reconnecting ? 'reconnecting' : card.hero ? 'ready' : 'selecting', health: null});
   }

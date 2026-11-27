@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../../game/characters/characterName";
 import { create } from "zustand";
 import type { SocialView } from "../social/socialStore";
 
@@ -86,18 +87,18 @@ export const usePresenceStore = create<{
         for (const [id, name] of before.members)
           if (id !== current.profile && !current.members.has(id))
             changes.push(
-              `${name} ${current.online.has(id) ? "left the world" : "disconnected"}.`,
+              `${formatCharacterName(name)} ${current.online.has(id) ? "left the world" : "disconnected"}.`,
             );
         for (const [id, name] of current.members)
           if (id !== current.profile && !before.members.has(id))
             changes.push(
-              `${name} ${before.reconnecting.has(id) ? "reconnected" : "joined the world"}.`,
+              `${formatCharacterName(name)} ${before.reconnecting.has(id) ? "reconnected" : "joined the world"}.`,
             );
       } else {
         for (const [id, name] of before.online)
-          if (!current.online.has(id)) changes.push(`${name} disconnected.`);
+          if (!current.online.has(id)) changes.push(`${formatCharacterName(name)} disconnected.`);
         for (const [id, name] of current.online)
-          if (!before.online.has(id)) changes.push(`${name} connected.`);
+          if (!before.online.has(id)) changes.push(`${formatCharacterName(name)} connected.`);
       }
       if (!changes.length) return;
       const events = before.world === current.world ? get().events : [];

@@ -1,12 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
 import { GameButton } from "../../components/GameButton";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { garageBrandIdentity } from "../../theme/garageEntry";
-import { entryAssets } from "./config";
+import { GarageBrandTab } from "./GarageBrandTab";
 import "./welcomeScreen.css";
-
-const { logo, name } = garageBrandIdentity(entryAssets);
-const brand = <><img src={logo} width={26} height={26} alt="" draggable={false} /><span>{name}</span></>;
 
 type AccountActions = {
   profileOpen: boolean;
@@ -88,22 +84,20 @@ export function GarageEntryHeader({ showBrand, account, menu, backAction }: {
   if (!showBrand && !account && !menu) return null;
   const back = backAction ?? menu ?? (account?.profileOpen ? account : null);
   return <header className="garage-entry-header angled-tab-header">
-    {showBrand && (back
-      ? <GameButton variant="custom" className="garage-entry-brand garage-entry-brand-back"
-        aria-label={backAction?.label ?? (menu ? "Back to character selection" : "Back")} title="Back"
-        data-profile-back={account ? true : undefined} data-profile-header-tab={account ? true : undefined}
-        data-controller-header-action disabled={back.busy} onPress={back.onBack}><MenuIcon name="back" />{brand}</GameButton>
-      : <div className="garage-entry-brand">{brand}</div>)}
+    {showBrand && <GarageBrandTab onPress={back?.onBack} disabled={back?.busy}
+      aria-label={backAction?.label ?? (menu ? "Back to character selection" : "Back")}
+      data-profile-back={account ? true : undefined} data-profile-header-tab={account ? true : undefined}
+      data-controller-header-action />}
     {account && <nav ref={tabs} className="garage-entry-actions" aria-label="Account actions" data-controller-row
       data-controller-header-action data-controller-tab-only={account.profileOpen || undefined}>
-      <GameButton variant="custom" className="garage-entry-action garage-entry-action--inner garage-entry-action--logout joined-header-action" aria-label="Log out" title="Log out"
+      <GameButton variant="custom" className="garage-entry-action joined-header-action" aria-label="Log out" title="Log out"
         data-profile-header-tab={account.profileOpen || undefined} onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>
-      <GameButton variant="custom" className="garage-entry-action garage-entry-action--outer garage-entry-action--profile joined-header-action" aria-label="Profile" title="Profile"
+      <GameButton variant="custom" className="garage-entry-action joined-header-action" aria-label="Profile" title="Profile"
         aria-pressed={account.profileOpen} data-profile-header-tab={account.profileOpen || undefined} onPress={account.onProfile} disabled={account.busy}><MenuIcon name="profile" /></GameButton>
     </nav>}
     {menu && <nav className="garage-entry-actions" aria-label="Garage shortcuts">
-      {shortcuts.map(({ id, label }, index) => <GameButton key={id} variant="custom"
-        className={`garage-entry-action garage-entry-action--${index === shortcuts.length - 1 ? "outer" : "inner"} joined-header-action`}
+      {shortcuts.map(({ id, label }) => <GameButton key={id} variant="custom"
+        className="garage-entry-action joined-header-action"
         aria-label={label} title={label} disabled={menu.busy} onPress={() => menu.onOpen(id)}>
         <MenuIcon name={id} />
       </GameButton>)}

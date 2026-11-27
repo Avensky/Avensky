@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import { useConnectionView } from "../../store/session/networkViews";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ControlGlyph } from "../../components/controller";
@@ -135,7 +136,7 @@ export function LobbyChat({ driving = false }: { driving?: boolean }) {
       [
         ...lines.map((line) => ({
           id: `chat:${line.id}`,
-          name: line.name,
+          name: formatCharacterName(line.name),
           text: line.text,
           time: line.sent_at,
           system: false,

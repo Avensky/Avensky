@@ -1,7 +1,7 @@
 import {MenuTabButton} from "../../components/menus/MenuTabButton";
 import {useEffect,useId,useRef} from 'react';
 import {HEROES} from '../../store/alpha/alphaStore';
-import {useSocialStore} from '../../store/social/socialStore';
+import {selectActiveCharacterName,useSocialStore} from '../../store/social/socialStore';
 import {useUIStore} from '../../store/menus/uiStore';
 import {ControllerAction} from '../../components/controller';
 import {HeroPortrait} from '../alpha/HeroPortrait';
@@ -19,6 +19,7 @@ import './career.css';
 
 export function CareerPage(){
  const profile=useSocialStore(state=>state.view?.profile),career=profile?.progression?.career;
+ const name=useSocialStore(selectActiveCharacterName)??profile?.name;
  const {tab,mode,hero,selectTab,setMode,setHero}=useCareerViewStore();
  const back=useUIStore(state=>state.backToParentMenu);
  const angled=useAngledMenuHeader();
@@ -43,7 +44,7 @@ export function CareerPage(){
    {angled&&<div className="tabbed-angled-scroll">{navigation}</div>}
   </MenuFrameHeader>
   {!angled&&navigation}
-  <div className="career-profile-strip"><span className="career-profile-mark" aria-hidden="true">{profile?.name.slice(0,1).toUpperCase()??'?'}</span><div><h2>{profile?.name??'YOUR CAREER'}</h2><p>{profile?.progression?`LEVEL ${profile.progression.level} · PRESTIGE ${profile.progression.prestige}`:'Connect your player profile'}<span> PLAYER RECORD</span></p></div><span className="career-alpha-tag">ALPHA</span></div>
+  <div className="career-profile-strip"><span className="career-profile-mark" aria-hidden="true">{name?.slice(0,1).toUpperCase()??'?'}</span><div><h2>{name??'YOUR CAREER'}</h2><p>{profile?.progression?`LEVEL ${profile.progression.level} · PRESTIGE ${profile.progression.prestige}`:'Connect your player profile'}<span> PLAYER RECORD</span></p></div><span className="career-alpha-tag">ALPHA</span></div>
   {hasFilters&&<div className="career-filters" data-controller-row><label>MODE<select aria-label="Career mode" value={mode} onChange={event=>setMode(event.target.value)}>{CAREER_MODES.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label><label>HERO<select aria-label="Career hero" value={hero} onChange={event=>setHero(event.target.value)}><option value="all">All heroes</option>{HEROES.map(item=><option value={item.id} key={item.id}>{item.name}</option>)}</select></label><span>YOUR STATS. YOUR STYLE.</span></div>}
   <div ref={content} className="career-content menu-frame-content" role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-${tab}`} tabIndex={0}>
    {hasFilters?<div className="career-performance-layout"><aside className="career-hero-showcase" aria-label="Selected career hero"><HeroPortrait key={heroDefinition.id} hero={heroDefinition.id} appearance={profile?.progression?.hero_loadouts?.[heroDefinition.vehicle]}/><div><p className="career-eyebrow">{hero==='all'?'ALL HEROES':heroDefinition.role.toUpperCase()}</p><h2>{hero==='all'?'Your garage':heroDefinition.name}</h2><p>{hero==='all'?`${heroDefinition.name} · your main hero`:heroDefinition.note}</p></div></aside><div className="career-performance-main">{tab==='history'?<CareerHistoryPanel owner={profile?.active_character_id??profile?.id??null} mode={mode} hero={hero}/>:<><div className="career-section-heading"><div><p className="career-eyebrow">{CAREER_MODES.find(([value])=>value===mode)?.[1].toUpperCase()}</p><h2>{tab==='overview'?'Career overview':'Performance statistics'}</h2></div><span>SERVER RECORD</span></div><CareerRecordNotice career={career} bucket={bucket}/>{tab==='overview'?<CareerOverview bucket={bucket}/>:<CareerStatistics bucket={bucket}/>}</>}</div></div>:<CareerTools key={`${profile?.id}:${tab}`} tab={tab}/>}

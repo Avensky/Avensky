@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import type {CareerAward,CareerMatch,CareerParticipant,CareerStats} from '../career/careerTypes';
 import type {ScoreboardPlayer} from '../stats/scoreboardData';
 import {isPaintFinish} from '../../vehicles/cosmetics/paintFinishes.ts';
@@ -63,5 +64,5 @@ export function resultDuration(seconds:number):string{
  return hours?`${hours}:${String(minutes).padStart(2,'0')}:${rest}`:`${minutes}:${rest}`;
 }
 export function resultPlayers(record:CareerMatch,profileId:string|null):ScoreboardPlayer[]{
- return record.participants.map(player=>({id:player.profile_id,profileId:player.profile_id,name:player.name,team:player.team,self:player.profile_id===profileId,hero:player.hero,appearance:player.appearance,waiting:false,defeated:false,status:'completed' as const,kills:player.stats.kills,deaths:player.stats.deaths,stats:player.stats,level:player.level??null}));
+ return record.participants.map(player=>({id:player.profile_id,profileId:player.profile_id,name:formatCharacterName(player.name),team:player.team,self:player.profile_id===profileId,hero:player.hero,appearance:player.appearance,waiting:false,defeated:false,status:'completed' as const,kills:player.stats.kills,deaths:player.stats.deaths,stats:player.stats,level:player.level??null}));
 }

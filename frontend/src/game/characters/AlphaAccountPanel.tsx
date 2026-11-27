@@ -1,5 +1,5 @@
 import { useId, useState, type ReactNode } from "react";
-import { useSocialStore } from "../../store/social/socialStore";
+import { selectActiveCharacterName, useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
 import { signOutPlayerProfile } from "../../net/socialClient";
 import { AccountActionForm, AccountFeedback, AccountSecurity, maskAccountEmail, useAccountSettings } from "./AccountSettings";
@@ -27,6 +27,7 @@ function AccountRow({ label, value, icon, expanded, onToggle, children }: {
 
 export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   const player = useSocialStore(s => s.view?.profile);
+  const name = useSocialStore(selectActiveCharacterName) ?? player?.name;
   const settings = useAccountSettings();
   const { session, unavailable, busy, staging: isStaging } = settings;
   const active = player?.characters?.find(slot => slot.id === player.active_character_id);
@@ -45,9 +46,9 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
   return <section className="alpha-account-panel menu-panel-frame" aria-label={tab === "profile" ? "Character profile" : "Account settings"} data-controller-rows>
     {tab === "profile" ? <>
       <div className="alpha-profile-hero">
-        <ProfilePortrait choice={active?.appearance ?? player?.progression?.character} label={active?.name ?? player?.name ?? "Player portrait"} welcomePreview="selected" />
+        <ProfilePortrait choice={active?.appearance ?? player?.progression?.character} label={name ?? "Player portrait"} welcomePreview="selected" />
         <div className="alpha-profile-facts">
-          <strong>{active?.name ?? player?.name ?? "Player"}</strong>
+          <strong>{name ?? "Player"}</strong>
           <span>{active ? styleName(active.style) : "Your character"}</span>
           <span>Level {active?.level ?? 1}</span>
           <small>{player?.characters?.length ?? 0} saved {player?.characters?.length === 1 ? "character" : "characters"}</small>

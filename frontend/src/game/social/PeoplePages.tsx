@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import { useState } from "react";
 import { AssistedInput } from "../../components/text/AssistedInput";
 import type { SocialView } from "../../store/social/socialStore";
@@ -31,7 +32,7 @@ export function TeammatesPage({
         {view.teammates.map((person) => (
           <article className="social-person" key={person.id}>
             <div>
-              <strong>{person.name}</strong>
+              <strong>{formatCharacterName(person.name)}</strong>
               <small>
                 {person.online ? "ONLINE" : "OFFLINE"}
                 {person.team ? ` · TEAM ${person.team.toUpperCase()}` : ""}
@@ -76,7 +77,7 @@ export function TeammatesPage({
           .filter((request) => !request.incoming)
           .map((request) => (
             <article className="social-person" key={request.player.id}>
-              <span>{request.player.name} · REQUEST SENT</span>
+              <span>{formatCharacterName(request.player.name)} · REQUEST SENT</span>
               <button
                 type="button"
                 className="menu-control"
@@ -129,7 +130,7 @@ export function TeammatesPage({
           .map((person) => (
             <article className="social-person" key={person.id}>
               <div>
-                <strong>{person.name}</strong>
+                <strong>{formatCharacterName(person.name)}</strong>
                 <small>
                   {person.id.slice(0, 8)}
                   {person.team ? ` · ${person.team.toUpperCase()}` : ""}
@@ -214,7 +215,7 @@ export function GroupsPage({
               <article className="social-person" key={person.id}>
                 <div>
                   <strong>
-                    {person.name}
+                    {formatCharacterName(person.name)}
                     {person.id === group.owner_id ? " · LEADER" : ""}
                   </strong>
                   <small>{person.online ? "ONLINE" : "OFFLINE"}</small>
@@ -265,7 +266,7 @@ export function GroupsPage({
                       )
                       .map((person) => (
                         <option key={person.id} value={person.id}>
-                          {person.name}
+                          {formatCharacterName(person.name)}
                         </option>
                       ))}
                   </select>
@@ -286,7 +287,7 @@ export function GroupsPage({
                 </button>
                 {group.invited.map((person) => (
                   <article className="social-person" key={person.id}>
-                    <span>{person.name} · INVITED</span>
+                    <span>{formatCharacterName(person.name)} · INVITED</span>
                     <button
                       type="button"
                       className="menu-control"

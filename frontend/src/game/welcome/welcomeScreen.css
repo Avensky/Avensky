@@ -19,29 +19,6 @@
 /* The compact inner tab and the outer title follow the same slant as the
    brand in the opposite direction. Painted height and hit height are independent. */
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
-/* Paint the shared angled face at its normal height; extend only the touch
-   target below it. Keep the diagonal clear for the adjacent creator tab. */
-.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
-  --brand-hit-height: max(44px, var(--angled-header-height));
-  height: var(--brand-hit-height);
-  padding-block-end: calc(var(--brand-hit-height) - var(--angled-header-height));
-  pointer-events: auto; border: 0; touch-action: manipulation; background: transparent;
-  clip-path: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height),
-    calc(100% - var(--angled-title-cut)) var(--angled-header-height), calc(100% - var(--angled-title-cut)) 100%, 0 100%);
-}
-.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child::before {
-  bottom: calc(var(--brand-hit-height) - var(--angled-header-height) + 1px);
-}
-.garage-entry-brand-back::after {
-  content: ""; position: absolute; inset: 0 0 auto; z-index: -2; height: var(--angled-header-height);
-  background: var(--app-accent); clip-path: var(--angled-title-shape); pointer-events: none;
-}
-.garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; }
-@media (orientation: landscape) and (pointer: coarse) {
-  .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
-    padding-left: max(calc(2 * var(--angled-brand-padding)), env(safe-area-inset-left, 0px));
-  }
-}
 /* Controller focus remains visible even when the previous input was touch. */
 .garage-entry-header.angled-tab-header > .garage-entry-brand-back:focus {
   --angled-title-fill: var(--app-accent); color: var(--app-background);
@@ -76,26 +53,24 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   color: var(--app-text); background: transparent;
   cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-.garage-entry-action--inner {
+.garage-entry-action:not(:last-child) {
   --action-width: calc(44px + var(--angled-tab-cut));
   --action-icon-size: 17px;
   --action-face-height: var(--angled-tabs-height);
   --action-cut: var(--angled-tab-cut);
 }
-.garage-entry-actions .garage-entry-action--inner + .garage-entry-action--inner {
+.garage-entry-actions .garage-entry-action + .garage-entry-action {
   --action-padding-start: var(--angled-tab-cut);
   margin-inline-start: calc(-1 * var(--angled-tab-cut));
 }
 /* Overlap the faces across the full diagonal. The outer tab's clip also
    routes each point on the seam to the action that owns that visible area. */
-.garage-entry-actions .garage-entry-action--outer {
+.garage-entry-actions .garage-entry-action:last-child {
   --action-safe-end: env(safe-area-inset-right,0px);
   --action-width: calc(clamp(64px,6.5vw,88px) + var(--action-safe-end));
   --action-icon-size: clamp(21px,1.9vw,26px);
   --action-face-height: var(--angled-header-height);
   --action-cut: var(--angled-title-cut);
-  --action-padding-start: var(--angled-tab-cut);
-  margin-inline-start: calc(-1 * var(--angled-tab-cut));
 }
 .garage-entry-actions .garage-entry-action {
   clip-path: polygon(0 0,100% 0,100% 100%,var(--action-cut) 100%,var(--action-cut) var(--action-face-height));
@@ -108,16 +83,17 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   box-sizing: border-box;
   height: var(--action-face-height);
   background: var(--joined-action-fill);
-  border-bottom: var(--joined-action-rule) solid var(--app-accent);
+  border-block: var(--angled-edge-width) solid var(--angled-edge-color);
+  border-block-end-width: var(--joined-action-rule);
 }
 .garage-entry-action::after {
   content: "";
   position: absolute;
   inset: 0 auto auto 0;
-  width: calc(var(--action-cut) + 1px);
+  width: calc(var(--action-cut) + var(--angled-edge-width));
   height: var(--action-face-height);
-  background: var(--app-line);
-  clip-path: polygon(0 0,1px 0,100% 100%,var(--action-cut) 100%);
+  background: var(--angled-edge-color);
+  clip-path: polygon(0 0,var(--angled-edge-width) 0,100% 100%,var(--action-cut) 100%);
   pointer-events: none;
 }
 .garage-entry-action .menu-icon { width: var(--action-icon-size); height: var(--action-icon-size); }

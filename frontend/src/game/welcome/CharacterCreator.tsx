@@ -6,7 +6,7 @@ import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { bindWelcomeMenuPanel, routeMenuAction, type MenuAction } from "../../controls/inputRouting";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
-import { APP_BRANDING } from "../../theme/branding";
+import { GarageBrandTab } from "./GarageBrandTab";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
 import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, VILLAGER_ID, characterAppearance, type CharacterChoice } from "../characters/characterCatalog";
 import { CHARACTER_STYLES, attitudeName, type CharacterBody } from "../characters/characterStyles";
@@ -151,10 +151,8 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
 
   return <div className="creator-controls" onKeyDown={keyboard}>
     <header className="garage-entry-header angled-tab-header creator-header">
-      <GameButton ref={backButton} variant="custom" className="garage-entry-brand garage-entry-brand-back creator-back"
-        aria-label="Back to character selection" title="Back" disabled={busy} onPress={onBack}>
-        <MenuIcon name="back" /><span>{APP_BRANDING.productName}</span>
-      </GameButton>
+      <GarageBrandTab ref={backButton} className="creator-back" showLogo={false}
+        aria-label="Back to character selection" disabled={busy} onPress={onBack} />
       <div className="tabbed-angled-scroll creator-tab-scroll">
         <nav ref={tabs} className="angled-header-tabs" role="tablist" aria-label="Character creation steps">
           {CREATOR_STEPS.map(key => <AngledGameTab key={key} id={scope + key} aria-label={labels[key]}
