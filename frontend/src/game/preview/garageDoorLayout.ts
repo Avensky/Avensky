@@ -18,7 +18,7 @@ const openings = [
 
 const wallLeft = -6.64, wallRight = 8.50, roofHeight = 4.98;
 // Include the lamp, panic hardware, and backs of the framed shutters in the culling bounds.
-export const garageDoorWallBounds = { min: [wallLeft, -.02, wallZ - .23], max: [wallRight, roofHeight + .02, wallZ + .21] } as const;
+export const garageDoorWallBounds = { min: [wallLeft, -.02, wallZ - .53], max: [wallRight, roofHeight + .02, wallZ + .21] } as const;
 type WallPanel = { center: [number, number, number]; size: [number, number, number] };
 export const garageDoorWallPanels: WallPanel[] = [];
 function closeWall(left: number, right: number, base: number) {

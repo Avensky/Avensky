@@ -1,0 +1,57 @@
+.garage-drive-hud {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  user-select: none;
+  color: var(--garage-menu-ink, #fff3df);
+}
+.garage-drive-actions, .garage-drive-steering, .garage-drive-pedals, .garage-drive-hints {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: .45rem;
+}
+.garage-drive-actions {
+  top: max(10px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+}
+.garage-drive-pedals, .garage-drive-steering, .garage-drive-hints {
+  bottom: max(12px, env(safe-area-inset-bottom));
+}
+.garage-drive-pedals { right: max(12px, env(safe-area-inset-right)); }
+.garage-drive-steering, .garage-drive-hints { left: max(12px, env(safe-area-inset-left)); }
+.garage-drive-action, .garage-drive-pedal {
+  --frame-top-cut: 7px;
+  --frame-bottom-cut: 7px;
+  --frame-line-color: var(--garage-menu-line);
+  position: relative;
+  pointer-events: auto;
+  display: flex;
+  min-height: 46px;
+  min-width: 46px;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  padding-inline: .7rem;
+  border: 0;
+  outline: none;
+  background: var(--garage-menu-row, #25201bbf);
+  touch-action: none;
+}
+.garage-drive-action:focus-visible, .garage-drive-pedal:active {
+  --frame-line-color: var(--garage-menu-accent);
+  background: color-mix(in srgb, var(--garage-menu-row) 82%, var(--garage-menu-accent));
+}
+@media (hover: hover) {
+  .garage-drive-action:hover { --frame-line-color: var(--garage-menu-accent); }
+}
+.garage-drive-hints { gap: 1rem; text-shadow: 0 2px 4px #000; }
+.garage-drive-hints > span { display: inline-flex; align-items: center; gap: .3rem; }
+.garage-drive-status {
+  position: absolute;
+  left: max(12px, env(safe-area-inset-left));
+  top: max(12px, env(safe-area-inset-top));
+  max-width: 55%;
+  text-shadow: 0 2px 4px #000;
+}

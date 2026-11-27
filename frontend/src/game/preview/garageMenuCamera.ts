@@ -2,53 +2,56 @@ import { Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 import { placeGarageOrbit } from "./garageCameraTravel.ts";
 import { GARAGE_MENU_LANDMARKS, type GarageMenuStation } from "./garageMenuLandmarks.ts";
-import { ROSTER_HEADING } from "./rosterCamera.ts";
 
-const cameraAngles = {
-  enter_world: { heading: 2.94, elevation: .17 },
-  wardrobe: { heading: ROSTER_HEADING - .04, elevation: .07 },
-  vehicle: { heading: ROSTER_HEADING + .08, elevation: .07 },
-  world_editor: { heading: ROSTER_HEADING - .07, elevation: .11 },
-};
+// Eye positions in the clear aisle, in floor metres from the character.
+// Portrait views look farther along the aisle to fit the station and actor side by side.
+const stationEyes = {
+  wardrobe: { wide: [3.6, 1.77, .62], tall: [2.70, 1.65, 1.75], tallFov: 70, tallStationWeight: .5 },
+  vehicle: { wide: [1.50, 1.85, 3.65], tall: [5.90, 2.48, 6.95], tallFov: 80, tallStationWeight: .8 },
+  world_editor: { wide: [3.00, 2.1, 3.95], tall: [-3.0, 2.55, 5.55], tallFov: 77, tallStationWeight: .55 },
+} as const;
 
-/** The doorway opens on the selected character. Other stations keep the actor in the shot
- * while shifting the orbit toward the selected prop. The room owns all travel between shots. */
 export function garageMenuCamera(station: GarageMenuStation): GarageEntryShot {
   const landmark = new Vector3(...GARAGE_MENU_LANDMARKS[station]);
-  const target = new Vector3();
-  const angles = cameraAngles[station];
-  let distance = 4;
+  const actor = new Vector3(0, .88, 0), target = new Vector3();
+  const actorRay = new Vector3(), stationRay = new Vector3();
+  let distance = 2.57, heading = 2.94, elevation = .17, stationWeight = .5;
+
   function orbit(camera: PerspectiveCamera, yaw: number, pitch: number) {
-    placeGarageOrbit(camera, target, distance, angles.heading - yaw, angles.elevation + pitch);
+    if (station === "enter_world") {
+      placeGarageOrbit(camera, target, distance, heading - yaw, elevation + pitch);
+      return;
+    }
+    placeGarageOrbit(camera, actor, distance, heading - yaw, elevation + pitch);
+    // The normalized sightlines keep the near character and the distant station
+    // in frame independently of depth. The narrow vehicle shot gives its nose more room.
+    actorRay.subVectors(actor, camera.position).normalize();
+    stationRay.subVectors(landmark, camera.position).normalize();
+    target.copy(camera.position).addScaledVector(actorRay, 1 - stationWeight).addScaledVector(stationRay, stationWeight);
+    camera.lookAt(target);
   }
+
   return {
     subject: "ready",
     frame(camera, width, height) {
       const aspect = width / height;
       const portrait = aspect < 1;
+      let centerX = .50, centerY = portrait ? .36 : .49;
       if (station === "enter_world") {
-        // Look across the driver toward the exit wall. On a phone the narrower horizontal
-        // field shows the central bay; keep the full body above the two rows of controls.
-        const pull = .50 / landmark.z;
-        target.set(landmark.x * pull, 1.17, landmark.z * pull);
-        distance = 2.57;
+        target.set(landmark.x * .50 / landmark.z, 1.17, .50);
         camera.fov = portrait ? 80 : 66;
-        const centerX = portrait ? .52 : .56;
-        const centerY = portrait ? .34 : .40;
-        camera.setViewOffset(width, height, width * (.5 - centerX), height * (.5 - centerY), width, height);
-        orbit(camera, 0, 0);
-        return;
+        centerX = portrait ? .52 : .56;
+        centerY = portrait ? .34 : .40;
+      } else {
+        const view = stationEyes[station];
+        const [x, y, z] = view[portrait ? "tall" : "wide"];
+        const horizontal = Math.hypot(x, z);
+        distance = Math.hypot(horizontal, y - actor.y);
+        heading = Math.atan2(x, z);
+        elevation = Math.atan2(y - actor.y, horizontal);
+        camera.fov = portrait ? view.tallFov : 59;
+        stationWeight = portrait ? view.tallStationWeight : .5;
       }
-      const pull = portrait ? .47 : .18;
-      target.set(0, .88, 0).lerp(landmark, pull);
-      // Keep a minimum horizontal span on narrow phones so the actor and the station share the view.
-      const fov = portrait ? 46 : 60;
-      const verticalSpan = 2 * Math.tan(fov * Math.PI / 360);
-      const bodyFraction = portrait ? Math.min(.43, .68 * aspect) : .50;
-      distance = Math.max(1.74 / (bodyFraction * verticalSpan), portrait ? 0 : 5.3 / aspect);
-      camera.fov = fov;
-      // The extra headroom in the wide shot contains the full rear-wall neon sign.
-      const centerX = portrait ? .50 : .39, centerY = portrait ? .31 : .58;
       camera.setViewOffset(width, height, width * (.5 - centerX), height * (.5 - centerY), width, height);
       orbit(camera, 0, 0);
     },

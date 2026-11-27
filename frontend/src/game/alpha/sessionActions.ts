@@ -71,7 +71,9 @@ export async function joinSelectedMode() {
 let spawning = false;
 /** The garage waits for the real spawn acknowledgement before exposing driving.
  * No extra socket, input loop or guessed loading timeout owns gameplay. */
-export async function deploySelectedHero() {
+type GarageDeparture = { worldId: number; map: string; current: () => boolean };
+
+export async function deploySelectedHero(departure?: GarageDeparture) {
   if (spawning) throw Error("Deployment is already in progress.");
   const connection = socket;
   if (!connection || connection.readyState !== WebSocket.OPEN)
@@ -80,13 +82,14 @@ export async function deploySelectedHero() {
   const hero = HEROES.find((h) => h.id === selected.hero);
   if (!hero) throw Error("Choose a hero before deploying.");
   const active = useSocialStore.getState().view?.alpha?.active;
-  if (active && active.hero !== hero.id)
-    await requestSocial("hero_select", { hero: hero.id });
-  const map =
-    useNetworkStore.getState().worldMap ??
-    useSelectionStore.getState().getSelectedMap().id;
+  const playerId = useNetworkStore.getState().playerId;
+  if (departure && !playerId) throw Error("Reconnect to the game server before driving out.");
+  const map = departure?.map ?? useNetworkStore.getState().worldMap ?? useSelectionStore.getState().getSelectedMap().id;
   spawning = true;
   try {
+    if (active && (!departure || active.world_id === departure.worldId) && active.hero !== hero.id)
+      await requestSocial("hero_select", { hero: hero.id });
+    if (departure && !departure.current()) return;
     await new Promise<void>((resolve, reject) => {
       const clear = () => {
         clearTimeout(timer);
@@ -112,7 +115,8 @@ export async function deploySelectedHero() {
           reject(Error(packet.message ?? "Spawn failed."));
         } else if (
           packet.type === "spawn_ready" &&
-          packet.vehicle === hero.vehicle
+          packet.vehicle === hero.vehicle &&
+          (!departure || (packet.map === map && packet.player_id === playerId))
         ) {
           clear();
           resolve();
@@ -124,15 +128,17 @@ export async function deploySelectedHero() {
       }, 12000);
       connection.addEventListener("message", received);
       connection.addEventListener("close", closed);
-      connection.send(
-        JSON.stringify({
-          type: "spawn_request",
-          map,
-          vehicle: hero.vehicle,
-          mode: active?.mode ?? selected.mode,
-        }),
-      );
+      try {
+        connection.send(JSON.stringify({
+          type: "spawn_request", map, vehicle: hero.vehicle,
+          mode: departure ? "sandbox" : active?.mode ?? selected.mode,
+        }));
+      } catch (error) {
+        clear();
+        reject(error);
+      }
     });
+    if (departure && !departure.current()) return;
     useRenderSettingsStore.getState().startSandbox();
     useGameStore.setState({ camera: "DEFAULT" });
     if (selected.mode === "editor") {

@@ -1,9 +1,10 @@
-import { Suspense, useLayoutEffect, useRef } from "react";
-import { useLoader, useThree } from "@react-three/fiber";
+import { Suspense, useLayoutEffect, useMemo, useRef } from "react";
+import { useFrame, useLoader, useThree } from "@react-three/fiber";
 import {
-  Color, Group, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D,
+  Color, DoubleSide, InstancedMesh, Matrix4, Mesh, MeshStandardMaterial, Object3D, PlaneGeometry, type BufferGeometry,
 } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { garageBayMotion } from "./garageBayMotion";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 
 export type GarageBayPlacement = {
@@ -17,7 +18,9 @@ export type GarageBayPlacement = {
 
 type Props = { bays: readonly GarageBayPlacement[] };
 const shutterUrl = "/open-art/garage/garage-door/garage-door.gltf";
-const donorWidth = 2.60, donorHeight = 2.967;
+// The donor's two narrow side tabs extend to 2.967 m. Its full-width sheet ends at 2.84 m.
+const donorWidth = 2.60, donorHeight = 2.84;
+const defaultHeight = 2.967;
 
 function positionDoor(door: Object3D, bay: GarageBayPlacement) {
   door.position.set(...bay.position);
@@ -43,18 +46,17 @@ function GarageBayFrames({ bays }: Props) {
     }
     bays.forEach((bay, i) => {
       positionDoor(door, bay);
-      const w = bay.width ?? donorWidth, h = bay.height ?? donorHeight;
-      const first = i * 4;
-      // Backing closes the bay even while the donor loads or if its request fails.
-      place(frame, first, 0, h / 2, -.13, w, h, .12);
-      frame.setColorAt(first, tint.set("#343839"));
+      const w = bay.width ?? donorWidth, h = bay.height ?? defaultHeight;
+      const first = i * 3;
       for (const [j, side] of [-1, 1].entries()) {
-        place(frame, first + j + 1, side * (w / 2 + .06), h / 2, -.01, .12, h, .20);
-        frame.setColorAt(first + j + 1, tint.set("#8f8580"));
+        place(frame, first + j, side * (w / 2 + .06), h / 2, -.01, .12, h, .20);
+        frame.setColorAt(first + j, tint.set("#8f8580"));
       }
-      place(frame, first + 3, 0, h + .10, -.01, w + .24, .20, .22);
-      frame.setColorAt(first + 3, tint.set("#554f48"));
-      place(lamp, i, 0, h + .08, .13, .054, w * .56, .054, Math.PI / 2);
+      // The sheet coils inside this housing above the opening. Leave the sill clear.
+      const hood = .58 * h / donorHeight;
+      place(frame, first + 2, 0, h + hood / 2, .20, w + .24, hood, .61);
+      frame.setColorAt(first + 2, tint.set("#554f48"));
+      place(lamp, i, 0, h + .12, .52, .054, w * .56, .054, Math.PI / 2);
     });
     frame.instanceMatrix.needsUpdate = true;
     if (frame.instanceColor) frame.instanceColor.needsUpdate = true;
@@ -64,7 +66,7 @@ function GarageBayFrames({ bays }: Props) {
     invalidate();
   }, [bays, invalidate]);
   return <>
-    <instancedMesh ref={frames} name="garage-bay-frames" args={[undefined, undefined, bays.length * 4]}>
+    <instancedMesh ref={frames} name="garage-bay-frames" args={[undefined, undefined, bays.length * 3]}>
       <boxGeometry />
       <meshStandardMaterial metalness={.30} roughness={.55} emissive="#171511" />
     </instancedMesh>
@@ -75,79 +77,129 @@ function GarageBayFrames({ bays }: Props) {
   </>;
 }
 
-// A ribbed shutter remains in the room before the textured mesh is requested.
-function GarageBaySlats({ bays }: Props) {
-  const ref = useRef<InstancedMesh>(null);
-  const invalidate = useThree(state => state.invalidate);
-  const courses = 18;
-  useLayoutEffect(() => {
-    const mesh = ref.current;
-    if (!mesh) return;
-    const door = new Object3D(), slat = new Object3D(), matrix = new Matrix4();
-    slat.rotation.x = -.14;
-    bays.forEach((bay, i) => {
-      positionDoor(door, bay);
-      const pitch = (bay.height ?? donorHeight) / courses;
-      slat.scale.set(bay.width ?? donorWidth, pitch - .007, .04);
-      for (let j = 0; j < courses; j++) {
-        slat.position.set(0, (j + .5) * pitch, -.03);
-        slat.updateMatrix();
-        mesh.setMatrixAt(i * courses + j, matrix.multiplyMatrices(door.matrix, slat.matrix));
-      }
-    });
-    mesh.instanceMatrix.needsUpdate = true;
-    mesh.computeBoundingSphere();
-    invalidate();
-  }, [bays, invalidate]);
-  return <instancedMesh ref={ref} name="garage-bay-slats" args={[undefined, undefined, bays.length * courses]}>
-    <boxGeometry />
-    <meshStandardMaterial color="#727674" emissive="#33312d" metalness={.42} roughness={.68} />
-  </instancedMesh>;
+type MovingDoors = Props & { openings: Float32Array };
+
+/** Lift the sheet without stretching its ribs or paint. Above the lintel it winds
+ * onto an inward spiral inside the metal hood. Only the small lift uniform changes. */
+function rollUpMaterial(finish: MeshStandardMaterial, openings: Float32Array) {
+  finish.customProgramCacheKey = () => `garage-shutter-${openings.length}`;
+  finish.onBeforeCompile = shader => {
+    shader.uniforms.garageBayLift = { value: openings };
+    shader.vertexShader = shader.vertexShader
+      .replace("#include <common>", `#include <common>
+        uniform float garageBayLift[${openings.length}];
+      `)
+      .replace("#include <beginnormal_vertex>", `#include <beginnormal_vertex>
+        const float garageLintel = ${donorHeight};
+        const float rollerY = garageLintel + .28;
+        float raisedY = position.y + garageBayLift[gl_InstanceID] * garageLintel;
+        vec2 coil = vec2(0.);
+        if (raisedY > rollerY) {
+          float angle = (raisedY - rollerY) / .19;
+          vec2 roller = vec2(cos(angle), sin(angle));
+          float radius = .224 - angle * .007 - position.z;
+          coil = vec2(rollerY + radius * roller.y, .224 - radius * roller.x);
+          mat2 bend = mat2(roller.x, roller.y, -roller.y, roller.x);
+          objectNormal.yz = bend * objectNormal.yz;
+          #ifdef USE_TANGENT
+            objectTangent.yz = bend * objectTangent.yz;
+          #endif
+        }
+      `)
+      .replace("#include <begin_vertex>", `#include <begin_vertex>
+        transformed.y = raisedY;
+        if (raisedY > rollerY) transformed.yz = coil;
+      `);
+  };
+  return finish;
 }
 
-function GarageBayShutters({ bays }: Props) {
-  // Its external JPEGs and plain geometry work with the entry scene’s existing loader.
-  const { scene } = useLoader(GLTFLoader, shutterUrl);
-  const host = useRef<Group>(null);
+function ShutterSheets({ bays, geometry, finish, name, sourceMatrix }: Props & {
+  geometry: BufferGeometry; finish: MeshStandardMaterial; name: string; sourceMatrix?: Matrix4;
+}) {
+  const ref = useRef<InstancedMesh>(null);
   const invalidate = useThree(state => state.invalidate);
   useLayoutEffect(() => {
-    const parent = host.current;
-    // The fitted donor is one static mesh with one galvanized finish.
-    const source = scene.getObjectByProperty("isMesh", true);
-    if (!parent || !(source instanceof Mesh) || !(source.material instanceof MeshStandardMaterial)) return;
-    const finish = source.material.clone();
-    finish.emissiveMap = finish.map;
-    finish.emissive.setRGB(.46, .39, .31);
-    const shutters = new InstancedMesh(source.geometry, finish, bays.length);
-    shutters.name = "garage-bay-shutters";
-    source.updateWorldMatrix(true, false);
+    const sheets = ref.current;
+    if (!sheets) return;
     const door = new Object3D(), matrix = new Matrix4();
     bays.forEach((bay, i) => {
-      door.scale.set((bay.width ?? donorWidth) / donorWidth, (bay.height ?? donorHeight) / donorHeight, 1);
+      door.scale.set((bay.width ?? donorWidth) / donorWidth, (bay.height ?? defaultHeight) / donorHeight, 1);
       positionDoor(door, bay);
-      shutters.setMatrixAt(i, matrix.multiplyMatrices(door.matrix, source.matrixWorld));
+      matrix.copy(door.matrix);
+      if (sourceMatrix) matrix.multiply(sourceMatrix);
+      sheets.setMatrixAt(i, matrix);
     });
-    shutters.instanceMatrix.needsUpdate = true;
-    shutters.computeBoundingSphere();
-    parent.add(shutters);
+    sheets.instanceMatrix.needsUpdate = true;
+    sheets.computeBoundingSphere();
+    // Shader-deformed coils fit inside the static header.
+    if (sheets.boundingSphere) sheets.boundingSphere.radius += .8;
     invalidate();
-    return () => {
-      parent.remove(shutters);
-      shutters.dispose();
-      finish.dispose();
-      invalidate();
-    };
-  }, [scene, bays, invalidate]);
-  return <group ref={host} />;
+    return () => { sheets.dispose(); };
+  }, [bays, geometry, finish, sourceMatrix, invalidate]);
+  return <instancedMesh ref={ref} name={name} args={[geometry, finish, bays.length]} dispose={null} />;
+}
+
+// The network-free sheets travel on the same rollers as the textured doors.
+function GarageBaySlats({ bays, openings }: MovingDoors) {
+  const panel = useMemo(() => {
+    const rows = 18 * 4;
+    const geometry = new PlaneGeometry(donorWidth, donorHeight, 1, rows).translate(0, donorHeight / 2, 0);
+    const position = geometry.attributes.position;
+    const profile = [-.008, -.012, -.039, -.04];
+    for (let i = 0; i < position.count; i++) {
+      const course = Math.round(position.getY(i) * rows / donorHeight);
+      position.setZ(i, profile[course % profile.length]);
+    }
+    geometry.computeVertexNormals();
+    return geometry;
+  }, []);
+  const finish = useMemo(() => rollUpMaterial(new MeshStandardMaterial({
+    color: "#727674", emissive: "#33312d", metalness: .42, roughness: .68, side: DoubleSide,
+  }), openings), [openings]);
+  useLayoutEffect(() => () => panel.dispose(), [panel]);
+  useLayoutEffect(() => () => finish.dispose(), [finish]);
+  return <ShutterSheets bays={bays} geometry={panel} finish={finish} name="garage-bay-slats" />;
+}
+
+function GarageBayShutters({ bays, openings }: MovingDoors) {
+  const { scene } = useLoader(GLTFLoader, shutterUrl);
+  const source = scene.getObjectByProperty("isMesh", true);
+  const finish = useMemo(() => {
+    if (!(source instanceof Mesh) || !(source.material instanceof MeshStandardMaterial)) return;
+    source.updateWorldMatrix(true, false);
+    const material = source.material.clone();
+    material.emissiveMap = material.map;
+    material.emissive.setRGB(.46, .39, .31);
+    return rollUpMaterial(material, openings);
+  }, [source, openings]);
+  useLayoutEffect(() => () => finish?.dispose(), [finish]);
+  if (!(source instanceof Mesh) || !finish) return <GarageBaySlats bays={bays} openings={openings} />;
+  return <ShutterSheets bays={bays} geometry={source.geometry} sourceMatrix={source.matrixWorld}
+    finish={finish} name="garage-bay-shutters" />;
 }
 
 export function GarageBayDoors({ bays, detailed = true }: Props & { detailed?: boolean }) {
+  const invalidate = useThree(state => state.invalidate);
+  const openings = useMemo(() => new Float32Array(bays.length), [bays.length]);
+  const moving = useRef(false);
+  useLayoutEffect(() => {
+    const wake = () => { moving.current = true; invalidate(); };
+    moving.current = garageBayMotion.sample(openings, performance.now());
+    invalidate();
+    return garageBayMotion.subscribe(wake);
+  }, [invalidate, openings]);
+  useFrame(() => {
+    if (!moving.current) return;
+    moving.current = garageBayMotion.sample(openings, performance.now());
+    if (moving.current) invalidate();
+  });
   if (!bays.length) return null;
-  const slats = <GarageBaySlats bays={bays} />;
+  const slats = <GarageBaySlats bays={bays} openings={openings} />;
   return <group name="garage-bay-doors">
     <GarageBayFrames bays={bays} />
     {detailed ? <AssetBoundary resetKey={shutterUrl} fallback={slats}>
-      <Suspense fallback={slats}><GarageBayShutters bays={bays} /></Suspense>
+      <Suspense fallback={slats}><GarageBayShutters bays={bays} openings={openings} /></Suspense>
     </AssetBoundary> : slats}
   </group>;
 }

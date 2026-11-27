@@ -42,7 +42,7 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
             const isSelected = slot.id === selected?.id;
             const canEnter = isSelected && connected && !busy && Boolean(selectedAppearance);
             return <GameButton key={slot.id} variant="custom" className="welcome-character roster-tile chamfered-frame"
-              aria-label={slot.name} aria-description={canEnter ? "Open the main menu as this character" : undefined}
+              aria-label={slot.name} aria-description={canEnter ? "Go to the Garage as this character" : undefined}
               title={canEnter ? `Continue as ${slot.name}` : slot.name} data-character-id={slot.id}
               aria-pressed={isSelected} selected={isSelected} disabled={busy}
               onFocusCapture={() => { if (!busy && !isSelected) onChoose(slot); }}

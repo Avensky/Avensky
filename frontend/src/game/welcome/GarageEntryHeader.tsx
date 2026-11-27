@@ -101,7 +101,7 @@ export function GarageEntryHeader({ showBrand, account, menu }: {
       <GameButton variant="custom" className="garage-entry-action garage-entry-action--outer garage-entry-action--profile joined-header-action" aria-label="Profile" title="Profile"
         aria-pressed={account.profileOpen} data-profile-header-tab={account.profileOpen || undefined} onPress={account.onProfile} disabled={account.busy}><MenuIcon name="profile" /></GameButton>
     </nav>}
-    {menu && <nav className="garage-entry-actions" aria-label="Main menu shortcuts">
+    {menu && <nav className="garage-entry-actions" aria-label="Garage shortcuts">
       {shortcuts.map(({ id, label }, index) => <GameButton key={id} variant="custom"
         className={`garage-entry-action garage-entry-action--${index === shortcuts.length - 1 ? "outer" : "inner"} joined-header-action`}
         aria-label={label} title={label} disabled={menu.busy} onPress={() => menu.onOpen(id)}>

@@ -241,6 +241,26 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
     );
     const stationControl = id => document.querySelector(`[data-station-anchor="${id}"] [role="button"]`);
     const continueControl = () => document.querySelector('[aria-label="Continue"]');
+    await t.test("keyboard and D-pad follow the garage stations on screen as the camera reframes", async () => {
+      await reset();
+      const controls = MAIN_MENU_ITEMS.map(({ id }) => stationControl(id));
+      const positions = [[450, 118], [365, 463], [706, 236], [166, 291]];
+      for (const [index, button] of controls.entries()) {
+        button.getBoundingClientRect = () => new dom.window.DOMRect(...positions[index], 80, 44);
+      }
+      try {
+        await key("KeyD", "d");
+        assert.equal(document.activeElement, controls[2], "Vehicle is to the right of Enter World");
+        await key("ArrowRight", "ArrowRight");
+        assert.equal(document.activeElement, controls[2], "no wrap at the right edge");
+        positions.splice(0, 4, [135, 463], [571, 213], [214, 298], [762, 287]);
+        await button(15);
+        assert.equal(document.activeElement, controls[1], "Wardrobe is now the closest station to the right");
+        assert.equal(ui.getState().screen, "main");
+      } finally {
+        for (const control of controls) delete control.getBoundingClientRect;
+      }
+    });
     await t.test("garage hover previews each destination and Continue opens the selected workshop", async () => {
       await reset();
       for (const [index, item] of MAIN_MENU_ITEMS.entries()) {
@@ -316,7 +336,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         await reset();
         const station = stationControl("world_editor");
         await act(async () => station.focus());
-        const tab = document.querySelector(`nav[aria-label="Main menu shortcuts"] [aria-label="${name}"]`);
+        const tab = document.querySelector(`nav[aria-label="Garage shortcuts"] [aria-label="${name}"]`);
         await click(tab);
         assert.equal(ui.getState().screen, screen);
       }
