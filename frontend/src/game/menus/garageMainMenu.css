@@ -110,6 +110,25 @@
   top: calc(100% + 6px);
   border-radius: 50%;
 }
+@media (orientation: landscape) {
+  /* Keep the doorway label on the far side of its pin, away from the actor. */
+  .garage-station-anchor[data-station-anchor="enter_world"] {
+    --entry-pin-x: var(--station-x, 30vw);
+    left: 0;
+    width: 100%;
+    transform: translateY(calc(-100% - 9px));
+  }
+  [data-station-anchor="enter_world"] .garage-station-button {
+    width: max-content;
+    left: min(var(--entry-pin-x), calc(100% - var(--garage-right)));
+    transform: translateX(max(-100%, calc(var(--garage-left) - var(--entry-pin-x))));
+  }
+  .garage-station-anchor[data-station-anchor="enter_world"]::before {
+    left: calc(var(--entry-pin-x) - 10px);
+    transform: rotate(-38deg);
+  }
+  .garage-station-anchor[data-station-anchor="enter_world"]::after { left: calc(var(--entry-pin-x) - 3px); }
+}
 .garage-menu-stations .garage-station-button[data-selected="true"] {
   --frame-line-color: var(--garage-menu-accent);
   --frame-line-width: 2px;
