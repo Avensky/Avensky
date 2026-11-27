@@ -107,6 +107,11 @@ export function Keyboard() {
       )
         return;
       const ui = useUIStore.getState();
+      if (event.code === "KeyF" && ui.screen === "main" && !ui.overlay && !ui.isModeLoading &&
+          !performanceOverlayHasFocus() && !event.altKey && !event.metaKey && !event.ctrlKey) {
+        const drive = document.querySelector<HTMLElement>('[data-garage-drive-start]:not([aria-disabled="true"])');
+        if (drive) { event.preventDefault(); drive.click(); return; }
+      }
       if(event.code==="KeyM" && !event.altKey && !event.metaKey && !event.ctrlKey && !event.shiftKey &&
           ui.screen==="sandbox" && !ui.isModeLoading && !useGameStore.getState().editor &&
           !performanceOverlayHasFocus() &&

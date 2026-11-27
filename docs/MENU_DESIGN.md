@@ -1,6 +1,6 @@
 # Avensky’s approved garage menus
 
-Use sign-in, character selection, and character creation as the references for new garage menus. Carry their input behavior and visual language into the final game. Profile uses the same header and navigation rules. The main menu is the current destination after character selection.
+Use sign-in, character selection, and character creation as the references for new garage menus. Carry their input behavior and visual language into the final game. Profile uses the same header and navigation rules. Selecting a character opens the Garage. Its four stations are the main menu.
 
 ## Each input has a job
 
@@ -21,8 +21,8 @@ Let real text inputs handle typing, autofill, and password managers. While editi
 | Screen | Keep |
 | --- | --- |
 | Sign-in | Signed-in players go to character selection. The signed-out screen has the logo and Avensky name flush at the upper left. Email, password with centered eye control, Sign in, and Forgot password form a compact, vertically centered stack of translucent bars. Put status and errors in their own space so the form stays put. Show account actions after authentication. |
-| Character selection | Branded header on the left, joined Log out and Profile tabs on the right. Give the outer Profile tab the prominent face and Log out the smaller one. Use portrait tiles and short details beside each portrait. Keep the selected actor visible as the main menu opens. |
-| Main menu | Keep the selected character in the room. Frame Enter World at the middle of the three overhead doors opposite the 0999 sign, Wardrobe at the mirror and lockers, Vehicle at the service bay, and World Editor at the map table. Focusing a station moves the camera. On touch, the first tap on a different station previews it. A second tap or Continue opens it. In portrait, use a two-by-two tile grid with the character visible above. Keep the Avensky Back tab at the upper left for returning to the roster, Career, Social and Settings in the joined upper-right header, and Continue at the bottom right. |
+| Character selection | Branded header on the left, joined Log out and Profile tabs on the right. Give the outer Profile tab the prominent face and Log out the smaller one. Use portrait tiles and short details beside each portrait. Keep the selected actor visible as the Garage opens. |
+| Garage | Keep the selected character in the room. Frame Enter World at the middle of the three overhead doors opposite the 0999 sign, Wardrobe at the mirror and lockers, Vehicle at the service bay, and World Editor at the map table. Focusing a station moves the camera. On touch, the first tap on a different station previews it. A second tap or Continue opens it. In portrait, use a two-by-two tile grid with the character visible above. Keep the Avensky Back tab at the upper left for returning to the roster, Career, Social and Settings in the joined upper-right header, and Continue at the bottom right. |
 | Character creation | The angled Avensky Back control participates in the primary tab cycle. Show visual tiles and swatches, with one caption below Hairstyle, Eyes, and Eyeliner. Keep Continue/Create in a compact bottom-right action with a glyph and open space behind it. Choose the name on Personality. Appearance tabs use quiet emotes. Previewing a personality blends into its gestures and changes the wardrobe while preserving the player’s chosen face, hair, and colors. |
 | Profile | Keep the left Avensky brand and Back affordance, and the joined right account tabs. Use that header for Back. Open one settings row at a time. Back closes the row first and then returns to the screen that opened Profile. |
 
@@ -32,13 +32,21 @@ Keep touch targets at least 44 CSS pixels where the player taps. Use the shared 
 
 ## One garage and one camera
 
-Mount the real 3D garage once. Sign-in, the roster, the creator, Profile, the main menu, and garage views in Play and Heroes change the UI, actor, or camera shot on that scene. On cold entry, show the logo on neutral black, reveal the garage, then fade in the controls. On return or logout, retain the canvas and fade the UI layers. Keep the header’s size steady throughout its fade.
+Mount the real 3D garage once. Sign-in, the roster, the creator, Profile, the Garage stations, and views in Play and Heroes change the UI, actor, or camera shot on that scene. On cold entry, show the logo on neutral black, reveal the garage, then fade in the controls. On return or logout, retain the canvas and fade the UI layers. Keep the header’s size steady throughout its fade.
 
-The shared room has a vehicle entrance wall with three roll-up doors and a personnel exit at each end. On first entry the ribbed doors are already in the room. Opening the main menu loads one textured shutter shared by all three bays. Keep this detail mounted across subsequent menu changes.
+The shared room has a vehicle entrance wall with three roll-up doors and a personnel exit at each end. On first entry the ribbed doors are already in the room. Visiting the Garage stations loads the shared shutter texture. Each door has its own opening height. Keep this detail mounted across subsequent menu changes.
 
 Use the shared warm brown garage as the default. Let the fixtures illuminate the room and the mechanic’s floor catch their reflections. The segmented wall sign reads 0999 with its first zero dark. In the login resting shot the left corner pillar sits near the middle and the right edge meets the middle of the far pillar. Change the environment and its theme at their shared source so the result carries through every garage screen.
 
 Move the camera from its **displayed position and lens**, including during an unfinished move or after a drag. Looks frames the face, Eyes brings both irises close, and Makeup keeps the eyes and lips together. Measure the landmarks on the displayed rig. Honor reduced motion with settled framing. In the roster the left stick or a background drag orbits the room, while the right stick or dragging the actor turns the character. Login orbit eases back to rest. Use cached portraits for tiles and schedule rendering when something visible changes. Keep the vehicle platform tied to the presence of a vehicle.
+
+## Moving through the Garage
+
+Use the displayed station button positions to choose the next focus in the pressed direction. Recheck when the camera reframes or the viewport rotates. Stop at an edge, and move only once per press or stick deflection. A stationary pointer keeps the player's current selection while the camera moves. LB/RB and Q/E still own the header.
+
+Anchor Wardrobe to the lockers against the clear rear wall and World Editor to the desk in the opposite rear corner. Park the equipped road car facing the left bay with the toolbox and jack beside it. Place the hoist beside the nose so the widest vehicle can pull straight through. Move the authored prop, its optional detailed model, and its collision footprint together.
+
+Enter World follows the station's existing vehicle selection. For a physical exit, tap Drive, press F, or press Xbox X. Steer with the left stick, accelerate with RT, and brake or reverse with LT. On keyboard use the driving bindings or arrow keys. Park with B, Esc, or the touch action. An approaching car opens its bay. Keep the physics clearance in sync with the visible shutter, and wait for the rear of the car to clear before joining the Harbor. Keep the garage on screen until the server confirms the player's vehicle and map.
 
 ## Where to make changes
 
@@ -47,12 +55,14 @@ Move the camera from its **displayed position and lens**, including during an un
 | Entry branding, credentials, header geometry and surfaces | [Shared sign-in markup](../frontend/src/theme/garageEntry.ts), [theme palettes](../frontend/src/theme/palettes.json), [angled header CSS](../frontend/public/images/angled-header.css), [entry CSS](../frontend/public/images/garage-entry.css) |
 | Joined header actions, roster, creation, and Profile | [GarageEntryHeader](../frontend/src/game/welcome/GarageEntryHeader.tsx), [CharacterRoster](../frontend/src/game/welcome/CharacterRoster.tsx), [CharacterCreator](../frontend/src/game/welcome/CharacterCreator.tsx), [GarageProfilePanel](../frontend/src/game/characters/GarageProfilePanel.tsx) |
 | Tab faces, secondary rows, and activation | [MenuTabButton](../frontend/src/components/menus/MenuTabButton.tsx), [SecondaryTabRow](../frontend/src/components/menus/SecondaryTabRow.tsx), [GameButton](../frontend/src/components/GameButton.tsx), [input routing](../frontend/src/controls/inputRouting.ts) |
-| Main menu stations | [Station labels](../frontend/src/game/menus/menuItems.ts), [projected controls](../frontend/src/game/menus/MainMenu.tsx), [shared prop and camera coordinates](../frontend/src/game/preview/garageMenuLandmarks.ts), [station camera](../frontend/src/game/preview/garageMenuCamera.ts), [furnishings](../frontend/src/game/preview/GarageMenuFurnishings.tsx) |
+| Garage stations | [Station labels](../frontend/src/game/menus/menuItems.ts), [projected controls](../frontend/src/game/menus/MainMenu.tsx), [shared prop and camera coordinates](../frontend/src/game/preview/garageMenuLandmarks.ts), [station camera](../frontend/src/game/preview/garageMenuCamera.ts), [furnishings](../frontend/src/game/preview/GarageMenuFurnishings.tsx) |
+| Parking and drive-out | [Workshop placement](../frontend/src/game/preview/garageServiceLayout.ts), [parking physics](../frontend/src/game/preview/garageParkingPhysics.ts), [shutter movement](../frontend/src/game/preview/garageBayMotion.ts), [Harbor handoff](../frontend/src/game/alpha/driveIntoOpenWorld.ts) |
 | Scene lifetime, camera destinations, and interpolation | [LiveGarage](../frontend/src/game/preview/LiveGarage.tsx), [rosterCamera](../frontend/src/game/preview/rosterCamera.ts), [GarageCameraTravel](../frontend/src/game/preview/garageCameraTravel.ts) |
 
 ## Before merging a menu change
 
 - Walk sign-in → roster → creator → Back → Profile → Back → main menu. From the main menu, use the branded Back tab to reach the roster and open Profile. Confirm all four stations and all three right header actions are reachable. Check focus after every handoff and verify one live garage canvas through logout.
+- Release each direction in turn and verify focus follows the visible stations, including in portrait. Drive out with the widest road vehicle. Check shutter clearance, parking and resuming, and retrying a failed world connection.
 - Try the same route with keyboard, controller, and touch. Cycle across both ends of a header. Move through settings, edit a field, back out, and confirm one press produces one action.
 - Check desktop, phone landscape, and phone portrait, including an installed Home Screen launch. Look for obscured corners, a bottom strip, clipped hair, duplicate borders, or a notice that moves a form.
 - Switch camera tabs rapidly, interrupt a move with a drag, and repeat with reduced motion. Verify the actor and camera stay continuous. Record which checks used actual hardware and which used browser emulation.

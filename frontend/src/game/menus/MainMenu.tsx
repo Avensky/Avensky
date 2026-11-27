@@ -4,8 +4,11 @@ import { GameButton } from "../../components/GameButton";
 import type { MenuAction } from "../../controls/inputRouting";
 import { useUIStore } from "../../store";
 import { registerGarageMenuMarker } from "../preview/garageMenuMarkers";
+import { useGarageParking } from "../preview/garageParkingStore";
+import { useGarageParkingVehicle } from "../preview/garageParkingVehicle";
+import { GarageDriveOverlay } from "./GarageDriveOverlay";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
-import { navigateFormRows } from "../social/formRows";
+import { nextGarageStation } from "./garageStationNavigation";
 import { GarageEntryHeader } from "../welcome/GarageEntryHeader";
 import { MAIN_MENU_ITEMS } from "./menuItems";
 import "./garageMainMenu.css";
@@ -16,12 +19,17 @@ const stationRefs = MAIN_MENU_ITEMS.map(({ id }) => (element: HTMLDivElement | n
 });
 
 export function MainMenu() {
+  const driving = useGarageParking(state => state.driving);
+  return driving ? <GarageDriveOverlay /> : <GarageStations />;
+}
+
+function GarageStations() {
+  const vehicle = useGarageParkingVehicle();
   const selectedIndex = useUIStore(state => state.selectedMenuIndexById.main);
   const joining = useUIStore(state => state.mainWorldJoining);
   const error = useUIStore(state => state.mainWorldError);
   const root = useRef<HTMLElement>(null);
   const stations = useRef<HTMLElement>(null);
-  const remembered = useRef(new WeakMap<HTMLElement, number>());
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const touchStart = useRef<{ pointerId: number; selected: number } | null>(null);
 
@@ -53,21 +61,33 @@ export function MainMenu() {
         tabs[next]?.focus({ preventScroll: true });
       } else if (action === "activate") continueSelection();
       else if (action === "back") back();
-      else if (stations.current && ["left", "right", "up", "down"].includes(action)) {
+      else if (stations.current && (action === "left" || action === "right" || action === "up" || action === "down")) {
         if (!stations.current.contains(active)) focusStation();
-        else navigateFormRows(stations.current, active, action, remembered.current);
+        else {
+          const buttons = Array.from(stations.current.querySelectorAll<HTMLElement>('[data-station-anchor] [role="button"]:not([aria-disabled="true"])'));
+          const next = nextGarageStation(buttons, active, action);
+          if (next !== active) next?.focus({ preventScroll: true });
+        }
       }
     }
     window.addEventListener("avenlab:main-menu-action", route);
     return () => window.removeEventListener("avenlab:main-menu-action", route);
   }, [continueSelection]);
 
-  return <main ref={root} className="game-ui menu-surface menu-home main-menu garage-main-menu relative z-30" aria-label="Main menu"
-    onKeyDown={event => { if (event.key === "Tab") event.preventDefault(); }}>
+  return <main ref={root} className="game-ui menu-surface menu-home main-menu garage-main-menu relative z-30" aria-label="Garage"
+    onKeyDown={event => { if (event.key === "Tab") event.preventDefault(); }}
+    onPointerMove={event => {
+      if (event.pointerType !== "mouse" || event.buttons || joining) return;
+      // Track the cursor over the whole room: a label passing beneath a parked mouse
+      // during a controller camera move must not steal focus.
+      if (pointer.current?.x === event.clientX && pointer.current.y === event.clientY) return;
+      pointer.current = { x: event.clientX, y: event.clientY };
+      if (event.target instanceof HTMLElement) event.target.closest<HTMLElement>(".garage-station-button")?.focus({ preventScroll: true });
+    }}>
     <GarageOrbitSurface />
     <GarageEntryHeader showBrand menu={{ busy: joining, onBack: back, onOpen: screen => useUIStore.getState().setScreen(screen) }} />
-    <section ref={stations} className="garage-menu-stations" aria-label="Garage stations" data-controller-rows>
-      <div className="garage-menu-markers" data-controller-row data-controller-columns="2">
+    <section ref={stations} className="garage-menu-stations" aria-label="Garage stations">
+      <div className="garage-menu-markers">
         {MAIN_MENU_ITEMS.map((item, index) => <div key={item.id} ref={stationRefs[index]}
           className="garage-station-anchor" data-station-anchor={item.id}>
           <GameButton variant="custom" className="garage-station-button" selected={selectedIndex === index}
@@ -80,13 +100,6 @@ export function MainMenu() {
             }}
             onPointerCancel={() => { touchStart.current = null; }}
             onFocusCapture={() => useUIStore.getState().setActiveMenuIndex(index)}
-            onPointerMove={event => {
-              if (event.pointerType !== "mouse" || event.buttons || joining) return;
-              // A moving marker can pass under a stationary cursor as the camera settles.
-              if (pointer.current?.x === event.clientX && pointer.current.y === event.clientY) return;
-              pointer.current = { x: event.clientX, y: event.clientY };
-              event.currentTarget.focus({ preventScroll: true });
-            }}
             onPress={event => {
               const ui = useUIStore.getState();
               if (ui.mainWorldJoining) return;
@@ -111,6 +124,11 @@ export function MainMenu() {
     {(joining || error) && <p className="garage-menu-notice" role={error ? "alert" : "status"}>
       {joining ? "Entering the Harbor…" : error}
     </p>}
+    <GameButton variant="custom" className="garage-menu-drive" data-garage-drive-start
+      aria-label={vehicle.loaner ? "Drive loaner BRZ" : "Drive " + vehicle.name}
+      disabled={joining} onPress={() => useGarageParking.getState().start()}>
+      <ControlGlyph controller="X" keyboard="F" />{vehicle.loaner ? "Drive loaner BRZ" : "Drive"}
+    </GameButton>
     <GameButton variant="custom" className="garage-menu-continue" aria-label="Continue"
       disabled={joining} onPress={continueSelection}><ControlGlyph controller="A" />Continue</GameButton>
   </main>;

@@ -6,6 +6,7 @@ import { creatorStepFrames, rosterCamera } from "../src/game/preview/rosterCamer
 import { garageMenuCamera } from "../src/game/preview/garageMenuCamera.ts";
 import { GARAGE_BAY_DOORS } from "../src/game/preview/garageDoorLayout.ts";
 import { GARAGE_MENU_LANDMARKS } from "../src/game/preview/garageMenuLandmarks.ts";
+import { GARAGE_PARKING } from "../src/game/preview/garageServiceLayout.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
 import { installGarageEntryInteraction } from "../src/game/preview/garageEntryInteraction.ts";
 import { bindRosterSticks, readRosterSticks, releaseRosterSticks } from "../src/game/preview/rosterStickControls.ts";
@@ -90,6 +91,14 @@ test("garage station shots keep the character in view across phone orientations"
         assert.ok(visible(actor, camera), `${id} should keep the driver visible at ${width}×${height}`);
         if (!yaw && !pitch) {
           assert.ok(visible(new Vector3(...anchor), camera), `${id} should frame its station at ${width}×${height}`);
+          if (id === "vehicle" && height > width) {
+            const [x, , z] = GARAGE_PARKING.position;
+            // A center pin can still be in view with both bumpers cropped off.
+            for (const side of [-1, 1]) for (const end of [-1, 1]) for (const y of [0, 2]) {
+              const corner = new Vector3(x + side * 2.41 / 2, y, z + end * 5.81 / 2);
+              assert.ok(visible(corner, camera), "portrait fits the entire largest road pickup at rest");
+            }
+          }
           if (id === "enter_world" && width > height) {
             for (const { position } of GARAGE_BAY_DOORS) {
               const center = new Vector3(position[0], 1.45, position[2]);

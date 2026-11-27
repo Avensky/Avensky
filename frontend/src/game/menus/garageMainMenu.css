@@ -123,7 +123,7 @@
   --frame-line-width: 1px;
 }
 .garage-main-menu:has(header :focus) .garage-station-face { background: var(--garage-menu-row); }
-.garage-main-menu .garage-menu-continue {
+.garage-main-menu :is(.garage-menu-continue, .garage-menu-drive) {
   position: absolute;
   right: var(--garage-right);
   bottom: var(--garage-bottom);
@@ -142,9 +142,10 @@
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
 }
-.garage-menu-continue:focus-visible { outline: 0; text-decoration: underline; text-underline-offset: .25em; }
+.garage-main-menu .garage-menu-drive { left: var(--garage-left); right: auto; }
+.garage-main-menu :is(.garage-menu-continue, .garage-menu-drive):focus-visible { outline: 0; text-decoration: underline; text-underline-offset: .25em; }
 @media (hover: hover) {
-  .garage-main-menu .garage-menu-continue:hover { color: var(--garage-menu-accent); }
+  .garage-main-menu :is(.garage-menu-continue, .garage-menu-drive):hover { color: var(--garage-menu-accent); }
 }
 .garage-menu-notice {
   position: absolute;
@@ -176,7 +177,7 @@
   .garage-station-face { white-space: normal; text-align: center; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  html:not([data-reduce-motion="true"]) .garage-main-menu > :is(header,.garage-menu-stations,.garage-menu-continue) {
+  html:not([data-reduce-motion="true"]) .garage-main-menu > :is(header,.garage-menu-stations,.garage-menu-continue,.garage-menu-drive) {
     animation: garage-main-reveal 240ms ease-out both;
   }
 }

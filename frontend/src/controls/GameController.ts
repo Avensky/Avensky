@@ -6,6 +6,7 @@ import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove, turnHubC
 import {requestNearestRevive,isMechanicPlayer} from '../combat/reviveTargets';
 import {isGuardDpsPlayer,requestGuardBoost,requestTankBarrier,requestDiveShield,isDiveShieldPlayer} from '../combat/guardBoost';
 import {useScoreboardStore} from "../store/hud/scoreboardStore";
+import { setParkingInput, useGarageParking } from "../game/preview/garageParkingStore";
 import {controllerDrive} from "./controllerDrive";
 import {unpackCockpit} from "../store/input/protocol/cockpitMasks";
 import {useNetworkStore} from '../store/session/networkStore';
@@ -73,6 +74,7 @@ export function GameController() {
       routePhysicalMenuPress(false, cancelled);
     };
     const release = () => {
+      setParkingInput("controller");
       releaseHubMove("gamepad");
       barragePressStarted = null;
       releaseWeaponSource("gamepad");combatIntent.gamepadRam=false;combatIntent.gamepadFire=false;
@@ -193,6 +195,25 @@ export function GameController() {
       }
       if (panelPressHeld && !pressed(0)) releasePanelPress(false);
       const ui = useUIStore.getState();
+      if (ui.screen === "main" && !ui.overlay && !ui.isModeLoading && !performanceOverlayHasFocus()) {
+        const parking = useGarageParking.getState();
+        if (parking.driving) {
+          if (edges.some(Boolean)) reportMenuDevice("controller");
+          if (parking.joining) return;
+          if (edges[1]) { parking.park(); return; }
+          if (edges[0] && parking.error) {
+            document.querySelector<HTMLElement>("[data-garage-retry]")?.click();
+            return;
+          }
+          const pedals = controllerDrive(trigger(pad.buttons[7]?.value), trigger(pad.buttons[6]?.value), 0, true);
+          setParkingInput("controller", pedals.throttle, calibratedSteering(pad.axes[0], usePreferencesStore.getState()), pedals.brake);
+          return;
+        }
+        if (edges[2] && menuArmed && !useTextKeyboardStore.getState().session) {
+          const button = document.querySelector<HTMLElement>('[data-garage-drive-start]:not([aria-disabled="true"])');
+          if (button) { reportMenuDevice("controller"); button.click(); return; }
+        }
+      }
       // Statistics is a passive overlay: ordinary driving continues beneath it.
       // Its B/Close action owns this edge, then requires neutral controls before
       // the same held button can become the driving handbrake again.
@@ -330,7 +351,7 @@ export function GameController() {
           return;
         }
         const now = performance.now();
-        let navigationSticks: boolean | "left" = true;
+        let navigationSticks: boolean | "left" | "stations" = true;
         if ((ui.screen === "welcome" || ui.screen === "main") && !ui.overlay && !keyboardOpen && !performanceOverlayHasFocus()) {
           const deadzone = usePreferencesStore.getState().controllerDeadzone;
           const turn = axis(pad.axes[2], deadzone);
@@ -339,7 +360,10 @@ export function GameController() {
             navigationSticks = "left";
           } else if (ui.screen === "welcome")
             navigationSticks = !readRosterSticks(axis(pad.axes[0], deadzone), axis(pad.axes[1], deadzone), turn, now);
-          else if (readRosterSticks(0, 0, turn, now)) navigationSticks = "left";
+          else {
+            readRosterSticks(0, 0, turn, now);
+            navigationSticks = "stations";
+          }
         } else releaseRosterSticks();
         // A fresh press or deliberate stick tilt changes automatic hints. A held or
         // drifting stick must not immediately steal them back from touch or typing.

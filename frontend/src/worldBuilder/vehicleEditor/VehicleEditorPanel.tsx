@@ -154,7 +154,7 @@ export function VehicleEditorPanel() {
       <div className="ve-fields">
       {tab === 'Weapons' ? <WeaponEditor vehicle={vehicle} onTest={test}/> : tab === 'Materials' ? <>
         <h3>MATERIAL SLOT CHECKLIST · {vehicle.toUpperCase()}</h3>
-        <p>Body paint is equipped in Main menu → Heroes and shared with other players. This page reserves the per-car asset mapping work.</p>
+        <p>Equip body paint at the Garage’s Vehicle station to share it with other players. This page reserves the per-car asset mapping work.</p>
         <p>Body: known paint slot. Seats: BRZ yellow bucket material not yet verified. Front seat named nodes contain no mesh data in the current export.</p>
         <p>TODO: assign dedicated seat fabric, stitching, caliper, stripe mask and steering-wheel accent materials. Avoid renaming unrelated meshes; add stable material slot names when updating each GLB.</p>
         <p>Requested naming: Paint_Body, Fabric_Seat, Thread_Seat, Paint_Caliper, Decal_Stripe, Leather_Wheel, Thread_Wheel.</p>

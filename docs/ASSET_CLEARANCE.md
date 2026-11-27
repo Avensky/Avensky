@@ -82,13 +82,13 @@ These claims alone are insufficient to clear public distribution. Credits withou
 
 ## Garage props for private staging
 
-The main-menu garage can stream these temporary props from the authenticated staging asset service. Their optimized GLBs carry attribution and modification notices. The repository carries only the staging catalog and placement code. Replace the following three props with original or cleared models before the first public alpha or beta, and remove their entries from the staging catalog when retired.
+The garage includes original procedural lockers, an engine hoist and a hydraulic floor jack in every build. Private staging can replace each prop at the same location once its evaluation model loads. The optimized GLBs live on the authenticated asset service and carry attribution and modification notices. Retire these staging entries or obtain clearance before public distribution.
 
 | Prop | Artist and original | Staging adaptation |
 | --- | --- | --- |
 | Vehicle bay engine crane | [Dudzy, Engine Crane](https://sketchfab.com/3d-models/engine-crane-31fa381f73dd481daef557ea9fe66e79) | Static hoist with chassis, boom and hanging hook |
 | Vehicle bay floor jack | [Jinhong Jeong, Car jack](https://sketchfab.com/3d-models/car-jack-b07e82ed61d145d5a3294d74f6183368) | Floor-centered red jack with its saddle and handle |
-| Wardrobe cabinet | [Jinhong Jeong, Cabinet](https://sketchfab.com/3d-models/cabinet-b25dbbb846c54a9a9999fa686b01ec9b) | Three-door locker, including its original decals. The authored locker stays visible until this one loads. |
+| Wardrobe cabinet | [Jinhong Jeong, Cabinet](https://sketchfab.com/3d-models/cabinet-b25dbbb846c54a9a9999fa686b01ec9b) | Three-door locker with its original decals |
 
 All three source listings specify [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Each staging adaptation uses one material and reduced textures. Review or replace the cabinet decals when choosing the public model.
 

@@ -28,7 +28,7 @@ export function enterWorld(result: Record<string, unknown>, mode?: "sandbox") {
 
 /** Admission always targets the server's designated shared hub. The caller can
  * invalidate a pending request if the profile or visible menu is replaced. */
-export async function joinOpenWorld(stillJoining = () => true) {
+export async function admitOpenWorld(stillJoining: () => boolean) {
   const player = useSocialStore.getState().view?.profile;
   if (!player) throw Error("Connect your player profile to enter the shared world.");
   const currentView = () => {
@@ -49,8 +49,16 @@ export async function joinOpenWorld(stillJoining = () => true) {
     : await requestSocial("world_join", { world_id: world.id });
   if (!stillJoining()) return;
   currentView();
+  if (joined.world_id !== world.id || joined.map !== world.map)
+    throw Error("The server assigned a different world. Return to the garage and try again.");
+  return world;
+}
+
+export async function joinOpenWorld(stillJoining = () => true) {
+  const world = await admitOpenWorld(stillJoining);
+  if (!world || !stillJoining()) return;
   useAlphaStore.getState().clearHero();
   // The public hub uses the free-drive vehicle policy, even when the
   // admission acknowledgment precedes a previous match's social update.
-  enterWorld(joined, "sandbox");
+  enterWorld({ world_id: world.id, map: world.map }, "sandbox");
 }

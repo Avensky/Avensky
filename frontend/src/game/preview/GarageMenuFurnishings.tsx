@@ -1,10 +1,11 @@
-import { Suspense, useCallback, useLayoutEffect, useRef } from "react";
+import { Suspense, useMemo, useLayoutEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import {
   BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, Object3D, PlaneGeometry, type BufferGeometry, type Material,
 } from "three";
-import { GARAGE_MENU_LANDMARKS } from "./garageMenuLandmarks";
+import { GARAGE_WORKSHOP } from "./garageServiceLayout";
+import { buildServiceTools } from "./garageServiceTools";
 import { garagePaintedFinish } from "./garagePaintedFinish";
 import { garageRoutePlan } from "./garageRoutePlan";
 import { assetAvailable, stagingAssetsEnabled } from "../../assets/runtimeAssets";
@@ -25,8 +26,8 @@ function buildFurnishings() {
   group.name = "garage-menu-furnishings";
   const parts: Record<Finish, Part[]> = { steel: [], round: [], glass: [], light: [], shade: [], paper: [] };
   const station = new Object3D(), local = new Object3D();
-  function place(anchor: readonly number[], yaw: number) {
-    station.position.set(anchor[0], 0, anchor[2]);
+  function place({ position, yaw }: typeof GARAGE_WORKSHOP.lockers) {
+    station.position.set(...position);
     station.rotation.y = yaw;
     station.updateMatrix();
   }
@@ -41,7 +42,7 @@ function buildFurnishings() {
     part("steel", color, [x, y, z], [w, h, d]);
 
   // Vented steel lockers, hardware, a standing mirror and slatted changing bench.
-  place(GARAGE_MENU_LANDMARKS.wardrobe, .28);
+  place(GARAGE_WORKSHOP.lockers);
   const lockerStart = parts.steel.length;
   box(dark, .32, 1.02, -.16, 1.48, 1.93, .48);
   for (let column = 0; column < 3; column++) {
@@ -56,15 +57,15 @@ function buildFurnishings() {
     box(brass, x + .13, 1.03, .169, .025, .093, .033);
   }
   const lockerPanels = parts.steel.splice(lockerStart);
-  for (const x of [-1.1, -.52]) box(iron, x, .048, .28, .07, .08, .54);
-  box(brass, -.81, .98, .12, .78, 1.83, .09);
-  box(dark, -.81, .98, .17, .72, 1.77, .018);
-  part("glass", "#c0c8bf", [-.81, .98, .186], [.671, 1.716, .012]);
+  for (const x of [1.26, 1.84]) box(iron, x, .048, .28, .07, .08, .54);
+  box(brass, 1.55, .98, .12, .78, 1.83, .09);
+  box(dark, 1.55, .98, .17, .72, 1.77, .018);
+  part("glass", "#c0c8bf", [1.55, .98, .186], [.671, 1.716, .012]);
   for (const x of [.14, .97]) box(iron, x, .225, .46, .076, .43, .32);
   for (const z of [.31, .44, .57]) box(timber, .56, .47, z, 1.19, .064, .108);
 
   // A low rolling stand supports the portable donor chest, which has no wheels.
-  place(GARAGE_MENU_LANDMARKS.vehicle, .60);
+  place(GARAGE_WORKSHOP.toolbox);
   for (const x of [-.34, .34]) {
     for (const z of [-.20, .08]) {
       part("round", dark, [x, .087, z], [.14, .06, .14], [0, 0, Math.PI / 2]);
@@ -74,7 +75,7 @@ function buildFurnishings() {
   box(iron, 0, .22, -.06, .88, .07, .52);
 
   // Drafting desk, weighted paper, plan rack, swing-arm lamp and workshop stool.
-  place(GARAGE_MENU_LANDMARKS.world_editor, .57);
+  place(GARAGE_WORKSHOP.desk);
   for (const x of [-.83, .83]) {
     for (const z of [-.47, .47]) box(iron, x, .424, z, .079, .85, .079);
     box(dark, x, .23, 0, .08, .06, .98);
@@ -110,7 +111,7 @@ function buildFurnishings() {
   part("round", timber, [-.12, .66, -.86], [.44, .063, .44]);
   // An open planning alcove: steel-framed half partitions leave the authored
   // sign and practical lights visible through the upper panels.
-  const alcoveX = 1.46, rear = -2.52, side = alcoveX + .9;
+  const alcoveX = 0, rear = -1.32, side = .98;
   box("#484e4c", alcoveX, .45, rear, 1.8, .85, .043);
   box("#484e4c", side, .45, rear + .64, .043, .85, 1.28);
   box("#575c57", alcoveX, .43, rear, 1.8, .84, .078);
@@ -125,7 +126,7 @@ function buildFurnishings() {
   part("paper", "#e8e2d2", [alcoveX, 1.49, rear + .057], [1.39, .87, 1]);
 
   const map = garageRoutePlan();
-  const painted = new MeshStandardMaterial({ metalness: .3, roughness: .53, emissive: "#100e0b" });
+  const painted = new MeshStandardMaterial({ metalness: .3, roughness: .53, emissive: "#100e0b", vertexColors: true });
   painted.onBeforeCompile = garagePaintedFinish;
   const surface = new MeshStandardMaterial({ metalness: .92, roughness: .17, envMapIntensity: 1.25, emissive: "#171b1b" });
   // Keep the real fixture probe on the glass. Two soft strips supply a stable
@@ -177,12 +178,16 @@ function buildFurnishings() {
   batch("glass", cube, surface);
   batch("light", tube, luminous);
   batch("paper", paper, printed);
+  const serviceTools = buildServiceTools(cube, tube, painted);
+  group.add(serviceTools["car-jack"], serviceTools["engine-crane"]);
   return {
     group,
-    showLockerFallback(visible: boolean) {
-      steel.count = fixedSteelCount + (visible ? lockerPanels.length : 0);
+    showFallback(name: EvaluationProp, visible: boolean) {
+      if (name === "cabinet") steel.count = fixedSteelCount + (visible ? lockerPanels.length : 0);
+      else serviceTools[name].visible = visible;
     },
     dispose() {
+      for (const tool of Object.values(serviceTools)) tool.geometry.dispose();
       for (const mesh of meshes) mesh.dispose();
       for (const geometry of [cube, tube, shade, paper]) geometry.dispose();
       for (const material of [painted, surface, printed, luminous]) material.dispose();
@@ -248,16 +253,20 @@ export function GarageMenuFurnishings() {
   const scene = useThree(state => state.scene);
   const invalidate = useThree(state => state.invalidate);
   const current = useRef<ReturnType<typeof buildFurnishings> | null>(null);
-  const cabinetMounted = useRef(false);
-  const handleCabinetReady = useCallback((mounted: boolean) => {
-    cabinetMounted.current = mounted;
-    current.current?.showLockerFallback(!mounted);
-    invalidate();
+  const mountedModels = useRef(new Set<EvaluationProp>());
+  const onReady = useMemo(() => {
+    const track = (name: EvaluationProp) => (mounted: boolean) => {
+      if (mounted) mountedModels.current.add(name);
+      else mountedModels.current.delete(name);
+      current.current?.showFallback(name, !mounted);
+      invalidate();
+    };
+    return { cabinet: track("cabinet"), jack: track("car-jack"), crane: track("engine-crane") };
   }, [invalidate]);
   useLayoutEffect(() => {
     const furnishings = buildFurnishings();
     current.current = furnishings;
-    furnishings.showLockerFallback(!cabinetMounted.current);
+    for (const name of mountedModels.current) furnishings.showFallback(name, false);
     scene.add(furnishings.group);
     invalidate();
     return () => {
@@ -267,18 +276,17 @@ export function GarageMenuFurnishings() {
       invalidate();
     };
   }, [scene, invalidate]);
-  const [lockerX, , lockerZ] = GARAGE_MENU_LANDMARKS.wardrobe;
-  const [bayX, , bayZ] = GARAGE_MENU_LANDMARKS.vehicle;
+  const { lockers, toolbox, tire, jack, crane, shelf } = GARAGE_WORKSHOP;
   return <>
-    <group position={[bayX, 0, bayZ]} rotation-y={.60}>
+    <group position={toolbox.position} rotation-y={toolbox.yaw}>
       <OpenWorkshopProp name="metal-tool-chest" position={[0, .255, -.06]} scale={1.12} />
-      <EvaluationWorkshopProp name="car-jack" position={[.80, 0, -.03]} yaw={.60} />
-      <OpenWorkshopProp name="service-tire" position={[-.70, 0, -.075]} yaw={.55} />
     </group>
-    <EvaluationWorkshopProp name="engine-crane" position={[-3.65, 0, -1.75]} yaw={-.50} />
-    <group position={[lockerX, 0, lockerZ]} rotation-y={.28}>
-      <EvaluationWorkshopProp name="cabinet" position={[.32, 0, -.16]} onReady={handleCabinetReady} />
+    <OpenWorkshopProp name="service-tire" {...tire} />
+    <EvaluationWorkshopProp name="car-jack" {...jack} onReady={onReady.jack} />
+    <EvaluationWorkshopProp name="engine-crane" {...crane} onReady={onReady.crane} />
+    <group position={lockers.position} rotation-y={lockers.yaw}>
+      <EvaluationWorkshopProp name="cabinet" position={[.32, 0, -.16]} onReady={onReady.cabinet} />
     </group>
-    <OpenWorkshopProp name="metal-shelf" position={[-3.66, 0, -3.75]} yaw={.40} />
+    <OpenWorkshopProp name="metal-shelf" {...shelf} />
   </>;
 }

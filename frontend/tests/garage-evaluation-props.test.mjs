@@ -74,25 +74,42 @@ async function withGarageRenderer(paths, run) {
   }
 }
 
-function renderWorkshop(paths, unavailable) {
+function renderWorkshop(paths, attempts = [null]) {
   return withGarageRenderer(paths, async ({ load, render, setLoader }) => {
     const { GarageMenuFurnishings } = await load("GarageMenuFurnishings.tsx");
-    const requests = new Set(), models = new Map();
-    setLoader(url => {
-      requests.add(url);
-      if (url === unavailable) throw Error("Missing evaluation fixture");
-      if (!models.has(url)) {
-        const scene = new THREE.Group();
-        scene.name = url;
-        models.set(url, { scene });
+    const { GARAGE_WORKSHOP } = await load("garageServiceLayout.ts");
+    const results = [];
+    for (const unavailable of attempts) {
+      const requests = new Set(), models = new Map();
+      setLoader(url => {
+        requests.add(url);
+        if (url === unavailable) throw Error("Missing evaluation fixture");
+        if (!models.has(url)) {
+          const scene = new THREE.Group();
+          scene.name = url;
+          models.set(url, { scene });
+        }
+        return models.get(url);
+      });
+      const scene = await render(createElement(GarageMenuFurnishings, { key: unavailable ?? "ready" }));
+      assert.ok(scene.getObjectByName("garage-menu-furnishings"));
+      for (const url of openModels) assert.ok(scene.getObjectByName(url), url);
+      for (const url of requests) assert.equal(Boolean(scene.getObjectByName(url)), url !== unavailable, url);
+      const visible = {};
+      for (const [name, placement, key] of [
+        ["garage-floor-jack", GARAGE_WORKSHOP.jack, "jack"], ["garage-engine-hoist", GARAGE_WORKSHOP.crane, "crane"],
+      ]) {
+        const tool = scene.getObjectByName(name);
+        assert.ok(tool?.isMesh && !tool.children.length, "one static draw per original tool");
+        assert.deepEqual(tool.position.toArray(), placement.position);
+        assert.equal(tool.rotation.y, placement.yaw);
+        assert.equal(tool.scale.x, placement.scale ?? 1);
+        assert.ok(tool.geometry.attributes.color && tool.material.vertexColors, "retain the painted hardware finish");
+        visible[key] = tool.visible;
       }
-      return models.get(url);
-    });
-    const scene = await render(createElement(GarageMenuFurnishings));
-    assert.ok(scene.getObjectByName("garage-menu-furnishings"));
-    for (const url of openModels) assert.ok(scene.getObjectByName(url), url);
-    for (const url of requests) assert.equal(Boolean(scene.getObjectByName(url)), url !== unavailable, url);
-    return { requests, steelCount: scene.getObjectByName("garage-furnishing-steel").count };
+      results.push({ requests, visible, steelCount: scene.getObjectByName("garage-furnishing-steel").count });
+    }
+    return results;
   });
 }
 
@@ -101,15 +118,20 @@ test("the workshop keeps its public furnishings in production and when an option
   t.mock.method(console, "error", (...args) => {
     if (args[0]?.message !== "Missing evaluation fixture") report(...args);
   });
-  const production = await renderWorkshop(null);
+  const [production] = await renderWorkshop(null);
   assert.deepEqual(production.requests, new Set(openModels));
+  assert.deepEqual(production.visible, { jack: true, crane: true });
 
-  const partial = await renderWorkshop({ [cabinet]: true, [crane]: true }, cabinet);
+  const [partial] = await renderWorkshop({ [cabinet]: true, [crane]: true }, [cabinet]);
   assert.deepEqual(partial.requests, new Set([...openModels, cabinet, crane]));
   assert.equal(partial.steelCount, production.steelCount, "keep the fallback locker after a failed fetch");
+  assert.deepEqual(partial.visible, { jack: true, crane: false }, "each installed prop replaces only its own original");
+  const [missingCrane, missingJack, ready] = await renderWorkshop(catalog, [crane, jack, null]);
+  assert.deepEqual(missingCrane.visible, { jack: false, crane: true }, "a failed crane request keeps the hoist visible");
+  assert.deepEqual(missingJack.visible, { jack: true, crane: false }, "a failed jack request keeps the jack visible");
 
-  const ready = await renderWorkshop(catalog);
   assert.deepEqual(ready.requests, new Set([...openModels, cabinet, jack, crane]));
+  assert.deepEqual(ready.visible, { jack: false, crane: false });
   assert.ok(ready.steelCount < production.steelCount, "hide the fallback locker after its replacement has mounted");
 });
 

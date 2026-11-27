@@ -8,6 +8,11 @@ import { getGarageMotion, setGaragePreview, type GarageEntryShot } from "./LiveG
 import { useUIStore } from "../../store/menus/uiStore";
 import { MAIN_MENU_ITEMS } from "../menus/menuItems";
 import { garageMenuCamera } from "./garageMenuCamera";
+import { GarageParkingMotion } from "./GarageParkingMotion";
+import { garageParkingCamera } from "./garageParkingCamera";
+import { useGarageParking } from "./garageParkingStore";
+import { GarageExitApron } from "./GarageExitApron";
+import { useSocialStore } from "../../store/social/socialStore";
 import { GarageMenuMarkers } from "./garageMenuMarkers";
 import { GarageMenuFurnishings } from "./GarageMenuFurnishings";
 import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
@@ -89,23 +94,40 @@ function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelec
 
 /** Install just the selected actor in the already-mounted room; row thumbnails have no scene. */
 export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes }: Omit<GarageCharacterSelection, "choice"> & { choice?: CharacterChoice }) {
+  const driving = useGarageParking(s => mode === "main" && s.driving);
+  const parkingKey = useSocialStore(s => {
+    const profile = s.view?.profile;
+    return profile ? JSON.stringify([profile.id, profile.active_character_id]) : "local";
+  });
   const station = useUIStore(state => mode === "main"
     ? MAIN_MENU_ITEMS[state.selectedMenuIndexById.main]?.id ?? "enter_world" : undefined);
   // Changing rigs has a new measured endpoint. Color and makeup changes keep
   // the existing shot and in-flight interpolation.
   const creatorRig = mode === "create" ? choice?.id : undefined;
-  const shot = useMemo(() => mode === "main" ? garageMenuCamera(station ?? "enter_world") : rosterCamera(mode, creatorFrame),
-    [mode, station, creatorFrame, creatorRig]);
+  const shot = useMemo(() => {
+    if (driving) return garageParkingCamera();
+    if (mode === "main") return garageMenuCamera(station ?? "enter_world");
+    return rosterCamera(mode, creatorFrame);
+  }, [driving, mode, station, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
     setGaragePreview({ shot, loadBayDetail: mode === "main", demand: true, shadows: false, contents: <>
-      {choice && <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} />}
-      {mode === "main" && <><GarageMenuFurnishings /><GarageMenuMarkers /></>}
+      {choice && !driving && <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} />}
+      {mode === "main" && <>
+        <GarageMenuFurnishings />
+        <GarageParkingMotion parkingKey={parkingKey} />
+        <GarageExitApron driving={driving} />
+        {!driving && <GarageMenuMarkers />}
+      </>}
     </> });
-  }, [choice, mode, creatorEmotes, shot]);
+  }, [choice, mode, creatorEmotes, shot, driving, parkingKey]);
   // Reframe the same actor when switching panels. Release the scene only on leaving this preview.
   useLayoutEffect(() => () => setGaragePreview(null), []);
   useLayoutEffect(() => {
     const motion = getGarageMotion();
+    if (driving) {
+      motion.stickYaw = motion.stickPitch = 0;
+      return;
+    }
     return bindRosterSticks((x, y, turn, elapsed) => {
       const yaw = -x * MAX_YAW, pitch = y * MAX_PITCH;
       if (yaw !== (motion.stickYaw ?? 0) || pitch !== (motion.stickPitch ?? 0)) {
@@ -116,6 +138,6 @@ export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes 
       }
       if (turn) shot.actor?.turn(turn * elapsed * 2.6);
     });
-  }, [shot]);
+  }, [shot, driving]);
   return null;
 }
