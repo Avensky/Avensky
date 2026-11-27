@@ -478,6 +478,48 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(button("Sign in"), undefined);
     assert.match(document.querySelector(".welcome-character").textContent, /Track Fox/);
     assert.deepEqual(selectEquippedCharacter(social.getState()), fox);
+    {
+      const count = sent.length;
+      const actor = document.querySelector(".garage-orbit-surface");
+      const manage = button("Manage Track Fox II");
+      await act(async () => panelAction("right"));
+      assert.ok(document.activeElement === manage, "Right focuses the current tile’s Manage action");
+      await act(async () => panelAction("activate"));
+      await select("Delete character");
+      assert.ok(document.activeElement === button("Cancel"), "confirmation starts on the safe action");
+      const enterName = async value => {
+        const field = document.querySelector('.roster-confirm-field input');
+        await act(async () => {
+          field.focus();
+          Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(field, value);
+          field.dispatchEvent(new Event("input", {bubbles:true}));
+        });
+      };
+      for (const name of ["track fox ii", "Track Fox II "]) {
+        await enterName(name);
+        assert.ok(disabled(button("Delete character")));
+      }
+      await enterName("Track Fox II");
+      await pressKey("Enter", "Enter");
+      assert.ok(document.activeElement === button("Cancel"), "finishing text entry cannot submit");
+      assert.equal(sent.length, count);
+      await select("Cancel");
+      await act(async () => panelAction("back"));
+      assert.ok(document.activeElement === button("Manage Track Fox II"), "Back restores the selected tile’s Manage action");
+      await select("Manage Track Fox II");
+      await select("Delete character");
+      assert.equal(document.querySelector('.roster-confirm-field input').value, "");
+      await enterName("Track Fox II");
+      await select("Delete character");
+      const request = sent.at(-1);
+      assert.deepEqual([request.action, request.character_id, request.confirmation_name],
+        ["character_delete", saved.characters[0].id, "Track Fox II"]);
+      assert.equal(sent.length, count + 1);
+      await act(async () => reply(request, {profile:view.profile}));
+      assert.equal(button("Manage Track Fox II"), undefined);
+      assert.ok(document.activeElement === button("Create character"), "deleting the final slot focuses Create");
+      assert.equal(document.querySelector(".garage-orbit-surface"), actor);
+    }
     await act(async () => client.receiveSocialState({...view, profile:{...saved,
       characters:Array.from({length:4},(_,i)=>({...saved.characters[0], id:i===0?saved.active_character_id:"slot"+i}))}}));
     assert.equal(button("Create character"),undefined,"a full registered account has four real slots");

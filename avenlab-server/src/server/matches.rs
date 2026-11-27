@@ -114,6 +114,11 @@ fn apply_record(data: &mut SocialData, record: &CareerMatch) -> Result<bool, Str
     record.validate()?;
     for person in &record.participants {
         let profile = data.profiles.get_mut(person.owner()).ok_or("A match profile is unavailable.")?;
+        // A player can leave a match, then delete that character before it
+        // ends. Its immutable result still counts for the remaining players.
+        if profile.career_id() != person.profile_id && !profile.characters.contains_key(&person.profile_id) {
+            continue;
+        }
         let progression = profile.character_progression(&person.profile_id).ok_or("A match character is unavailable.")?;
         progression.career.record(record, &person.profile_id)?;
         if record.progression_eligible && !person.abandoned {

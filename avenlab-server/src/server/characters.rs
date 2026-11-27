@@ -35,17 +35,38 @@ fn style_choice(style: &str, body: &str) -> Result<CharacterChoice, String> {
     Ok(choice)
 }
 
+fn delete_character(profile: &mut Profile, slot_id: &str, confirmation: &str) -> Result<(), String> {
+    let slot = profile.characters.get(slot_id).ok_or("Choose one of your saved characters.")?;
+    if confirmation.is_empty() || slot.name != confirmation {
+        return Err("Type the character’s name exactly as shown.".into());
+    }
+    if profile.active_character.as_deref() == Some(slot_id) {
+        let remaining = profile.characters.iter_mut().find(|(id, _)| id.as_str() != slot_id);
+        if let Some((next_id, next)) = remaining {
+            profile.progression = next.inactive.take().ok_or("Your other saved character is unavailable.")?;
+            profile.active_character = Some(next_id.clone());
+        } else {
+            profile.progression = Default::default();
+            profile.active_character = None;
+            profile.next_character_id = Some(id());
+        }
+    }
+    profile.characters.remove(slot_id);
+    Ok(())
+}
+
 impl Server {
     pub(super) async fn handle_character_slots(&self, player: &str, value: &Value) -> Result<Value, String> {
         if !self.player_accounts_enabled() { return Err("Saved characters are unavailable on this server.".into()); }
         let actor = self.actor(player).await?;
         let text = |field: &str| value[field].as_str().unwrap_or_default();
-        let creating = text("action") != "character_select";
+        let action = text("action");
+        let creating = matches!(action, "character_create" | "character_create_styled");
         let requested = text("character_id");
-        {
+        if action == "character_select" {
             let data = self.data.lock().await;
             let profile = data.profile(&actor)?;
-            if !creating && profile.active_character.as_deref() == Some(requested) {
+            if profile.active_character.as_deref() == Some(requested) {
                 return Ok(json!({ "profile": profile.player_view(true) }));
             }
         }
@@ -80,7 +101,7 @@ impl Server {
             };
             // Validate the entire draft before switching slots. The previous client
             // sends no preview and still uses the server's original preset.
-            let choice = if text("action") == "character_create_styled" {
+            let choice = if action == "character_create_styled" {
                 let draft: CharacterChoice = serde_json::from_value(value["character"].clone())
                     .map_err(|_| "Choose an available character appearance.")?;
                 if !draft.is_equippable() || !draft.has_starter_identity(&starter) {
@@ -90,7 +111,7 @@ impl Server {
             } else {
                 starter
             };
-            Some((if first { actor.clone() } else { id() }, SavedCharacter { name, style, inactive: None }, choice))
+            Some((if first { profile.career_id().to_owned() } else { id() }, SavedCharacter { name, style, inactive: None }, choice))
         } else {
             None
         };
@@ -104,6 +125,9 @@ impl Server {
             profile.progression.character = Some(choice);
             profile.characters.insert(slot_id.clone(), slot);
             profile.active_character = Some(slot_id);
+            profile.next_character_id = None;
+        } else if action == "character_delete" {
+            delete_character(profile, requested, text("confirmation_name"))?;
         } else {
             let next = profile.characters.get_mut(requested).and_then(|slot| slot.inactive.take())
                 .ok_or("Choose one of your saved characters.")?;

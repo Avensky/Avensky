@@ -335,3 +335,41 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   .welcome-profile { width: 100%; max-height: max(54%, 18rem); }
   .welcome-profile:focus-within:has(input:focus) { max-height: 90%; }
 }
+
+.roster-tile-row { display: flex; gap: 3px; min-width: 0; }
+.roster-tile-row > .roster-tile { flex: 1; min-width: 0; }
+.character-roster .roster-manage {
+  flex: none; display: grid; place-content: center; justify-items: center; gap: 2px;
+  min-width: 44px; min-height: 44px; padding: 3px 6px; font-size: .75rem;
+}
+.roster-manage .menu-icon { width: 22px; height: 18px; }
+.character-roster[data-portrait] .roster-caption { align-items: center; }
+.character-roster[data-portrait] .roster-manage { margin-inline-start: auto; display: flex; align-items: center; gap: 4px; }
+.roster-manager {
+  gap: var(--roster-gap); overflow-y: auto; overscroll-behavior: contain;
+  pointer-events: auto; scrollbar-width: thin;
+}
+.roster-manager > * { flex: none; }
+.character-roster[data-portrait] .roster-manager { max-height: 100%; }
+.character-roster .roster-manager-summary, .character-roster .roster-confirm-field {
+  padding: .75rem 1rem; overflow-wrap: anywhere;
+}
+.roster-manager h2 { margin: 0; font-size: clamp(1.1rem, 2vw, 1.55rem); }
+.roster-manager p { margin: .35rem 0 0; font-size: .9rem; }
+.roster-manager .roster-confirm-field { display: grid; gap: .3rem; }
+.roster-confirm-field label { display: block; font-size: .9rem; }
+.welcome-panel .roster-confirm-field input {
+  min-height: 44px; font-size: 1rem; color: var(--garage-menu-ink); background: var(--app-background);
+  border: 1px solid var(--garage-menu-line); border-radius: 0; padding: .5rem;
+}
+.roster-manager-actions { display: grid; grid-template-columns: auto minmax(0,1fr); gap: 4px; }
+.roster-manager-actions > [role="button"] {
+  display: flex; gap: .35rem; align-items: center; justify-content: center;
+  min-height: 44px; padding: .45rem .7rem; font-size: .95rem; text-align: center;
+}
+.roster-manager-actions .menu-icon { flex: none; width: 18px; height: 18px; }
+.character-roster .roster-destructive, .roster-manager-error { color: var(--app-danger, #df968c); }
+.roster-manager .roster-manager-error { background: var(--garage-menu-row); padding: .5rem .75rem; }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduce-motion="true"]) .roster-manager { animation: garage-entry-reveal 160ms ease-out both; }
+}

@@ -263,6 +263,62 @@ test("social requests, world transitions and assisted text have independent owne
         client.setSocialConnection(null);
       },
     );
+    await t.test("character deletion requires the owned slot and exact name, then adopts the confirmed roster", async () => {
+      const sent = [];
+      const connect = () => client.setSocialConnection({
+        readyState: WebSocket.OPEN, send: text => sent.push(JSON.parse(text)),
+      });
+      const active = { id: "one", name: "Mara Vega", style: "neutral", level: 3 };
+      const target = { id: "two", name: "D'Arcy West", style: "neutral", level: 1 };
+      const owner = view.profile.id;
+      const before = { ...view.profile, characters: [active, target], active_character_id: active.id,
+        progression: { cosmetics_revision: 4 } };
+      const after = { ...before, characters: [active], progression: { cosmetics_revision: 5 } };
+      const remove = () => client.deleteRosterCharacter(owner, target.id, target.name);
+      const reply = (profile) => client.receiveSocialResult({
+        request_id: sent.at(-1).request_id, ok: true, data: { profile },
+      });
+      connect();
+      try {
+        social.getState().receive({ ...view, profile: before });
+        for (const name of [target.name.toLowerCase(), target.name + " "]) {
+          await assert.rejects(client.deleteRosterCharacter(owner, target.id, name), /exact/);
+        }
+        await assert.rejects(client.deleteRosterCharacter("somebody-else", target.id, target.name), /roster/);
+        assert.equal(sent.length, 0);
+        const denied = remove();
+        const { action, character_id, confirmation_name, request_id } = sent.at(-1);
+        assert.deepEqual([action, character_id, confirmation_name], ["character_delete", target.id, target.name]);
+        client.receiveSocialResult({ request_id, ok: false, message: "Leave the queue." });
+        await assert.rejects(denied, /Leave the queue/);
+        assert.equal(social.getState().view.profile, before);
+        const unconfirmed = remove();
+        reply(before);
+        await assert.rejects(unconfirmed, /did not confirm/);
+        assert.equal(social.getState().view.profile, before);
+        const retried = remove();
+        reply(after);
+        assert.equal(await retried, after);
+        social.getState().receive({ ...view, profile: before });
+        assert.deepEqual(social.getState().view.profile.characters, [active], "a delayed snapshot cannot restore the deleted inactive slot");
+
+        const stale = client.deleteRosterCharacter(owner, active.id, active.name);
+        const empty = { ...after, active_character_id: null, characters: [], progression: { cosmetics_revision: 6 } };
+        reply(empty);
+        connect(); // A new session starts before the acknowledgement runs.
+        social.getState().receive({ ...view, profile: { ...after, id: "new-account" } });
+        await assert.rejects(stale, /profile changed/);
+        assert.equal(social.getState().view.profile.id, "new-account");
+        social.getState().receive({ ...view, profile: after });
+        const last = client.deleteRosterCharacter(owner, active.id, active.name);
+        reply(empty);
+        await last;
+        social.getState().receive({ ...view, profile: after });
+        assert.deepEqual(social.getState().view.profile.characters, [], "a delayed snapshot cannot reactivate the last career");
+      } finally {
+        client.setSocialConnection(null);
+      }
+    });
     await t.test(
       "world reset accepts the destination's lower tick without disconnecting the player",
       () => {
