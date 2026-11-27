@@ -11,6 +11,7 @@ export function garageAdmission(signal: AbortSignal) {
   let provisioned: boolean | undefined;
   let result: boolean | undefined;
   let acknowledged = false;
+  let attempts = 0;
   let pending: Promise<void> | undefined;
   function settle() {
     if (pending || acknowledged || result === undefined || world === undefined ||
