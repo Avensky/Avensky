@@ -1,9 +1,13 @@
 import { MathUtils, Quaternion, Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 
+export function garageOrbitDirection(direction: Vector3, heading: number, elevation: number) {
+  const horizontal = Math.cos(elevation);
+  return direction.set(horizontal * Math.sin(heading), Math.sin(elevation), horizontal * Math.cos(heading));
+}
+
 export function placeGarageOrbit(camera: PerspectiveCamera, target: Vector3, distance: number, heading: number, elevation: number) {
-  const horizontal = distance * Math.cos(elevation);
-  camera.position.set(horizontal * Math.sin(heading), distance * Math.sin(elevation), horizontal * Math.cos(heading)).add(target);
+  garageOrbitDirection(camera.position, heading, elevation).multiplyScalar(distance).add(target);
   camera.lookAt(target);
 }
 
@@ -125,7 +129,10 @@ export class GarageCameraTravel {
       // Keep its turn direction through subsequent changes to the player's drag offset.
       this.arcDirection = from.x * to.x + from.z * to.z < 0 && this.sourceRadius > 1 &&
         to.x * to.x + to.z * to.z > 1 ? Math.sign(from.z * to.x - from.x * to.z) || 1 : 0;
-      if (this.arcDirection) this.localStart.copy(this.sourceOrientation).premultiply(this.yawRotation.setFromAxisAngle(worldUp, -this.sourceHeading));
+      if (this.arcDirection) {
+        this.yawRotation.setFromAxisAngle(worldUp, -this.sourceHeading);
+        this.localStart.copy(this.sourceOrientation).premultiply(this.yawRotation);
+      }
     }
 
     const lens = this.targetLens;

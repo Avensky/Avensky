@@ -8,10 +8,32 @@ type Box = [x: number, y: number, z: number, width: number, height: number, dept
 const threshold = GARAGE_ENTRY_BAY.position[2];
 const yard: Box[] = [
   // Extend the slab under the shutter sill and along the entire departure lane.
-  [0, -.091, threshold + 37, 96, .16, 75, "#626261"],
+  [0, -.091, threshold + 37, 96, .16, 75, "#514f4d"],
   [-7.9, .22, threshold + 10, .35, .44, 21, "#89877f"],
   [9.5, .22, threshold + 10, .35, .44, 21, "#89877f"],
 ];
+// The high chase shot sees the concrete first. Transverse joints and wheel wear
+// make the open threshold readable even before the skyline comes into view.
+const slabs = [
+  ["#494643", "#44423f"], ["#55524f", "#4e4b48"], ["#5e5b57", "#575551"],
+  ["#65615d", "#5f5c59"], ["#686561", "#64615d"],
+];
+for (let row = 0; row < slabs.length; row++) {
+  const z = threshold + row * 3.8;
+  yard.push([.8, -.010, z + 1.90, 18, .006, 3.77, slabs[row][0]]);
+  yard.push([.8, -.005, z, 18, .006, .035, "#363633"]);
+  for (const bay of GARAGE_BAY_DOORS) {
+    const x = bay.position[0];
+    for (const side of [-1, 1]) {
+      yard.push([x + .78 * side, -.004, z + 1.90, .20, .004, 3.66, slabs[row][1]]);
+    }
+  }
+}
+// A narrow slotted drain runs across all three entries just outside the threshold.
+yard.push([.8, -.004, threshold + .45, 17.6, .008, .21, "#343735"]);
+for (let x = -7.9; x <= 9.5; x += .23) {
+  yard.push([x, .002, threshold + .45, .075, .003, .195, "#686661"]);
+}
 // The far edge of the service yard gives the open door a horizon at dusk.
 for (const [x, z, w, h] of [[-22, 49, 21, 4.4], [16, 55, 16, 5.6], [34, 47, 13, 4.3]]) {
   yard.push([x, h / 2, z, w, h, 9, "#62676a"], [x, h + .08, z, w + .32, .16, 9.25, "#474e53"]);

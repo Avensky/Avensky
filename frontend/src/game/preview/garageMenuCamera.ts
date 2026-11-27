@@ -1,6 +1,6 @@
 import { Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
-import { placeGarageOrbit } from "./garageCameraTravel.ts";
+import { garageOrbitDirection, placeGarageOrbit } from "./garageCameraTravel.ts";
 import { GARAGE_MENU_LANDMARKS, type GarageMenuStation } from "./garageMenuLandmarks.ts";
 
 // Eye positions in the clear aisle, in floor metres from the character.
@@ -22,10 +22,10 @@ export function garageMenuCamera(station: GarageMenuStation): GarageEntryShot {
       placeGarageOrbit(camera, target, distance, heading - yaw, elevation + pitch);
       return;
     }
-    placeGarageOrbit(camera, actor, distance, heading - yaw, elevation + pitch);
+    garageOrbitDirection(actorRay, heading - yaw, elevation + pitch).negate();
+    camera.position.copy(actor).addScaledVector(actorRay, -distance);
     // The normalized sightlines keep the near character and the distant station
     // in frame independently of depth. The narrow vehicle shot gives its nose more room.
-    actorRay.subVectors(actor, camera.position).normalize();
     stationRay.subVectors(landmark, camera.position).normalize();
     target.copy(camera.position).addScaledVector(actorRay, 1 - stationWeight).addScaledVector(stationRay, stationWeight);
     camera.lookAt(target);
