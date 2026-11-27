@@ -1,9 +1,9 @@
 // Labels, routing and controller item counts share the same source of truth.
 export const MAIN_MENU_ITEMS = [
-  { id: "enter_world", label: "Enter World" },
-  { id: "wardrobe", label: "Wardrobe" },
-  { id: "vehicle", label: "Vehicle" },
-  { id: "world_editor", label: "World Editor" },
+  { id: "enter_world", icon: "open_world", label: "Enter World" },
+  { id: "wardrobe", icon: "wardrobe", label: "Wardrobe" },
+  { id: "vehicle", icon: "vehicles", label: "Vehicle" },
+  { id: "world_editor", icon: "edit", label: "World Editor" },
 ] as const;
 
 export const PAUSE_MENU_ITEMS = [

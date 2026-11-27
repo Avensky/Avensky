@@ -2,7 +2,7 @@ import test, { before, after } from "node:test";
 import assert from "node:assert/strict";
 import { createServer } from "vite";
 
-let server, ui, route, preferences, canDrive, canNavigateMenu, alpha, mainItems;
+let server, ui, route, preferences, canDrive, canNavigateMenu, alpha, mainItems, garageEditor;
 before(async () => {
   server = await createServer({
     server: { middlewareMode: true, hmr: false, ws: false },
@@ -11,6 +11,7 @@ before(async () => {
   });
   ui = (await server.ssrLoadModule("/src/store/menus/uiStore.ts")).useUIStore;
   alpha = (await server.ssrLoadModule("/src/store/alpha/alphaStore.ts")).useAlphaStore;
+  garageEditor = (await server.ssrLoadModule("/src/worldBuilder/garage/garageEditorState.ts")).useGarageEditor;
   mainItems = (await server.ssrLoadModule("/src/game/menus/menuItems.ts")).MAIN_MENU_ITEMS;
   ({
     routeMenuAction: route,
@@ -81,8 +82,10 @@ test("garage station navigation wraps without opening a destination or disturbin
   ui.getState().setScreen("main");
   ui.getState().setActiveMenuIndex(ids.indexOf("world_editor"));
   route("activate");
-  assert.equal(ui.getState().screen, "world_builder");
+  assert.equal(ui.getState().screen, "main");
+  assert.equal(garageEditor.getState().page, "projects");
   assert.equal(ui.getState().overlay, null);
+  garageEditor.setState({page: null});
 });
 
 test("panel input never activates the underlying main menu and Back returns to the correct parent", () => {

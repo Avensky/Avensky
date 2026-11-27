@@ -3,7 +3,7 @@ import {
   type Material,
 } from "three";
 import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
-import { GARAGE_WORKSHOP } from "./garageServiceLayout";
+import { CRANE_SCALE } from "./garageServiceLayout";
 
 type Point = [number, number, number];
 
@@ -37,13 +37,11 @@ export function buildServiceTools(cube: BufferGeometry, tube: BufferGeometry, pa
     local.quaternion.setFromUnitVectors(up, end.normalize());
     add(geometry, tint);
   }
-  function finish(name: string, placement: typeof GARAGE_WORKSHOP.jack, scale = 1) {
+  function finish(name: string, scale = 1) {
     const mesh = new Mesh(mergeGeometries(pieces), paint);
     for (const piece of pieces) piece.dispose();
     pieces.length = 0;
     mesh.name = name;
-    mesh.position.set(...placement.position);
-    mesh.rotation.y = placement.yaw;
     mesh.scale.setScalar(scale);
     mesh.updateMatrix();
     mesh.matrixAutoUpdate = false;
@@ -66,7 +64,7 @@ export function buildServiceTools(cube: BufferGeometry, tube: BufferGeometry, pa
   part(tube, black, [0, .271, .24], [.11, .013, .11]);
   bar(tube, pin, [0, .13, -.245], [0, .68, -.38], .021);
   bar(tube, black, [0, .67, -.378], [0, .81, -.406], .031);
-  const jack = finish("garage-floor-jack", GARAGE_WORKSHOP.jack);
+  const jack = finish("garage-floor-jack");
 
   // Folding shop hoist: diverging caster legs, braced mast, hydraulic cylinder and telescoping jib.
   for (const side of [-1, 1]) {
@@ -89,6 +87,6 @@ export function buildServiceTools(cube: BufferGeometry, tube: BufferGeometry, pa
   const hook = new TorusGeometry(.055, .014, 6, 14, 1.59 * Math.PI);
   part(hook, pin, [0, 1.62, 1.08], [1, 1, 1], [0, Math.PI / 2, .15]);
   hook.dispose();
-  const crane = finish("garage-engine-hoist", GARAGE_WORKSHOP.crane, GARAGE_WORKSHOP.crane.scale);
+  const crane = finish("garage-engine-hoist", CRANE_SCALE);
   return { "car-jack": jack, "engine-crane": crane };
 }

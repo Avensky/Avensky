@@ -1,6 +1,6 @@
 # Staging Open World
 
-Start on the staging site, select your character, then choose **Enter World** and **Continue** in the garage. Select the BRZ at deployment. Stop on clear, level ground before getting out. The same car stays in the room under its parking brake. Walk, run, or jump nearby, select the parked BRZ, and approach either side to get back in. Other players can see you on foot.
+Start on the staging site, select your character, then choose **Enter World** and **Continue** in the garage. Your selected character boards the parked car and drives through the shutter as the Harbor loads. Choose Vehicle in the Garage first if you want a different road car. Stop on clear, level ground before getting out. The same car stays in the room under its parking brake. Walk, run, or jump nearby, select the parked BRZ, and approach either side to get back in. Other players can see you on foot.
 
 | Input | Move | Run | Jump | Enter or exit your BRZ |
 | --- | --- | --- | --- | --- |
@@ -16,7 +16,7 @@ The staging Rust service advertises on-foot support for listed, unlocked free-dr
 
 ## Planned next update — queue from the hub
 
-Players enter through **Character selection → Main menu → Enter World**. From the hub, a player could open **Play**, choose a match, then close the menu and keep driving, walking, or spending time with other players while waiting. A compact queue indicator would reopen the queue or cancel it. A match-ready prompt would offer **Join match** and **Stay here**.
+Players enter through **Character selection → Garage → Enter World**. From the hub, a player could open **Play**, choose a match, then close the menu and keep driving, walking, or spending time with other players while waiting. A compact queue indicator would reopen the queue or cancel it. A match-ready prompt would offer **Join match** and **Stay here**.
 
 1. Give the matchmaking ticket a lifecycle independent of hub membership. Joining or cancelling a queue should preserve the current character, vehicle, position, and connection to nearby players.
 2. Reserve a place in the destination match before transferring the player. Accepting transfers once. Declining, an expired offer, or a full destination leaves the player in the hub. Count a transferring player once toward server capacity.

@@ -426,7 +426,7 @@ test("social requests, world transitions and assisted text have independent owne
       const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");
       const { MainMenu } = await load("game/menus/MainMenu.tsx");
       const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
-      const { useAlphaStore: alpha } = await load("store/alpha/alphaStore.ts");
+      const { useGarageParking: parking } = await load("game/preview/garageParkingStore.ts");
       assert.equal(OPEN_WORLD_ID, 7);
       assert.equal(parseOpenWorldId("1e2"), undefined);
       const world = {
@@ -487,9 +487,10 @@ test("social requests, world transitions and assisted text have independent owne
       } finally {
         globalThis.fetch = originalFetch;
       }
-      assert.equal(ui.getState().screen, "hero_select");
-      assert.equal(ui.getState().heroSelectionParent, "main");
-      assert.equal(alpha.getState().mode, "sandbox", "a late lobby update cannot carry the previous match into the hub");
+      assert.equal(ui.getState().screen, "main", "admission alone cannot interrupt the boarding shot");
+      assert.equal(parking.getState().departurePhase, "boarding");
+      await act(async () => parking.getState().cancelDeparture());
+      assert.equal(ui.getState().mainWorldJoining, false);
     });
     await t.test(
       "switching locked world targets clears the previous password before sending a join",

@@ -11,7 +11,7 @@ import { stagingRelease, trackedAssets } from "../scripts/staging-release.mjs";
 
 const folder = "/models/world/garage-evaluation/";
 const [cabinet, jack, crane] = ["cabinet", "car-jack", "engine-crane"].map(name => folder + name + ".glb");
-const openModels = ["metal-tool-chest", "metal-shelf", "service-tire"]
+const openModels = ["metal-tool-chest", "metal-shelf"]
   .map(name => `/open-art/garage/${name}/${name}.gltf`);
 const catalog = JSON.parse(readFileSync(new URL("../scripts/staging-garage-evaluation.json", import.meta.url)));
 const frontend = fileURLToPath(new URL("..", import.meta.url));
@@ -77,7 +77,7 @@ async function withGarageRenderer(paths, run) {
 function renderWorkshop(paths, attempts = [null]) {
   return withGarageRenderer(paths, async ({ load, render, setLoader }) => {
     const { GarageMenuFurnishings } = await load("GarageMenuFurnishings.tsx");
-    const { GARAGE_WORKSHOP } = await load("garageServiceLayout.ts");
+    const { DEFAULT_GARAGE_LAYOUT: layout, CRANE_SCALE } = await load("garageServiceLayout.ts");
     const results = [];
     for (const unavailable of attempts) {
       const requests = new Set(), models = new Map();
@@ -93,17 +93,19 @@ function renderWorkshop(paths, attempts = [null]) {
       });
       const scene = await render(createElement(GarageMenuFurnishings, { key: unavailable ?? "ready" }));
       assert.ok(scene.getObjectByName("garage-menu-furnishings"));
+      assert.equal(scene.getObjectByName("garage-furnishing-rubber").count, 4, "shelved tires share one draw");
+      assert.equal(scene.getObjectByName("service-tire"), undefined, "no loose tire on the workshop floor");
       for (const url of openModels) assert.ok(scene.getObjectByName(url), url);
       for (const url of requests) assert.equal(Boolean(scene.getObjectByName(url)), url !== unavailable, url);
       const visible = {};
       for (const [name, placement, key] of [
-        ["garage-floor-jack", GARAGE_WORKSHOP.jack, "jack"], ["garage-engine-hoist", GARAGE_WORKSHOP.crane, "crane"],
+        ["garage-floor-jack", layout.jack, "jack"], ["garage-engine-hoist", layout.crane, "crane"],
       ]) {
         const tool = scene.getObjectByName(name);
         assert.ok(tool?.isMesh && !tool.children.length, "one static draw per original tool");
-        assert.deepEqual(tool.position.toArray(), placement.position);
+        assert.deepEqual(tool.position.toArray(), [placement.x, 0, placement.z]);
         assert.equal(tool.rotation.y, placement.yaw);
-        assert.equal(tool.scale.x, placement.scale ?? 1);
+        assert.equal(tool.scale.x, key === "crane" ? CRANE_SCALE : 1);
         assert.ok(tool.geometry.attributes.color && tool.material.vertexColors, "retain the painted hardware finish");
         visible[key] = tool.visible;
       }
@@ -173,4 +175,33 @@ test("the persistent door bank draws the entry locally and promotes all three sh
     surface.geometry.dispose();
     surface.material.dispose();
   }
+});
+
+test("moving the shelf updates four tires and its detailed model without replacing the room geometry", async () => {
+  await withGarageRenderer(null, async ({ load, render, setLoader }) => {
+    const { GarageMenuFurnishings } = await load("GarageMenuFurnishings.tsx");
+    const { usePersonalGarage } = await load("../../store/social/personalGarage.ts");
+    const { DEFAULT_GARAGE_LAYOUT } = await load("garageServiceLayout.ts");
+    const art = new THREE.Group();
+    setLoader(() => ({ scene: art }));
+    const scene = await render(createElement(GarageMenuFurnishings));
+    const tires = scene.getObjectByName("garage-furnishing-rubber");
+    const mirror = scene.getObjectByName("garage-furnishing-glass");
+    const shelf = scene.getObjectByName("metal-shelf");
+    const position = new THREE.Matrix4();
+    tires.getMatrixAt(0, position);
+    const old = position.clone();
+    const mirrorVersion = mirror.instanceMatrix.version;
+    const shelfPose = { x: 7.95, z: 4.55, yaw: Math.PI / 2 };
+    await act(() => usePersonalGarage.setState({ layout: { ...DEFAULT_GARAGE_LAYOUT, shelf: shelfPose } }));
+    assert.equal(scene.getObjectByName("garage-furnishing-rubber"), tires);
+    assert.equal(scene.getObjectByName("metal-shelf"), shelf);
+    assert.equal(mirror.instanceMatrix.version, mirrorVersion, "unaffected batches keep their buffers");
+    assert.equal(shelf.rotation.y, shelfPose.yaw);
+    assert.deepEqual(shelf.position.toArray(), [7.95, 0, 4.55]);
+    tires.getMatrixAt(0, position);
+    assert.ok(!position.equals(old));
+    assert.ok(Math.abs(position.elements[12] - 7.95) < 1e-5);
+    assert.ok(Math.abs(position.elements[14] - 4.925) < 1e-5);
+  });
 });

@@ -12,9 +12,11 @@ const transportPlugin = {
   name: "garage-drive-connection",
   enforce: "pre",
   resolveId(id) {
+    if (id.endsWith("/modes/WorldContents") || id.endsWith("/modes/preloadWorldApproach") || id === "virtual:garage-runtime") return "\0virtual:garage-runtime";
     if (id === transportModule || id.endsWith("/net/rustSocket")) return `\0${transportModule}`;
   },
   load(id) {
+    if (id === "\0virtual:garage-runtime") return "export const warmed = []; export function preloadWorldApproach(map) { warmed.push(map.map_id); }";
     if (id === `\0${transportModule}`) return "export let socket; export const connect = value => { socket = value; };";
   },
 };
@@ -47,6 +49,9 @@ test("driving out of the garage uses the admitted Harbor and the parked car", as
   const { useAlphaStore: alpha } = await load("store/alpha/alphaStore");
   const { useHeroLoadouts: loadouts } = await load("vehicles/cosmetics/heroLoadouts");
   const { useUIStore: ui } = await load("store/menus/uiStore");
+  const { useGarageParking: parking } = await load("game/preview/garageParkingStore");
+  const { useWorldStore: worldState } = await load("store/world/worldStore");
+  const { warmed } = await vite.ssrLoadModule("virtual:garage-runtime");
   const catalog = await readFile(new URL("../public/world-builder/catalog.json", import.meta.url), "utf8");
   t.mock.method(globalThis, "fetch", async url => {
     assert.match(String(url), /^\/world-builder\/catalog\.json\?/);
@@ -109,6 +114,112 @@ test("driving out of the garage uses the admitted Harbor and the parked car", as
     await finished;
     assert.deepEqual(transitions, ["sandbox"]);
     assert.equal(loadouts.getState().defaultHero, "louisiana");
+  });
+
+  await t.test("Enter World warms only the admitted room during boarding, waits for the rear bumper and retains the shot until gameplay paints", async t => {
+    const { nextRequest, socket, transitions } = start(t);
+    ui.getState().setActiveMenuIndex(0);
+    ui.getState().activateActiveMenuSelection();
+    const join = await nextRequest();
+    assert.equal(parking.getState().departurePhase, "boarding");
+    ui.getState().activateActiveMenuSelection();
+    receiveSocialResult({ request_id:join.request_id, ok:true, data:{...admission, garage_departure:join.garage_departure} });
+    network.setState({ room_id:hub.id+1 });
+    worldState.getState().setMap({map_id:hub.map});
+    await nextTurn();
+    assert.deepEqual(warmed, []);
+    network.setState({ room_id:hub.id });
+    worldState.getState().setMap({map_id:staleMap});
+    await nextTurn();
+    assert.deepEqual(warmed, []);
+    worldState.getState().setMap({map_id:hub.map});
+    await nextTurn();
+    assert.deepEqual(warmed, [hub.map]);
+    assert.equal(socket.sent.length, 1);
+    parking.getState().finishBoarding();
+    assert.equal(parking.getState().departurePhase, "rolling");
+    parking.getState().reachApron();
+    const spawn = await nextRequest();
+    assert.equal(spawn.vehicle, "sierra");
+    assert.equal(spawn.garage_departure, join.garage_departure);
+    parking.getState().cancelDeparture();
+    assert.equal(parking.getState().departurePhase, "outside", "pending spawn owns this final shot");
+    socket.receive(validSpawn(spawn.vehicle));
+    await nextTurn();
+    assert.deepEqual(transitions, ["sandbox"]);
+    assert.equal(parking.getState().committingDeparture,true);
+    parking.getState().completeDeparture(); // first frame of the matching gameplay world
+    assert.equal(parking.getState().departurePhase,null);
+    const committed = await nextRequest();
+    assert.deepEqual([committed.action,committed.garage_departure,committed.entered], ["garage_departure_finish",join.garage_departure,true]);
+    receiveSocialResult({request_id:committed.request_id,ok:true});
+    assert.equal(socket.sent.length, 3);
+  });
+
+  await t.test("a room replacement while boarding cannot spawn the car in the new room", async t => {
+    const { socket, transitions, nextRequest } = start(t, {alreadyInHub:true});
+    network.setState({room_id:hub.id});
+    worldState.getState().setMap({map_id:hub.map});
+    const restored = new Promise(resolve => {
+      const stop = ui.subscribe(s => {
+        if (s.mainWorldError) { stop(); resolve(s.mainWorldError); }
+      });
+    });
+    const previous = warmed.length;
+    ui.getState().setActiveMenuIndex(0);
+    ui.getState().activateActiveMenuSelection();
+    const join = await nextRequest();
+    receiveSocialResult({request_id:join.request_id,ok:true,data:{...admission,garage_departure:null}});
+    for (let i = 0; i < 1000 && warmed.length === previous; i++) await nextTurn();
+    assert.equal(warmed.length, previous + 1);
+    network.setState({room_id:900});
+    parking.getState().finishBoarding();
+    parking.getState().reachApron();
+    assert.match(await restored,/Harbor session changed/);
+    assert.deepEqual(socket.sent.map(p => p.action), ["world_join"]);
+    assert.deepEqual(transitions,[]);
+  });
+
+  await t.test("cancelling boarding returns immediately and discards a late admission", async t => {
+    const { nextRequest, socket, transitions } = start(t);
+    ui.getState().setActiveMenuIndex(0);
+    ui.getState().activateActiveMenuSelection();
+    const join = await nextRequest();
+    parking.getState().cancelDeparture();
+    await nextTurn();
+    assert.equal(ui.getState().mainWorldJoining,false);
+    assert.equal(parking.getState().departurePhase,null);
+    const cancel = await nextRequest();
+    assert.deepEqual([cancel.action,cancel.garage_departure,cancel.entered], ["garage_departure_finish",join.garage_departure,false]);
+    ui.getState().activateActiveMenuSelection();
+    const retry = await nextRequest();
+    assert.notEqual(retry.garage_departure, join.garage_departure);
+    receiveSocialResult({ request_id:join.request_id, ok:true, data:{...admission,garage_departure:join.garage_departure} });
+    receiveSocialResult({ request_id:cancel.request_id, ok:true, data:{released:true} });
+    receiveSocialResult({ request_id:retry.request_id, ok:false, message:"The Harbor is full." });
+    await nextTurn();
+    assert.equal(socket.sent.length,3);
+    assert.deepEqual(transitions,[]);
+  });
+
+  await t.test("a rejected cinematic spawn releases the provisionally admitted seat", async t => {
+    const { nextRequest, socket, transitions } = start(t);
+    network.setState({room_id:hub.id});
+    worldState.getState().setMap({map_id:hub.map});
+    ui.getState().activateActiveMenuSelection();
+    const join = await nextRequest();
+    receiveSocialResult({request_id:join.request_id,ok:true,data:{...admission,garage_departure:join.garage_departure}});
+    parking.getState().finishBoarding();
+    parking.getState().reachApron();
+    const spawn = await nextRequest();
+    assert.equal(spawn.garage_departure,join.garage_departure);
+    socket.receive({type:"spawn_error",map:hub.map,message:"The spawn lane is busy."});
+    const cancel = await nextRequest();
+    assert.deepEqual([cancel.action,cancel.entered,cancel.garage_departure],["garage_departure_finish",false,join.garage_departure]);
+    receiveSocialResult({request_id:cancel.request_id,ok:true,data:{released:true}});
+    await nextTurn();
+    assert.match(ui.getState().mainWorldError,/spawn lane/);
+    assert.deepEqual(transitions,[]);
   });
 
   await t.test("wrong-world and rejected admissions cannot send a spawn request", async t => {

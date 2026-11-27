@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
 import { ControlGlyph } from "../../components/controller/ControlGlyph";
+import { MenuIcon } from "../../components/menus/MenuIcon";
 import { GameButton } from "../../components/GameButton";
 import type { MenuAction } from "../../controls/inputRouting";
 import { useUIStore } from "../../store";
@@ -11,7 +12,10 @@ import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { nextGarageStation } from "./garageStationNavigation";
 import { GarageEntryHeader } from "../welcome/GarageEntryHeader";
 import { MAIN_MENU_ITEMS } from "./menuItems";
+import { useGarageEditor } from "../../worldBuilder/garage/garageEditorState";
 import "./garageMainMenu.css";
+
+const GarageEditor = lazy(() => import("../../worldBuilder/garage/GarageEditor"));
 
 // Keep marker registration stable while focus, controller hints or status change.
 const stationRefs = MAIN_MENU_ITEMS.map(({ id }) => (element: HTMLDivElement | null) => {
@@ -20,6 +24,20 @@ const stationRefs = MAIN_MENU_ITEMS.map(({ id }) => (element: HTMLDivElement | n
 
 export function MainMenu() {
   const driving = useGarageParking(state => state.driving);
+  const departure = useGarageParking(state => state.departurePhase);
+  const committing = useGarageParking(state => state.committingDeparture);
+  const editing = useGarageEditor(state => state.page);
+  useEffect(() => () => {
+    if (useUIStore.getState().screen !== "main") useGarageEditor.setState({ page: null });
+  }, []);
+  if (departure) return <section className="game-ui garage-drive-hud" aria-label="Leaving the Garage">
+    {departure === "outside" && <div className="garage-drive-status" role="status">Entering the Harbor…</div>}
+    {!committing && <div className="garage-drive-actions"><GameButton variant="custom" className="garage-drive-action chamfered-frame"
+      aria-label="Cancel departure" onPress={() => useGarageParking.getState().cancelDeparture()}>
+      <ControlGlyph controller="B" keyboard="Esc" />Cancel
+    </GameButton></div>}
+  </section>;
+  if (editing) return <Suspense fallback={null}><GarageEditor /></Suspense>;
   return driving ? <GarageDriveOverlay /> : <GarageStations />;
 }
 
@@ -92,7 +110,7 @@ function GarageStations() {
           className="garage-station-anchor" data-station-anchor={item.id}>
           <GameButton variant="custom" className="garage-station-button" selected={selectedIndex === index}
             aria-label={item.label} aria-pressed={selectedIndex === index}
-            aria-description={item.id === "world_editor" ? "Build and test drive your own world" : undefined} disabled={joining}
+            aria-description={item.id === "world_editor" ? "Arrange your garage or build and test drive a world" : undefined} disabled={joining}
             onPointerDownCapture={event => {
               if (event.pointerType === "touch" || event.pointerType === "pen") {
                 touchStart.current = { pointerId: event.pointerId, selected: useUIStore.getState().selectedMenuIndexById.main };
@@ -114,8 +132,8 @@ function GarageStations() {
               else ui.activateActiveMenuSelection();
             }}>
             <span className="garage-station-face chamfered-frame">
-              {item.label}
-              {item.id === "world_editor" && <small className="garage-station-caption">Build · Test drive</small>}
+              <span className="garage-station-title"><MenuIcon name={item.icon} />{item.label}</span>
+              {item.id === "world_editor" && <small className="garage-station-caption">Garage · Worlds</small>}
             </span>
           </GameButton>
         </div>)}

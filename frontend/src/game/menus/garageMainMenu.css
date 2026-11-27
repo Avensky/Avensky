@@ -65,11 +65,16 @@
   white-space: nowrap;
   pointer-events: none;
 }
+.garage-station-title { display: inline-flex; align-items: center; justify-content: center; gap: .42em; }
+.garage-station-title .menu-icon { width: 1.05em; height: 1.05em; flex: none; color: var(--garage-menu-muted); }
+.garage-main-menu:not(:has(header :focus)) .garage-station-button[data-selected="true"] .menu-icon {
+  color: var(--garage-menu-accent);
+}
 .garage-station-caption { display: none; }
 @media (orientation: landscape) and (min-width: 900px) and (min-height: 500px) {
   /* The selected editor plate grows up from its pin. Its hit target and all
      four station positions stay fixed while the caption appears. */
-  [data-station-anchor="world_editor"] .garage-station-button { width: 8em; }
+  [data-station-anchor="world_editor"] .garage-station-button { width: 9em; }
   [data-station-anchor="world_editor"] .garage-station-face {
     position: absolute;
     inset-inline: 0;
@@ -174,7 +179,10 @@
   .garage-station-anchor { position: static; transform: none; }
   .garage-station-anchor::before, .garage-station-anchor::after { content: none; }
   .garage-station-button, .garage-station-face { width: 100%; min-height: 44px; }
-  .garage-station-face { white-space: normal; text-align: center; }
+  .garage-station-face { white-space: normal; text-align: center; padding-inline: .4em; }
+}
+@media (orientation: landscape) and (min-width: 641px) and (max-width: 899px) {
+  .garage-station-face { padding-inline: .48em; }
 }
 @media (prefers-reduced-motion: no-preference) {
   html:not([data-reduce-motion="true"]) .garage-main-menu > :is(header,.garage-menu-stations,.garage-menu-continue,.garage-menu-drive) {
@@ -191,6 +199,7 @@ html[data-high-contrast="true"] .garage-station-button[data-selected="true"] .ga
   color: var(--app-background);
   text-shadow: none;
 }
+html[data-high-contrast="true"] .garage-station-button[data-selected="true"] .menu-icon { color: currentColor; }
 @media (forced-colors: active) {
   .garage-station-face { border: 1px solid ButtonText; color: ButtonText; }
   .garage-station-button[data-selected="true"] .garage-station-face { border: 3px solid Highlight; }

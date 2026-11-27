@@ -4,7 +4,7 @@ import { createServer } from "vite";
 import { fileURLToPath } from "node:url";
 import { approachBay, bodySpan, fitsGarage, initialGaragePose, moveGarageCar, rearClearOfBays } from "../src/game/preview/garageParkingPhysics.ts";
 import { GARAGE_BAY_DOORS } from "../src/game/preview/garageDoorLayout.ts";
-import { GARAGE_WORKSHOP } from "../src/game/preview/garageServiceLayout.ts";
+import { DEFAULT_GARAGE_LAYOUT as GARAGE_WORKSHOP } from "../src/game/preview/garageServiceLayout.ts";
 
 const coupe = { width: 2.03, length: 4.34, height: 1.24 };
 const pickup = { width: 2.41, length: 5.81, height: 1.95 };
@@ -47,7 +47,7 @@ test("each bay accepts an aligned car, and the door jambs, walk-outs, crane and 
   }
   assert.equal(fitsGarage(-5.98,8.75,0,coupe,open),false);
   for (const prop of [GARAGE_WORKSHOP.desk, GARAGE_WORKSHOP.crane, GARAGE_WORKSHOP.toolbox, GARAGE_WORKSHOP.lockers])
-    assert.equal(fitsGarage(prop.position[0],prop.position[2],prop.yaw,coupe,open),false);
+    assert.equal(fitsGarage(prop.x,prop.z,prop.yaw,coupe,open),false);
   assert.equal(fitsGarage(9,2,0,coupe,open),false);
 });
 

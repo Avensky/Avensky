@@ -28,7 +28,7 @@ export type GarageEntryShot = {
   actor?: ActorInput;
 };
 type Preview = { loadBayDetail?: boolean; contents: ReactNode; demand: boolean; dpr?: number; shadows: boolean; shot?: GarageEntryShot };
-type GarageRuntime = { detailedBayDoors?: boolean; preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
+type GarageRuntime = { holdFrame?: boolean; detailedBayDoors?: boolean; preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
 const shared = globalThis as typeof globalThis & { __avenskyGarage?: GarageRuntime };
 const runtime = shared.__avenskyGarage ??= {
   preview: null, listeners: new Set(), motion: { yaw: .055, pitch: 0, dragging: false },
@@ -36,6 +36,13 @@ const runtime = shared.__avenskyGarage ??= {
 function subscribe(listener: () => void) {
   runtime.listeners.add(listener);
   return () => { runtime.listeners.delete(listener); };
+}
+// Keep the final rendered garage frame under the incoming world without
+// running two render loops while the live world compiles its first frame.
+export function holdGarageFrame(hold: boolean) {
+  if (Boolean(runtime.holdFrame) === hold) return;
+  runtime.holdFrame = hold;
+  for (const listener of runtime.listeners) listener();
 }
 export function setGaragePreview(next: Preview | null) {
   if (next?.loadBayDetail) runtime.detailedBayDoors = true;
@@ -210,13 +217,14 @@ class GarageFailure extends Component<{ children: ReactNode; host: HTMLElement }
 
 function LiveGarage({ host }: { host: HTMLElement }) {
   const view = useSyncExternalStore(subscribe, () => runtime.preview);
+  const hold = useSyncExternalStore(subscribe, () => Boolean(runtime.holdFrame));
   const coarse = useMemo(() => window.matchMedia?.("(pointer: coarse)")?.matches, []);
   const camera = useMemo(() => new PerspectiveCamera(55, 1, .05, 150), []);
   const onCreated = (state: RootState) => { state.gl.setClearColor("#080808", 1); };
   return <GarageFailure host={host}>
     <Canvas className={view ? "garage-canvas" : undefined} camera={camera} onCreated={onCreated}
       dpr={view?.dpr ?? (coarse ? 1 : [1, 1.5])} shadows={view?.shadows ?? false}
-      frameloop={view && !view.demand ? "always" : "demand"}
+      frameloop={hold ? "never" : view && !view.demand ? "always" : "demand"}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} fallback={null}>
       <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view || Boolean(view.shot)} shot={view?.shot} detailedDoors={Boolean(runtime.detailedBayDoors)} /></Suspense></GarageFailure>
       {view?.contents}

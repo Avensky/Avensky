@@ -1,6 +1,6 @@
 // Low-speed bicycle kinematics in garage metres, with the vehicle's nose on +Z.
 import { GARAGE_BAY_DOORS } from "./garageDoorLayout.ts";
-import { GARAGE_PARKING, GARAGE_PARKING_OBSTACLES, type GarageParkingObstacle } from "./garageServiceLayout.ts";
+import { GARAGE_PARKING, GARAGE_PARKING_OBSTACLES, garageFootprintsOverlap, type GarageParkingObstacle } from "./garageServiceLayout.ts";
 
 export type CarFootprint = { width: number; length: number; height: number };
 export type GarageCarPose = { x: number; z: number; yaw: number; speed: number };
@@ -15,19 +15,8 @@ export function bodySpan(footprint: CarFootprint, yaw: number) {
   return { x: (c * footprint.width + s * footprint.length) / 2, z: (s * footprint.width + c * footprint.length) / 2 };
 }
 
-// A separation test on the four local axes avoids blocking the clear aisle beside a rotated prop.
-function touches(x: number, z: number, yaw: number, car: CarFootprint, obstacle: GarageParkingObstacle) {
-  const dx = x - obstacle.x, dz = z - obstacle.z, b = obstacle.yaw ?? 0;
-  const w = car.width / 2, l = car.length / 2;
-  const c = Math.cos(yaw), s = Math.sin(yaw), cb = Math.cos(b), sb = Math.sin(b);
-  const cc = Math.abs(c * cb + s * sb), ss = Math.abs(s * cb - c * sb);
-  return Math.abs(dx * c - dz * s) < w + obstacle.halfWidth * cc + obstacle.halfLength * ss &&
-    Math.abs(dx * s + dz * c) < l + obstacle.halfWidth * ss + obstacle.halfLength * cc &&
-    Math.abs(dx * cb - dz * sb) < obstacle.halfWidth + w * cc + l * ss &&
-    Math.abs(dx * sb + dz * cb) < obstacle.halfLength + w * ss + l * cc;
-}
-
-export function fitsGarage(x: number, z: number, yaw: number, car: CarFootprint, opening: (bay: number) => number) {
+export function fitsGarage(x: number, z: number, yaw: number, car: CarFootprint, opening: (bay: number) => number,
+  obstacles: readonly GarageParkingObstacle[] = GARAGE_PARKING_OBSTACLES) {
   const span = bodySpan(car, yaw);
   if (x - span.x < -6.6 || x + span.x > 8.5 || z - span.z < -6.16 || z + span.z > 17.85) return false;
   const wall = GARAGE_BAY_DOORS[0].position[2];
@@ -36,7 +25,7 @@ export function fitsGarage(x: number, z: number, yaw: number, car: CarFootprint,
     const aligned = GARAGE_BAY_DOORS.findIndex(bay => Math.abs(x - bay.position[0]) + span.x + .035 <= bay.width / 2);
     if (aligned < 0 || opening(aligned) * GARAGE_BAY_DOORS[aligned].height < car.height + .10) return false;
   }
-  return !GARAGE_PARKING_OBSTACLES.some(prop => touches(x, z, yaw, car, prop));
+  return !obstacles.some(prop => garageFootprintsOverlap(x, z, yaw, car.width / 2, car.length / 2, prop));
 }
 
 export function approachBay(pose: GarageCarPose, car: CarFootprint): number {
@@ -51,7 +40,8 @@ export function rearClearOfBays(pose: GarageCarPose, car: CarFootprint) {
 }
 
 export function moveGarageCar(pose: GarageCarPose, car: CarFootprint, input: ParkingInput,
-  delta: number, opening: (bay: number) => number) {
+  delta: number, opening: (bay: number) => number,
+  obstacles: readonly GarageParkingObstacle[] = GARAGE_PARKING_OBSTACLES) {
   // Cap time after a background pause, then substep steep steering commands to avoid tunnelling.
   let remaining = Math.max(0, Math.min(.10, delta));
   while (remaining > 1e-7) {
@@ -65,7 +55,7 @@ export function moveGarageCar(pose: GarageCarPose, car: CarFootprint, input: Par
     const turn = -meters * Math.tan(input.steer * .56) / (car.length * .58);
     const x = pose.x + Math.sin(pose.yaw + turn / 2) * meters;
     const z = pose.z + Math.cos(pose.yaw + turn / 2) * meters;
-    if ((meters || turn) && !fitsGarage(x, z, pose.yaw + turn, car, opening)) {
+    if ((meters || turn) && !fitsGarage(x, z, pose.yaw + turn, car, opening, obstacles)) {
       pose.speed = 0;
       return;
     }

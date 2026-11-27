@@ -218,7 +218,7 @@ mod tests {
         let (frame, _frame) = watch::channel(None);
         let (social, _social) = watch::channel(None);
         let (input_tx, input) = watch::channel(None);
-        s.register(player.clone(), Connection { tx, frame:frame.into(), social, input, input_tx, profile_id: None, staging_session: None, world_id: None, team: Team::Red }).await.unwrap();
+        s.register(player.clone(), Connection { tx, frame:frame.into(), social, input, input_tx, profile_id: None, staging_session: None, world_id: None, garage_departure: None, team: Team::Red }).await.unwrap();
         player
     }
     async fn identified(s: &Server, name: &str) -> (String, Value) {

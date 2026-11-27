@@ -55,6 +55,7 @@ const saveIdentity = (value: Identity, scope:IdentityScope) => {
 let pageIdentity: Identity | null = null;
 let pageIdentityScope:IdentityScope = "device";
 let connectionGeneration = 0;
+export const socialConnectionGeneration = () => connectionGeneration;
 let identifying = false;
 
 /** One request owner with bounded pending work. Closing a socket rejects every
@@ -109,6 +110,7 @@ export function requestSocial(
     }
   });
 }
+export class SocialCommandDenied extends Error {}
 export function receiveSocialResult(value: Response) {
   if (typeof value.request_id !== "string") return;
   const request = pending.get(value.request_id);
@@ -118,7 +120,7 @@ export function receiveSocialResult(value: Response) {
   if (value.ok === true) request.resolve(value.data ?? {});
   else
     request.reject(
-      new Error(value.message || "The server rejected the request."),
+      new SocialCommandDenied(value.message || "The server rejected the request."),
     );
 }
 type AccountCredentials = { login: string; password: string };

@@ -54,6 +54,9 @@ canvas {
   z-index: 100;
 }
 
+/* The departing garage stays visible behind the incoming world until its first map frame. */
+.game-wrapper[data-garage-handoff] { opacity: 0; pointer-events: none; }
+
 /* The world keeps warming underneath. Driving HUD elements appear when the player enters it. */
 .game-wrapper[data-world-cover] > :not(.garage-mode-loading, .team-lineup) { visibility: hidden; }
 .garage-mode-loading { color: var(--app-text); }

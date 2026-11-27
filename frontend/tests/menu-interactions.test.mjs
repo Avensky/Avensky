@@ -132,6 +132,12 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         });
         if (screen === "main") document.querySelector('[data-station-anchor="enter_world"] [role="button"]')?.focus();
       });
+    // The Garage editor loads on first use; wait for its real control before sending input.
+    const waitControl = async (selector) => {
+      for (let i = 0; i < 100 && !document.querySelector(selector); i++)
+        await act(async () => new Promise(resolve => setTimeout(resolve, 20)));
+      return document.querySelector(selector);
+    };
     const click = async (element) => {
       assert.ok(element, "element exists");
       await act(async () => element.click());
@@ -198,7 +204,9 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         assert.equal(document.querySelector(".main-menu video"), null);
         await key("Enter", "Enter");
         assert.equal(ui.getState().screen, "main", "the garage remains available without a hub");
-        assert.ok(document.querySelector('[role="status"],[role="alert"]')?.textContent.trim());
+        const departure = await waitControl('[aria-label="Cancel departure"],[role="alert"]');
+        assert.ok(departure, "the garage offers a cancel action or a visible admission failure");
+        if (departure.getAttribute("aria-label") === "Cancel departure") await click(departure);
         await reset();
         await act(async () =>
           preferences.getState().update({ reducedMotion: true }),
@@ -292,7 +300,61 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       await act(async () => editor.dispatchEvent(new dom.window.PointerEvent("pointerup", {
         bubbles: true, pointerType:"mouse", button:0,
       })));
+      assert.equal(ui.getState().screen, "main");
+      const projects = await waitControl('[aria-label="World projects"]');
+      assert.ok(projects, "World Editor opens its destination picker in the live garage");
+      await act(async () => projects.click());
       assert.equal(ui.getState().screen, "world_builder");
+    });
+    await t.test("the garage editor moves live furniture, supports undo and discards a draft on back", async () => {
+      await reset();
+      const personal = (await load("store/social/personalGarage.ts")).usePersonalGarage;
+      const { DEFAULT_GARAGE_LAYOUT } = await load("game/preview/garageServiceLayout.ts");
+      const editor = (await load("worldBuilder/garage/garageEditorState.ts")).useGarageEditor;
+      await act(async () => personal.setState({owner: "editor-test", savedLayout: DEFAULT_GARAGE_LAYOUT,
+        layout: DEFAULT_GARAGE_LAYOUT, error: "", status: "ready"}));
+      await click(stationControl("world_editor"));
+      await click(await waitControl('[aria-label="Edit garage"]'));
+      assert.equal(editor.getState().page, "room");
+      assert.equal(ui.getState().screen, "main");
+      const original = DEFAULT_GARAGE_LAYOUT.toolbox;
+      // Project the real tool from its editor shot. Cancelling a drag must put it back.
+      const { PerspectiveCamera, Vector3 } = await import("three");
+      const { garageRoomEditorCamera } = await load("game/preview/garageRoomEditorCamera.ts");
+      const { garageFloorPoint } = await load("worldBuilder/garage/garagePlacement.ts");
+      const camera = new PerspectiveCamera(56, 800 / 600, .05, 150);
+      garageRoomEditorCamera("toolbox").frame(camera, 800, 600);
+      camera.updateMatrixWorld();
+      const stage = document.querySelector(".garage-edit-stage");
+      const bounds = new dom.window.DOMRect(0, 0, 800, 600);
+      stage.getBoundingClientRect = () => bounds;
+      stage.setPointerCapture = () => {};
+      const pixel = (x, y, z) => {
+        const p = new Vector3(x, y, z).project(camera);
+        return [(p.x + 1) * 400, (1 - p.y) * 300];
+      };
+      const at = pixel(original.x, .50, original.z);
+      const [x, z] = garageFloorPoint(...at, bounds, camera);
+      const dragTo = pixel(x - .50, 0, z);
+      const pointer = async (type, position) => act(async () => stage.dispatchEvent(
+        new dom.window.PointerEvent(type, { bubbles: true, cancelable: true, pointerId: 2,
+          clientX: position[0], clientY: position[1], button: 0, pointerType: "touch" })));
+      await pointer("pointerdown", at);
+      await pointer("pointermove", dragTo);
+      assert.equal(personal.getState().layout.toolbox.x, original.x - .50);
+      await pointer("pointercancel", dragTo);
+      assert.deepEqual(personal.getState().layout.toolbox, original);
+      await key("ArrowLeft");
+      assert.equal(personal.getState().layout.toolbox.x, original.x - .25);
+      await key("Digit3", "3");
+      assert.notEqual(personal.getState().layout.toolbox.yaw, original.yaw);
+      await click(document.querySelector('[aria-label="Undo placement"]'));
+      assert.equal(personal.getState().layout.toolbox.yaw, original.yaw);
+      for (let i = 0; i < 4; i++) await key("KeyQ", "q");
+      assert.equal(document.activeElement.getAttribute("aria-label"), "Discard changes");
+      await key("Enter");
+      assert.equal(editor.getState().page, null);
+      assert.deepEqual(personal.getState().layout.toolbox, original);
     });
     await t.test("touch can preview a different station and either tap again or Continue to enter it", async () => {
       const tap = async element => act(async () => {

@@ -21,6 +21,7 @@ pub struct Connection {
     pub profile_id: Option<String>,
     pub staging_session: Option<String>,
     pub world_id: Option<usize>,
+    pub garage_departure: Option<String>,
     pub team: Team,
 }
 pub struct Server {
@@ -184,6 +185,7 @@ impl Server {
             }
             if let Some(connection) = self.connections.lock().await.get_mut(player) {
                 connection.world_id = None;
+                connection.garage_departure = None;
             }
             let occupied = self
                 .connections
@@ -227,7 +229,8 @@ impl Server {
             }
         }
         self.checkpoint_departure(player, false).await;
-        self.reserve_disconnect(player).await;
+        let provisional = self.connections.lock().await.get(player).is_some_and(|c| c.garage_departure.is_some());
+        if !provisional { self.reserve_disconnect(player).await; }
         let client=self.connections.lock().await.get(player).cloned();
         let retained={let a=self.alpha.lock().await;client.as_ref().and_then(|c|c.profile_id.as_ref()).and_then(|p|a.reservations.get(p)).is_some_and(|r|r.retained_player.as_deref()==Some(player))};
         if retained{
@@ -424,15 +427,20 @@ impl Server {
         profile.and_then(|id| data.profiles.get(&id)).and_then(|p| p.progression.equipped_character())
             .and_then(|choice| choice.driver_appearance()).unwrap_or_default()
     }
+    #[cfg(test)]
     pub async fn spawn(&self, player: &str, map: &str, vehicle: &str) -> Result<(), String> {
+        self.spawn_for_departure(player, map, vehicle, None).await
+    }
+    pub async fn spawn_for_departure(&self, player: &str, map: &str, vehicle: &str, departure: Option<&str>) -> Result<(), String> {
         let _operation = self.operations.lock().await;
-        let current = self
-            .connections
-            .lock()
-            .await
-            .get(player)
-            .ok_or("The connection closed.")?
-            .world_id;
+        let current = {
+            let clients = self.connections.lock().await;
+            let client = clients.get(player).ok_or("The connection closed.")?;
+            if departure.is_some() && client.garage_departure.as_deref() != departure {
+                return Err("This garage departure is no longer active.".into());
+            }
+            client.world_id
+        };
         if let Some(world_id) = current {
             let data=self.data.lock().await;
             let matches=data.worlds.get(&world_id).is_some_and(|world|world.map==map ||
@@ -527,6 +535,11 @@ impl Server {
         drop(room);
         self.maintain_matches_inner().await;
         self.publish().await;
+        // A direct/manual spawn takes ownership; an animated departure awaits
+        // the client's receipt so an unacknowledged vehicle can still be cleaned up.
+        if departure.is_none() {
+            if let Some(c) = self.connections.lock().await.get_mut(player) { c.garage_departure = None; }
+        }
         Ok(())
     }
     pub async fn handle(&self, player: &str, value: Value) -> Result<Value, String> {
@@ -553,6 +566,7 @@ impl Server {
                 .to_string()
         };
         let result = match action {
+            "garage_layout_get" | "garage_layout_save" => return self.personal_garage(player, action, &value).await,
             "character_create" | "character_create_styled" | "character_select" => self.handle_character_slots(player, &value).await?,
             "roster_save" | "world_approve" | "world_set_main" => self.author(player, action, &value).await?,
             "mode_join" | "mode_cancel" | "mode_leave" | "hero_select" | "skin_redeem" | "skin_equip"
@@ -680,8 +694,33 @@ impl Server {
                         .map(|world| world.id)
                         .ok_or("That invite code is unavailable.")?
                 };
-                self.join_inner(player, world_id, &code, string("password"))
-                    .await?
+                let ticket = value.get("garage_departure").and_then(Value::as_str);
+                if ticket.is_some_and(|t| t.is_empty() || t.len() > 64 || !t.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')) {
+                    return Err("Invalid garage departure.".into());
+                }
+                let already_permanent = self.connections.lock().await.get(player)
+                    .is_some_and(|c| c.world_id == Some(world_id) && c.garage_departure.is_none());
+                let mut joined = self.join_inner(player, world_id, &code, string("password")).await?;
+                if let Some(c) = self.connections.lock().await.get_mut(player) {
+                    c.garage_departure = ticket.filter(|_| !already_permanent).map(str::to_owned);
+                    if ticket.is_some() { joined["garage_departure"] = json!(c.garage_departure); }
+                }
+                joined
+            }
+            "garage_departure_finish" => {
+                self.actor(player).await?;
+                let world_id = value.get("world_id").and_then(Value::as_u64).ok_or("Missing garage destination.")? as usize;
+                let entered = value.get("entered").and_then(Value::as_bool).ok_or("Missing departure result.")?;
+                let ticket = value.get("garage_departure").and_then(Value::as_str).ok_or("Missing garage departure.")?;
+                let matched = {
+                    let mut clients = self.connections.lock().await;
+                    let c = clients.get_mut(player).ok_or("The connection closed.")?;
+                    let owns = c.world_id == Some(world_id) && c.garage_departure.as_deref() == Some(ticket);
+                    if owns { c.garage_departure = None; }
+                    owns
+                };
+                if matched && !entered { self.leave_inner(player).await; }
+                json!({"released": matched && !entered})
             }
             "world_leave" => {
                 self.leave_inner(player).await;
@@ -725,6 +764,7 @@ impl Server {
 }
 
 mod authoring;
+mod garage;
 mod alpha_sessions;
 mod characters;
 mod identity;

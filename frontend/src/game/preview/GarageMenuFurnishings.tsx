@@ -1,10 +1,13 @@
+import { GaragePropSelection } from "../../worldBuilder/garage/GaragePropSelection";
+import { useGarageEditor } from "../../worldBuilder/garage/garageEditorState";
 import { Suspense, useMemo, useLayoutEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import {
   BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
-  MeshStandardMaterial, Object3D, PlaneGeometry, type BufferGeometry, type Material,
+  MeshStandardMaterial, Object3D, PlaneGeometry, LatheGeometry, Vector2, type BufferGeometry, type Material,
 } from "three";
-import { GARAGE_WORKSHOP } from "./garageServiceLayout";
+import { CRANE_SCALE, floorPlacement, GARAGE_PROP_IDS, type GaragePropId, type GarageRoomLayout } from "./garageServiceLayout";
+import { usePersonalGarage, useGarageAccountLayout } from "../../store/social/personalGarage";
 import { buildServiceTools } from "./garageServiceTools";
 import { garagePaintedFinish } from "./garagePaintedFinish";
 import { garageRoutePlan } from "./garageRoutePlan";
@@ -13,8 +16,8 @@ import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 
 type Triple = [number, number, number];
-type Finish = "steel" | "round" | "glass" | "light" | "shade" | "paper";
-type Part = { matrix: Matrix4; color: string };
+type Finish = "steel" | "round" | "glass" | "light" | "shade" | "paper" | "rubber";
+type Part = { owner: GaragePropId; matrix: Matrix4; color: string };
 
 const iron = "#554f48", dark = "#343839", edge = "#8f8580", brass = "#ac8966";
 const timber = "#aa815f", canvas = "#aaa58e";
@@ -24,25 +27,21 @@ const level: Triple = [0, 0, 0];
 function buildFurnishings() {
   const group = new Group();
   group.name = "garage-menu-furnishings";
-  const parts: Record<Finish, Part[]> = { steel: [], round: [], glass: [], light: [], shade: [], paper: [] };
-  const station = new Object3D(), local = new Object3D();
-  function place({ position, yaw }: typeof GARAGE_WORKSHOP.lockers) {
-    station.position.set(...position);
-    station.rotation.y = yaw;
-    station.updateMatrix();
-  }
+  const parts: Record<Finish, Part[]> = { steel: [], round: [], glass: [], light: [], shade: [], paper: [], rubber: [] };
+  const local = new Object3D();
+  let owner: GaragePropId = "lockers";
   function part(finish: Finish, color: string, position: Triple, size: Triple, rotation: Triple = level) {
     local.position.set(...position);
     local.rotation.set(...rotation);
     local.scale.set(...size);
     local.updateMatrix();
-    parts[finish].push({ matrix: new Matrix4().multiplyMatrices(station.matrix, local.matrix), color });
+    parts[finish].push({ owner, matrix: local.matrix.clone(), color });
   }
   const box = (color: string, x: number, y: number, z: number, w: number, h: number, d: number) =>
     part("steel", color, [x, y, z], [w, h, d]);
 
   // Vented steel lockers, hardware, a standing mirror and slatted changing bench.
-  place(GARAGE_WORKSHOP.lockers);
+  owner = "lockers";
   const lockerStart = parts.steel.length;
   box(dark, .32, 1.02, -.16, 1.48, 1.93, .48);
   for (let column = 0; column < 3; column++) {
@@ -65,7 +64,7 @@ function buildFurnishings() {
   for (const z of [.31, .44, .57]) box(timber, .56, .47, z, 1.19, .064, .108);
 
   // A low rolling stand supports the portable donor chest, which has no wheels.
-  place(GARAGE_WORKSHOP.toolbox);
+  owner = "toolbox";
   for (const x of [-.34, .34]) {
     for (const z of [-.20, .08]) {
       part("round", dark, [x, .087, z], [.14, .06, .14], [0, 0, Math.PI / 2]);
@@ -75,7 +74,7 @@ function buildFurnishings() {
   box(iron, 0, .22, -.06, .88, .07, .52);
 
   // Drafting desk, weighted paper, plan rack, swing-arm lamp and workshop stool.
-  place(GARAGE_WORKSHOP.desk);
+  owner = "desk";
   for (const x of [-.83, .83]) {
     for (const z of [-.47, .47]) box(iron, x, .424, z, .079, .85, .079);
     box(dark, x, .23, 0, .08, .06, .98);
@@ -125,6 +124,20 @@ function buildFurnishings() {
   box(iron, alcoveX, 1.49, rear, 1.56, 1.09, .093);
   part("paper", "#e8e2d2", [alcoveX, 1.49, rear + .057], [1.39, .87, 1]);
 
+  // Four upright tires rest on two rails over the top shelf. One lathed cross
+  // section supplies the shoulders, sidewalls and circumferential tread grooves.
+  owner = "shelf";
+  for (const z of [-.14, .14]) box(dark, 0, 2.217, z, 1.10, .04, .04);
+  for (const x of [-.375, -.125, .125, .375]) part("rubber", "#ffffff", [x, 2.502, 0], [1, 1, 1], [0, 0, Math.PI / 2]);
+  const profile = [
+    [.179,-.08],[.185,-.095],[.237,-.108],[.285,-.104],[.305,-.086],
+    [.312,-.066],[.312,-.052],[.304,-.048],[.304,-.043],[.313,-.038],
+    [.313,-.012],[.305,-.009],[.305,-.004],[.313,0],[.313,.026],
+    [.305,.030],[.305,.035],[.312,.040],[.312,.066],[.305,.086],
+    [.285,.104],[.237,.108],[.185,.095],[.179,.08],[.179,-.08],
+  ];
+  const tire = new LatheGeometry(profile.map(([r,y]) => new Vector2(r,y)), 32);
+  const rubber = new MeshStandardMaterial({ color: "#393b3b", roughness: .77, emissive: "#111210" });
   const map = garageRoutePlan();
   const painted = new MeshStandardMaterial({ metalness: .3, roughness: .53, emissive: "#100e0b", vertexColors: true });
   painted.onBeforeCompile = garagePaintedFinish;
@@ -155,6 +168,7 @@ function buildFurnishings() {
   const shade = new CylinderGeometry(.18, .5, 1, 16, 1, true);
   const paper = new PlaneGeometry();
   const meshes: InstancedMesh[] = [];
+  const batches: { mesh: InstancedMesh; instances: Part[] }[] = [];
   function batch(kind: Finish, geometry: BufferGeometry, material: Material) {
     const instances = parts[kind];
     const mesh = new InstancedMesh(geometry, material, instances.length);
@@ -167,6 +181,7 @@ function buildFurnishings() {
     mesh.computeBoundingSphere();
     group.add(mesh);
     meshes.push(mesh);
+    batches.push({ mesh, instances });
     return mesh;
   }
   // Keep the fallback locker at the tail of the existing draw so it can be hidden independently.
@@ -178,10 +193,49 @@ function buildFurnishings() {
   batch("glass", cube, surface);
   batch("light", tube, luminous);
   batch("paper", paper, printed);
+  batch("rubber", tire, rubber);
   const serviceTools = buildServiceTools(cube, tube, painted);
   group.add(serviceTools["car-jack"], serviceTools["engine-crane"]);
+  // Keep the original batches, meshes and materials on every edit. Only the
+  // instance matrices of changed furnishings are uploaded to the GPU.
+  const transforms = new Map<GaragePropId, Matrix4>();
+  const worldMatrix = new Matrix4();
+  let previous: GarageRoomLayout | undefined;
   return {
     group,
+    apply(layout: GarageRoomLayout) {
+      const changed = new Set<GaragePropId>();
+      for (const id of GARAGE_PROP_IDS) {
+        const pose = layout[id], before = previous?.[id];
+        if (before && before.x === pose.x && before.z === pose.z && before.yaw === pose.yaw) continue;
+        changed.add(id);
+        transforms.set(id, new Matrix4().makeRotationY(pose.yaw).setPosition(pose.x, 0, pose.z));
+        const tool = id === "jack" ? serviceTools["car-jack"] : id === "crane" ? serviceTools["engine-crane"] : undefined;
+        if (tool) {
+          tool.position.set(pose.x, 0, pose.z);
+          tool.rotation.y = pose.yaw;
+          tool.updateMatrix();
+          tool.matrixWorldNeedsUpdate = true;
+        }
+      }
+      for (const { mesh, instances } of batches) {
+        let updated = false;
+        instances.forEach(({ owner: id, matrix }, i) => {
+          if (!changed.has(id)) return;
+          mesh.setMatrixAt(i, worldMatrix.multiplyMatrices(transforms.get(id)!, matrix));
+          updated = true;
+        });
+        if (updated) {
+          mesh.instanceMatrix.needsUpdate = true;
+          // Hidden fallback locker instances must be in the culling sphere too.
+          const count = mesh.count;
+          mesh.count = instances.length;
+          mesh.computeBoundingSphere();
+          mesh.count = count;
+        }
+      }
+      previous = layout;
+    },
     showFallback(name: EvaluationProp, visible: boolean) {
       if (name === "cabinet") steel.count = fixedSteelCount + (visible ? lockerPanels.length : 0);
       else serviceTools[name].visible = visible;
@@ -189,14 +243,14 @@ function buildFurnishings() {
     dispose() {
       for (const tool of Object.values(serviceTools)) tool.geometry.dispose();
       for (const mesh of meshes) mesh.dispose();
-      for (const geometry of [cube, tube, shade, paper]) geometry.dispose();
-      for (const material of [painted, surface, printed, luminous]) material.dispose();
+      for (const geometry of [cube, tube, shade, paper, tire]) geometry.dispose();
+      for (const material of [painted, surface, printed, luminous, rubber]) material.dispose();
       map.dispose();
     },
   };
 }
 
-type WorkshopProp = "metal-tool-chest" | "service-tire" | "metal-shelf";
+type WorkshopProp = "metal-tool-chest" | "metal-shelf";
 
 type EvaluationProp = "engine-crane" | "car-jack" | "cabinet";
 type PropPlacement = { position?: Triple; yaw?: number; scale?: number; onReady?: (mounted: boolean) => void };
@@ -207,7 +261,7 @@ function WorkshopModel({ url, onReady }: { url: string; onReady?: PropPlacement[
   const invalidate = useThree(state => state.invalidate);
   useLayoutEffect(() => {
     // These metals need the same workshop bounce as the painted fixtures. Tint their
-    // original base map so scratches and tread remain visible in the unlit recesses.
+    // original base map so surface wear remains visible in the unlit recesses.
     const object = scene.clone();
     const materials: MeshStandardMaterial[] = [];
     object.traverse(child => {
@@ -250,6 +304,9 @@ function EvaluationWorkshopProp({ name, ...placement }: PropPlacement & { name: 
 }
 
 export function GarageMenuFurnishings() {
+  const editing = useGarageEditor(s => s.page === "room");
+  useGarageAccountLayout();
+  const layout = usePersonalGarage(state => state.layout);
   const scene = useThree(state => state.scene);
   const invalidate = useThree(state => state.invalidate);
   const current = useRef<ReturnType<typeof buildFurnishings> | null>(null);
@@ -266,6 +323,7 @@ export function GarageMenuFurnishings() {
   useLayoutEffect(() => {
     const furnishings = buildFurnishings();
     current.current = furnishings;
+    furnishings.apply(usePersonalGarage.getState().layout);
     for (const name of mountedModels.current) furnishings.showFallback(name, false);
     scene.add(furnishings.group);
     invalidate();
@@ -276,17 +334,21 @@ export function GarageMenuFurnishings() {
       invalidate();
     };
   }, [scene, invalidate]);
-  const { lockers, toolbox, tire, jack, crane, shelf } = GARAGE_WORKSHOP;
+  useLayoutEffect(() => {
+    current.current?.apply(layout);
+    invalidate();
+  }, [invalidate, layout]);
+  const { lockers, toolbox, jack, crane, shelf } = layout;
   return <>
-    <group position={toolbox.position} rotation-y={toolbox.yaw}>
+    {editing && <GaragePropSelection layout={layout}/>}
+    <group position={[toolbox.x, 0, toolbox.z]} rotation-y={toolbox.yaw}>
       <OpenWorkshopProp name="metal-tool-chest" position={[0, .255, -.06]} scale={1.12} />
     </group>
-    <OpenWorkshopProp name="service-tire" {...tire} />
-    <EvaluationWorkshopProp name="car-jack" {...jack} onReady={onReady.jack} />
-    <EvaluationWorkshopProp name="engine-crane" {...crane} onReady={onReady.crane} />
-    <group position={lockers.position} rotation-y={lockers.yaw}>
+    <EvaluationWorkshopProp name="car-jack" {...floorPlacement(jack)} onReady={onReady.jack} />
+    <EvaluationWorkshopProp name="engine-crane" {...floorPlacement(crane)} scale={CRANE_SCALE} onReady={onReady.crane} />
+    <group position={[lockers.x, 0, lockers.z]} rotation-y={lockers.yaw}>
       <EvaluationWorkshopProp name="cabinet" position={[.32, 0, -.16]} onReady={onReady.cabinet} />
     </group>
-    <OpenWorkshopProp name="metal-shelf" {...shelf} />
+    <OpenWorkshopProp name="metal-shelf" {...floorPlacement(shelf)} />
   </>;
 }

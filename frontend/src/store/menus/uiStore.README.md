@@ -8,7 +8,7 @@ Owns routes, overlays and menu navigation. Pause and editor transitions also app
 | --- | --- | --- |
 | `screen`, `overlay`, `welcomeSection`, `workshopEntry`, `heroSelectionParent`, `vehicleSelectionParent`, `debugMenuParent`, `missionLogParent`, `settingsParent` | Screen and overlay transitions and return routes. | Per navigation action. |
 | `selectedMenuIndexById`, `selectedMission`, `settingsTab`, `cockpitTab` | Current selections in visible menus. | Per selection or activation. |
-| `mainWorldJoining`, `mainWorldError` | Keep the garage visible during shared-world admission and report the server’s response. | On admission, failure, station change or exit. |
+| `mainWorldJoining`, `mainWorldError` | Keep the departure in the Garage while the character boards, the car rolls out, and the Harbor confirms admission. Show recoverable errors at the station. | On admission, failure, station change or exit. |
 | `isModeLoading`, `loadingLabel`, `loadingProgress` | Mode transition and loader progress callbacks. | On start, progress or completion. No fixed loading Hz. |
 
 [Implementation](uiStore.ts) · [All store update rates](../README.md)

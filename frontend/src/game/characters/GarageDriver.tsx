@@ -1,4 +1,5 @@
 import type { MirrorCheckFit } from "./mirrorCheck";
+import { useGarageParking } from "../preview/garageParkingStore";
 import { RosterRigHandoff } from "./RosterRigHandoff";
 import { CharacterTurntable } from "./CharacterTurntable";
 import { usesFittedAnimation } from "./animationFit";
@@ -70,13 +71,16 @@ function VillagerDriver({ url: preferredUrl, look, kind, villageKind, fallback, 
   url: string; look: CharacterLook; kind: WardrobeAssetTier; villageKind: WardrobeAssetTier; fallback: ReactNode;
 }) {
   const [active, setActive] = useState<WardrobePreview>();
+  const boarding = useGarageParking(s => Boolean(playback.rosterPreview && s.departurePhase));
   const [sources, setSources] = useState<WardrobeAssetSources>({});
   const onReady = useCallback<WardrobeAssetListener>((asset, loaded) => setSources(current => current[asset] === loaded
     ? current : { ...current, [asset]: loaded }), []);
   const { scene, pendingUrls, optionalHairUrl, unavailable, preview } = useMemo(() => resolveWardrobePreview({
     preferredUrl, look, kind, villageKind, sources, previous: active, allowStockHair: playback.rosterPreview,
   }), [preferredUrl, look, kind, villageKind, sources, active, playback.rosterPreview]);
-  if (preview !== active) setActive(preview);
+  // A late optional hair or clothing download can prepare a different skeleton.
+  // Finish boarding on the dressed rig the player saw walk up to the door.
+  if (preview !== active && (!boarding || active?.look.character.id !== look.character.id)) setActive(preview);
   const failedRig = scene === null && active && active.look.character.id !== look.character.id;
   useLayoutEffect(() => {
     if (failedRig) playback.onSettled?.(false);
@@ -165,6 +169,7 @@ function RosterEmotePlayer({ root, look, bag, paused, creatorEmotes }: { root: O
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, creatorEmotes }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
+  const departing = useGarageParking(s => Boolean(rosterPreview && s.departurePhase));
   const previewHair = useLocalHairstyle(s => s.id);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
@@ -189,7 +194,7 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
 
   return <group name="garage-driver" rotation={upright ? [0, 0, 0] : DRIVER_TILT}>
     {model.detachedCorset?.updateShoulders && <HighCollarMotion update={model.detachedCorset.updateShoulders} />}
-    {rosterPreview ? <RosterEmotePlayer root={model.root} look={look} bag={bag} paused={paused} creatorEmotes={creatorEmotes} />
+    {departing ? <primitive object={model.root} dispose={null} /> : rosterPreview ? <RosterEmotePlayer root={model.root} look={look} bag={bag} paused={paused} creatorEmotes={creatorEmotes} />
       : <GarageEmotePlayer root={model.root} bag={bag} personality={look.appearance.personality} bagColors={clothingColors(look, "bag")} previewPacks={previewPacks} leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} />}
   </group>;
 }

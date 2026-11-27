@@ -1,3 +1,4 @@
+import { useGarageParking } from "../../game/preview/garageParkingStore";
 import { create } from "zustand";
 import { PAUSE_RESUME_INDEX } from "../../game/menus/menuItems";
 import { useInputStore } from "../input/inputStore";
@@ -32,6 +33,8 @@ export const useUIStore = create<UIState>()((set, get, api) => ({
   mainWorldJoining: false,
   mainWorldError: "",
   setScreen: (screen, section?: "account" | "wardrobe" | "vehicle") => {
+    if (screen !== "sandbox" && useGarageParking.getState().departurePhase)
+      useGarageParking.getState().completeDeparture();
     set({
       screen,
       welcomeSection: screen === "welcome" && section === "account" ? section : null,

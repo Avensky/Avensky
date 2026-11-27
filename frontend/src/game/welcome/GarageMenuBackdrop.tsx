@@ -1,8 +1,8 @@
 import { useLayoutEffect, useRef } from "react";
-import { mountGarage } from "../preview/LiveGarage";
+import { holdGarageFrame, mountGarage } from "../preview/LiveGarage";
 import { entryAssets } from "./config";
 
-export function GarageMenuBackdrop({ visible }: { visible: boolean }) {
+export function GarageMenuBackdrop({ visible, hold = false }: { visible: boolean; hold?: boolean }) {
   const host = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const slot = host.current!;
@@ -16,6 +16,11 @@ export function GarageMenuBackdrop({ visible }: { visible: boolean }) {
     if (room.parentElement !== slot) slot.append(room);
     mountGarage(room);
   }, []);
+  useLayoutEffect(() => {
+    if (!hold) return;
+    holdGarageFrame(true);
+    return () => holdGarageFrame(false);
+  }, [hold]);
   return <>
     <link rel="stylesheet" href={entryAssets + "/garage-entry.css"} />
     <div ref={host} className="garage-menu-backdrop" hidden={!visible} aria-hidden="true" />

@@ -18,6 +18,9 @@ Build and validation
 Garage presentation
 - Sign-in, character selection, Play and Heroes share the authored garage_special.glb and LiveGarage scene. Make garage edits there for all four screens.
 - For sign-in, character selection, creation, Profile, or their menu handoffs, read [the approved menu guide](docs/MENU_DESIGN.md). It records the shared controls, visual rules, scene ownership, and acceptance checks to carry into the final game.
+- Treat the Garage as the player's private room and its four stations as the menu. Keep one garage canvas, carry the selected actor and vehicle forward, and introduce detail as the player reaches each stage.
+- Enter World is a visible departure. Begin preparing the admitted destination while the actor boards, drive through the real shutter, and reveal gameplay after its first map frame. Exercise this on a cold load and during a failed admission.
+- Keep new workshop props editable and their labels and collision footprints attached to their placements. Preserve the open center and the drive lane in default layouts. See the layout and handoff checks in the menu guide.
 Characters and appearance
 - Mara Vega and Rook Okafor are the original starter rigs. Preserve save IDs, rigs, existing working animation and network compatibility.
 - Repaired 12-style hairstyles have provisional approval only; final approval requires checking actual in-game hair color and opacity.

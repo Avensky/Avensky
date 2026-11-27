@@ -11,8 +11,10 @@ const stationEyes = {
   world_editor: { wide: [3.00, 2.1, 3.95], tall: [-3.0, 2.55, 5.55], tallFov: 77, tallStationWeight: .55 },
 } as const;
 
-export function garageMenuCamera(station: GarageMenuStation): GarageEntryShot {
-  const landmark = new Vector3(...GARAGE_MENU_LANDMARKS[station]);
+export function garageMenuCamera(station: GarageMenuStation, anchor: readonly [number, number, number] = GARAGE_MENU_LANDMARKS[station]): GarageEntryShot {
+  const landmark = new Vector3(...anchor);
+  const base = GARAGE_MENU_LANDMARKS[station];
+  const bearingChange = Math.atan2(landmark.x, landmark.z) - Math.atan2(base[0], base[2]);
   const actor = new Vector3(0, .88, 0), target = new Vector3();
   const actorRay = new Vector3(), stationRay = new Vector3();
   let distance = 2.57, heading = 2.94, elevation = .17, stationWeight = .5;
@@ -47,7 +49,7 @@ export function garageMenuCamera(station: GarageMenuStation): GarageEntryShot {
         const [x, y, z] = view[portrait ? "tall" : "wide"];
         const horizontal = Math.hypot(x, z);
         distance = Math.hypot(horizontal, y - actor.y);
-        heading = Math.atan2(x, z);
+        heading = Math.atan2(x, z) + bearingChange;
         elevation = Math.atan2(y - actor.y, horizontal);
         camera.fov = portrait ? view.tallFov : 59;
         stationWeight = portrait ? view.tallStationWeight : .5;

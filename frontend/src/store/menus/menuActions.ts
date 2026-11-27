@@ -1,4 +1,7 @@
-import { joinOpenWorld } from "../../game/social/navigation";
+import { useGarageParking } from "../../game/preview/garageParkingStore";
+import { garageParkingVehicle } from "../../game/preview/garageParkingVehicle";
+import { useHeroLoadouts } from "../../vehicles/cosmetics/heroLoadouts";
+import { useGarageEditor } from "../../worldBuilder/garage/garageEditorState";
 import type { StateCreator } from "zustand";
 import { MAIN_MENU_ITEMS, PAUSE_MENU_ITEMS, PAUSE_RESUME_INDEX, pauseMenuRails } from "../../game/menus/menuItems";
 import { canOpenVehicleSelection } from "../alpha/matchHeroChange";
@@ -114,12 +117,13 @@ export const createMenuActions: StateCreator<
         const request = ++mainAdmission;
         const stillJoining = () => request === mainAdmission && get().screen === "main" && get().mainWorldJoining;
         set({ mainWorldJoining: true, mainWorldError: "" });
-        void joinOpenWorld(stillJoining)
+        const { heroId } = garageParkingVehicle(useHeroLoadouts.getState().defaultHero);
+        void useGarageParking.getState().startDeparture(heroId, stillJoining)
           .catch(error => {
             if (stillJoining()) set({mainWorldError: error instanceof Error ? error.message : "Could not enter the shared world."});
           })
           .finally(() => { if (stillJoining()) set({mainWorldJoining: false}); });
-      } else if (item.id === "world_editor") get().setScreen("world_builder");
+      } else if (item.id === "world_editor") useGarageEditor.setState({ page: "projects" });
       else get().setScreen("heroes", item.id);
       return;
     }

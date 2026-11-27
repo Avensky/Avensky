@@ -3,5 +3,6 @@ pub mod actions;
 pub mod accounts;
 pub mod database;
 pub mod model;
+pub mod garage;
 pub mod security;
 pub mod authoring;

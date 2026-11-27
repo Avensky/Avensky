@@ -1,7 +1,10 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Matrix4, Quaternion, Vector3, Vector4 } from "three";
-import { GARAGE_MENU_LANDMARKS, type GarageMenuStation } from "./garageMenuLandmarks";
+import { GARAGE_MENU_LANDMARKS, garageMenuLandmarks, type GarageMenuStation } from "./garageMenuLandmarks";
+
+import { usePersonalGarage } from "../../store/social/personalGarage";
+import { garageParkingPose } from "./garageParkingCamera";
 
 type Marker = {
   station: GarageMenuStation;
@@ -39,6 +42,9 @@ export function registerGarageMenuMarker(station: GarageMenuStation, element: HT
  * offscreen or whose labels would overlap. A parked camera writes no menu styles. */
 export function GarageMenuMarkers() {
   const invalidate = useThree(state => state.invalidate);
+  const layout = usePersonalGarage(state => state.layout);
+  const landmarks = useMemo(() => garageMenuLandmarks(layout, garageParkingPose), [layout]);
+  useLayoutEffect(invalidateLayout, [landmarks]);
   const frame = useRef({
     revision: -1, width: 0, height: 0, left: 0, top: 0,
     position: new Vector3(), orientation: new Quaternion(), lens: new Matrix4(),
@@ -87,7 +93,7 @@ export function GarageMenuMarkers() {
 
     const place = (marker: Marker) => {
       const { width, height, field, clip } = last;
-      const [x, y, z] = GARAGE_MENU_LANDMARKS[marker.station];
+      const [x, y, z] = landmarks[marker.station];
       clip.set(x, y, z, 1).applyMatrix4(last.projection);
       let dock = clip.w <= 0 || Math.abs(clip.z) > clip.w;
       if (!dock) {

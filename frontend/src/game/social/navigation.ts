@@ -28,7 +28,8 @@ export function enterWorld(result: Record<string, unknown>, mode?: "sandbox") {
 
 /** Admission always targets the server's designated shared hub. The caller can
  * invalidate a pending request if the profile or visible menu is replaced. */
-export async function admitOpenWorld(stillJoining: () => boolean) {
+export async function admitOpenWorld(stillJoining: () => boolean, prepare?: (world: NonNullable<ReturnType<typeof currentOpenWorld>>) => Promise<void>,
+  scopedJoin?: (worldId: number) => Promise<Record<string, unknown>>) {
   const player = useSocialStore.getState().view?.profile;
   if (!player) throw Error("Connect your player profile to enter the shared world.");
   const currentView = () => {
@@ -44,13 +45,16 @@ export async function admitOpenWorld(stillJoining: () => boolean) {
   if (!world) throw Error("No Open World hub is available.");
   if (!useWorldCatalog.getState().maps.some(map => map.id === world.map))
     throw Error("The Open World map is unavailable in this client.");
-  const joined = view.current_world_id === world.id
-    ? { world_id: world.id, map: world.map }
-    : await requestSocial("world_join", { world_id: world.id });
+  const admission = (async () => {
+    const joined = scopedJoin ? await scopedJoin(world.id) : view.current_world_id === world.id
+      ? { world_id: world.id, map: world.map }
+      : await requestSocial("world_join", { world_id: world.id });
+    if (joined.world_id !== world.id || joined.map !== world.map)
+      throw Error("The server assigned a different world. Return to the garage and try again.");
+  })();
+  await Promise.all([admission, prepare?.(world)]);
   if (!stillJoining()) return;
   currentView();
-  if (joined.world_id !== world.id || joined.map !== world.map)
-    throw Error("The server assigned a different world. Return to the garage and try again.");
   return world;
 }
 

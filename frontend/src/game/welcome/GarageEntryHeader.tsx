@@ -81,16 +81,16 @@ type MenuShortcuts = {
   onOpen: (screen: (typeof shortcuts)[number]["id"]) => void;
 };
 
-export function GarageEntryHeader({ showBrand, account, menu }: {
-  showBrand: boolean; account?: AccountActions; menu?: MenuShortcuts;
+export function GarageEntryHeader({ showBrand, account, menu, backAction }: {
+  showBrand: boolean; account?: AccountActions; menu?: MenuShortcuts; backAction?: { onBack: () => void; busy: boolean; label: string };
 }) {
   const tabs = useRosterTabFade(Boolean(account));
   if (!showBrand && !account && !menu) return null;
-  const back = menu ?? (account?.profileOpen ? account : null);
+  const back = backAction ?? menu ?? (account?.profileOpen ? account : null);
   return <header className="garage-entry-header angled-tab-header">
     {showBrand && (back
       ? <GameButton variant="custom" className="garage-entry-brand garage-entry-brand-back"
-        aria-label={menu ? "Back to character selection" : "Back"} title="Back"
+        aria-label={backAction?.label ?? (menu ? "Back to character selection" : "Back")} title="Back"
         data-profile-back={account ? true : undefined} data-profile-header-tab={account ? true : undefined}
         data-controller-header-action disabled={back.busy} onPress={back.onBack}><MenuIcon name="back" />{brand}</GameButton>
       : <div className="garage-entry-brand">{brand}</div>)}
