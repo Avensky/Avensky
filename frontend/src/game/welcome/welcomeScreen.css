@@ -20,14 +20,14 @@
    brand in the opposite direction. Painted height and hit height are independent. */
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
 /* Controller focus remains visible even when the previous input was touch. */
-.garage-entry-header.angled-tab-header > .garage-entry-brand-back:focus {
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:is(:focus, :active, [data-pressing]):not([aria-disabled="true"]) {
   --angled-title-fill: var(--app-accent); color: var(--app-background);
 }
-.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child:focus > span { color: inherit; }
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child:is(:focus, :active, [data-pressing]) > span { color: inherit; }
 @media (hover: hover) {
   .garage-entry-header .garage-entry-brand-back:hover { --angled-title-fill: var(--app-raised); }
 }
-.garage-entry-header .garage-entry-brand-back:is(:hover,:focus-visible)::before { box-shadow: inset 0 -2px var(--app-accent); }
+.garage-entry-header .garage-entry-brand-back:is(:hover,:active,[data-pressing],:focus-visible)::before { box-shadow: inset 0 -2px var(--app-accent); }
 /* Both screens share the corner badge. Swap it in place as the controls crossfade. */
 html[data-entry-handoff="fading"]:has(#garage-entry-handoff .garage-entry-brand)
 .welcome-screen > .garage-entry-header:has(> .garage-entry-brand) {
@@ -47,14 +47,14 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 .garage-entry-actions .garage-entry-action {
   box-sizing: border-box; position: relative; isolation: isolate;
   display: grid; justify-items: center; align-items: start;
-  width: var(--action-width); height: max(44px,var(--action-face-height));
+  width: var(--action-width); height: max(var(--angled-hit-min),var(--action-face-height));
   margin: 0; border: 0; border-radius: 0;
   padding: calc((var(--action-face-height) - var(--action-icon-size)) / 2) var(--action-safe-end,0px) 0 var(--action-padding-start,0px);
   color: var(--app-text); background: transparent;
   cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
 .garage-entry-action:not(:last-child) {
-  --action-width: calc(44px + var(--angled-tab-cut));
+  --action-width: calc(var(--angled-hit-min) + var(--angled-tab-cut));
   --action-icon-size: 17px;
   --action-face-height: var(--angled-tabs-height);
   --action-cut: var(--angled-tab-cut);
@@ -66,8 +66,9 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
 /* Overlap the faces across the full diagonal. The outer tab's clip also
    routes each point on the seam to the action that owns that visible area. */
 .garage-entry-actions .garage-entry-action:last-child {
-  --action-safe-end: env(safe-area-inset-right,0px);
-  --action-width: calc(clamp(64px,6.5vw,88px) + var(--action-safe-end));
+  --action-safe-end: var(--angled-end-padding);
+  --action-padding-start: var(--angled-title-cut);
+  --action-width: calc(var(--angled-title-cut) + var(--angled-hit-min) + var(--action-safe-end));
   --action-icon-size: clamp(21px,1.9vw,26px);
   --action-face-height: var(--angled-header-height);
   --action-cut: var(--angled-title-cut);
@@ -90,15 +91,16 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   content: "";
   position: absolute;
   inset: 0 auto auto 0;
-  width: calc(var(--action-cut) + var(--angled-edge-width));
+  --action-divider-width: calc(1.25 * var(--angled-edge-width));
+  width: calc(var(--action-cut) + var(--action-divider-width));
   height: var(--action-face-height);
   background: var(--angled-edge-color);
-  clip-path: polygon(0 0,var(--angled-edge-width) 0,100% 100%,var(--action-cut) 100%);
+  clip-path: polygon(0 0,var(--action-divider-width) 0,100% 100%,var(--action-cut) 100%);
   pointer-events: none;
 }
 .garage-entry-action .menu-icon { width: var(--action-icon-size); height: var(--action-icon-size); }
 .garage-entry-action:focus { outline: 0; }
-.garage-entry-header:has([data-profile-header-tab]:focus) .garage-entry-action[aria-pressed="true"]:not(:focus) {
+.garage-entry-header:has([data-profile-header-tab]:focus) .garage-entry-action[aria-pressed="true"]:not(:focus,:active,[data-pressing]) {
   --joined-action-fill: var(--angled-tab-surface);
   --joined-action-rule: 1px;
 }

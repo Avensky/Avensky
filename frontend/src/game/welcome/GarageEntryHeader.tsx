@@ -90,13 +90,13 @@ export function GarageEntryHeader({ showBrand, account, menu, backAction }: {
       data-controller-header-action />}
     {account && <nav ref={tabs} className="garage-entry-actions" aria-label="Account actions" data-controller-row
       data-controller-header-action data-controller-tab-only={account.profileOpen || undefined}>
-      <GameButton variant="custom" className="garage-entry-action joined-header-action" aria-label="Log out" title="Log out"
+      <GameButton pressFeedback variant="custom" className="garage-entry-action joined-header-action" aria-label="Log out" title="Log out"
         data-profile-header-tab={account.profileOpen || undefined} onPress={account.onLogOut} disabled={account.busy}><MenuIcon name="leave_game" /></GameButton>
-      <GameButton variant="custom" className="garage-entry-action joined-header-action" aria-label="Profile" title="Profile"
+      <GameButton pressFeedback variant="custom" className="garage-entry-action joined-header-action" aria-label="Profile" title="Profile"
         aria-pressed={account.profileOpen} data-profile-header-tab={account.profileOpen || undefined} onPress={account.onProfile} disabled={account.busy}><MenuIcon name="profile" /></GameButton>
     </nav>}
     {menu && <nav className="garage-entry-actions" aria-label="Garage shortcuts">
-      {shortcuts.map(({ id, label }) => <GameButton key={id} variant="custom"
+      {shortcuts.map(({ id, label }) => <GameButton key={id} pressFeedback variant="custom"
         className="garage-entry-action joined-header-action"
         aria-label={label} title={label} disabled={menu.busy} onPress={() => menu.onOpen(id)}>
         <MenuIcon name={id} />

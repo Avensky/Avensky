@@ -18,11 +18,19 @@ test("game buttons activate once per touch or pen tap and still accept keyboard 
     const { createRoot } = await import("react-dom/client");
     root = createRoot(document.getElementById("root"));
     const activations = [];
-    await act(async () => root.render(createElement(GameButton, { onPress: event => activations.push(event.type) }, "Preview")));
+    await act(async () => root.render(createElement(GameButton, { pressFeedback: true, onPress: event => activations.push(event.type) }, "Preview")));
     const button = document.querySelector('[role="button"]');
     for (const pointerType of ["touch", "pen", "mouse"]) {
-      for (const type of ["pointerdown", "pointerup", "click"])
-        button.dispatchEvent(new window.PointerEvent(type, { bubbles: true, cancelable: true, pointerType, button: 0, detail: 0 }));
+      const pointer = type => button.dispatchEvent(new window.PointerEvent(type, { bubbles: true, cancelable: true, pointerType, button: 0, detail: 0 }));
+      pointer("pointerdown");
+      assert.equal(button.hasAttribute("data-pressing"), true);
+      pointer("pointercancel");
+      assert.equal(button.hasAttribute("data-pressing"), false);
+      assert.deepEqual(activations, [], "cancelling a press never activates the button");
+      pointer("pointerdown");
+      pointer("pointerup");
+      assert.equal(button.hasAttribute("data-pressing"), false);
+      pointer("click");
       assert.deepEqual(activations.splice(0), ["pointerup"], pointerType);
     }
     button.click();

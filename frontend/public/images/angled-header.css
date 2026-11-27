@@ -1,15 +1,19 @@
-/* Shared dimensions for scene menus and both sides of the sign-in handoff. */
-:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(41px * var(--menu-text-scale, 1)); }
-@media (max-width: 760px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(39px * var(--menu-text-scale, 1)); }
-}
-@media (max-height: 480px) and (min-width: 560px) {
-  :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(35px * var(--menu-text-scale, 1)); }
+/* Shared face dimensions. Scale the face independently of its touch target. */
+:root { --angled-outer-base: 41px; }
+@media (max-width: 760px) { :root { --angled-outer-base: 39px; } }
+@media (max-width: 600px) and (orientation: portrait) { :root { --angled-outer-base: 32px; } }
+@media (max-height: 480px) and (min-width: 560px) { :root { --angled-outer-base: 35px; } }
+:where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) {
+  --menu-angled-header-height: calc(var(--angled-outer-base) * var(--menu-text-scale, 1));
 }
 .angled-tab-header {
   --angled-edge-color: var(--app-accent);
   --angled-edge-width: 1px;
+  --angled-hit-min: 44px;
   --angled-brand-padding: clamp(10px, 1.2vw, 18px);
+  --angled-edge-gutter: var(--angled-brand-padding);
+  --angled-start-padding: max(var(--angled-edge-gutter), env(safe-area-inset-left, 0px));
+  --angled-end-padding: max(var(--angled-edge-gutter), env(safe-area-inset-right, 0px));
   --angled-title-scale: 1.2;
   --angled-title-tracking: .08em;
   --angled-tab-cut: clamp(16px, 1.45vw, 22px);
@@ -20,6 +24,10 @@
   --angled-title-shape: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height), calc(100% - var(--angled-title-cut) - var(--angled-title-chamfer)) 100%, 0 100%);
   --angled-title-fill: color-mix(in srgb, var(--app-panel) 92%, var(--app-raised));
   --angled-tab-surface: color-mix(in srgb, var(--app-background) 62%, var(--app-panel));
+}
+
+@media (orientation: landscape) and (pointer: coarse) {
+  .angled-tab-header { --angled-edge-gutter: calc(2 * var(--angled-brand-padding)); }
 }
 
 :is(.menu-frame-header, .garage-entry-header).angled-tab-header {
@@ -100,13 +108,15 @@
    extend below this row without changing the visible alignment. */
 .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
   display: grid;
+  column-gap: 0;
+  padding-inline-start: var(--angled-start-padding);
   grid-auto-flow: column;
   grid-template-rows: var(--angled-header-height);
   align-content: start;
   align-items: center;
 }
 .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
-  height: max(44px, var(--angled-header-height));
+  height: max(var(--angled-hit-min), var(--angled-header-height));
   border: 0;
   background: transparent;
   pointer-events: auto;
@@ -122,7 +132,10 @@
   content: ""; position: absolute; inset: 0 0 auto; z-index: -2; height: var(--angled-header-height);
   background: var(--angled-edge-color); clip-path: var(--angled-title-shape); pointer-events: none;
 }
-.garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; }
+.garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; margin-inline-end: 6px; }
+/* The A emblem supplies the first letter visually. Keep the full name in the
+   DOM for speech, including in the independently installed sign-in portal. */
+.garage-entry-brand > img + span::first-letter { font-size: 0; letter-spacing: 0; }
 
 img.menu-logo--header,
 .garage-entry-brand > img {

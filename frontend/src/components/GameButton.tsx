@@ -7,6 +7,7 @@ type GameButtonProps = Omit<HTMLAttributes<HTMLDivElement>, "children" | "onFocu
   onFocus?: () => void;
   disabled?: boolean;
   selected?: boolean;
+  pressFeedback?: boolean;
   variant?: "primary" | "secondary" | "danger" | "warning" | "neutral" | "selector" | "menu" | "custom";
   className?: string;
 };
@@ -19,6 +20,7 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
       onFocus,
       disabled = false,
       selected = false,
+      pressFeedback = false,
       variant = "primary",
       className = "",
       onClick,
@@ -60,8 +62,21 @@ export const GameButton = forwardRef<HTMLDivElement, GameButtonProps>(
           } ${disabled ? "pointer-events-none opacity-40" : "cursor-pointer"} ${className} px-1`}
         onPointerEnter={() => { if (!disabled) onFocus?.(); }}
         onFocus={() => { if (!disabled) onFocus?.(); }}
-        onPointerDown={(e) => e.preventDefault()}
+        onPointerDown={(e) => {
+          e.preventDefault();
+          // Suppressing native focus on touch also suppresses :active on some browsers.
+          if (pressFeedback && !disabled && e.button === 0) e.currentTarget.setAttribute("data-pressing", "");
+        }}
+        onPointerLeave={(e) => {
+          if (pressFeedback) e.currentTarget.removeAttribute("data-pressing");
+          rest.onPointerLeave?.(e);
+        }}
+        onPointerCancel={(e) => {
+          if (pressFeedback) e.currentTarget.removeAttribute("data-pressing");
+          rest.onPointerCancel?.(e);
+        }}
         onPointerUp={(e) => {
+          if (pressFeedback) e.currentTarget.removeAttribute("data-pressing");
           e.preventDefault();
           if (!disabled && (e.pointerType !== "mouse" || e.button === 0)) onPress?.(e);
         }}

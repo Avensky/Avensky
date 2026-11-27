@@ -151,7 +151,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
 
   return <div className="creator-controls" onKeyDown={keyboard}>
     <header className="garage-entry-header angled-tab-header creator-header">
-      <GarageBrandTab ref={backButton} className="creator-back" showLogo={false}
+      <GarageBrandTab ref={backButton} className="creator-back"
         aria-label="Back to character selection" disabled={busy} onPress={onBack} />
       <div className="tabbed-angled-scroll creator-tab-scroll">
         <nav ref={tabs} className="angled-header-tabs" role="tablist" aria-label="Character creation steps">

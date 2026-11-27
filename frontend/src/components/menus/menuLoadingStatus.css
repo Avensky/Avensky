@@ -1,0 +1,12 @@
+.menu-loading-status {
+  display: inline-flex; align-items: center; gap: .45em;
+  font-size: .875rem; color: var(--app-text);
+}
+.menu-loading-status::before {
+  content: ""; flex: none; width: .8em; height: .8em;
+  border: 2px solid var(--app-line); border-top-color: var(--app-accent); border-radius: 50%;
+}
+@keyframes menu-status-spin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduce-motion="true"]) .menu-loading-status::before { animation: menu-status-spin .8s linear infinite; }
+}

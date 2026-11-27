@@ -113,7 +113,7 @@ function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelec
     <PreviewContactShadow footprint={[.52, .46]} />
     <AssetBoundary resetKey={choice.id} fallback={<UnavailableRosterActor settled={settled} />}>
       <Suspense fallback={null}><GarageDriver choice={choice} upright rosterPreview creatorEmotes={creatorEmotes}
-        paused={mode === "profile"} onSettled={settled} /></Suspense>
+        onSettled={settled} /></Suspense>
     </AssetBoundary>
   </group>;
 }
