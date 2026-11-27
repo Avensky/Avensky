@@ -1,0 +1,153 @@
+{
+  "asset": {
+    "version": "2.0",
+    "copyright": "Low-Poly Metal Shelf by Ronstu. CC BY 4.0.",
+    "extras": {
+      "title": "Low-Poly Metal Shelf",
+      "author": "Ronstu",
+      "source": "https://sketchfab.com/3d-models/low-poly-metal-shelf-d9f0169a2a254d5a8668d4cf598c743e",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "changes": "Reoriented and grounded the shelf, compressed the original surface maps, removed unused UVs and corrected the metallic texture assignment."
+    }
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "Workshop shelf",
+      "mesh": 0
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Workshop shelf",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "materials": [
+    {
+      "name": "Edge wear dull gray",
+      "doubleSided": true,
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 1
+        }
+      }
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    }
+  ],
+  "images": [
+    {
+      "name": "Powder-coated steel with edge wear",
+      "mimeType": "image/jpeg",
+      "uri": "map-0181e720bd81.jpg"
+    },
+    {
+      "name": "Packed metal and roughness",
+      "mimeType": "image/jpeg",
+      "uri": "map-4109ec3386e1.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 452,
+      "max": [
+        0.5892645120620728,
+        2.1968026482500136,
+        0.2096918672323227
+      ],
+      "min": [
+        -0.5892645120620728,
+        0.0,
+        -0.2096918672323227
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 452,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 452,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 756,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 5424,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 5424,
+      "byteLength": 5424,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 10848,
+      "byteLength": 3616,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 14464,
+      "byteLength": 1512,
+      "target": 34963
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "geometry-8a45396aeb69.bin",
+      "byteLength": 15976
+    }
+  ]
+}

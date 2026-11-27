@@ -53,6 +53,8 @@ The fitted GLBs are installed separately. The hair and wardrobe catalog entries 
 
 ## Credits
 
+The shared garage uses community-authored workshop props. [Workshop model credits and adaptations](frontend/public/open-art/garage/CREDITS.md)
+
 Frontend inspiration from Domenicobrz’s R3F-in-practice. The upstream project identifies its code license as MIT. Bundled third-party assets retain their own notices.
 
 - “T-90M (With interior) [FREE]” by DerpDude. [Model](https://skfb.ly/oWGUu) · [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
