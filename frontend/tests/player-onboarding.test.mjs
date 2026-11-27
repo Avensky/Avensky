@@ -466,13 +466,15 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(sent.some(request=>request.action==="world_join"),false);
     assert.deepEqual(selectEquippedCharacter(social.getState()),fox);
     const previouslySent = sent.length;
+    const exactName = "track FOX ii";
     await act(async () => {
       localStorage.setItem("avenlab-social-profile-v1:unified-test", JSON.stringify({ id: "older-device", token, name: "Older guest" }));
       client.setSocialConnection(socket);
       client.beginSocialSession("unified-test", undefined, true, true, true);
       ui.setState({ screen: "welcome" });
       root.render(createElement(WelcomeScreen, { key: "shared-sign-in" }));
-      client.receiveSocialState({ ...view, profile: saved });
+      client.receiveSocialState({ ...view, profile: { ...saved, name: exactName,
+        characters: saved.characters.map(slot => ({ ...slot, name: exactName })) } });
     });
     assert.equal(sent.length, previouslySent, "a staged session skips old device credentials and a second login");
     assert.equal(button("Sign in"), undefined);
@@ -495,11 +497,12 @@ test("the creator preserves an eight-step appearance through registration, name 
           field.dispatchEvent(new Event("input", {bubbles:true}));
         });
       };
-      for (const name of ["track fox ii", "Track Fox II "]) {
+      assert.ok(document.querySelector(".roster-confirm-field label").textContent.includes(exactName));
+      for (const name of ["Track Fox II", "track fox ii", exactName + " "]) {
         await enterName(name);
         assert.ok(disabled(button("Delete character")));
       }
-      await enterName("Track Fox II");
+      await enterName(exactName);
       await pressKey("Enter", "Enter");
       assert.ok(document.activeElement === button("Cancel"), "finishing text entry cannot submit");
       assert.equal(sent.length, count);
@@ -509,11 +512,11 @@ test("the creator preserves an eight-step appearance through registration, name 
       await select("Manage Track Fox II");
       await select("Delete character");
       assert.equal(document.querySelector('.roster-confirm-field input').value, "");
-      await enterName("Track Fox II");
+      await enterName(exactName);
       await select("Delete character");
       const request = sent.at(-1);
       assert.deepEqual([request.action, request.character_id, request.confirmation_name],
-        ["character_delete", saved.characters[0].id, "Track Fox II"]);
+        ["character_delete", saved.characters[0].id, exactName]);
       assert.equal(sent.length, count + 1);
       await act(async () => reply(request, {profile:{...view.profile, progression:{...view.profile.progression, cosmetics_revision:2}}}));
       assert.ok(!button("Manage Track Fox II"), "the deleted slot leaves the roster");

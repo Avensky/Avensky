@@ -94,7 +94,7 @@
   border-radius: 0;
   color: var(--app-text);
   background: var(--angled-tab-surface);
-  box-shadow: inset 0 -1px var(--app-accent);
+  box-shadow: inset 0 var(--angled-edge-width) var(--angled-edge-color), inset 0 calc(-1 * var(--angled-edge-width)) var(--angled-edge-color);
   clip-path: polygon(var(--angled-tab-cut) 0, 100% 0, calc(100% - var(--angled-tab-cut)) 100%, 0 100%);
   font: inherit;
   font-size: calc(clamp(9px, 1.05vw, 12px) * var(--menu-text-scale, 1));
@@ -118,7 +118,7 @@
   right: 0;
   bottom: 0;
   width: calc(var(--angled-tab-cut) + 1px);
-  background: var(--app-accent);
+  background: var(--angled-edge-color);
   clip-path: polygon(calc(100% - 1px) 0, 100% 0, 1px 100%, 0 100%);
   pointer-events: none;
 }
@@ -166,12 +166,12 @@
 }
 .angled-header-edge path {
   fill: none;
-  stroke: var(--app-line);
+  stroke: var(--angled-edge-color);
   stroke-width: 1.2;
   vector-effect: non-scaling-stroke;
 }
 .angled-header-edge[data-separator] path {
-  stroke: var(--app-muted);
+  stroke-width: 1.5;
 }
 .angled-header-tab[aria-selected="true"] .angled-header-edge path {
   stroke: color-mix(in srgb, currentColor 42%, transparent);

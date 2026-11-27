@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import { useState } from "react";
 import { AssistedInput } from "../../components/text/AssistedInput";
 import type {
@@ -40,7 +41,7 @@ export function InvitationsPage({
           <article className="social-invitation" key={invite.id}>
             <strong>{invite.world_name}</strong>
             <p>
-              FROM {invite.from.name} ·{" "}
+              FROM {formatCharacterName(invite.from.name)} ·{" "}
               {invite.locked ? "PASSWORD REQUIRED" : "OPEN INVITATION"}
             </p>
             {selected?.id === invite.id && (
@@ -89,7 +90,7 @@ export function InvitationsPage({
           .filter((request) => request.incoming)
           .map((request) => (
             <article className="social-person" key={request.player.id}>
-              <strong>{request.player.name}</strong>
+              <strong>{formatCharacterName(request.player.name)}</strong>
               <div className="social-actions">
                 <button
                   type="button"

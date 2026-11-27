@@ -8,6 +8,7 @@ import { useMobilePortrait } from "../../controls/useMobilePortrait";
 import { deleteRosterCharacter } from "../../net/socialClient";
 import type { CharacterSlot } from "../../store/social/socialStore";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
+import { formatCharacterName } from "../characters/characterName";
 import { styleName } from "../characters/characterStyles";
 import { navigateFormRows } from "../social/formRows";
 
@@ -33,6 +34,7 @@ export function RosterCharacterManager({ owner, slot, connected, onClose, onDele
   const portrait = useMobilePortrait();
   const id = useId();
   const fieldId = id + "-name";
+  const displayName = formatCharacterName(slot.name);
   const canDelete = confirming && connected && !submitting && typedName === slot.name;
 
   function back() {
@@ -108,9 +110,9 @@ export function RosterCharacterManager({ owner, slot, connected, onClose, onDele
     <section ref={panel} className="roster-choices roster-manager" role="dialog" aria-modal="true"
       aria-labelledby={id} aria-describedby={confirming ? id + "-warning" : undefined} data-controller-rows onKeyDown={keyDown}>
       <div className="roster-manager-summary chamfered-frame">
-        <h2 id={id}>{confirming ? "Delete character?" : slot.name}</h2>
+        <h2 id={id}>{confirming ? "Delete character?" : displayName}</h2>
         {confirming
-          ? <p id={id + "-warning"}>Permanently removes <strong>{slot.name}</strong> and their progress from this server.</p>
+          ? <p id={id + "-warning"}>Permanently removes <strong>{displayName}</strong> and their progress from this server.</p>
           : <p>{styleName(slot.style)} · Level {slot.level}</p>}
       </div>
       {confirming ? <>

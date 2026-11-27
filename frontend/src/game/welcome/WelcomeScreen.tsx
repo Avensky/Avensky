@@ -6,6 +6,7 @@ import { isTypingTarget, menuActionForKey, type MenuAction } from "../../control
 import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
+import { formatCharacterName } from "../characters/characterName";
 import { CHARACTERS, characterAppearance, characterLook, ROOK_ID, type CharacterChoice } from "../characters/characterCatalog";
 import { CHARACTER_STYLES, applyCreatorWardrobe, creatorChoice, type CharacterBody } from "../characters/characterStyles";
 import { CharacterCreator, CREATOR_STEPS } from "./CharacterCreator";
@@ -513,7 +514,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
         : screen === "characters" && player && managedSlot ? <RosterCharacterManager key={`${player.id}/${managedSlot.id}`}
             owner={player.id} slot={managedSlot} connected={connected && !busy} onClose={() => setManagement(undefined)}
             onDeleted={() => {
-              setRosterNotice({ owner: player.id, text: `${managedSlot.name} was deleted.` });
+              setRosterNotice({ owner: player.id, text: `${formatCharacterName(managedSlot.name)} was deleted.` });
               setManagement(undefined);
             }} />
         : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}

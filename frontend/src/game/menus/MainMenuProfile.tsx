@@ -2,7 +2,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { MenuAction } from "../../controls/inputRouting";
 import { createGuestProfile, signInDeviceProfile, signOutPlayerProfile } from "../../net/socialClient";
 import { connectRustServer, disconnectRustServer } from "../../net/rustSocket";
-import { useSocialStore } from "../../store/social/socialStore";
+import { selectActiveCharacterName, useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
 import { CharacterHeaderButton } from "../characters/CharacterHeaderProfile";
 import { useSavedPlayerCharacter } from "../characters/localOutfits";
@@ -10,7 +10,7 @@ import { PLAYER_ONBOARDING } from "../welcome/config";
 import "./mainMenuProfile.css";
 
 export function MainMenuProfile({ focusMenu }: { focusMenu?: () => void }) {
-  const name = useSocialStore(state => state.view?.profile.name);
+  const name = useSocialStore(state => selectActiveCharacterName(state) ?? state.view?.profile.name);
   const scope = useSocialStore(state => state.profileScope);
   const available = useSocialStore(state => state.available);
   const status = useSocialStore(state => state.profileStatus);

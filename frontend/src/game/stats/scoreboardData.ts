@@ -1,7 +1,8 @@
+import { formatCharacterName } from "../characters/characterName";
 import {shallow} from 'zustand/vanilla/shallow';
 import {HEROES,heroForVehicle} from '../../store/alpha/alphaStore';
 import type {PhysicsEntitySnapshot,PhysicsSnapshot,VehicleSessionStats} from '../../store/session/networkStore';
-import type {SocialView} from '../../store/social/socialStore';
+import {selectActiveCharacterName,type SocialView} from '../../store/social/socialStore';
 import type {HeroAppearance} from '../../vehicles/cosmetics/heroLoadouts';
 import type {CharacterChoice} from '../characters/characterCatalog';
 
@@ -47,6 +48,7 @@ export function scoreboardPlayers(snapshot:PhysicsSnapshot|null,playerId:string,
  if(worldId===null||worldId===undefined)return [];
  const members=view?.worlds.find(world=>world.id===worldId)?.members??[];
  const roster=(view?.alpha?.roster??[]).filter(card=>card.world_id===worldId||(card.world_id===undefined&&card.id===view?.profile.id&&view?.alpha?.active?.world_id===worldId));
+ const ownName=selectActiveCharacterName({view})??view?.profile.name;
  const seenProfiles=new Set<string>();
  const rows:ScoreboardPlayer[]=entities.filter(entity=>entity.room_id===worldId).map(entity=>{
   const self=entity.id===playerId,member=members.find(item=>item.player_id===entity.id);
@@ -56,7 +58,10 @@ export function scoreboardPlayers(snapshot:PhysicsSnapshot|null,playerId:string,
   const hidden=card?.hero_hidden===true,desired=self?view?.alpha?.active?.hero:card?.hero;
   const hero=hidden?undefined:HEROES.find(item=>item.id===desired&&item.vehicle===entity.vehicle_id)??heroForVehicle(entity.vehicle_id);
   const ownStyle=self&&hero?view?.profile.progression?.hero_loadouts?.[hero.vehicle]:undefined;
-  return {id:entity.id,profileId,name:self?view?.profile.name??member?.name??'YOU':member?.name??card?.name??'UNKNOWN PLAYER',team:team(entity.team),self,
+  const remoteName=member?.name??card?.name;
+  const display=remoteName&&profileId?formatCharacterName(remoteName):remoteName;
+  const name=self?(ownName??display??'YOU'):(display??'UNKNOWN PLAYER');
+  return {id:entity.id,profileId,name,team:team(entity.team),self,
    hero:hero?.id??null,appearance:hidden?null:entity.appearance??card?.appearance??ownStyle??null,heroHidden:hidden,
    waiting:false,defeated:entity.health?.defeated===true,status:hidden?undefined:card?.reconnecting?'reconnecting':entity.health?.defeated===true?'defeated':'active',kills:hidden?null:count(entity.health?.kills),deaths:hidden?null:count(entity.health?.deaths),stats:hidden?null:readStats(entity),
    level:self?count(view?.profile.progression?.level):count(member?.level)} satisfies ScoreboardPlayer;
@@ -66,7 +71,7 @@ export function scoreboardPlayers(snapshot:PhysicsSnapshot|null,playerId:string,
  for(const card of roster){
   if(seenProfiles.has(card.id)||rows.some(row=>row.self&&view?.profile.id===card.id))continue;
   const self=card.id===view?.profile.id,hidden=card.hero_hidden===true,hero=hidden?undefined:HEROES.find(item=>item.id===(card.hero||card.showcase_hero)),member=members.find(item=>item.profile_id===card.id);
-  rows.push({id:`profile:${card.id}`,profileId:card.id,name:card.name,team:team(card.team),self,hero:hero?.id??null,appearance:hidden?null:card.appearance??(self&&hero?view?.profile.progression?.hero_loadouts?.[hero.vehicle]:null)??null,heroHidden:hidden,waiting:true,defeated:false,status:hidden?undefined:card.reconnecting?'reconnecting':card.hero?'ready':'selecting',kills:null,deaths:null,stats:null,level:self?count(view?.profile.progression?.level):count(member?.level)});
+  rows.push({id:`profile:${card.id}`,profileId:card.id,name:self&&ownName?ownName:formatCharacterName(card.name),team:team(card.team),self,hero:hero?.id??null,appearance:hidden?null:card.appearance??(self&&hero?view?.profile.progression?.hero_loadouts?.[hero.vehicle]:null)??null,heroHidden:hidden,waiting:true,defeated:false,status:hidden?undefined:card.reconnecting?'reconnecting':card.hero?'ready':'selecting',kills:null,deaths:null,stats:null,level:self?count(view?.profile.progression?.level):count(member?.level)});
  }
  // Guarantee our own card survives a malformed/overfull peer list. Stable sort
  // avoids place changes for pose-only snapshots and does not rank by score.

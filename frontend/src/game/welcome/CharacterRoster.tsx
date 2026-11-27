@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import { formatCharacterName } from "../characters/characterName";
 import { ControllerButton } from "../../components/controller/ControllerButton";
 import { useMenuInputDevice } from "../../components/controller/useMenuInputDevice";
 import { GameButton } from "../../components/GameButton";
@@ -27,8 +28,9 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
   const device = useMenuInputDevice();
   const slots = profile.characters;
   const selectedAppearance = selected && savedCharacterAppearance(profile, selected);
+  const selectedName = selected && formatCharacterName(selected.name);
   const manage = selected && onManage && <GameButton variant="custom" className="roster-manage chamfered-frame"
-    aria-label={`Manage ${selected.name}`} title={`Manage ${selected.name}`} aria-haspopup="dialog" data-roster-manage
+    aria-label={`Manage ${selectedName}`} title={`Manage ${selectedName}`} aria-haspopup="dialog" data-roster-manage
     disabled={busy || !connected} onPress={() => onManage(selected)}>
     <MenuIcon name="other" /><span>Manage</span>
   </GameButton>;
@@ -40,18 +42,19 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
     <div className="roster-choices">
       {slots ? <>
         <div className="roster-caption" data-controller-row={portrait || undefined}>
-          <span className="roster-mobile-name">{selected?.name ?? "Characters"}</span>
+          <span className="roster-mobile-name">{selectedName ?? "Characters"}</span>
           {portrait && manage}
           <small aria-label={`${slots.length} of ${limit} character slots used`}>{slots.length} / {limit}</small>
         </div>
         <div className="roster-tiles" role="group" aria-label="Saved characters" data-controller-row={portrait || undefined} data-controller-columns={portrait ? limit : undefined}
           onFocus={event => event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
           {slots.map(slot => {
+            const name = formatCharacterName(slot.name);
             const isSelected = slot.id === selected?.id;
             const canEnter = isSelected && connected && !busy && Boolean(selectedAppearance);
             const tile = <GameButton variant="custom" className="welcome-character roster-tile chamfered-frame"
-              aria-label={slot.name} aria-description={canEnter ? "Go to the Garage as this character" : undefined}
-              title={canEnter ? `Continue as ${slot.name}` : slot.name} data-character-id={slot.id}
+              aria-label={name} aria-description={canEnter ? "Go to the Garage as this character" : undefined}
+              title={canEnter ? `Continue as ${name}` : name} data-character-id={slot.id}
               aria-pressed={isSelected} selected={isSelected} disabled={busy}
               onFocusCapture={() => { if (!busy && !isSelected) onChoose(slot); }}
               onPress={event => {
@@ -62,8 +65,8 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
                   else onChoose(slot);
                 }
               }}>
-              <ProfilePortrait choice={savedCharacterAppearance(profile, slot)} label={slot.name} welcomePreview="roster" />
-              <span className="welcome-character-details"><strong>{slot.name}</strong>
+              <ProfilePortrait choice={savedCharacterAppearance(profile, slot)} label={name} welcomePreview="roster" />
+              <span className="welcome-character-details"><strong>{name}</strong>
                 <small>{styleName(slot.style)} · Level {slot.level}</small></span>
               {canEnter && device === "controller" && <ControllerButton button="A" />}
             </GameButton>;

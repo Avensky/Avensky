@@ -109,7 +109,7 @@ button.character-header-profile { cursor: pointer; }
   font-size: clamp(8px, 1.05vw, 12px);
   font-weight: 850;
   font-style: italic;
-  text-transform: uppercase;
+  text-transform: none;
   white-space: nowrap;
 }
 .character-header-portrait {
@@ -129,7 +129,8 @@ button.character-header-profile { cursor: pointer; }
   position: relative;
   align-items: center;
   background: var(--joined-action-fill);
-  box-shadow: inset 0 calc(-1 * var(--joined-action-rule)) var(--app-accent);
+  box-shadow: inset 0 1px var(--angled-edge-color, var(--app-accent)),
+    inset 0 calc(-1 * var(--joined-action-rule)) var(--angled-edge-color, var(--app-accent));
 }
 .character-header-profile:is([data-joined], [data-angled]) :is(.character-header-info, .character-header-portrait) {
   height: 100%;
@@ -155,7 +156,7 @@ button.character-header-profile { cursor: pointer; }
   inset: 0 auto auto 0;
   width: calc(var(--profile-cut) + 1px);
   height: var(--profile-edge-height);
-  background: var(--app-line);
+  background: var(--angled-edge-color, var(--app-accent));
   clip-path: polygon(var(--profile-cut) 0, 100% 0, 1px 100%, 0 100%);
   pointer-events: none;
 }

@@ -56,7 +56,7 @@ test('saved/live results use server outcomes and preserve modal/action ownership
    await act(async()=>window.dispatchEvent(new CustomEvent('avenlab:panel-action',{detail:'next_option'})));
    assert.equal(store.useMatchResultsStore.getState().teamFilter,'red');assert.equal(document.querySelectorAll('.match-team-composition .match-composition-team').length,1);assert(document.querySelector('.match-team-composition [data-team="red"]'));
    await act(async()=>window.dispatchEvent(new KeyboardEvent('keydown',{code:'Digit3',bubbles:true,cancelable:true})));
-   assert.equal(store.useMatchResultsStore.getState().teamFilter,'blue');assert(document.querySelector('.match-team-composition [data-team="blue"]'));assert.match(document.querySelector('.scoreboard-player-details').textContent,/OTHER DRIVER/);
+   assert.equal(store.useMatchResultsStore.getState().teamFilter,'blue');assert(document.querySelector('.match-team-composition [data-team="blue"]'));assert.match(document.querySelector('.scoreboard-player-details').textContent,/Other Driver/);
    assert.equal(store.useMatchResultsStore.getState().record,saved,'filtering never mutates archived match data');
    await act(async()=>store.useMatchResultsStore.getState().selectTab('stats'));await act(async()=>window.dispatchEvent(new CustomEvent('avenlab:panel-action',{detail:'next_option'})));assert.equal(store.useMatchResultsStore.getState().teamFilter,'blue','secondary filters only own Team view');
   });

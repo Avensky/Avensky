@@ -32,6 +32,14 @@ Keep touch targets at least 44 CSS pixels where the player taps. Use the shared 
 
 Delete character belongs to the roster. Open it from Manage, keep the actor in the garage, and identify the character by its saved name. Start the confirmation on Cancel. The player must enter the name exactly, including capitalization, and then activate Delete character separately. Finishing text entry only puts the keyboard away. Use the server’s updated roster to pick the next character or focus Create character when the last slot is deleted.
 
+## Shared header and character names
+
+Use `GarageEntryHeader` for the garage entry and account actions, and the shared angled tab system for scene menus. Keep geometry and theme colors in the shared styles. A page supplies the tabs, icons and actions it needs. Align the Back arrow, logo and wordmark to the vertical center of the visible tab face. On short landscape screens the touch target can extend below the face. Apply the device safe area once at the edge of the header.
+
+Draw one continuous top edge across the joined right tabs and a single diagonal divider at each join, using the same theme accent as the left tab. The outer tab stays prominent. Focus and selection use the lower accent edge. Check the top line and dividers in two contrasting themes and compare the brand position with and without Back, including at a 35 px landscape header height.
+
+Display character names with an initial capital for each part, as in **Vesper Vega** or **O’Neil**. Preserve intentionally mixed spelling such as **McKay**. Use the shared formatter when rendering a character name. Keep the original text for editing, saving and the exact-name deletion prompt. Profile’s **Display name** is the account name and keeps its owner’s spelling. [Character name formatter](../frontend/src/game/characters/characterName.ts)
+
 ## One garage and one camera
 
 Mount the real 3D garage once. Sign-in, the roster, the creator, Profile, the Garage stations, and views in Play and Heroes change the UI, actor, or camera shot on that scene. On cold entry, show the logo on neutral black, reveal the garage, then fade in the controls. On return or logout, retain the canvas and fade the UI layers. Keep the header’s size steady throughout its fade.
@@ -61,7 +69,7 @@ Introduce assets at the first screen that can use them. Sign-in needs the room i
 | Change | Start here |
 | --- | --- |
 | Entry branding, credentials, header geometry and surfaces | [Shared sign-in markup](../frontend/src/theme/garageEntry.ts), [theme palettes](../frontend/src/theme/palettes.json), [angled header CSS](../frontend/public/images/angled-header.css), [entry CSS](../frontend/public/images/garage-entry.css) |
-| Joined header actions, roster, creation, and Profile | [GarageEntryHeader](../frontend/src/game/welcome/GarageEntryHeader.tsx), [CharacterRoster](../frontend/src/game/welcome/CharacterRoster.tsx), [CharacterCreator](../frontend/src/game/welcome/CharacterCreator.tsx), [GarageProfilePanel](../frontend/src/game/characters/GarageProfilePanel.tsx) |
+| Joined header actions, roster, creation, and Profile | [GarageBrandTab](../frontend/src/game/welcome/GarageBrandTab.tsx), [GarageEntryHeader](../frontend/src/game/welcome/GarageEntryHeader.tsx), [CharacterRoster](../frontend/src/game/welcome/CharacterRoster.tsx), [CharacterCreator](../frontend/src/game/welcome/CharacterCreator.tsx), [GarageProfilePanel](../frontend/src/game/characters/GarageProfilePanel.tsx) |
 | Tab faces, secondary rows, and activation | [MenuTabButton](../frontend/src/components/menus/MenuTabButton.tsx), [SecondaryTabRow](../frontend/src/components/menus/SecondaryTabRow.tsx), [GameButton](../frontend/src/components/GameButton.tsx), [input routing](../frontend/src/controls/inputRouting.ts) |
 | Garage stations | [Station labels](../frontend/src/game/menus/menuItems.ts), [projected controls](../frontend/src/game/menus/MainMenu.tsx), [shared prop and camera coordinates](../frontend/src/game/preview/garageMenuLandmarks.ts), [station camera](../frontend/src/game/preview/garageMenuCamera.ts), [furnishings](../frontend/src/game/preview/GarageMenuFurnishings.tsx) |
 | Personal garage editing | [World Editor room controls](../frontend/src/worldBuilder/garage/GarageEditor.tsx), [account layout](../frontend/src/store/social/personalGarage.ts), [server save](../avenlab-server/src/server/garage.rs) |

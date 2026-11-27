@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../game/characters/characterName";
 import {create} from 'zustand';
 import {canDrive} from '../controls/inputRouting';
 import {requestSocial} from '../net/socialClient';
@@ -62,5 +63,6 @@ export async function requestAssistedHealPack():Promise<boolean>{
 export function healTargetName(target:PhysicsEntitySnapshot|null){
  if(!target)return 'NO INJURED ALLY';
  const world=useSocialStore.getState().view?.worlds.find(world=>world.id===target.room_id);
- return world?.members.find(member=>member.player_id===target.id)?.name??'INJURED ALLY';
+ const member=world?.members.find(member=>member.player_id===target.id);
+ return member?.profile_id?formatCharacterName(member.name):member?.name??'INJURED ALLY';
 }

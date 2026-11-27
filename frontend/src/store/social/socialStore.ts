@@ -2,6 +2,7 @@ import type { AlphaView, Progression, GameMode } from "../alpha/alphaStore";
 import type { VehicleDriver } from "../../game/characters/driverRoster";
 import type { CharacterChoice } from "../../game/characters/characterCatalog";
 import { create } from "zustand";
+import { formatCharacterName } from "../../game/characters/characterName";
 import type { SessionEndReason } from "../../net/stagingAccount";
 
 export type EntryIssue = { kind: "other-tab" | SessionEndReason } | { kind: "server"; message: string };
@@ -108,7 +109,8 @@ export function playerDisplayName(profile?: PlayerProfile | null): string | unde
 export function selectActiveCharacterName(state: { view: SocialView | null }): string | undefined {
   const profile = state.view?.profile;
   if (!profile?.active_character_id) return undefined;
-  return profile.characters?.find(slot => slot.id === profile.active_character_id)?.name ?? profile.name;
+  const name = profile.characters?.find(slot => slot.id === profile.active_character_id)?.name ?? profile.name;
+  return formatCharacterName(name);
 }
 
 /** The active career's progression can already contain a newer wardrobe edit. */

@@ -39,7 +39,7 @@ header.garage-entry-header.angled-tab-header {
 }
 @media (orientation: landscape) and (pointer: coarse) {
   header.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
-    padding-left: calc(2 * var(--angled-brand-padding));
+    padding-left: max(calc(2 * var(--angled-brand-padding)), env(safe-area-inset-left, 0px));
   }
 }
 body.garage-entry:has(.garage-entry-account) > .garage-entry-header { display: none; }
@@ -125,7 +125,6 @@ html[data-high-contrast="true"] {
 .garage-entry-card [role="alert"] { border-inline-start:2px solid var(--app-accent); padding-inline-start:.7rem; }
 @media (max-width:600px) and (orientation:portrait) {
   .garage-entry-header.angled-tab-header { --angled-header-height: calc(32px * var(--menu-text-scale, 1)); }
-  .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child::before { top: 1px; }
   .garage-entry-body { align-items:end; justify-items:center; padding:1rem 1rem max(2rem,env(safe-area-inset-bottom)); }
   .garage-entry-card { width:min(100%,390px); }
 }

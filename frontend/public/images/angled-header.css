@@ -7,6 +7,8 @@
   :where(.menu-frame, .hero-selection, .hero-ability-guide, .cockpit-panel, .main-menu, .garage-entry, .garage-entry-header) { --menu-angled-header-height: calc(35px * var(--menu-text-scale, 1)); }
 }
 .angled-tab-header {
+  --angled-edge-color: var(--app-accent);
+  --angled-edge-width: 1px;
   --angled-brand-padding: clamp(10px, 1.2vw, 18px);
   --angled-title-scale: 1.2;
   --angled-title-tracking: .08em;
@@ -49,7 +51,7 @@
   min-width: 0;
   padding: 1px calc(var(--angled-title-cut) + 9px) 1px 12px;
   color: var(--app-text);
-  background: var(--app-accent);
+  background: var(--angled-edge-color);
   clip-path: var(--angled-title-shape);
   filter: drop-shadow(0 0 1px var(--app-accent));
 }
@@ -57,7 +59,7 @@
   content: "";
   position: absolute;
   z-index: -1;
-  inset: 0 1px 1px;
+  inset: var(--angled-edge-width);
   pointer-events: none;
   background: var(--angled-title-fill);
   clip-path: var(--angled-title-shape);
@@ -82,9 +84,7 @@
 
 .menu-frame-header.menu-frame-header--compact > div:first-child,
 .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
-  display: flex;
   flex: 0 0 auto;
-  align-items: center;
   gap: 6px;
   margin-inline-end: auto;
 }
@@ -96,6 +96,33 @@
 .garage-entry-header.angled-tab-header > .garage-entry-brand:first-child > span {
   font-size: calc(clamp(14px, 1.6vw, 20px) * var(--menu-text-scale, 1));
 }
+/* Center the controls within the painted face. A Back tab's touch target can
+   extend below this row without changing the visible alignment. */
+.garage-entry-header.angled-tab-header > .garage-entry-brand:first-child {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: var(--angled-header-height);
+  align-content: start;
+  align-items: center;
+}
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
+  height: max(44px, var(--angled-header-height));
+  border: 0;
+  background: transparent;
+  pointer-events: auto;
+  touch-action: manipulation;
+  clip-path: polygon(0 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height),
+    calc(100% - var(--angled-title-cut)) var(--angled-header-height), calc(100% - var(--angled-title-cut)) 100%, 0 100%);
+}
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child::before {
+  bottom: auto;
+  height: calc(var(--angled-header-height) - 2 * var(--angled-edge-width));
+}
+.garage-entry-brand-back::after {
+  content: ""; position: absolute; inset: 0 0 auto; z-index: -2; height: var(--angled-header-height);
+  background: var(--angled-edge-color); clip-path: var(--angled-title-shape); pointer-events: none;
+}
+.garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; }
 
 img.menu-logo--header,
 .garage-entry-brand > img {

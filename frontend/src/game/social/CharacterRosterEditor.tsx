@@ -1,3 +1,4 @@
+import { formatCharacterName } from "../characters/characterName";
 import { useState } from "react";
 import { CHARACTERS, ROOK_ID, VILLAGER_ID } from "../characters/characterCatalog";
 import { sharedDrivers, type VehicleDriver } from "../characters/driverRoster";
@@ -15,7 +16,7 @@ export function CharacterRosterEditor({ overrides, command }: { overrides: Vehic
     <label>Character<select value={draft.id} onChange={e =>
       setDraft(roster.find(driver => driver.id === e.target.value) ?? makeDriver())}>
       <option value="">Create a character</option>
-      {roster.map(driver => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+      {roster.map(driver => <option key={driver.id} value={driver.id}>{formatCharacterName(driver.name)}</option>)}
     </select></label>
     <form onSubmit={async e => {
       e.preventDefault();
