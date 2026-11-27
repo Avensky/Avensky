@@ -97,7 +97,7 @@ export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes 
   const shot = useMemo(() => mode === "main" ? garageMenuCamera(station ?? "enter_world") : rosterCamera(mode, creatorFrame),
     [mode, station, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
-    setGaragePreview({ shot, demand: true, shadows: false, contents: <>
+    setGaragePreview({ shot, loadBayDetail: mode === "main", demand: true, shadows: false, contents: <>
       {choice && <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} />}
       {mode === "main" && <><GarageMenuFurnishings /><GarageMenuMarkers /></>}
     </> });

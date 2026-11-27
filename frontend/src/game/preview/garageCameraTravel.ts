@@ -8,6 +8,7 @@ export function placeGarageOrbit(camera: PerspectiveCamera, target: Vector3, dis
 }
 
 const TRAVEL_MS = 1000;
+const WORKBENCH_CLEARANCE_Y = 2.2;
 
 class Lens {
   fov = 55;
@@ -47,6 +48,9 @@ export class GarageCameraTravel {
   private dpr = 0;
   private sourcePosition = new Vector3();
   private sourceOrientation = new Quaternion();
+  private sourceRadius = 0;
+  private sourceHeading = 0;
+  private arcDirection = 0;
   private sourceLens = new Lens();
   private targetLens = new Lens();
   private roomPosition = new Vector3();
@@ -109,6 +113,16 @@ export class GarageCameraTravel {
       camera.rotateX(pitch);
     }
 
+    if ((changed || resized) && this.time < TRAVEL_MS) {
+      const from = this.sourcePosition, to = camera.position;
+      this.sourceRadius = Math.hypot(from.x, from.z);
+      this.sourceHeading = Math.atan2(from.x, from.z);
+      // Only a move to the opposing side of the actor needs to go around the workbench.
+      // Keep its turn direction through subsequent changes to the player's drag offset.
+      this.arcDirection = from.x * to.x + from.z * to.z < 0 && this.sourceRadius > 1 &&
+        to.x * to.x + to.z * to.z > 1 ? Math.sign(from.z * to.x - from.x * to.z) || 1 : 0;
+    }
+
     const lens = this.targetLens;
     if (reducedMotion || (changed && this.sourcePosition.distanceToSquared(camera.position) < 1e-10 &&
         1 - Math.abs(this.sourceOrientation.dot(camera.quaternion)) < 1e-10 &&
@@ -122,8 +136,19 @@ export class GarageCameraTravel {
     this.lastFrame = now;
     if (this.time < TRAVEL_MS) {
       const t = MathUtils.smootherstep(this.time, 0, TRAVEL_MS);
-      camera.position.lerpVectors(this.sourcePosition, camera.position, t);
       camera.quaternion.slerp(this.sourceOrientation, 1 - t);
+      if (this.arcDirection && t > 0) {
+        const end = camera.position;
+        const turn = MathUtils.euclideanModulo(
+          (Math.atan2(end.x, end.z) - this.sourceHeading) * this.arcDirection, Math.PI * 2);
+        const heading = this.sourceHeading + this.arcDirection * turn * t;
+        // Blend inverse range so the long portrait shots pass inside the map-room partition.
+        const radius = 1 / MathUtils.lerp(1 / this.sourceRadius, 1 / Math.hypot(end.x, end.z), t);
+        const y = MathUtils.lerp(this.sourcePosition.y, end.y, t);
+        const lift = Math.max(0, WORKBENCH_CLEARANCE_Y - y) * 4 * t * (1 - t);
+        camera.position.set(radius * Math.sin(heading), y + lift, radius * Math.cos(heading));
+        camera.rotateX(-Math.atan2(lift, radius));
+      } else camera.position.lerpVectors(this.sourcePosition, camera.position, t);
       applyLens(camera, width, height, MathUtils.lerp(this.sourceLens.fov, lens.fov, t),
         MathUtils.lerp(this.sourceLens.x, lens.x, t), MathUtils.lerp(this.sourceLens.y, lens.y, t));
     } else applyLens(camera, width, height, lens.fov, lens.x, lens.y);

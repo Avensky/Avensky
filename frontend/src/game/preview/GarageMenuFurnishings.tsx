@@ -1,11 +1,13 @@
-import { Suspense, useLayoutEffect, useRef } from "react";
+import { Suspense, useCallback, useLayoutEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import {
   BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
   MeshStandardMaterial, Object3D, PlaneGeometry, type BufferGeometry, type Material,
 } from "three";
 import { GARAGE_MENU_LANDMARKS } from "./garageMenuLandmarks";
+import { garagePaintedFinish } from "./garagePaintedFinish";
 import { garageRoutePlan } from "./garageRoutePlan";
+import { assetAvailable, stagingAssetsEnabled } from "../../assets/runtimeAssets";
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 
@@ -38,15 +40,9 @@ function buildFurnishings() {
   const box = (color: string, x: number, y: number, z: number, w: number, h: number, d: number) =>
     part("steel", color, [x, y, z], [w, h, d]);
 
-  // Door frame, backing and practical lamp stay visible while the shutter loads.
-  place(GARAGE_MENU_LANDMARKS.enter_world, .40);
-  box(dark, 0, 1.47, -.14, 2.68, 2.9, .14);
-  for (const x of [-1.35, 1.35]) box(edge, x, 1.48, -.02, .12, 2.96, .2);
-  box(iron, 0, 2.96, -.04, 2.86, .21, .21);
-  part("light", "#ffe3b5", [0, 2.84, .09], [.06, 1.47, .06], [0, 0, Math.PI / 2]);
-
   // Vented steel lockers, hardware, a standing mirror and slatted changing bench.
   place(GARAGE_MENU_LANDMARKS.wardrobe, .28);
+  const lockerStart = parts.steel.length;
   box(dark, .32, 1.02, -.16, 1.48, 1.93, .48);
   for (let column = 0; column < 3; column++) {
     const x = -.15 + column * .47;
@@ -59,6 +55,7 @@ function buildFurnishings() {
     box(iron, x + .13, 1.00, .14, .048, .19, .035);
     box(brass, x + .13, 1.03, .169, .025, .093, .033);
   }
+  const lockerPanels = parts.steel.splice(lockerStart);
   for (const x of [-1.1, -.52]) box(iron, x, .048, .28, .07, .08, .54);
   box(brass, -.81, .98, .12, .78, 1.83, .09);
   box(dark, -.81, .98, .17, .72, 1.77, .018);
@@ -129,14 +126,7 @@ function buildFurnishings() {
 
   const map = garageRoutePlan();
   const painted = new MeshStandardMaterial({ metalness: .3, roughness: .53, emissive: "#100e0b" });
-  // The source room has direct bulbs and a fixture-only environment probe.
-  // Bake a little wall bounce into the enamel so its recesses stay legible.
-  painted.onBeforeCompile = shader => {
-    shader.fragmentShader = shader.fragmentShader.replace("#include <emissivemap_fragment>", `
-      #include <emissivemap_fragment>
-      totalEmissiveRadiance += diffuseColor.rgb * vec3(.31, .28, .24);
-    `);
-  };
+  painted.onBeforeCompile = garagePaintedFinish;
   const surface = new MeshStandardMaterial({ metalness: .92, roughness: .17, envMapIntensity: 1.25, emissive: "#171b1b" });
   // Keep the real fixture probe on the glass. Two soft strips supply a stable
   // reflected rack silhouette even on devices which disable that probe.
@@ -176,8 +166,12 @@ function buildFurnishings() {
     mesh.computeBoundingSphere();
     group.add(mesh);
     meshes.push(mesh);
+    return mesh;
   }
-  batch("steel", cube, painted);
+  // Keep the fallback locker at the tail of the existing draw so it can be hidden independently.
+  const fixedSteelCount = parts.steel.length;
+  parts.steel.push(...lockerPanels);
+  const steel = batch("steel", cube, painted);
   batch("round", tube, painted);
   batch("shade", shade, painted);
   batch("glass", cube, surface);
@@ -185,6 +179,9 @@ function buildFurnishings() {
   batch("paper", paper, printed);
   return {
     group,
+    showLockerFallback(visible: boolean) {
+      steel.count = fixedSteelCount + (visible ? lockerPanels.length : 0);
+    },
     dispose() {
       for (const mesh of meshes) mesh.dispose();
       for (const geometry of [cube, tube, shade, paper]) geometry.dispose();
@@ -194,10 +191,13 @@ function buildFurnishings() {
   };
 }
 
-type WorkshopProp = "garage-door" | "metal-tool-chest" | "service-tire" | "metal-shelf";
+type WorkshopProp = "metal-tool-chest" | "service-tire" | "metal-shelf";
 
-function WorkshopModel({ name }: { name: WorkshopProp }) {
-  const { scene } = useAssetGLTF(`/open-art/garage/${name}/${name}.gltf`);
+type EvaluationProp = "engine-crane" | "car-jack" | "cabinet";
+type PropPlacement = { position?: Triple; yaw?: number; scale?: number; onReady?: (mounted: boolean) => void };
+
+function WorkshopModel({ url, onReady }: { url: string; onReady?: PropPlacement["onReady"] }) {
+  const { scene } = useAssetGLTF(url);
   const host = useRef<Group>(null);
   const invalidate = useThree(state => state.invalidate);
   useLayoutEffect(() => {
@@ -214,46 +214,71 @@ function WorkshopModel({ name }: { name: WorkshopProp }) {
       materials.push(finish);
     });
     host.current?.add(object);
+    onReady?.(true);
     invalidate();
     return () => {
       object.removeFromParent();
+      onReady?.(false);
       for (const material of materials) material.dispose();
     };
-  }, [scene, invalidate]);
+  }, [scene, invalidate, onReady]);
   return <group ref={host} />;
 }
 
-function WorkshopPropModel({ name, position, yaw = 0, scale = 1 }: {
-  name: WorkshopProp; position?: Triple; yaw?: number; scale?: number;
-}) {
+function WorkshopPropModel({ name, url, position, yaw = 0, scale = 1, onReady }:
+  PropPlacement & { name: WorkshopProp | EvaluationProp; url: string }) {
   return <group name={name} position={position} rotation-y={yaw} scale={scale}>
-    <AssetBoundary resetKey={name} fallback={null}>
-      <Suspense fallback={null}><WorkshopModel name={name} /></Suspense>
+    <AssetBoundary resetKey={url} fallback={null}>
+      <Suspense fallback={null}><WorkshopModel url={url} onReady={onReady} /></Suspense>
     </AssetBoundary>
   </group>;
+}
+
+function OpenWorkshopProp({ name, ...placement }: PropPlacement & { name: WorkshopProp }) {
+  return <WorkshopPropModel name={name} url={`/open-art/garage/${name}/${name}.gltf`} {...placement} />;
+}
+
+function EvaluationWorkshopProp({ name, ...placement }: PropPlacement & { name: EvaluationProp }) {
+  const url = `/models/world/garage-evaluation/${name}.glb`;
+  if (!stagingAssetsEnabled || !assetAvailable(url)) return null;
+  return <WorkshopPropModel name={name} url={url} {...placement} />;
 }
 
 export function GarageMenuFurnishings() {
   const scene = useThree(state => state.scene);
   const invalidate = useThree(state => state.invalidate);
+  const current = useRef<ReturnType<typeof buildFurnishings> | null>(null);
+  const cabinetMounted = useRef(false);
+  const handleCabinetReady = useCallback((mounted: boolean) => {
+    cabinetMounted.current = mounted;
+    current.current?.showLockerFallback(!mounted);
+    invalidate();
+  }, [invalidate]);
   useLayoutEffect(() => {
     const furnishings = buildFurnishings();
+    current.current = furnishings;
+    furnishings.showLockerFallback(!cabinetMounted.current);
     scene.add(furnishings.group);
     invalidate();
     return () => {
+      current.current = null;
       scene.remove(furnishings.group);
       furnishings.dispose();
       invalidate();
     };
   }, [scene, invalidate]);
-  const [doorX, , doorZ] = GARAGE_MENU_LANDMARKS.enter_world;
+  const [lockerX, , lockerZ] = GARAGE_MENU_LANDMARKS.wardrobe;
   const [bayX, , bayZ] = GARAGE_MENU_LANDMARKS.vehicle;
   return <>
-    <WorkshopPropModel name="garage-door" position={[doorX, 0, doorZ]} yaw={.40} />
     <group position={[bayX, 0, bayZ]} rotation-y={.60}>
-      <WorkshopPropModel name="metal-tool-chest" position={[0, .255, -.06]} scale={1.12} />
-      <WorkshopPropModel name="service-tire" position={[-.70, 0, -.075]} yaw={.55} />
+      <OpenWorkshopProp name="metal-tool-chest" position={[0, .255, -.06]} scale={1.12} />
+      <EvaluationWorkshopProp name="car-jack" position={[.80, 0, -.03]} yaw={.60} />
+      <OpenWorkshopProp name="service-tire" position={[-.70, 0, -.075]} yaw={.55} />
     </group>
-    <WorkshopPropModel name="metal-shelf" position={[-3.66, 0, -3.75]} yaw={.40} />
+    <EvaluationWorkshopProp name="engine-crane" position={[-3.65, 0, -1.75]} yaw={-.50} />
+    <group position={[lockerX, 0, lockerZ]} rotation-y={.28}>
+      <EvaluationWorkshopProp name="cabinet" position={[.32, 0, -.16]} onReady={handleCabinetReady} />
+    </group>
+    <OpenWorkshopProp name="metal-shelf" position={[-3.66, 0, -3.75]} yaw={.40} />
   </>;
 }

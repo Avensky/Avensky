@@ -1,9 +1,10 @@
 import { Component, Suspense, useLayoutEffect, useMemo, useRef, useSyncExternalStore, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { Canvas, useFrame, useLoader, useThree, type RootState } from "@react-three/fiber";
-import { Box3, Mesh, PerspectiveCamera, type WebGLRenderTarget } from "three";
+import { Box3, Mesh, PerspectiveCamera, type Material, type WebGLRenderTarget } from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { GarageDoorWall } from "./GarageDoorWall";
 import { prepareGarageDisplay } from "./prepareGarageDisplay";
 import { garagePlacement } from "./garagePlacement";
 import { applyGarageLighting } from "../../theme/garageLighting";
@@ -26,8 +27,8 @@ export type GarageEntryShot = {
   orbit(camera: PerspectiveCamera, yaw: number, pitch: number): void;
   actor?: ActorInput;
 };
-type Preview = { contents: ReactNode; demand: boolean; dpr?: number; shadows: boolean; shot?: GarageEntryShot };
-type GarageRuntime = { preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
+type Preview = { loadBayDetail?: boolean; contents: ReactNode; demand: boolean; dpr?: number; shadows: boolean; shot?: GarageEntryShot };
+type GarageRuntime = { detailedBayDoors?: boolean; preview: Preview | null; listeners: Set<() => void>; motion: EntryMotion; input?: AbortController; owner?: string; legacy?: Promise<(next: Preview | null) => void> };
 const shared = globalThis as typeof globalThis & { __avenskyGarage?: GarageRuntime };
 const runtime = shared.__avenskyGarage ??= {
   preview: null, listeners: new Set(), motion: { yaw: .055, pitch: 0, dragging: false },
@@ -37,6 +38,7 @@ function subscribe(listener: () => void) {
   return () => { runtime.listeners.delete(listener); };
 }
 export function setGaragePreview(next: Preview | null) {
+  if (next?.loadBayDetail) runtime.detailedBayDoors = true;
   runtime.preview = next;
   for (const listener of runtime.listeners) listener();
   if (runtime.legacy) void runtime.legacy.then(update => update(runtime.preview));
@@ -47,7 +49,7 @@ function revealGarage(host: HTMLElement) {
   window.dispatchEvent(new Event("avensky:garage-ready"));
 }
 
-function GarageObject({ host, camera, entry, shot }: { host: HTMLElement; camera: PerspectiveCamera; entry: boolean; shot?: GarageEntryShot }) {
+function GarageObject({ host, camera, entry, shot, detailedDoors }: { host: HTMLElement; camera: PerspectiveCamera; entry: boolean; shot?: GarageEntryShot; detailedDoors: boolean }) {
   const { scene } = useLoader(GLTFLoader, __GARAGE_MODEL_URL__, configure);
   const invalidate = useThree(state => state.invalidate);
   const gl = useThree(state => state.gl);
@@ -79,7 +81,13 @@ function GarageObject({ host, camera, entry, shot }: { host: HTMLElement; camera
       const height = new Box3().setFromObject(ceiling).min.y;
       if (height > 1) bounds.max.y = height;
     }
-    return { ...garage, fixtures: collectGarageFixtures(garage.root), envelope: { bounds } };
+    let wallSurface: Material | undefined;
+    walls.traverse(node => {
+      if (wallSurface || !(node instanceof Mesh)) return;
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      wallSurface = materials.find(material => material.userData.garageSurface === "garage-wall");
+    });
+    return { ...garage, wallSurface, fixtures: collectGarageFixtures(garage.root), envelope: { bounds } };
   }, [scene]);
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -125,6 +133,7 @@ function GarageObject({ host, camera, entry, shot }: { host: HTMLElement; camera
   return <>
     <primitive object={display.root} dispose={null} />
     <primitive object={display.fixtures.lights} />
+    <GarageDoorWall surface={display.wallSurface} detailed={detailedDoors} cullOutsideShot={entry} />
     <EntryCamera camera={camera} active={entry} shot={shot} />
     <object3D name="garage-camera-envelope" userData={display.envelope} />
   </>;
@@ -209,7 +218,7 @@ function LiveGarage({ host }: { host: HTMLElement }) {
       dpr={view?.dpr ?? (coarse ? 1 : [1, 1.5])} shadows={view?.shadows ?? false}
       frameloop={view && !view.demand ? "always" : "demand"}
       gl={{ antialias: false, alpha: false, powerPreference: "high-performance" }} fallback={null}>
-      <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view || Boolean(view.shot)} shot={view?.shot} /></Suspense></GarageFailure>
+      <GarageFailure host={host}><Suspense fallback={null}><GarageObject host={host} camera={camera} entry={!view || Boolean(view.shot)} shot={view?.shot} detailedDoors={Boolean(runtime.detailedBayDoors)} /></Suspense></GarageFailure>
       {view?.contents}
     </Canvas>
   </GarageFailure>;

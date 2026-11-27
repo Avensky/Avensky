@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from "three";
 import { creatorStepFrames, rosterCamera } from "../src/game/preview/rosterCamera.ts";
 import { garageMenuCamera } from "../src/game/preview/garageMenuCamera.ts";
+import { GARAGE_BAY_DOORS } from "../src/game/preview/garageDoorLayout.ts";
 import { GARAGE_MENU_LANDMARKS } from "../src/game/preview/garageMenuLandmarks.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
 import { installGarageEntryInteraction } from "../src/game/preview/garageEntryInteraction.ts";
@@ -87,13 +88,14 @@ test("garage station shots keep the character in view across phone orientations"
         shot.orbit(camera, yaw, pitch);
         camera.updateMatrixWorld();
         assert.ok(visible(actor, camera), `${id} should keep the driver visible at ${width}×${height}`);
-        if (id === "enter_world" && width > height && !yaw && !pitch) {
-          // The highest right-hand segment of the original 0999 wall sign in world space.
-          const top = new Vector3(1.387, 4.3244, -5.508).project(camera);
-          assert.ok((1 - top.y) / 2 > .05, "the default landscape shot leaves room for the header above the sign");
-        }
-        if (id !== "enter_world" && !yaw && !pitch) {
+        if (!yaw && !pitch) {
           assert.ok(visible(new Vector3(...anchor), camera), `${id} should frame its station at ${width}×${height}`);
+          if (id === "enter_world" && width > height) {
+            for (const { position } of GARAGE_BAY_DOORS) {
+              const center = new Vector3(position[0], 1.45, position[2]);
+              assert.ok(visible(center, camera), "the wide entry shot shows all three garage bays");
+            }
+          }
         }
       }
     }
