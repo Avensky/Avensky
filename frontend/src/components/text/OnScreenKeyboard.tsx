@@ -9,7 +9,7 @@ import "./textKeyboard.css";
 const LETTERS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"].map((row) =>
   row.split(""),
 );
-const SYMBOLS = ["1234567890", "!@#$%&*()-", "_+=?/.:,;"].map((row) =>
+const SYMBOLS = ["1234567890", "!@#$%&*()-", "_+=?/.:,;'"].map((row) =>
   row.split(""),
 );
 

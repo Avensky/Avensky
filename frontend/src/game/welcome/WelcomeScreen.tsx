@@ -10,6 +10,7 @@ import { CHARACTERS, characterAppearance, characterLook, ROOK_ID, type Character
 import { CHARACTER_STYLES, applyCreatorWardrobe, creatorChoice, type CharacterBody } from "../characters/characterStyles";
 import { CharacterCreator, CREATOR_STEPS } from "./CharacterCreator";
 import { CharacterRoster } from "./CharacterRoster";
+import { RosterCharacterManager } from "./RosterCharacterManager";
 import { creatorStepFrames } from "../preview/rosterCamera";
 import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
@@ -79,6 +80,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const [creatorStep, setCreatorStep] = useState<typeof CREATOR_STEPS[number]>("gender");
   const [previewStyle, setPreviewStyle] = useState<string>();
   const [preview, setPreview] = useState<{ owner: string; slotId: string }>();
+  const [management, setManagement] = useState<{ owner: string; slotId: string }>();
+  const [rosterNotice, setRosterNotice] = useState<{ owner: string; text: string }>();
   const [error, setError] = useState("");
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [connectionSlow, setConnectionSlow] = useState(false);
@@ -102,6 +105,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
     : rememberedPlayer ? "characters" : step;
   const selectedSlot = (preview?.owner === player?.id && slots?.find(slot => slot.id === preview?.slotId))
     || slots?.find(slot => slot.id === (player?.active_character_id ?? player?.id)) || slots?.[0];
+  const managedSlot = management && management.owner === player?.id && screen === "characters"
+    ? slots?.find(slot => slot.id === management.slotId) : undefined;
   const slotLimit = registered || stagingSignIn || leavingPlayer ? 4 : 1;
   const original = slots?.length === 0 && saved && characterLook(saved) ? saved : undefined;
   const body: CharacterBody = creation.choice.id === ROOK_ID ? "male" : "female";
@@ -144,6 +149,19 @@ export function WelcomeScreen({ onGarageCharacter }: {
     reveal();
   }, [busy, sessionPending, screen]);
   const accountOpen = accountRoot && (showSettings || openedFromMenu);
+  const managing = Boolean(managedSlot && !accountOpen);
+  const previousManager = useRef<string | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (managing) { previousManager.current = managedSlot?.id; return; }
+    if (!previousManager.current) return;
+    const retained = selectedSlot?.id === previousManager.current;
+    previousManager.current = undefined;
+    if (screen !== "characters" || accountOpen) return;
+    const roster = root.current?.querySelector(".character-roster");
+    const target = (retained && roster?.querySelector<HTMLElement>("[data-roster-manage]"))
+      || roster?.querySelector<HTMLElement>('[data-character-id][aria-pressed="true"], [data-roster-create]');
+    target?.focus({ preventScroll: true });
+  }, [managing, managedSlot?.id, screen, accountOpen, selectedSlot?.id]);
   const showBrand = screen === "characters" ||
     !signedIn && (screen === "register" || (screen === "welcome" && !sessionPending));
   const garageMode = accountOpen ? "profile" : screen === "create" ? "create" : screen === "characters" ? "roster" : null;
@@ -299,7 +317,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
 
   useEffect(() => {
     function navigate(event: Event) {
-      if (screen === "create" || !root.current || root.current.inert || (busy && !sessionPending)) return;
+      if (managing || screen === "create" || !root.current || root.current.inert || (busy && !sessionPending)) return;
       const action = (event as CustomEvent<MenuAction>).detail;
       if (moveProfileFocus(action)) return;
       const active = root.current.contains(document.activeElement) ? document.activeElement :
@@ -458,7 +476,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     <main className="welcome-screen garage-entry" ref={root} data-logging-out={leavingPlayer ? true : undefined} data-controller-rows data-controller-form onKeyDown={event => {
       if (event.defaultPrevented || event.nativeEvent.isComposing) return;
       if (event.key === "Tab") { event.preventDefault(); return; }
-      if (screen === "create") return;
+      if (managing || screen === "create") return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (!event.repeat) back();
@@ -476,7 +494,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
       }
     }}>
       <GarageEntryHeader showBrand={showBrand} account={accountRoot && player ? {
-        profileOpen: accountOpen, busy, onBack: () => back(), onLogOut: () => void run(logOut, { kind: "logout", player }),
+        profileOpen: accountOpen, busy: busy || managing, onBack: () => back(), onLogOut: () => void run(logOut, { kind: "logout", player }),
         onProfile: () => { if (accountOpen) leaveProfile(); else setShowSettings(true); },
       } : undefined} />
       <div className="welcome-scroll">
@@ -492,9 +510,20 @@ export function WelcomeScreen({ onGarageCharacter }: {
           name={name} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}
           onBack={() => back(true)} onSubmit={createDraft}
           submitLabel={player ? "Create character" : "Continue"} original={originalLook} />
+        : screen === "characters" && player && managedSlot ? <RosterCharacterManager key={`${player.id}/${managedSlot.id}`}
+            owner={player.id} slot={managedSlot} connected={connected && !busy} onClose={() => setManagement(undefined)}
+            onDeleted={() => {
+              setRosterNotice({ owner: player.id, text: `${managedSlot.name} was deleted.` });
+              setManagement(undefined);
+            }} />
         : screen === "characters" ? player && <CharacterRoster profile={player} selected={selectedSlot} limit={slotLimit}
             busy={busy} connected={connected}
-            onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setError(""); }}
+            onManage={accountRoot ? slot => {
+              setRosterNotice(undefined);
+              setError("");
+              setManagement({ owner: player.id, slotId: slot.id });
+            } : undefined}
+            onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setRosterNotice(undefined); setError(""); }}
             onCreate={openCreation} onEnter={slot => void run(() =>
               saveCharacter(player.id, "character_select", { character_id: slot.id }))}
             onBack={accountRoot ? undefined : back} /> : screen === "register" ? (
@@ -540,6 +569,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
         </> : (busy || !connected || (confirmedProfile && !player)) && <p role="status" className="welcome-help">
           {working ? workingMessage : restoring ? "Loading your characters…" : "Waiting for the game server…"}
         </p>}
+        {!busy && !managing && !accountOpen && screen === "characters" && rosterNotice && rosterNotice.owner === player?.id &&
+          <p role="status">{rosterNotice.text}</p>}
         {(error || (restoreError && !sessionPending)) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
       </aside>
       </div>

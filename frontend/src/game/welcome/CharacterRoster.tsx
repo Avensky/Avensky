@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { ControllerButton } from "../../components/controller/ControllerButton";
 import { useMenuInputDevice } from "../../components/controller/useMenuInputDevice";
 import { GameButton } from "../../components/GameButton";
@@ -15,16 +16,22 @@ type Props = {
   connected: boolean;
   onChoose: (slot: CharacterSlot) => void;
   onCreate: () => void;
+  onManage?: (slot: CharacterSlot) => void;
   onEnter: (slot: CharacterSlot) => void;
   onBack?: () => void;
 };
 
 export function CharacterRoster({ profile, selected, limit, busy, connected, onChoose,
-  onCreate, onEnter, onBack }: Props) {
+  onCreate, onEnter, onBack, onManage }: Props) {
   const portrait = useMobilePortrait();
   const device = useMenuInputDevice();
   const slots = profile.characters;
   const selectedAppearance = selected && savedCharacterAppearance(profile, selected);
+  const manage = selected && onManage && <GameButton variant="custom" className="roster-manage chamfered-frame"
+    aria-label={`Manage ${selected.name}`} title={`Manage ${selected.name}`} aria-haspopup="dialog" data-roster-manage
+    disabled={busy || !connected} onPress={() => onManage(selected)}>
+    <MenuIcon name="other" /><span>Manage</span>
+  </GameButton>;
   return <div className="character-roster" data-input-device={device} data-portrait={portrait || undefined}>
     {onBack && <div className="roster-tools" data-controller-row data-controller-header-action>
       <GameButton variant="custom" className="roster-tool chamfered-frame" aria-label="Back"
@@ -32,16 +39,17 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
     </div>}
     <div className="roster-choices">
       {slots ? <>
-        <div className="roster-caption">
+        <div className="roster-caption" data-controller-row={portrait || undefined}>
           <span className="roster-mobile-name">{selected?.name ?? "Characters"}</span>
+          {portrait && manage}
           <small aria-label={`${slots.length} of ${limit} character slots used`}>{slots.length} / {limit}</small>
         </div>
-        <div className="roster-tiles" role="group" aria-label="Saved characters" data-controller-row data-controller-columns={portrait ? limit : 1}
+        <div className="roster-tiles" role="group" aria-label="Saved characters" data-controller-row={portrait || undefined} data-controller-columns={portrait ? limit : undefined}
           onFocus={event => event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
           {slots.map(slot => {
             const isSelected = slot.id === selected?.id;
             const canEnter = isSelected && connected && !busy && Boolean(selectedAppearance);
-            return <GameButton key={slot.id} variant="custom" className="welcome-character roster-tile chamfered-frame"
+            const tile = <GameButton variant="custom" className="welcome-character roster-tile chamfered-frame"
               aria-label={slot.name} aria-description={canEnter ? "Go to the Garage as this character" : undefined}
               title={canEnter ? `Continue as ${slot.name}` : slot.name} data-character-id={slot.id}
               aria-pressed={isSelected} selected={isSelected} disabled={busy}
@@ -59,9 +67,13 @@ export function CharacterRoster({ profile, selected, limit, busy, connected, onC
                 <small>{styleName(slot.style)} · Level {slot.level}</small></span>
               {canEnter && device === "controller" && <ControllerButton button="A" />}
             </GameButton>;
+            return portrait ? <Fragment key={slot.id}>{tile}</Fragment> :
+              <div key={slot.id} className="roster-tile-row" data-controller-row>
+                {tile}{isSelected && manage}
+              </div>;
           })}
           {slots.length < limit && <GameButton variant="custom" className="roster-tile roster-create chamfered-frame" aria-label="Create character"
-            title="Create character" data-roster-create disabled={busy || !connected} onPress={onCreate}>
+            title="Create character" data-controller-row={!portrait || undefined} data-roster-create disabled={busy || !connected} onPress={onCreate}>
             <span className="roster-plus" aria-hidden="true"><MenuIcon name="add" /></span><span className="roster-create-label">Create character</span>
           </GameButton>}
         </div>

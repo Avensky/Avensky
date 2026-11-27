@@ -61,6 +61,10 @@ pub struct Profile {
     pub progression: crate::alpha::progression::Progression,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub active_character: Option<String>,
+    /// Empty legacy rosters use the account ID. Once a roster is emptied, the
+    /// next character needs a new career ID even if it takes the same name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next_character_id: Option<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub characters: BTreeMap<String, SavedCharacter>,
 }
@@ -76,7 +80,7 @@ pub struct SavedCharacter {
 
 impl Profile {
     pub fn career_id(&self) -> &str {
-        self.active_character.as_deref().unwrap_or(&self.id)
+        self.active_character.as_deref().or(self.next_character_id.as_deref()).unwrap_or(&self.id)
     }
 
     pub fn display_name(&self) -> &str {
@@ -267,6 +271,7 @@ impl SocialData {
                 friends: BTreeSet::new(),
                 progression: Default::default(),
                 active_character: None,
+                next_character_id: None,
                 characters: BTreeMap::new(),
             },
         );

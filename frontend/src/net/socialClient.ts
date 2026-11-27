@@ -1,7 +1,7 @@
 import { returnToStagingSignIn } from "./stagingAccount";
 import { stagingAccountPortal } from "../game/welcome/config";
 import { usePresenceStore } from "../store/chat/presenceStore";
-import { playerDisplayName, useSocialStore } from "../store/social/socialStore";
+import { playerDisplayName, useSocialStore, type PlayerProfile } from "../store/social/socialStore";
 import { useChatStore } from "../store/chat/chatStore";
 import { useNetworkStore } from "../store/session/networkStore";
 
@@ -123,6 +123,34 @@ export function receiveSocialResult(value: Response) {
       new SocialCommandDenied(value.message || "The server rejected the request."),
     );
 }
+
+export async function deleteRosterCharacter(owner: string, characterId: string, confirmationName: string): Promise<PlayerProfile> {
+  const generation = connectionGeneration;
+  const profile = useSocialStore.getState().view?.profile;
+  const slot = profile?.characters?.find(character => character.id === characterId);
+  if (profile?.id !== owner || !slot) throw new Error("This character is no longer on your roster.");
+  if (confirmationName !== slot.name) throw new Error("Type the character’s name exactly as shown.");
+
+  const result = await requestSocial("character_delete", { character_id: characterId, confirmation_name: confirmationName });
+  const state = useSocialStore.getState();
+  if (generation !== connectionGeneration || state.view?.profile.id !== owner)
+    throw new Error("Your profile changed. Check your current roster.");
+  const saved = result.profile as PlayerProfile | undefined;
+  if (saved?.id !== owner || !saved.progression || !Array.isArray(saved.characters)
+    || saved.characters.some(character => character.id === characterId)
+    || (saved.active_character_id === null
+      ? saved.characters.length > 0
+      : !saved.characters.some(character => character.id === saved.active_character_id)))
+    throw new Error("The server did not confirm the character deletion.");
+  state.acknowledgeCharacter(saved);
+  const current = useSocialStore.getState().view?.profile;
+  if (generation !== connectionGeneration || current?.id !== owner || !current.characters)
+    throw new Error("Your profile changed. Check your current roster.");
+  if (current.characters.some(character => character.id === characterId))
+    throw new Error("The current roster still contains this character. Check the name and try again.");
+  return current;
+}
+
 type AccountCredentials = { login: string; password: string };
 
 async function identifyProfile(name: string | undefined, source: IdentitySource, account?: AccountCredentials) {

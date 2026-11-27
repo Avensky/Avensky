@@ -186,6 +186,9 @@ export const useSocialStore = create<{
     }),
   acknowledgeCharacter: profile => set(state => {
     if (!state.view || state.view.profile.id !== profile.id || !profile.progression) return state;
+    const current = state.view.profile.progression;
+    if (hasCosmeticsRevision(current) && hasCosmeticsRevision(profile.progression)
+      && profile.progression.cosmetics_revision < current.cosmetics_revision) return state;
     return { view: { ...state.view, profile }, cachedCosmetics: cosmeticsFrom(profile.progression) };
   }),
   acknowledgeProgression: (owner, fallback, cosmetics) => set(state => {
@@ -299,16 +302,19 @@ export const useSocialStore = create<{
       const incoming = view.profile.progression;
       const current = state.view?.profile.id === view.profile.id ? state.view.profile.progression : undefined;
       // A reliable reply can arrive before a replaceable snapshot that was captured earlier.
-      // Keep newer cosmetics while still consuming the snapshot's world and career data.
+      // Preserve confirmed slot membership and cosmetics while consuming new world and career data.
       const currentProfile = state.view?.profile;
-      const oldCharacter = currentProfile?.id === view.profile.id &&
-        currentProfile.active_character_id !== view.profile.active_character_id &&
-        hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current) &&
-        incoming.cosmetics_revision < current.cosmetics_revision;
-      const profile = oldCharacter ? currentProfile : hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current)
-        && incoming.cosmetics_revision <= current.cosmetics_revision
-        ? { ...view.profile, progression: { ...incoming, ...cosmeticsFrom(current) } }
-        : view.profile;
+      let profile = view.profile;
+      if (currentProfile && hasCosmeticsRevision(incoming) && hasCosmeticsRevision(current)
+        && incoming.cosmetics_revision <= current.cosmetics_revision) {
+        const olderRoster = incoming.cosmetics_revision < current.cosmetics_revision;
+        if (olderRoster && currentProfile.active_character_id !== profile.active_character_id) {
+          profile = currentProfile;
+        } else {
+          profile = { ...profile, characters: olderRoster ? currentProfile.characters : profile.characters,
+            progression: { ...incoming, ...cosmeticsFrom(current) } };
+        }
+      }
       return { view: { ...view, profile }, profileOwner: profile.id, profileStatus: "ready", entryIssue: null, message: "Connected",
         cachedCosmetics: profile.progression ? cosmeticsFrom(profile.progression) : null };
     });

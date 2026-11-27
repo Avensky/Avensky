@@ -1,6 +1,7 @@
 use super::*;
 
 mod garage;
+mod character_deletion;
 
 fn server(active: usize, players: usize) -> Server {
     Server {
