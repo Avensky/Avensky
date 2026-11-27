@@ -121,6 +121,8 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
           vehicleSelectionParent: null,
           debugMenuParent: "pause",
           isModeLoading: false,
+          mainWorldError: "",
+          mainWorldJoining: false,
           selectedMenuIndexById: {
             main: 0,
             pause: 0,
@@ -128,6 +130,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
             sandbox_setup: 0,
           },
         });
+        if (screen === "main") document.querySelector('[data-station-anchor="enter_world"] [role="button"]')?.focus();
       });
     const click = async (element) => {
       assert.ok(element, "element exists");
@@ -194,14 +197,15 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         assert.equal(document.querySelector(".main-menu .menu-flare-background"), null);
         assert.equal(document.querySelector(".main-menu video"), null);
         await key("Enter", "Enter");
-        assert.equal(ui.getState().screen, "mode_select");
+        assert.equal(ui.getState().screen, "main", "the garage remains available without a hub");
+        assert.ok(document.querySelector('[role="status"],[role="alert"]')?.textContent.trim());
         await reset();
         await act(async () =>
           preferences.getState().update({ reducedMotion: true }),
         );
         assert.equal(document.querySelector(".main-menu video"), null);
         await button(13);
-        assert.equal(ui.getState().getActiveMenuIndex(), 1);
+        assert.equal(ui.getState().getActiveMenuIndex(), 2);
         await act(async () =>
           preferences.getState().update({ reducedMotion: false }),
         );
@@ -226,7 +230,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
           assert.equal(document.activeElement, selected, "turning the actor cannot open the player menu");
           pad.axes = [0, .9, -.8, 0];
           await poll();
-          assert.equal(ui.getState().getActiveMenuIndex(), 1);
+          assert.equal(ui.getState().getActiveMenuIndex(), 2);
           assert.ok(samples.some(([x, y, turn]) => x === 0 && y === 0 && turn < -.5));
         } finally {
           pad.axes = [0, 0, 0, 0];
@@ -235,39 +239,88 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
         }
       },
     );
-    await t.test(
-      "every main-menu entry has the same selected theme for mouse and controller",
-      async () => {
-        await reset();
-        let theme;
-        for (let index = 0; index < MAIN_MENU_ITEMS.length; index++) {
-          const element = document.querySelectorAll('[role="button"]')[index];
-          await act(async () =>
-            element.dispatchEvent(
-              new dom.window.MouseEvent("pointerover", { bubbles: true }),
-            ),
-          );
-          assert.equal(ui.getState().getActiveMenuIndex(), index);
-          assert.equal(element.dataset.selected, "true");
-          if (index === 0) theme = element.className;
-          else
-            assert.equal(
-              element.className,
-              theme,
-              `row ${index} should use the Sandbox theme`,
-            );
+    const stationControl = id => document.querySelector(`[data-station-anchor="${id}"] [role="button"]`);
+    const continueControl = () => document.querySelector('[aria-label="Continue"]');
+    await t.test("garage hover previews each destination and Continue opens the selected workshop", async () => {
+      await reset();
+      for (const [index, item] of MAIN_MENU_ITEMS.entries()) {
+        const element = stationControl(item.id);
+        assert.ok(element, item.label);
+        await act(async () => element.dispatchEvent(new dom.window.PointerEvent("pointermove", {
+          pointerType: "mouse", clientX: 40 + index * 20, clientY: 60, bubbles: true,
+        })));
+        assert.equal(ui.getState().getActiveMenuIndex(), index);
+        assert.equal(element.dataset.selected, "true");
+        assert.equal(ui.getState().screen, "main");
+      }
+      await act(async () => stationControl("wardrobe").focus());
+      await click(continueControl());
+      assert.equal(ui.getState().screen, "heroes");
+      assert.equal(ui.getState().workshopEntry, "wardrobe");
+    });
+    await t.test("a resting cursor does not refocus the moving camera markers and a mouse click opens the editor", async () => {
+      await reset();
+      const wardrobe = stationControl("wardrobe");
+      const editor = stationControl("world_editor");
+      const move = element => element.dispatchEvent(new dom.window.PointerEvent("pointermove", {
+        bubbles: true, pointerType: "mouse", clientX: 245, clientY: 100,
+      }));
+      await act(async () => move(wardrobe));
+      await act(async () => move(editor));
+      assert.equal(wardrobe.getAttribute("aria-pressed"), "true");
+      assert.equal(ui.getState().screen, "main");
+      await act(async () => editor.dispatchEvent(new dom.window.PointerEvent("pointerup", {
+        bubbles: true, pointerType:"mouse", button:0,
+      })));
+      assert.equal(ui.getState().screen, "world_builder");
+    });
+    await t.test("touch can preview a different station and either tap again or Continue to enter it", async () => {
+      const tap = async element => act(async () => {
+        for (const type of ["pointerdown", "pointerup", "click"]) {
+          element.dispatchEvent(new dom.window.PointerEvent(type, {
+            bubbles: true, pointerType: "touch", button: 0, pointerId: 1, isPrimary: true,
+          }));
         }
-        assert.deepEqual(
-          MAIN_MENU_ITEMS.map((item) => item.id),
-          ["play", "explore", "heroes", "career", "social", "settings"],
-        );
-        await button(12);
-        assert.equal(
-          document.querySelector('[data-selected="true"]').className,
-          theme,
-        );
-      },
-    );
+      });
+      for (const next of ["station", "continue"]) {
+        await reset();
+        const vehicle = stationControl("vehicle");
+        await tap(vehicle);
+        assert.equal(ui.getState().screen, "main");
+        assert.equal(vehicle.dataset.selected, "true");
+        await tap(next === "station" ? vehicle : continueControl());
+        assert.equal(ui.getState().screen, "heroes");
+        assert.equal(ui.getState().workshopEntry, "vehicle");
+      }
+    });
+    await t.test("shoulders focus header shortcuts while directions select stations and Back opens the roster", async () => {
+      await reset();
+      await button(5);
+      assert.equal(document.activeElement.getAttribute("aria-label"), "Back to character selection");
+      await button(5);
+      assert.equal(document.activeElement.getAttribute("aria-label"), "Career");
+      assert.equal(ui.getState().screen, "main");
+      await button(13);
+      assert.ok(document.activeElement.closest("[data-station-anchor]"));
+      const selected = ui.getState().getActiveMenuIndex();
+      await key("KeyQ", "q");
+      assert.equal(document.activeElement.getAttribute("aria-label"), "Settings");
+      await key("KeyE", "e");
+      assert.equal(document.activeElement.getAttribute("aria-label"), "Back to character selection");
+      assert.equal(ui.getState().getActiveMenuIndex(), selected);
+      await key("Enter", "Enter");
+      assert.equal(ui.getState().screen, "welcome");
+    });
+    await t.test("each right-header shortcut opens its own menu independently of the focused station", async () => {
+      for (const [name, screen] of [["Career","career"], ["Social","social"], ["Settings","settings"]]) {
+        await reset();
+        const station = stationControl("world_editor");
+        await act(async () => station.focus());
+        const tab = document.querySelector(`nav[aria-label="Main menu shortcuts"] [aria-label="${name}"]`);
+        await click(tab);
+        assert.equal(ui.getState().screen, screen);
+      }
+    });
     const pointerPress = async (element) => {
       assert.ok(element);
       await act(async () => {
@@ -284,6 +337,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
     await t.test(
       "Sandbox arrow keys focus vehicle, environment, Start and Exit and wrap without starting",
       async () => {
+        await reset("sandbox_setup");
         assert.equal(
           document.activeElement.getAttribute("aria-label"),
           "Vehicle selection",
@@ -506,11 +560,8 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       "controller in a nonzero slot navigates rows, tabs, values and Back",
       async () => {
         await reset();
-        const settingsIndex = MAIN_MENU_ITEMS.findIndex(
-          (item) => item.id === "settings",
-        );
-        for (let index = 0; index < settingsIndex; index++) await button(13);
-        assert.equal(ui.getState().getActiveMenuIndex(), settingsIndex);
+        await button(4);
+        assert.equal(document.activeElement.getAttribute("aria-label"), "Settings");
         await button(0);
         assert.equal(ui.getState().screen, "settings");
         assert.equal(tab("Display").getAttribute("aria-selected"), "true");

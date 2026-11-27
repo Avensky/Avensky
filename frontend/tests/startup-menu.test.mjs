@@ -78,19 +78,16 @@ test("real App removes the startup cover and opens the latest main menu without 
     );
     assert.ok(document.querySelector(".main-menu"));
     assert.equal(document.querySelector(".main-menu .menu-home-content .menu-panel-frame"), null);
-    const profile = document.querySelector(".main-menu > header [data-main-profile-toggle]");
-    assert.ok(profile, "the profile portrait is available at startup");
-    await act(async () => profile.click());
-    const profilePanel = document.querySelector('[aria-label="Player profile options"]');
-    assert.equal(profilePanel.hidden, false);
-    const guest = [...profilePanel.querySelectorAll("button")].find(button => button.textContent === "Continue as guest");
-    assert.ok(guest);
-    await act(async () => guest.click());
-    assert.equal(profilePanel.hidden, true, "offline guests can dismiss the panel and use the menu");
-    assert.equal(document.querySelectorAll(".main-menu .menu-action-list .menu-icon").length, 6);
-    assert.doesNotMatch(document.querySelector(".main-menu").textContent, /Avensky/i);
-    assert.equal(document.querySelector('.main-menu img[src$="/logo.svg"]'), null);
-    assert.ok(document.querySelector(".main-menu .alpha-progress"), "the menu still shows player progression");
+    const main = document.querySelector(".main-menu");
+    const rosterBack = main.querySelector('[aria-label="Back to character selection"]');
+    assert.ok(rosterBack, "the branded header returns to the character roster");
+    assert.ok(rosterBack.textContent.toLowerCase().includes("avensky") || rosterBack.querySelector("img, svg"));
+    const shortcuts = main.querySelector('nav[aria-label="Main menu shortcuts"]');
+    for (const name of ["Career", "Social", "Settings"]) assert.ok(shortcuts.querySelector(`[aria-label="${name}"]`), name);
+    assert.deepEqual(Array.from(main.querySelectorAll("[data-station-anchor]"), station => station.dataset.stationAnchor), [
+      "enter_world", "wardrobe", "vehicle", "world_editor",
+    ]);
+    assert.ok(main.querySelector('[aria-label="Continue"]'));
     assert.equal(
       document.querySelector("canvas"),
       null,
@@ -111,40 +108,39 @@ test("real App removes the startup cover and opens the latest main menu without 
       ui.getState().setScreen("welcome");
     });
     const garage = globalThis.__avenskyGarage;
-    assert.equal(garage.preview.contents.props.choice, choice);
+    const actor = () => garage.preview?.contents.props.children.find(child => child?.props?.choice);
+    assert.equal(actor().props.choice, choice);
     const handoffs = [];
-    const observe = () => handoffs.push(garage.preview?.contents.type);
+    const observe = () => handoffs.push(actor()?.type);
     garage.listeners.add(observe);
-    const actorType = garage.preview.contents.type;
+    const actorType = actor().type;
     try {
       await act(async () => {
         // An acknowledgement is a fresh object, even when its clothes are identical.
         social.getState().acknowledgeCharacter(structuredClone(profileData));
         ui.getState().setScreen("main");
       });
-      assert.equal(garage.preview.contents.props.mode, "main");
-      assert.deepEqual(garage.preview.contents.props.choice, choice);
-      await act(async () => ui.getState().setScreen("welcome", "account"));
-      assert.equal(garage.preview.contents.props.mode, "profile");
+      assert.equal(actor().props.mode, "main");
+      assert.deepEqual(actor().props.choice, choice);
+      await act(async () => {
+        ui.getState().setScreen("welcome", "account");
+        await server.ssrLoadModule("/src/game/characters/GarageProfilePanel.tsx");
+      });
+      assert.equal(actor().props.mode, "profile");
       await act(async () => ui.getState().setScreen("main"));
       assert.ok(handoffs.length >= 3);
       assert.ok(handoffs.every(type => type === actorType), "route changes never release ownership of the live actor");
       await act(async () => social.setState({ view: { ...view, profile: { ...profileData, active_character_id: null, characters: [] } } }));
-      assert.equal(garage.preview, null, "a player with no careers does not get a draft or a default actor");
+      assert.equal(actor(), undefined, "a player with no careers does not get a draft or a default actor");
+      assert.ok(garage.preview, "the empty garage still frames the station props");
     } finally {
       garage.listeners.delete(observe);
       await act(async () => social.setState(originalSocial));
     }
-    assert.equal(garage.preview, null, "a main menu without a selected character keeps only the room");
-    const settings = [
-      ...document.querySelectorAll('.main-menu [role="button"]'),
-    ].find((e) => /settings/i.test(e.textContent));
+    assert.equal(actor(), undefined, "a main menu without a selected character keeps only the room and stations");
+    const settings = document.querySelector('.main-menu [aria-label="Settings"]');
     assert.ok(settings);
-    await act(async () =>
-      settings.dispatchEvent(
-        new dom.window.MouseEvent("pointerup", { bubbles: true, button: 0 }),
-      ),
-    );
+    await act(async () => settings.click());
     assert.equal(
       ui.getState().screen,
       "settings",

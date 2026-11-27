@@ -3,6 +3,8 @@ import test from "node:test";
 import { JSDOM } from "jsdom";
 import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from "three";
 import { creatorStepFrames, rosterCamera } from "../src/game/preview/rosterCamera.ts";
+import { garageMenuCamera } from "../src/game/preview/garageMenuCamera.ts";
+import { GARAGE_MENU_LANDMARKS } from "../src/game/preview/garageMenuLandmarks.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
 import { installGarageEntryInteraction } from "../src/game/preview/garageEntryInteraction.ts";
 import { bindRosterSticks, readRosterSticks, releaseRosterSticks } from "../src/game/preview/rosterStickControls.ts";
@@ -71,26 +73,57 @@ test("both rigs fit the selector framing across orientation and garage orbit", (
   }
 });
 
-test("Main retains the landscape orbit and frames the actor above phone menu actions", () => {
-  const roster = rosterCamera(), main = rosterCamera("main");
-  const a = new PerspectiveCamera(), b = new PerspectiveCamera();
-  for (const [w, h] of [[844, 390], [1280, 720], [320, 568], [390, 844]]) {
-    roster.frame(a, w, h);
-    main.frame(b, w, h);
-    for (const yaw of [-.24, .24]) for (const pitch of [-.09, .09]) {
-      roster.orbit(a, yaw, pitch);
-      main.orbit(b, yaw, pitch);
-      b.updateMatrixWorld();
-      if (w > h) {
-        assert.ok(a.position.equals(b.position));
-        assert.ok(a.quaternion.equals(b.quaternion));
-        assert.ok(a.projectionMatrix.equals(b.projectionMatrix));
-      } else {
-        const y = height => (1 - new Vector3(0, height, 0).project(b).y) / 2;
-        assert.ok(y(1.8) > .055 && y(0) < (h < 650 ? .49 : .61), "the shoes clear the progression line");
+test("garage station shots keep the character in view across phone orientations", () => {
+  const actor = new Vector3(0, .9, 0);
+  const visible = (point, camera) => {
+    const {x, y, z} = point.clone().project(camera);
+    return Math.abs(x) < 1 && Math.abs(y) < 1 && Math.abs(z) < 1;
+  };
+  for (const [width, height] of [[844,390], [1280,720], [320,568], [390,844]]) {
+    for (const [id, anchor] of Object.entries(GARAGE_MENU_LANDMARKS)) {
+      const shot = garageMenuCamera(id), camera = new PerspectiveCamera();
+      shot.frame(camera, width, height);
+      for (const yaw of [-.24, 0, .24]) for (const pitch of [-.09, 0, .09]) {
+        shot.orbit(camera, yaw, pitch);
+        camera.updateMatrixWorld();
+        assert.ok(visible(actor, camera), `${id} should keep the driver visible at ${width}×${height}`);
+        if (id === "enter_world" && width > height && !yaw && !pitch) {
+          // The highest right-hand segment of the original 0999 wall sign in world space.
+          const top = new Vector3(1.387, 4.3244, -5.508).project(camera);
+          assert.ok((1 - top.y) / 2 > .05, "the default landscape shot leaves room for the header above the sign");
+        }
+        if (id !== "enter_world" && !yaw && !pitch) {
+          assert.ok(visible(new Vector3(...anchor), camera), `${id} should frame its station at ${width}×${height}`);
+        }
       }
     }
   }
+});
+
+test("changing garage stations mid-travel picks up from the displayed camera and settles", () => {
+  const travel = new GarageCameraTravel(), camera = new PerspectiveCamera();
+  const frame = (time, shot, reduced = false) => travel.frame(camera, shot, 844, 390, 1, 0, 0, time, reduced);
+  const entrance = garageMenuCamera("enter_world");
+  const vehicle = garageMenuCamera("vehicle");
+  const editor = garageMenuCamera("world_editor");
+  frame(0, entrance, true);
+  frame(16, vehicle);
+  frame(100, vehicle);
+  const displayed = camera.clone();
+  frame(116, editor);
+  assert.equal(travel.moving, true);
+  assert.ok(camera.position.distanceTo(displayed.position) < 1e-9);
+  assert.ok(camera.quaternion.angleTo(displayed.quaternion) < 1e-6);
+  assert.ok(camera.projectionMatrix.equals(displayed.projectionMatrix));
+  for (let time = 132; time < 1800; time += 16) frame(time, editor);
+  const destination = new PerspectiveCamera();
+  editor.frame(destination, 844, 390);
+  assert.ok(camera.position.distanceTo(destination.position) < 1e-9);
+  assert.equal(travel.moving, false, "the renderer can sleep at a settled station");
+  frame(1800, vehicle, true);
+  vehicle.frame(destination, 844, 390);
+  assert.ok(camera.position.distanceTo(destination.position) < 1e-9);
+  assert.equal(travel.moving, false, "reduced motion applies the selected shot immediately");
 });
 
 test("Profile frames the fitted rig's eyes above the settings sheet and preserves the landscape shot", () => {

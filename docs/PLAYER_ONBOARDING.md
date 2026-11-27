@@ -42,7 +42,7 @@ See [OWASP authentication guidance](https://cheatsheetseries.owasp.org/cheatshee
 
 Sign-in and character selection share the top-left header with the triangular A and game name. After a successful sign-in, the controls fade into the roster and the garage camera moves from its current angle toward the dressed character. Reduced motion switches directly to the settled view. A new account can use **Create character** while the camera stays on the room.
 
-Sign-in, character selection, and the main menu share one live garage. The roster tiles use cached portraits. Confirming a slot keeps that character on the garage floor while the main menu opens. **Play → Open World** remains the entry to the shared hub. After confirming a character, open **Main menu → Explore → World Editor** to work on a world.
+Sign-in, character selection, and the main menu share one live garage. The roster tiles use cached portraits. Confirming a slot keeps that character on the garage floor while the main menu opens. Choose a station to move the camera, then use **Continue** to open it. **Enter World** takes you to the shared hub’s deployment flow. **Wardrobe** opens the fitting room, **Vehicle** opens the vehicle garage, and **World Editor** opens the workspace for building and test-driving your own worlds. The Avensky tab returns to the roster. Career, Social and Settings are in the upper-right header. Open **Social → Worlds → Find a match** for matchmaking or **Practice** for sandbox modes. **Social → Profile** opens player options.
 
 ## Wardrobe follow-up
 

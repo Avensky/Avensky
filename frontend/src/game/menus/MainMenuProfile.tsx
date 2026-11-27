@@ -9,7 +9,7 @@ import { useSavedPlayerCharacter } from "../characters/localOutfits";
 import { PLAYER_ONBOARDING } from "../welcome/config";
 import "./mainMenuProfile.css";
 
-export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
+export function MainMenuProfile({ focusMenu }: { focusMenu?: () => void }) {
   const name = useSocialStore(state => state.view?.profile.name);
   const scope = useSocialStore(state => state.profileScope);
   const available = useSocialStore(state => state.available);
@@ -46,10 +46,12 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
   }, [open]);
 
   useEffect(() => {
+    if (!focusMenu && !open) return;
     function route(event: Event) {
       const action = (event as CustomEvent<MenuAction>).detail;
       const active = document.activeElement;
       if (!open) {
+        if (!focusMenu) return;
         if (action === "right") trigger.current?.focus({ preventScroll: true });
         else if (active === trigger.current && action === "activate") trigger.current?.click();
         else if (active === trigger.current && (action === "left" || action === "back")) focusMenu();
@@ -64,11 +66,15 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
         const index = buttons.findIndex(button => button === active);
         const step = action === "up" || action === "left" ? -1 : 1;
         buttons[index < 0 ? 0 : (index + step + buttons.length) % buttons.length]?.focus();
-      }
+      } else return;
       event.preventDefault();
+      // Social normally owns this event. An expanded account chooser handles
+      // its own rows and Back before the containing social screen does.
+      if (!focusMenu) event.stopImmediatePropagation();
     }
-    window.addEventListener("avenlab:main-menu-action", route);
-    return () => window.removeEventListener("avenlab:main-menu-action", route);
+    const eventName = focusMenu ? "avenlab:main-menu-action" : "avenlab:panel-action";
+    window.addEventListener(eventName, route, true);
+    return () => window.removeEventListener(eventName, route, true);
   }, [close, focusMenu, open]);
 
   async function connect(action: () => Promise<void>) {
@@ -95,8 +101,8 @@ export function MainMenuProfile({ focusMenu }: { focusMenu: () => void }) {
     }
   }
 
-  return <header ref={root} className="main-menu-profile" onKeyDown={event => {
-    if (open && event.key === "Escape") { event.preventDefault(); close(); }
+  return <header ref={root} className="main-menu-profile" onKeyDownCapture={event => {
+    if (open && event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close(); }
   }}>
     <CharacterHeaderButton ref={trigger} angled choice={choice} name={caption}
       data-main-profile-toggle aria-label={`Player profile · ${caption}`} aria-expanded={open} aria-controls={panelId}

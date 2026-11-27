@@ -1,5 +1,7 @@
 import {MenuTabButton} from "../../components/menus/MenuTabButton";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { GameButton } from "../../components/GameButton";
+import { useAlphaStore } from "../../store/alpha/alphaStore";
 import { useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
 import {
@@ -14,6 +16,7 @@ import {ControllerAction} from "../../components/controller";
 import {isTypingTarget} from "../../controls/inputRouting";
 import { trapMenuFocus } from "../../components/menus/menuFocus";
 import { CharacterRosterEditor } from "./CharacterRosterEditor";
+import { MainMenuProfile } from "../menus/MainMenuProfile";
 import { WorldsPage } from "./WorldsPage";
 import { TeammatesPage, GroupsPage } from "./PeoplePages";
 import { InvitationsPage } from "./InvitationsPage";
@@ -153,6 +156,12 @@ function ProfilePage({
 export function SocialPanel() {
   const angled = useAngledMenuHeader();
   const loading = useUIStore((s) => s.isModeLoading);
+  const menuWorlds = useUIStore(s => s.screen === "social" && !s.overlay);
+  const openModes = (practice: boolean) => {
+    const alpha = useAlphaStore.getState();
+    alpha.chooseMode(practice ? "sandbox" : alpha.lastMatchMode);
+    useUIStore.getState().setScreen("mode_select");
+  };
   const view = useSocialStore((s) => s.view),
     available = useSocialStore((s) => s.available),
     connectionMessage = useSocialStore((s) => s.message);
@@ -258,6 +267,10 @@ export function SocialPanel() {
         {!angled && navigation}
         <div className="social-scroll menu-frame-content">
           <fieldset disabled={busy} className="social-body" aria-busy={busy}>
+            {menuWorlds && tab === "WORLDS" && <div className="social-actions" data-controller-row>
+              <GameButton variant="menu" disabled={busy} onPress={() => openModes(false)}>Find a match</GameButton>
+              <GameButton variant="menu" disabled={busy} onPress={() => openModes(true)}>Practice</GameButton>
+            </div>}
             {view && tab === "WORLDS" && (
               <WorldsPage view={view} command={command} onStatus={setStatus} />
             )}
@@ -270,6 +283,7 @@ export function SocialPanel() {
             {view && tab === "INVITES" && (
               <InvitationsPage view={view} command={command} />
             )}
+            {menuWorlds && tab === "PROFILE" && <MainMenuProfile />}
             {view?.permissions?.edit_characters && tab === "PROFILE" && (
               <CharacterRosterEditor key={view.profile.id} overrides={view.roster ?? []} command={command} />
             )}

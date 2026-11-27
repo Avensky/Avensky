@@ -168,26 +168,6 @@ html[data-ui-theme] .cockpit-panel .physical-hazard {
   border-color: #ad5965;
 }
 
-/* Scene treatment stays dark and translucent even when the panel palette is
-   light. Text over scenery uses scene ink; panel text uses the panel palette. */
-html[data-ui-theme] .main-menu {
-  --scene-ink: #f4f6ff;
-  --scene-muted: #c8d1e4;
-  background: #060a14;
-}
-html[data-ui-theme] .main-menu .menu-home-content { text-shadow: 0 1px 4px #000; }
-html[data-ui-theme] .main-menu :is(.menu-home-content,.menu-action) { color: var(--scene-ink); }
-html[data-ui-theme] .main-menu :is(.controller-shortcuts,.alpha-progress,.alpha-progress small) { color: var(--scene-muted); }
-html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action {
-  background: var(--garage-menu-row);
-  color: var(--garage-menu-ink);
-  border-color: var(--garage-menu-line);
-}
-html[data-ui-theme]:not([data-high-contrast="true"]) .main-menu .menu-action:is(:hover,:focus-visible,[data-selected="true"]) {
-  color: var(--scene-ink);
-  background: color-mix(in srgb,var(--garage-menu-row) 86%,var(--garage-menu-accent));
-  border-color: color-mix(in srgb,var(--app-scene-tint) 65%,#fff);
-}
 html[data-ui-theme]:not([data-high-contrast="true"]) [data-live-world] .tabbed-menu {
   background: color-mix(in srgb, var(--app-background) 78%, transparent);
   backdrop-filter: blur(4px);

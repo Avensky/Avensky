@@ -57,26 +57,32 @@ test("every pause row routes correctly and navigation follows the split menu", (
   assert.equal(ui.getState().getActiveMenuIndex(), 4);
 });
 
-test("Play and Explore share the garage while all six main destinations retain their actions", () => {
-  const destinations=[['play','mode_select'],['explore','mode_select'],['heroes','heroes'],['career','career'],['social','social'],['settings','settings']];
-  assert.deepEqual(mainItems.map(item=>item.id),destinations.map(([id])=>id));
-  alpha.getState().chooseMode('competitive');
+test("garage station navigation wraps without opening a destination or disturbing match preferences", () => {
+  const ids = mainItems.map(item => item.id);
+  assert.deepEqual(ids, ["enter_world", "wardrobe", "vehicle", "world_editor"]);
+  alpha.getState().chooseMode("competitive");
   alpha.getState().chooseTeamSize(3);
-  destinations.forEach(([id,screen], index) => {
-    ui.setState({ screen: "main", overlay: null, isModeLoading: false });
-    ui.getState().setActiveMenuIndex(index);
+  ui.setState({ screen: "main", overlay: null, isModeLoading: false });
+  ui.getState().setActiveMenuIndex(0);
+  route("up");
+  assert.equal(ui.getState().getActiveMenuIndex(), ids.length - 1);
+  route("down");
+  assert.equal(ui.getState().getActiveMenuIndex(), 0);
+  for (const station of ["wardrobe", "vehicle"]) {
+    ui.getState().setScreen("main");
+    ui.getState().setActiveMenuIndex(ids.indexOf(station));
+    assert.equal(ui.getState().screen, "main");
     route("activate");
-    assert.equal(ui.getState().screen, screen);
-    assert.equal(ui.getState().overlay, null);
-    if(id==='play')assert.equal(alpha.getState().mode,'competitive');
-    if(id==='explore')assert.equal(alpha.getState().mode,'sandbox');
-    assert.equal(alpha.getState().teamSize,3,'main-menu navigation cannot overwrite the match-size preference');
-  });
-  ui.setState({screen:'main',overlay:null});ui.getState().setActiveMenuIndex(0);
-  route('up');assert.equal(ui.getState().getActiveMenuIndex(),5,'controller navigation includes every main destination');
-  route('down');assert.equal(ui.getState().getActiveMenuIndex(),0);route('activate');
-  assert.equal(alpha.getState().mode,'competitive','returning from tools restores the last match category');
-  assert.equal(alpha.getState().teamSize,3);
+    assert.equal(ui.getState().screen, "heroes");
+    assert.equal(ui.getState().workshopEntry, station);
+    assert.equal(alpha.getState().lastMatchMode, "competitive");
+    assert.equal(alpha.getState().teamSize, 3);
+  }
+  ui.getState().setScreen("main");
+  ui.getState().setActiveMenuIndex(ids.indexOf("world_editor"));
+  route("activate");
+  assert.equal(ui.getState().screen, "world_builder");
+  assert.equal(ui.getState().overlay, null);
 });
 
 test("panel input never activates the underlying main menu and Back returns to the correct parent", () => {

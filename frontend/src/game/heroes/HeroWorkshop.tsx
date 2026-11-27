@@ -64,6 +64,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
 }={}){
  const inputDevice=useMenuInputDevice();
  const overlay=useUIStore(s=>s.overlay);
+ const entry=useUIStore(s=>s.workshopEntry);
  const owner=useSocialStore(s=>s.view?.profile.id??s.profileOwner);
  const connected=useSocialStore(s=>Boolean(s.view));
  const stagingSignedIn=useSocialStore(s=>s.stagingSignIn && s.profileStatus==="ready" && Boolean(s.view?.profile));
@@ -74,12 +75,13 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const owned=useSocialStore(s=>s.view?.profile.progression?.owned??NO_OWNED_SKINS);
  const [chosen,setHero]=useState<string|null>(null);
  const hero=chosen??mainDefinition?.id??null;
- const [page,setPage]=useState<WorkshopPage>("heroes");
+ const [page,setPage]=useState<WorkshopPage>(()=>entry==="wardrobe"?"character":entry==="vehicle"&&mainDefinition?"garage":"heroes");
+ const directGarage=useRef(page==="garage");
  const [selectedCharacterTab,setCharacterTab]=useState<CharacterTab>("appearance");
  const characterTab=!stagingSignedIn&&(selectedCharacterTab==="profile"||selectedCharacterTab==="account")?"appearance":selectedCharacterTab;
  const [characterReady,setCharacterReady]=useState(false);
  const beforeCharacterClose=useRef<()=>Promise<boolean>>(null);
- const previousCharacterPage=useRef<WorkshopPage>("heroes");
+ const previousCharacterPage=useRef<WorkshopPage|"main">(entry==="wardrobe"?"main":"heroes");
  const openCharacter=()=>{
   if(page==="character")return;
   previousCharacterPage.current=page;
@@ -166,6 +168,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  };
  const openHero=(id=hero)=>{
   if(!id){root.current?.querySelector<HTMLElement>("[data-hero]:not(:disabled)")?.focus({preventScroll:true});return;}
+  directGarage.current=false;
   preview(id);setStudioTab("performance");setPage("garage");
  };
  const mainChoice=(id=hero)=>{
@@ -176,24 +179,28 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  };
  const edit=(patch:Partial<HeroAppearance>)=>{
   if(!hero||!definition)return;
-  const next={...appearance,...patch};drafts.current[definition.vehicle]=next;setAppearance(next);
+  const next={...appearance,...patch};drafts.current[definition.vehicle]=next;setHero(hero);setAppearance(next);
   queue.enqueue({hero,vehicle:definition.vehicle,appearance:next,makeDefault:false});
  };
- const leaveCharacter=async(next:()=>void)=>{
+ const leaveCharacter=async(next:()=>void|Promise<void>)=>{
   if(leaving.current)return;
   leaving.current=true;
-  try{if(await beforeCharacterClose.current?.()!==false)next();}
+  try{if(await beforeCharacterClose.current?.()!==false)await next();}
   finally{leaving.current=false;}
+ };
+ const leaveWorkshop=async()=>{
+  if(await queue.flush())useUIStore.getState().setScreen("main");
  };
  const back=async()=>{
   if(useGarageDrive.getState().panelsHidden){useGarageDrive.setState({panelsHidden:false});return;}
   if(page==="character"){
-   await leaveCharacter(()=>setPage(previousCharacterPage.current));
+   const parent=previousCharacterPage.current;
+   await leaveCharacter(parent==="main"?leaveWorkshop:()=>setPage(parent));
    return;
   }
-  if(page!=="heroes"){setPage("heroes");return;}
+  if(page==="garage"&&!directGarage.current){setPage("heroes");return;}
   if(leaving.current)return;leaving.current=true;
-  try{if(await queue.flush())useUIStore.getState().setScreen("main");}finally{leaving.current=false;}
+  try{await leaveWorkshop();}finally{leaving.current=false;}
  };
  useSelectionNavigation(root,{confirm:()=>{
   if(useGarageDrive.getState().panelsHidden){useGarageDrive.setState({panelsHidden:false});return;}

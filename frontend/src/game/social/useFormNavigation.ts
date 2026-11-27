@@ -29,11 +29,11 @@ export function useFormNavigation(
       }
       const controls = Array.from(
         root.current?.querySelectorAll<HTMLElement>(
-          'button,input:not([type="hidden"]),select,textarea,[data-controller-selector][tabindex]',
+          'button,[role=button],input:not([type="hidden"]),select,textarea,[data-controller-selector][tabindex]',
         ) ?? [],
       ).filter(
         (node) =>
-          !node.matches(":disabled") &&
+          !node.matches(':disabled,[aria-disabled="true"]') &&
           !node.closest("[hidden],[inert]") &&
           node.tabIndex >= 0,
       );
@@ -67,7 +67,7 @@ export function useFormNavigation(
       if (grid && (action === "up" || action === "down")) {
         const items = Array.from(
           grid.querySelectorAll<HTMLElement>("[data-grid-item]"),
-        ).filter((node) => !node.matches(":disabled"));
+        ).filter((node) => !node.matches(':disabled,[aria-disabled="true"]'));
         const columns = Math.max(
           1,
           Number(grid.dataset.controllerColumns) || 1,

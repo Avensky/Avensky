@@ -1,0 +1,214 @@
+.garage-main-menu.menu-home {
+  --garage-edge: clamp(12px, 2.2vw, 36px);
+  --garage-left: max(var(--garage-edge), env(safe-area-inset-left, 0px));
+  --garage-right: max(var(--garage-edge), env(safe-area-inset-right, 0px));
+  --garage-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  display: block;
+  overflow: hidden;
+  padding: 0;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.garage-main-menu > header.garage-entry-header.angled-tab-header {
+  position: absolute;
+  inset: env(safe-area-inset-top, 0px) 0 auto;
+  z-index: 2;
+  opacity: 1;
+}
+.garage-menu-stations,
+.garage-menu-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.garage-station-anchor {
+  --marker-half-width: clamp(44px, 5.5vw, 88px);
+  --marker-mid-y: clamp(calc(env(safe-area-inset-top, 0px) + var(--menu-angled-header-height) + 27px),
+    var(--station-y, var(--rest-y)), calc(100% - var(--garage-bottom) - 74px));
+  position: absolute;
+  left: clamp(calc(var(--garage-left) + var(--marker-half-width) * .45), var(--station-x, var(--rest-x)),
+    calc(100% - var(--garage-right) - var(--marker-half-width) * 1.7));
+  top: var(--marker-mid-y);
+  /* Put the end of the leader on the projected point. */
+  transform: translate(calc(-20% + 10px), calc(-100% - 9px));
+}
+.garage-station-anchor[data-station-anchor="enter_world"] { --rest-x: 30%; --rest-y: 51%; }
+.garage-station-anchor[data-station-anchor="wardrobe"] { --rest-x: 54%; --rest-y: 46%; }
+.garage-station-anchor[data-station-anchor="vehicle"] { --rest-x: 18%; --rest-y: 62%; }
+.garage-station-anchor[data-station-anchor="world_editor"] { --rest-x: 72%; --rest-y: 60%; }
+.garage-station-button {
+  --frame-line-color: color-mix(in srgb, var(--garage-menu-accent) 60%, transparent);
+  --frame-line-width: 1px;
+  --frame-top-cut: 7px;
+  --frame-bottom-cut: 7px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--garage-menu-ink);
+  font-size: calc(clamp(14px, 1.42vw, 23px) * var(--menu-text-scale, 1));
+  font-weight: 650;
+  line-height: 1.15;
+  pointer-events: auto;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.garage-station-face {
+  display: grid;
+  place-items: center;
+  min-height: 1.95em;
+  padding: .3em .95em;
+  background: var(--garage-menu-row);
+  text-shadow: 0 1px 4px #000;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.garage-station-caption { display: none; }
+@media (orientation: landscape) and (min-width: 900px) and (min-height: 500px) {
+  /* The selected editor plate grows up from its pin. Its hit target and all
+     four station positions stay fixed while the caption appears. */
+  [data-station-anchor="world_editor"] .garage-station-button { width: 8em; }
+  [data-station-anchor="world_editor"] .garage-station-face {
+    position: absolute;
+    inset-inline: 0;
+    bottom: calc(50% - .975em);
+  }
+  .garage-main-menu:not(:has(header :focus)) .garage-station-button[data-selected="true"] .garage-station-caption {
+    display: block;
+    margin-top: .15em;
+    color: var(--garage-menu-ink);
+    font-size: .72em;
+    font-weight: 500;
+  }
+}
+.garage-station-anchor::before,
+.garage-station-anchor::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+  background: var(--garage-menu-accent);
+}
+.garage-station-anchor::before {
+  width: 1px;
+  height: 17px;
+  left: 20%;
+  top: calc(100% - 4px);
+  transform-origin: top;
+  transform: rotate(38deg);
+}
+.garage-station-anchor::after {
+  width: 6px;
+  height: 6px;
+  left: calc(20% - 13px);
+  top: calc(100% + 6px);
+  border-radius: 50%;
+}
+@media (orientation: landscape) {
+  /* Keep the doorway label on the far side of its pin, away from the actor. */
+  .garage-station-anchor[data-station-anchor="enter_world"] {
+    --entry-pin-x: var(--station-x, 30vw);
+    left: 0;
+    width: 100%;
+    transform: translateY(calc(-100% - 9px));
+  }
+  [data-station-anchor="enter_world"] .garage-station-button {
+    width: max-content;
+    left: min(var(--entry-pin-x), calc(100% - var(--garage-right)));
+    transform: translateX(max(-100%, calc(var(--garage-left) - var(--entry-pin-x))));
+  }
+  .garage-station-anchor[data-station-anchor="enter_world"]::before {
+    left: calc(var(--entry-pin-x) - 10px);
+    transform: rotate(-38deg);
+  }
+  .garage-station-anchor[data-station-anchor="enter_world"]::after { left: calc(var(--entry-pin-x) - 3px); }
+}
+.garage-menu-stations .garage-station-button[data-selected="true"] {
+  --frame-line-color: var(--garage-menu-accent);
+  --frame-line-width: 2px;
+}
+.garage-station-button[data-selected="true"] .garage-station-face {
+  background: color-mix(in srgb, var(--garage-menu-row) 78%, var(--app-accent));
+}
+.garage-main-menu:has(header :focus) .garage-station-button[data-selected="true"] {
+  --frame-line-color: color-mix(in srgb, var(--garage-menu-accent) 60%, transparent);
+  --frame-line-width: 1px;
+}
+.garage-main-menu:has(header :focus) .garage-station-face { background: var(--garage-menu-row); }
+.garage-main-menu .garage-menu-continue {
+  position: absolute;
+  right: var(--garage-right);
+  bottom: var(--garage-bottom);
+  display: inline-flex;
+  align-items: center;
+  gap: .45em;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 .3em;
+  border: 0;
+  background: transparent;
+  color: var(--garage-menu-ink);
+  font-size: calc(clamp(15px, 1.55vw, 24px) * var(--menu-text-scale, 1));
+  font-weight: 650;
+  text-shadow: 0 1px 4px #000;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.garage-menu-continue:focus-visible { outline: 0; text-decoration: underline; text-underline-offset: .25em; }
+@media (hover: hover) {
+  .garage-main-menu .garage-menu-continue:hover { color: var(--garage-menu-accent); }
+}
+.garage-menu-notice {
+  position: absolute;
+  left: var(--garage-left);
+  top: calc(env(safe-area-inset-top, 0px) + var(--menu-angled-header-height) + 10px);
+  max-width: min(31rem, calc(100% - var(--garage-left) - var(--garage-right)));
+  margin: 0;
+  padding: .5rem .8rem;
+  border-inline-start: 2px solid var(--garage-menu-accent);
+  color: var(--garage-menu-ink);
+  background: var(--garage-menu-panel);
+  pointer-events: none;
+}
+@media (orientation: portrait) {
+  /* In a narrow field of view some stations are off camera. Keep all four
+     destinations reachable, in the same two rows used by directional input. */
+  .garage-menu-stations {
+    inset: auto var(--garage-right) calc(var(--garage-bottom) + 52px) var(--garage-left);
+  }
+  .garage-menu-markers {
+    position: static;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 5px;
+  }
+  .garage-station-anchor { position: static; transform: none; }
+  .garage-station-anchor::before, .garage-station-anchor::after { content: none; }
+  .garage-station-button, .garage-station-face { width: 100%; min-height: 44px; }
+  .garage-station-face { white-space: normal; text-align: center; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduce-motion="true"]) .garage-main-menu > :is(header,.garage-menu-stations,.garage-menu-continue) {
+    animation: garage-main-reveal 240ms ease-out both;
+  }
+}
+@keyframes garage-main-reveal { from { opacity: 0; } to { opacity: 1; } }
+html[data-high-contrast="true"] .garage-station-button {
+  --frame-line-color: var(--app-text);
+}
+html[data-high-contrast="true"] .garage-station-face { background: var(--app-background); color: var(--app-text); }
+html[data-high-contrast="true"] .garage-station-button[data-selected="true"] .garage-station-face {
+  background: var(--app-accent);
+  color: var(--app-background);
+  text-shadow: none;
+}
+@media (forced-colors: active) {
+  .garage-station-face { border: 1px solid ButtonText; color: ButtonText; }
+  .garage-station-button[data-selected="true"] .garage-station-face { border: 3px solid Highlight; }
+}
