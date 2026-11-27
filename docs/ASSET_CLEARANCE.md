@@ -82,7 +82,7 @@ These claims alone are insufficient to clear public distribution. Credits withou
 
 ## Garage props for private staging
 
-The garage includes original procedural lockers, an engine hoist and a hydraulic floor jack in every build. Private staging can replace each prop at the same location once its evaluation model loads. The optimized GLBs live on the authenticated asset service and carry attribution and modification notices. Retire these staging entries or obtain clearance before public distribution.
+The garage includes original procedural lockers, an engine hoist, a hydraulic floor jack, and four matching tires on the workshop shelf. The tire geometry is generated in the client. Private staging can replace each prop at the same location once its evaluation model loads. The optimized GLBs live on the authenticated asset service and carry attribution and modification notices. Retire these staging entries or obtain clearance before public distribution.
 
 | Prop | Artist and original | Staging adaptation |
 | --- | --- | --- |

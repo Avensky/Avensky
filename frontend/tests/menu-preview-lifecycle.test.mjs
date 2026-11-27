@@ -12,13 +12,15 @@ const surfaceId = "\0" + surface;
 // networking, controls, UI panels and the world renderer at their boundaries.
 function testSurfaces() {
   const retained = new Set(["react", "../FullCanvas", "./store/menus/uiStore",
-    "./game/welcome/GarageMenuBackdrop", "./game/preview/RosterGaragePreview"]);
+    "./game/welcome/GarageMenuBackdrop", "./game/preview/RosterGaragePreview",
+    "./game/preview/garageParkingStore", "./preview/garageParkingStore", "./store/input/inputStore"]);
   const stubs = {
     useSocialStore: "select => select({})",
     useBuilderStore: 'select => select({ workspace: "world" })',
     useRenderSettingsStore: "select => select({ hud: false })",
     Sandbox: "() => <span data-sandbox />",
     Cameras: "() => <span data-gameplay-camera />",
+    GarageWorldReveal: "() => <span data-waiting-for-harbor-frame />",
   };
   return {
     name: "preview-lifecycle-test-surfaces", enforce: "pre",
@@ -140,6 +142,21 @@ test("Heroes, Main and Play hand off one startup garage; the live world owns a s
     assert.ok(world.querySelector("[data-sandbox]"));
     assert.ok(world.querySelector("[data-gameplay-camera]"));
     await screen("main"); main();
+    const { useGarageParking } = await vite.ssrLoadModule("/src/game/preview/garageParkingStore.ts");
+    await act(async () => {
+      useGarageParking.setState({ departurePhase: "outside", committingDeparture: true });
+      useUIStore.getState().setScreen("sandbox");
+    });
+    inRoom(home, true);
+    assert.equal(runtime.holdFrame, true, "the final garage frame is held while the game renderer starts");
+    assert.ok(gameplay()?.querySelector("[data-waiting-for-harbor-frame]"));
+    assert.ok(document.querySelector(".game-wrapper[data-garage-handoff][inert]"));
+    // The real paint signal owns this reset. Other modes never wait on the cinematic.
+    await act(async () => useGarageParking.setState({ departurePhase: null, committingDeparture: false }));
+    inRoom(home, false);
+    assert.equal(runtime.holdFrame, false);
+    assert.equal(document.querySelector("[data-garage-handoff]"), null);
+    assert.ok(gameplay()?.querySelector("[data-sandbox]"));
   } finally {
     if (root) await act(async () => root.unmount());
     await vite?.close();

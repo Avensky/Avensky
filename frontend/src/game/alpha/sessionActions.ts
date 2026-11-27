@@ -71,7 +71,7 @@ export async function joinSelectedMode() {
 let spawning = false;
 /** The garage waits for the real spawn acknowledgement before exposing driving.
  * No extra socket, input loop or guessed loading timeout owns gameplay. */
-type GarageDeparture = { worldId: number; map: string; current: () => boolean };
+type GarageDeparture = { worldId: number; map: string; current: () => boolean; ticket?: string };
 
 export async function deploySelectedHero(departure?: GarageDeparture) {
   if (spawning) throw Error("Deployment is already in progress.");
@@ -131,6 +131,7 @@ export async function deploySelectedHero(departure?: GarageDeparture) {
       try {
         connection.send(JSON.stringify({
           type: "spawn_request", map, vehicle: hero.vehicle,
+          ...(departure?.ticket && { garage_departure: departure.ticket }),
           mode: departure ? "sandbox" : active?.mode ?? selected.mode,
         }));
       } catch (error) {
@@ -152,6 +153,7 @@ export async function deploySelectedHero(departure?: GarageDeparture) {
         await import("../../worldBuilder/state/builderActions");
       await openWorldBuilder();
     } else useUIStore.getState().setScreen("sandbox");
+    return true;
   } finally {
     spawning = false;
   }

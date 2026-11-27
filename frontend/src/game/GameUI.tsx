@@ -13,6 +13,8 @@ import type { CharacterChoice } from "./characters/characterCatalog";
 import type { CharacterTab } from "./characters/CharacterPage";
 import { useCharacterPreviewStore } from "./characters/characterPreviewStore";
 import { characterEmoteNeedsGarage } from "./characters/characterPreviewStage";
+import { GarageWorldReveal } from "./preview/GarageWorldReveal";
+import { useGarageParking } from "./preview/garageParkingStore";
 import { useAlphaFlow } from "./alpha/useAlphaFlow";
 import "../theme/theme.css";
 import { FullCanvas } from "../FullCanvas";
@@ -23,7 +25,7 @@ import { PauseMenu } from "./menus/PauseMenu";
 import { ModeLoadingScreen } from "./ModeLoadingScreen";
 import { SandboxSetup } from "./modes/sandbox/SandboxSetup";
 import { CockpitPanel } from "../ui/Cockpit/CockpitPanel";
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useSocialStore } from "../store/social/socialStore";
 import { inviteCodeFromUrl } from "./social/invitationLinks";
 import { SettingsMenu } from "./menus/SettingsMenu";
@@ -87,10 +89,13 @@ export function GameUI() {
   const [collapsed, setCollapsed] = useState(false);
   const [roomReady, setRoomReady] = useState(false);
 
-  const worldCover = (screen === "sandbox" || screen === "world_builder") &&
+  const surface = useRef<HTMLDivElement>(null);
+  const garageHandoff = useGarageParking(state => state.committingDeparture) && screen === "sandbox";
+  const worldCover = !garageHandoff && (screen === "sandbox" || screen === "world_builder") &&
     (isModeLoading || overlay === "team_lineup");
   return (
-    <div className="relative game-wrapper" data-live-world={screen === "sandbox" || undefined} data-world-cover={worldCover || undefined}>
+    <div ref={surface} className="relative game-wrapper" data-garage-handoff={garageHandoff || undefined}
+      inert={garageHandoff} aria-busy={garageHandoff || undefined} data-live-world={screen === "sandbox" || undefined} data-world-cover={worldCover || undefined}>
       <HeroLoadoutSync />
       <MinimapSessionLifecycle />
       <CtfMissionLifecycle />
@@ -119,6 +124,7 @@ export function GameUI() {
           {(screen === "world_builder" || screen === "sandbox") && (
             <Suspense fallback={null}>
               <WorldContents screen={screen} editorOpen={overlay === "world_builder"} />
+              {garageHandoff && <GarageWorldReveal surface={surface} />}
             </Suspense>
           )}
         </FullCanvas>
@@ -187,7 +193,7 @@ export function GameUI() {
       )}
 
       {screen === "sandbox" && !overlay && <PerformanceOverlay />}
-      <ModeLoadingScreen />
+      {!garageHandoff && <ModeLoadingScreen />}
     </div>
   );
 }

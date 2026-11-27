@@ -1,3 +1,4 @@
+import { useGarageEditor } from "../worldBuilder/garage/garageEditorState";
 import {useNetworkStore} from '../store/session/networkStore';
 import { useGameStore } from "../store/presentation/gameStore";
 import { isDrivingScreen, useUIStore } from "../store/menus/uiStore";
@@ -61,6 +62,7 @@ export function welcomeUsesMenuStick() {
 
 export function hasSecondaryMenuControls(ui: ReturnType<typeof useUIStore.getState>) {
   if (ui.overlay) return ui.overlay === "match_results";
+  if (ui.screen === "main" && useGarageEditor.getState().page === "room") return true;
   if (ui.screen === "mode_select") return true;
   return ui.screen === "welcome" && Boolean(welcomeMenuPanel?.querySelector("[data-creator-channel]"));
 }
@@ -144,7 +146,10 @@ export function routeMenuAction(action: MenuAction) {
   if (!canNavigateMenu()) return;
   if(ui.overlay==="survey_map"){ if(action==="back"||action==="activate")ui.closeOverlay(); return; }
   const panel = ui.overlay ?? ui.screen;
-  if (panel === "main" && !window.dispatchEvent(new CustomEvent<MenuAction>("avenlab:main-menu-action", { detail: action, cancelable: true }))) return;
+  if (panel === "main") {
+    const handled = !window.dispatchEvent(new CustomEvent<MenuAction>("avenlab:main-menu-action", { detail: action, cancelable: true }));
+    if (handled || useGarageEditor.getState().page) return;
+  }
   if (
     [
       "debug_menu",

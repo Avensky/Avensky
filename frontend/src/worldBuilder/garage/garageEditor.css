@@ -1,0 +1,63 @@
+.garage-editor {
+  --edit-gap: clamp(4px, .7vmin, 9px);
+  --edit-edge: max(12px, env(safe-area-inset-right));
+  --edit-panel: clamp(14rem, 26vw, 18rem);
+  position: absolute; inset: 0; z-index: 30; overflow: hidden; outline: 0;
+  background: transparent; color: var(--garage-menu-ink);
+  pointer-events: none; user-select: none; -webkit-user-select: none;
+}
+.garage-editor > .garage-entry-header { position:absolute; inset: env(safe-area-inset-top, 0px) 0 auto; z-index: 2; }
+.garage-editor .garage-entry-brand { pointer-events: auto; }
+.garage-project-choices, .garage-edit-tools {
+  position: absolute; right: var(--edit-edge); width: var(--edit-panel);
+  display: grid; gap: var(--edit-gap); pointer-events: auto;
+}
+.garage-project-choices { top:50%; transform: translateY(-50%); }
+.garage-edit-control, .garage-edit-item output {
+  --frame-line-width: 1px; --frame-line-color: var(--garage-menu-line, #79736f);
+  --frame-top-cut: 5px; --frame-bottom-cut: 5px;
+  display: flex; align-items: center; justify-content: center; gap: .35rem;
+  min-height: 44px; min-width: 44px; padding: .3rem .55rem;
+  line-height:1; font-size: clamp(.93rem, 1.55vw, 1.15rem); font-weight: 650;
+  border: 0; outline:0; color:var(--garage-menu-ink); background:var(--garage-menu-row);
+  touch-action: manipulation; -webkit-tap-highlight-color:transparent;
+}
+.garage-edit-control[data-selected="true"], .garage-edit-control:focus-visible {
+  --frame-line-color:var(--garage-menu-accent); background:var(--garage-menu-row-selected, var(--garage-menu-row));
+  color:var(--garage-menu-accent);
+}
+.garage-editor .le-icon { width: 1.18em; height: 1.18em; flex: none; }
+.garage-edit-stage { position: absolute; inset:0; pointer-events:auto; touch-action:none; }
+.garage-edit-tools { bottom: max(12px, env(safe-area-inset-bottom)); }
+.garage-edit-item, .garage-edit-move, .garage-edit-footer { display: grid; gap: var(--edit-gap); }
+.garage-edit-item { grid-template-columns: auto 1fr auto; }
+.garage-edit-item output { min-width:0; text-align:center; background: var(--garage-menu-row); }
+.garage-edit-move { grid-template-columns:repeat(3, 1fr); }
+.garage-edit-move [aria-label="Rotate clockwise"] svg { transform:scaleX(-1); }
+.garage-edit-footer { grid-auto-flow:column; grid-auto-columns:1fr; }
+.garage-edit-footer > span > div { height:100%; }
+.garage-floor-plan {
+  position: absolute; right: var(--edit-edge);
+  bottom: calc(max(12px, env(safe-area-inset-bottom)) + 176px + 4 * var(--edit-gap));
+  width: var(--edit-panel); height: min(30vh, 13rem);
+  color:var(--garage-menu-ink); touch-action:none; pointer-events:auto;
+}
+.garage-plan-floor { fill: var(--garage-menu-row); stroke:var(--garage-menu-line, #796f66); stroke-width:.1; }
+.garage-plan-lane { fill:var(--garage-menu-muted); opacity:.15; }
+.garage-plan-fixture { fill:var(--garage-menu-muted); opacity:.32; }
+.garage-plan-prop { fill:var(--garage-menu-muted); stroke:var(--garage-menu-ink); stroke-width:.08; }
+.garage-plan-heading { stroke:var(--garage-menu-ink); stroke-width:.10; }
+.garage-floor-plan [data-active="true"] .garage-plan-prop { fill:var(--garage-menu-accent); }
+.garage-edit-notice { position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); max-width: min(42vw,28rem); padding:.55rem .8rem; color:var(--garage-menu-ink); background:var(--garage-menu-row); }
+.garage-edit-notice:empty { display:none; }
+@media (orientation:portrait) {
+  .garage-editor { --edit-panel: min(92vw, 19rem); }
+  .garage-project-choices, .garage-edit-tools { right:50%; transform:translateX(50%); }
+  .garage-project-choices { transform:translate(50%,-50%); }
+  .garage-floor-plan { width:var(--edit-panel); height: clamp(6rem, 19svh, 10rem); right:50%; transform:translateX(50%); }
+  .garage-edit-notice { top:max(4rem,calc(3rem + env(safe-area-inset-top))); bottom:auto; max-width:90vw; }
+}
+@media (orientation: landscape) and (max-height:370px) {
+  .garage-floor-plan { width: min(25vw, 10rem); height: 34vh; }
+}
+.garage-editor .garage-entry-brand:focus { color:var(--garage-menu-accent); }

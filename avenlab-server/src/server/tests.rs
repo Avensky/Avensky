@@ -1,5 +1,7 @@
 use super::*;
 
+mod garage;
+
 fn server(active: usize, players: usize) -> Server {
     Server {
         staff: Default::default(),
@@ -47,7 +49,7 @@ async fn test_socket(server: &Server) -> (String, watch::Receiver<Option<String>
                 input,
                 input_tx,
                 profile_id: None, staging_session: None,
-                world_id: None,
+                world_id: None, garage_departure: None,
                 team: Team::Blue,
             },
         )
@@ -1874,5 +1876,39 @@ async fn game_master_controls_roster_main_world_and_matchmaking() {
     assert!(s.handle(&owner,json!({"action":"world_join","world_id":room})).await.is_err());
     s.handle(&owner,authorize("world_approve",true)).await.unwrap();
     assert_eq!(s.data.lock().await.match_source(room), None, "old revision stays out of rotation");
+    cleanup(s).await;
+}
+
+
+#[tokio::test]
+async fn garage_departure_releases_only_its_own_seat_and_unconfirmed_vehicle() {
+    let s = server(3, 6);
+    let (owner, _, _) = client(&s, "Builder").await;
+    let (p, _, _) = client(&s, "Driver").await;
+    let hub = world(&s, &owner, "Harbor", "", true).await;
+    let join = |tag| json!({"action":"world_join","world_id":hub,"garage_departure":tag});
+    let end = |tag, entered| json!({"action":"garage_departure_finish","world_id":hub,"garage_departure":tag,"entered":entered});
+    assert_eq!(s.handle(&p, join("a")).await.unwrap()["garage_departure"], "a");
+    assert_eq!(s.handle(&p, join("b")).await.unwrap()["garage_departure"], "b");
+    assert_eq!(s.handle(&p, end("a",false)).await.unwrap()["released"], false);
+    assert!(s.spawn_for_departure(&p, "road_precision", "brz", Some("a")).await.is_err());
+    s.spawn_for_departure(&p, "road_precision", "brz", Some("b")).await.unwrap();
+    let room = s.runtime(&p).await.unwrap();
+    assert!(room.lock().await.physics.vehicles.contains_key(&p));
+    assert_eq!(s.handle(&p, end("b", false)).await.unwrap()["released"], true);
+    assert!(s.runtime(&p).await.is_err());
+    assert!(!room.lock().await.physics.vehicles.contains_key(&p));
+
+    s.handle(&p, join("c")).await.unwrap();
+    s.spawn_for_departure(&p, "road_precision", "brz", Some("c")).await.unwrap();
+    s.handle(&p, end("c",true)).await.unwrap();
+    assert_eq!(s.handle(&p, end("c",false)).await.unwrap()["released"], false);
+    assert!(s.handle(&p, join("d")).await.unwrap()["garage_departure"].is_null());
+    assert_eq!(s.handle(&p, end("d",false)).await.unwrap()["released"], false);
+    assert!(s.runtime(&p).await.is_ok());
+    s.handle(&p, json!({"action":"world_leave"})).await.unwrap();
+    s.handle(&p, join("e")).await.unwrap();
+    s.disconnect(&p).await;
+    assert!(s.runtime(&p).await.is_err());
     cleanup(s).await;
 }

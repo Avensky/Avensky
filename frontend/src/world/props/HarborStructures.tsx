@@ -61,6 +61,8 @@ export function HarborStreet({ item }: { item: LayoutObject }) {
     </group>
   );
 }
+export const HARBOR_FACADES = "/models/harbor-generated/dock-facades.glb";
+
 type Part = { mesh: Mesh; local: Matrix4 };
 const variantsCache = new WeakMap<Object3D, Part[][]>();
 function variantsFor(source: Object3D) {
@@ -142,7 +144,7 @@ function CityBuildings({
   onSelect?: (id: string) => void;
 }) {
   const { scene } = useAssetGLTF(
-    "/models/harbor-generated/dock-facades.glb",
+    HARBOR_FACADES,
     "/draco/",
   );
   const variants = useMemo(() => variantsFor(scene), [scene]);

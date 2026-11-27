@@ -54,6 +54,8 @@ pub struct Profile {
     pub token_hash: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub account: Option<super::accounts::Account>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub garage: Option<super::garage::SavedGarage>,
     pub friends: BTreeSet<String>,
     #[serde(default)]
     pub progression: crate::alpha::progression::Progression,
@@ -261,6 +263,7 @@ impl SocialData {
                 name,
                 token_hash: super::security::token_hash(&token),
                 account: None,
+                garage: None,
                 friends: BTreeSet::new(),
                 progression: Default::default(),
                 active_character: None,

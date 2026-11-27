@@ -197,7 +197,7 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
                 input: input_rx,
                 input_tx: input_tx.clone(),
                 profile_id: None, staging_session: None,
-                world_id: None,
+                world_id: None, garage_departure: None,
                 team: Team::Blue,
             };
             if let Err(error) = server.register(player.clone(), connection).await {
@@ -357,7 +357,7 @@ pub async fn start_websocket_server(server: Arc<Server>, gate: Option<Arc<Stagin
                             .and_then(Value::as_str)
                             .unwrap_or_default();
                         let map = value.get("map").and_then(Value::as_str).unwrap_or_default();
-                        if let Err(message) = server.spawn(&player, map, vehicle).await {
+                        if let Err(message) = server.spawn_for_departure(&player, map, vehicle, value.get("garage_departure").and_then(Value::as_str)).await {
                             let _ = tx.send(
                                 json!({"type":"spawn_error","map":map,"message":message})
                                     .to_string(),

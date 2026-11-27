@@ -197,6 +197,10 @@ export function GameController() {
       const ui = useUIStore.getState();
       if (ui.screen === "main" && !ui.overlay && !ui.isModeLoading && !performanceOverlayHasFocus()) {
         const parking = useGarageParking.getState();
+        if (parking.departurePhase) {
+          if (edges[1]) parking.cancelDeparture();
+          return;
+        }
         if (parking.driving) {
           if (edges.some(Boolean)) reportMenuDevice("controller");
           if (parking.joining) return;
@@ -208,6 +212,10 @@ export function GameController() {
           const pedals = controllerDrive(trigger(pad.buttons[7]?.value), trigger(pad.buttons[6]?.value), 0, true);
           setParkingInput("controller", pedals.throttle, calibratedSteering(pad.axes[0], usePreferencesStore.getState()), pedals.brake);
           return;
+        }
+        if (edges[3] && menuArmed && !useTextKeyboardStore.getState().session) {
+          const undo = document.querySelector<HTMLElement>('[data-garage-undo] [role="button"]:not([aria-disabled="true"])');
+          if (undo) { reportMenuDevice("controller"); undo.click(); return; }
         }
         if (edges[2] && menuArmed && !useTextKeyboardStore.getState().session) {
           const button = document.querySelector<HTMLElement>('[data-garage-drive-start]:not([aria-disabled="true"])');

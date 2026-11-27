@@ -1,8 +1,15 @@
 import { Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 import { initialGaragePose } from "./garageParkingPhysics";
+import { garageFootprintsOverlap, garagePropFootprint, type GaragePropId, type GaragePropPose } from "./garageServiceLayout";
 
 export const garageParkingPose = initialGaragePose();
+
+export const garageParkingFootprint = { width: 2.03, length: 4.34, height: 1.24 };
+export function isGaragePropOnParkedCar(id: GaragePropId, pose: GaragePropPose) {
+  const car = garageParkingPose, size = garageParkingFootprint;
+  return garageFootprintsOverlap(car.x, car.z, car.yaw, size.width / 2, size.length / 2, garagePropFootprint(id, pose));
+}
 
 export function garageParkingCamera(): GarageEntryShot {
   const aim = new Vector3();

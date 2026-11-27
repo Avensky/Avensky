@@ -1,4 +1,5 @@
 import { useMotionView } from "../store/session/networkViews";
+import { useGarageParking } from "../game/preview/garageParkingStore";
 import { hubMode, interactInHub, jumpInHub, releaseHubMove, setHubMove } from "../game/hub/hubControls";
 import {requestTankBarrage} from "../combat/tankBarrage";
 import {useSocialStore} from '../store/social/socialStore';
@@ -107,6 +108,11 @@ export function Keyboard() {
       )
         return;
       const ui = useUIStore.getState();
+      if (ui.screen === "main" && useGarageParking.getState().departurePhase) {
+        if (event.code === "Escape") useGarageParking.getState().cancelDeparture();
+        if (!event.ctrlKey && !event.metaKey && !event.altKey) event.preventDefault();
+        return;
+      }
       if (event.code === "KeyF" && ui.screen === "main" && !ui.overlay && !ui.isModeLoading &&
           !performanceOverlayHasFocus() && !event.altKey && !event.metaKey && !event.ctrlKey) {
         const drive = document.querySelector<HTMLElement>('[data-garage-drive-start]:not([aria-disabled="true"])');

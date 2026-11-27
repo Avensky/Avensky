@@ -9,6 +9,7 @@ import { useInputStore } from "./store/input/inputStore";
 import "./App.css";
 import { OnScreenKeyboard } from "./components/text/OnScreenKeyboard";
 import { useUIStore } from "./store/menus/uiStore";
+import { useGarageParking } from "./game/preview/garageParkingStore";
 import { GarageMenuBackdrop } from "./game/welcome/GarageMenuBackdrop";
 import { RosterGaragePreview, type GarageCharacterSelection } from "./game/preview/RosterGaragePreview";
 import { selectMainGarageCharacter, useSocialStore } from "./store/social/socialStore";
@@ -21,8 +22,9 @@ export default function App() {
   const mobilePortrait = useMobilePortrait();
   const screen = useUIStore(state => state.screen);
   const welcome = screen === "welcome";
+  const holdingGarage = useGarageParking(state => state.committingDeparture) && screen === "sandbox";
   const [welcomeCharacter, setWelcomeCharacter] = useState<GarageCharacterSelection | null>();
-  const equipped = useSocialStore(state => screen === "main" ||
+  const equipped = useSocialStore(state => screen === "main" || holdingGarage ||
     (welcome && state.view && !state.entryIssue && (state.stagingSignIn || state.registeredProfile))
     ? selectMainGarageCharacter(state) : null);
   // A returning roster can keep the equipped rig until it publishes its own selection.
@@ -30,15 +32,20 @@ export default function App() {
     ? welcomeCharacter : equipped && { choice: equipped, mode: welcome ? "roster" : "main" };
   const showGarageBackdrop = useUIStore(state =>
     state.isModeLoading || state.overlay === "team_lineup" || (state.screen !== "sandbox" && state.screen !== "world_builder"));
-  const rotate = mobilePortrait && !welcome && screen !== "main";
+  const rotate = mobilePortrait && !welcome && screen !== "main" && !holdingGarage;
   useAppTheme();
 
   useEffect(() => {
-    if (rotate) {
+    if (rotate || holdingGarage) {
       useInputStore.getState().releaseControls();
       releaseWeaponSource("pointer");
     }
-  }, [rotate]);
+  }, [rotate, holdingGarage]);
+
+  useEffect(() => useUIStore.subscribe((next, previous) => {
+    if (previous.screen === "sandbox" && next.screen !== "sandbox" && useGarageParking.getState().committingDeparture)
+      useGarageParking.getState().completeDeparture();
+  }), []);
 
   // The shared backdrop adopts the startup room before this cover is removed.
   useEffect(() => {
@@ -65,8 +72,8 @@ export default function App() {
   return (
     <div className="canvas-container">
       <div className="game-viewport" inert={rotate}>
-        <GarageMenuBackdrop visible={showGarageBackdrop} />
-        {(garageCharacter || screen === "main") && <RosterGaragePreview {...(garageCharacter ?? { mode: "main" })} />}
+        <GarageMenuBackdrop visible={holdingGarage || showGarageBackdrop} hold={holdingGarage} />
+        {(garageCharacter || screen === "main" || holdingGarage) && <RosterGaragePreview {...(garageCharacter ?? { mode: "main" })} />}
         {welcome ? <WelcomeScreen onGarageCharacter={setWelcomeCharacter} /> : <Suspense fallback={null}><GameUI /></Suspense>}
         {!rotate && <OnScreenKeyboard />}
       </div>
@@ -79,7 +86,7 @@ export default function App() {
           <h1>Rotate to play</h1>
           <p>Turn your device sideways for the widescreen view.</p>
         </div>
-      ) : <><Keyboard /><GameController /></>}
+      ) : !holdingGarage && <><Keyboard /><GameController /></>}
     </div>
   );
 }

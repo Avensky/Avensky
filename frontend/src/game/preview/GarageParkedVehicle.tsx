@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
-import { useThree } from "@react-three/fiber";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Box3, Color, Group, Material, Mesh, MeshStandardMaterial, Vector3 } from "three";
 import { assetAvailable } from "../../assets/runtimeAssets";
 import { vehicleLodUrl } from "../../vehicles/assetCatalog";
@@ -9,6 +9,10 @@ import { garagePaintedFinish } from "./garagePaintedFinish";
 import { useGarageParkingVehicle } from "./garageParkingVehicle";
 import { applyPaintFinish } from "./garageVehiclePaint";
 import { PreviewContactShadow } from "./PreviewContactShadow";
+
+import { boardingCar, boardingDoor, parkedDriverStation } from "./garageBoarding";
+import { installFleetDoor } from "./garageFleetDoor";
+import { useGarageParking } from "./garageParkingStore";
 
 export type GarageCarFootprint = { width: number; length: number; height: number };
 
@@ -25,9 +29,18 @@ function exteriorPlacement(scene: Group) {
  * from parking to departure. A decoded fleet seed is available before the first request. */
 export function GarageParkedVehicle({ onFootprint }: { onFootprint?: (size: GarageCarFootprint) => void }) {
   const { model } = useGarageParkingVehicle();
+  const departure = useGarageParking(s => s.departurePhase);
+  const boarding = departure === "boarding";
+  const door = useRef<ReturnType<typeof installFleetDoor> | null>(null);
   const appearance = useHeroLoadouts(state => state.loadouts[model]) ?? FACTORY_APPEARANCE;
   const currentArt = useCallback(() => fleetArt(model, "medium"), [model]);
-  const art = useSyncExternalStore(subscribeFleetArt, currentArt, currentArt);
+  const liveArt = useSyncExternalStore(subscribeFleetArt, currentArt, currentArt);
+  const [entryArt, setEntryArt] = useState<{ model: typeof model; art: NonNullable<typeof liveArt> } | null>(null);
+  // A medium LOD that arrives while the driver has one foot inside must not move
+  // the hinge or seat. The warmer mesh remains cached for the next garage view.
+  if (departure && liveArt && entryArt?.model !== model) setEntryArt({ model, art: liveArt });
+  else if (!departure && entryArt) setEntryArt(null);
+  const art = departure && entryArt?.model === model ? entryArt.art : liveArt;
   const invalidate = useThree(state => state.invalidate);
   const host = useRef<Group>(null);
   const finishes = useRef<Array<{ material: MeshStandardMaterial; factory: Color }>>([]);
@@ -80,7 +93,23 @@ export function GarageParkedVehicle({ onFootprint }: { onFootprint?: (size: Gara
   }, [art, appearance, invalidate]);
 
   useLayoutEffect(() => {
-    if (placement) onFootprint?.(placement.footprint);
+    const exterior = host.current?.children[0], car = host.current?.parent;
+    if (!boarding || !placement || !exterior || !(car instanceof Group)) return;
+    const station = parkedDriverStation(model, placement.footprint);
+    const rig = installFleetDoor(car, exterior, station.seat, placement.footprint, model === "timecar");
+    door.current = rig;
+    rig.set(boardingDoor.opening);
+    invalidate();
+    return () => { rig.dispose(); door.current = null; invalidate(); };
+  }, [art, model, placement, boarding, invalidate]);
+
+  useFrame(() => { door.current?.set(boardingDoor.opening); }, -.7);
+
+  useLayoutEffect(() => {
+    if (placement) {
+      Object.assign(boardingCar, placement.footprint);
+      onFootprint?.(placement.footprint);
+    }
   }, [onFootprint, placement]);
 
   if (!placement || !art) return null;
