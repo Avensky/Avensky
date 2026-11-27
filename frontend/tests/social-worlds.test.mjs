@@ -296,9 +296,15 @@ test("social requests, world transitions and assisted text have independent owne
         reply(before);
         await assert.rejects(unconfirmed, /did not confirm/);
         assert.equal(social.getState().view.profile, before);
+        const staleReply = remove();
+        reply({ ...after, progression: { cosmetics_revision: 3 } });
+        await assert.rejects(staleReply, /current roster still contains/);
+        assert.equal(social.getState().view.profile, before);
         const retried = remove();
+        const newerSnapshot = { ...after, progression: { cosmetics_revision: 6 } };
+        social.getState().receive({ ...view, profile: newerSnapshot });
         reply(after);
-        assert.equal(await retried, after);
+        assert.equal(await retried, newerSnapshot, "the newer roster already confirms deletion");
         social.getState().receive({ ...view, profile: before });
         assert.deepEqual(social.getState().view.profile.characters, [active], "a delayed snapshot cannot restore the deleted inactive slot");
 

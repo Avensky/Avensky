@@ -143,7 +143,12 @@ export async function deleteRosterCharacter(owner: string, characterId: string, 
       : !saved.characters.some(character => character.id === saved.active_character_id)))
     throw new Error("The server did not confirm the character deletion.");
   state.acknowledgeCharacter(saved);
-  return saved;
+  const current = useSocialStore.getState().view?.profile;
+  if (generation !== connectionGeneration || current?.id !== owner || !current.characters)
+    throw new Error("Your profile changed. Check your current roster.");
+  if (current.characters.some(character => character.id === characterId))
+    throw new Error("The current roster still contains this character. Check the name and try again.");
+  return current;
 }
 
 type AccountCredentials = { login: string; password: string };

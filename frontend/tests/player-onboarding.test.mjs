@@ -515,12 +515,13 @@ test("the creator preserves an eight-step appearance through registration, name 
       assert.deepEqual([request.action, request.character_id, request.confirmation_name],
         ["character_delete", saved.characters[0].id, "Track Fox II"]);
       assert.equal(sent.length, count + 1);
-      await act(async () => reply(request, {profile:view.profile}));
-      assert.equal(button("Manage Track Fox II"), undefined);
+      await act(async () => reply(request, {profile:{...view.profile, progression:{...view.profile.progression, cosmetics_revision:2}}}));
+      assert.ok(!button("Manage Track Fox II"), "the deleted slot leaves the roster");
       assert.ok(document.activeElement === button("Create character"), "deleting the final slot focuses Create");
-      assert.equal(document.querySelector(".garage-orbit-surface"), actor);
+      assert.ok(document.querySelector(".garage-orbit-surface") === actor, "management retains the room interaction surface");
     }
     await act(async () => client.receiveSocialState({...view, profile:{...saved,
+      progression:{...saved.progression, cosmetics_revision:3},
       characters:Array.from({length:4},(_,i)=>({...saved.characters[0], id:i===0?saved.active_character_id:"slot"+i}))}}));
     assert.equal(button("Create character"),undefined,"a full registered account has four real slots");
     assert.equal(button("World Editor"), undefined, "a full roster offers character selection only");
