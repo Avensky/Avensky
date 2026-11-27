@@ -1,0 +1,14 @@
+{
+  "/models/world/garage-evaluation/cabinet.glb": {
+    "sha256": "e64a86338d914a3beac02d27b6ba45620dca973515fa4dceba45a3fc81b1bc21",
+    "size": 213040
+  },
+  "/models/world/garage-evaluation/car-jack.glb": {
+    "sha256": "e724d5ff48ce90e8cfe0869f55e3f0bfaedfe025372c15ea1586d7740c03fc5e",
+    "size": 148912
+  },
+  "/models/world/garage-evaluation/engine-crane.glb": {
+    "sha256": "5cd468b8bc06c6e654e2d30b2c3ca594dff40f35d9a3f340db56ac9fa1f7094a",
+    "size": 290548
+  }
+}

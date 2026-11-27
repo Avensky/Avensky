@@ -63,9 +63,13 @@ test("the shared garage mounts its workshop furnishings only while the main menu
     const containsFurnishings = element => isValidElement(element) && (element.type === GarageMenuFurnishings ||
       Children.toArray(element.props.children).some(containsFurnishings));
     root = createRoot(document.getElementById("root"));
-    for (const mode of ["roster", "main", "profile", "create", "main", "roster"]) {
+    let visitedMain = false;
+    for (const mode of ["roster", "create", "main", "profile", "main", "roster"]) {
       await act(() => root.render(createElement(RosterGaragePreview, { mode })));
-      assert.equal(containsFurnishings(globalThis.__avenskyGarage.preview.contents), mode === "main", mode);
+      const runtime = globalThis.__avenskyGarage;
+      visitedMain ||= mode === "main";
+      assert.equal(containsFurnishings(runtime.preview.contents), mode === "main", mode);
+      assert.equal(Boolean(runtime.detailedBayDoors), visitedMain, "door detail stays mounted after first main-menu visit");
     }
   } finally {
     if (root) await act(() => root.unmount());

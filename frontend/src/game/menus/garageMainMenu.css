@@ -23,20 +23,15 @@
   pointer-events: none;
 }
 .garage-station-anchor {
-  --marker-half-width: clamp(44px, 5.5vw, 88px);
-  --marker-mid-y: clamp(calc(env(safe-area-inset-top, 0px) + var(--menu-angled-header-height) + 27px),
-    var(--station-y, var(--rest-y)), calc(100% - var(--garage-bottom) - 74px));
   position: absolute;
-  left: clamp(calc(var(--garage-left) + var(--marker-half-width) * .45), var(--station-x, var(--rest-x)),
-    calc(100% - var(--garage-right) - var(--marker-half-width) * 1.7));
-  top: var(--marker-mid-y);
-  /* Put the end of the leader on the projected point. */
-  transform: translate(calc(-20% + 10px), calc(-100% - 9px));
+  left: var(--station-x, var(--rest-x));
+  top: var(--station-y, var(--rest-y));
+  transform: translate(-50%, -100%);
 }
-.garage-station-anchor[data-station-anchor="enter_world"] { --rest-x: 30%; --rest-y: 51%; }
-.garage-station-anchor[data-station-anchor="wardrobe"] { --rest-x: 54%; --rest-y: 46%; }
-.garage-station-anchor[data-station-anchor="vehicle"] { --rest-x: 18%; --rest-y: 62%; }
-.garage-station-anchor[data-station-anchor="world_editor"] { --rest-x: 72%; --rest-y: 60%; }
+.garage-station-anchor[data-station-anchor="enter_world"] { --rest-x: 24%; --rest-y: 46%; }
+.garage-station-anchor[data-station-anchor="wardrobe"] { --rest-x: 63%; --rest-y: 46%; }
+.garage-station-anchor[data-station-anchor="vehicle"] { --rest-x: 22%; --rest-y: 72%; }
+.garage-station-anchor[data-station-anchor="world_editor"] { --rest-x: 72%; --rest-y: 72%; }
 .garage-station-button {
   --frame-line-color: color-mix(in srgb, var(--garage-menu-accent) 60%, transparent);
   --frame-line-width: 1px;
@@ -97,37 +92,24 @@
 }
 .garage-station-anchor::before {
   width: 1px;
-  height: 17px;
-  left: 20%;
-  top: calc(100% - 4px);
-  transform-origin: top;
-  transform: rotate(38deg);
+  height: 10px;
+  left: 50%;
+  top: 100%;
 }
 .garage-station-anchor::after {
   width: 6px;
   height: 6px;
-  left: calc(20% - 13px);
-  top: calc(100% + 6px);
+  left: calc(50% - 2.5px);
+  top: calc(100% + 7px);
   border-radius: 50%;
 }
-@media (orientation: landscape) {
-  /* Keep the doorway label on the far side of its pin, away from the actor. */
-  .garage-station-anchor[data-station-anchor="enter_world"] {
-    --entry-pin-x: var(--station-x, 30vw);
-    left: 0;
-    width: 100%;
-    transform: translateY(calc(-100% - 9px));
+.garage-station-anchor[data-docked="true"]::before,
+.garage-station-anchor[data-docked="true"]::after { content: none; }
+@media (orientation: landscape) and (min-width: 641px) {
+  .garage-menu-markers {
+    inset: calc(env(safe-area-inset-top, 0px) + var(--menu-angled-header-height) + 8px)
+      var(--garage-right) calc(var(--garage-bottom) + 49px) var(--garage-left);
   }
-  [data-station-anchor="enter_world"] .garage-station-button {
-    width: max-content;
-    left: min(var(--entry-pin-x), calc(100% - var(--garage-right)));
-    transform: translateX(max(-100%, calc(var(--garage-left) - var(--entry-pin-x))));
-  }
-  .garage-station-anchor[data-station-anchor="enter_world"]::before {
-    left: calc(var(--entry-pin-x) - 10px);
-    transform: rotate(-38deg);
-  }
-  .garage-station-anchor[data-station-anchor="enter_world"]::after { left: calc(var(--entry-pin-x) - 3px); }
 }
 .garage-menu-stations .garage-station-button[data-selected="true"] {
   --frame-line-color: var(--garage-menu-accent);
@@ -176,7 +158,7 @@
   background: var(--garage-menu-panel);
   pointer-events: none;
 }
-@media (orientation: portrait) {
+@media (orientation: portrait), (max-width: 640px) {
   /* In a narrow field of view some stations are off camera. Keep all four
      destinations reachable, in the same two rows used by directional input. */
   .garage-menu-stations {

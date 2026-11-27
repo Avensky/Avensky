@@ -3,6 +3,32 @@ import assert from 'node:assert/strict';
 import { Box3, BoxGeometry, Group, Matrix4, Mesh, MeshStandardMaterial, Vector3 } from 'three';
 import { prepareGarageDisplay } from '../src/game/preview/prepareGarageDisplay.ts';
 import { completeGarageStructure } from '../src/game/preview/completeGarageStructure.ts';
+import { GARAGE_BAY_DOORS, GARAGE_PERSONNEL_DOORS } from '../src/game/preview/garageDoorLayout.ts';
+import { GARAGE_MENU_LANDMARKS } from '../src/game/preview/garageMenuLandmarks.ts';
+
+test('three vehicle bays and two separate walk-outs line the wall opposite 0999', () => {
+  const bays = [...GARAGE_BAY_DOORS].sort((a, b) => a.position[0] - b.position[0]);
+  const exits = [...GARAGE_PERSONNEL_DOORS].sort((a, b) => a.position[0] - b.position[0]);
+  assert.equal(bays.length, 3);
+  assert.equal(exits.length, 2);
+  const sequence = [exits[0], ...bays, exits[1]];
+  // Measured in the authored GLB: the 0999 wall is at negative Z, and the
+  // usable part of its opposite wall runs from x=-6.61 to 8.50 at z=8.75.
+  let previousEdge = -6.61;
+  for (const placement of sequence) {
+    const [x, y, z] = placement.position;
+    const outerWidth = bays.includes(placement) ? (placement.width ?? 2.60) + .24 : 1.12;
+    assert.ok(Math.abs(z - 8.75) < .20 && Math.abs(y) < .03, 'the threshold meets the floor at the wall');
+    assert.ok(Math.cos(placement.yaw) < -.99, 'doors face back towards the 0999 sign');
+    assert.ok(x - outerWidth / 2 > previousEdge, 'each opening and its jambs clear the preceding door');
+    previousEdge = x + outerWidth / 2;
+  }
+  assert.ok(previousEdge < 8.50);
+  const [markerX, markerY, markerZ] = GARAGE_MENU_LANDMARKS.enter_world;
+  const centerBay = bays[1];
+  assert.ok(Math.abs(markerX - centerBay.position[0]) < .05 && Math.abs(markerZ - centerBay.position[2]) < .50);
+  assert.ok(markerY > 0 && markerY < (centerBay.height ?? 2.967), 'Enter World marks the middle opening');
+});
 
 test('ceiling repeats preserve source geometry and placement while the incorrect wall racks stay hidden', () => {
   const source = new Group(), material = new MeshStandardMaterial({ name: 'BARR LTTRl' });
