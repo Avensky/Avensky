@@ -1,0 +1,162 @@
+{
+  "asset": {
+    "generator": "Khronos glTF Blender I/O v4.3.47",
+    "version": "2.0",
+    "copyright": "Garage Door by FrodoUndead. CC BY 4.0.",
+    "extras": {
+      "title": "Garage Door",
+      "author": "FrodoUndead",
+      "source": "https://sketchfab.com/3d-models/garage-door-d5c417514e834a04b27b1a013d86a805",
+      "license": "https://creativecommons.org/licenses/by/4.0/",
+      "changes": "Reoriented and resized the shutter, packed its surface details, and resized and compressed the original textures."
+    }
+  },
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "extras": {
+        "license": "CC BY 4.0",
+        "source": "Garage Door by FrodoUndead — https://sketchfab.com/3d-models/garage-door-d5c417514e834a04b27b1a013d86a805"
+      },
+      "mesh": 0,
+      "name": "Harbor roll-up shutter"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "Weathered galvanized steel",
+      "normalTexture": {
+        "index": 0,
+        "scale": 0.7200000286102295
+      },
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 1
+        },
+        "metallicFactor": 0.41999998688697815,
+        "roughnessFactor": 0.6899999976158142
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cylinder.002",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0
+        }
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    },
+    {
+      "sampler": 0,
+      "source": 1
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "name": "door-normal",
+      "uri": "map-75283ed2f640.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "name": "door-finish",
+      "uri": "map-97a728220d67.jpg"
+    }
+  ],
+  "accessors": [
+    {
+      "bufferView": 0,
+      "componentType": 5126,
+      "count": 584,
+      "max": [
+        1.2998875379562378,
+        2.966874122619629,
+        -0.00011334662849549204
+      ],
+      "min": [
+        -1.2998875379562378,
+        -1.5655075458198553e-06,
+        -0.04256158694624901
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 584,
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 584,
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 3,
+      "componentType": 5123,
+      "count": 1056,
+      "type": "SCALAR"
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 7008,
+      "byteOffset": 0,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 7008,
+      "byteOffset": 7008,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4672,
+      "byteOffset": 14016,
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 2112,
+      "byteOffset": 18688,
+      "target": 34963
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "geometry-de2da113ebeb.bin",
+      "byteLength": 20800
+    }
+  ]
+}

@@ -1,0 +1,185 @@
+{
+  "asset": {
+    "generator": "glTF-Transform v4.3.0",
+    "version": "2.0",
+    "copyright": "Metal Tool Chest by John Hutcheson (model and textures), Yann Kervran (rigging). CC0 1.0.",
+    "extras": {
+      "title": "Metal Tool Chest",
+      "author": "John Hutcheson (model and textures), Yann Kervran (rigging)",
+      "source": "https://polyhaven.com/a/metal_tool_chest",
+      "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "changes": "Baked a static open-lid pose, normalized orientation and scale, reduced geometry and compressed and packed the original surface maps."
+    }
+  },
+  "extras": {
+    "source": "https://polyhaven.com/a/metal_tool_chest",
+    "license": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "author": "John Hutcheson, Yann Kervran",
+    "modifications": "Static baked pose, reduced geometry, textures resized and packed for Avensky."
+  },
+  "accessors": [
+    {
+      "type": "SCALAR",
+      "componentType": 5123,
+      "count": 18036,
+      "bufferView": 0,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5122,
+      "count": 5710,
+      "max": [
+        32767,
+        31163,
+        19466
+      ],
+      "min": [
+        -32767,
+        -31163,
+        -19466
+      ],
+      "normalized": true,
+      "bufferView": 1,
+      "byteOffset": 0
+    },
+    {
+      "type": "VEC3",
+      "componentType": 5120,
+      "count": 5710,
+      "normalized": true,
+      "bufferView": 1,
+      "byteOffset": 8
+    },
+    {
+      "type": "VEC2",
+      "componentType": 5123,
+      "count": 5710,
+      "normalized": true,
+      "bufferView": 1,
+      "byteOffset": 12
+    }
+  ],
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteOffset": 0,
+      "byteLength": 36072,
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteOffset": 36072,
+      "byteLength": 91360,
+      "byteStride": 16,
+      "target": 34962
+    }
+  ],
+  "samplers": [
+    {
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "textures": [
+    {
+      "source": 1,
+      "sampler": 0
+    },
+    {
+      "source": 2,
+      "sampler": 0
+    },
+    {
+      "source": 0,
+      "sampler": 0
+    }
+  ],
+  "images": [
+    {
+      "mimeType": "image/jpeg",
+      "uri": "map-cb27e9a1411e.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "uri": "map-38218d81a4bf.jpg"
+    },
+    {
+      "mimeType": "image/jpeg",
+      "uri": "map-9274739c262d.jpg"
+    }
+  ],
+  "buffers": [
+    {
+      "uri": "geometry-188eaa04a752.bin",
+      "byteLength": 127432
+    }
+  ],
+  "materials": [
+    {
+      "name": "tool-chest-enamel",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicRoughnessTexture": {
+          "index": 2
+        }
+      },
+      "normalTexture": {
+        "index": 1
+      },
+      "occlusionTexture": {
+        "index": 2
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "Cube.031",
+      "primitives": [
+        {
+          "attributes": {
+            "POSITION": 1,
+            "NORMAL": 2,
+            "TEXCOORD_0": 3
+          },
+          "mode": 4,
+          "material": 0,
+          "indices": 0
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "name": "tool-chest",
+      "translation": [
+        1.4901161193847656e-08,
+        0.32591769268960746,
+        7.450580596923828e-09
+      ],
+      "scale": [
+        0.3426942378282547,
+        0.3426942378282547,
+        0.3426942378282547
+      ],
+      "mesh": 0
+    }
+  ],
+  "scenes": [
+    {
+      "name": "Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "scene": 0,
+  "extensionsUsed": [
+    "KHR_mesh_quantization"
+  ],
+  "extensionsRequired": [
+    "KHR_mesh_quantization"
+  ]
+}

@@ -1,14 +1,16 @@
-import { useLayoutEffect } from "react";
+import { Suspense, useLayoutEffect, useRef } from "react";
 import { useThree } from "@react-three/fiber";
 import {
-  BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Matrix4, MeshBasicMaterial,
-  MeshStandardMaterial, Object3D, PlaneGeometry, TorusGeometry, type BufferGeometry, type Material,
+  BoxGeometry, Color, CylinderGeometry, Group, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
+  MeshStandardMaterial, Object3D, PlaneGeometry, type BufferGeometry, type Material,
 } from "three";
 import { GARAGE_MENU_LANDMARKS } from "./garageMenuLandmarks";
 import { garageRoutePlan } from "./garageRoutePlan";
+import { useAssetGLTF } from "../../assets/useAssetGLTF";
+import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 
 type Triple = [number, number, number];
-type Finish = "steel" | "round" | "rubber" | "glass" | "light" | "shade" | "paper";
+type Finish = "steel" | "round" | "glass" | "light" | "shade" | "paper";
 type Part = { matrix: Matrix4; color: string };
 
 const iron = "#554f48", dark = "#343839", edge = "#8f8580", brass = "#ac8966";
@@ -19,7 +21,7 @@ const level: Triple = [0, 0, 0];
 function buildFurnishings() {
   const group = new Group();
   group.name = "garage-menu-furnishings";
-  const parts: Record<Finish, Part[]> = { steel: [], round: [], rubber: [], glass: [], light: [], shade: [], paper: [] };
+  const parts: Record<Finish, Part[]> = { steel: [], round: [], glass: [], light: [], shade: [], paper: [] };
   const station = new Object3D(), local = new Object3D();
   function place(anchor: readonly number[], yaw: number) {
     station.position.set(anchor[0], 0, anchor[2]);
@@ -36,16 +38,11 @@ function buildFurnishings() {
   const box = (color: string, x: number, y: number, z: number, w: number, h: number, d: number) =>
     part("steel", color, [x, y, z], [w, h, d]);
 
-  // Corrugated harbor shutter behind the original tube rack, with a wicket door.
+  // Door frame, backing and practical lamp stay visible while the shutter loads.
   place(GARAGE_MENU_LANDMARKS.enter_world, .40);
   box(dark, 0, 1.47, -.14, 2.68, 2.9, .14);
-  for (let i = 0; i < 20; i++) box(i % 2 ? "#88837a" : "#9b9486", 0, .20 + i * .137, -.04, 2.53, .116, .055);
   for (const x of [-1.35, 1.35]) box(edge, x, 1.48, -.02, .12, 2.96, .2);
   box(iron, 0, 2.96, -.04, 2.86, .21, .21);
-  box("#666d66", .53, 1.03, .03, .88, 2.05, .08);
-  box(edge, .53, 1.55, .09, .69, .65, .025);
-  part("glass", "#b9cabf", [.53, 1.55, .11], [.58, .55, .018]);
-  box(brass, .52, .95, .12, .62, .047, .052);
   part("light", "#ffe3b5", [0, 2.84, .09], [.06, 1.47, .06], [0, 0, Math.PI / 2]);
 
   // Vented steel lockers, hardware, a standing mirror and slatted changing bench.
@@ -69,22 +66,15 @@ function buildFurnishings() {
   for (const x of [.14, .97]) box(iron, x, .225, .46, .076, .43, .32);
   for (const z of [.31, .44, .57]) box(timber, .56, .47, z, 1.19, .064, .108);
 
-  // Low cart with wheels, drawers, a ratchet and a pair of upright service tyres.
-  place(GARAGE_MENU_LANDMARKS.vehicle, .6);
-  box(dark, 0, .48, -.07, .91, .66, .49);
-  for (const x of [-.35, .35]) {
-    for (const z of [-.22, .09]) part("round", dark, [x, .105, z], [.142, .059, .142], [0, 0, Math.PI / 2]);
+  // A low rolling stand supports the portable donor chest, which has no wheels.
+  place(GARAGE_MENU_LANDMARKS.vehicle, .60);
+  for (const x of [-.34, .34]) {
+    for (const z of [-.20, .08]) {
+      part("round", dark, [x, .087, z], [.14, .06, .14], [0, 0, Math.PI / 2]);
+      box(iron, x, .155, z, .07, .13, .07);
+    }
   }
-  for (let i = 0; i < 4; i++) {
-    const y = .29 + i * .134;
-    box("#965039", 0, y, .19, .84, .117, .036);
-    box(edge, 0, y + .036, .214, .71, .018, .025);
-  }
-  box(iron, 0, .835, -.065, .99, .06, .56);
-  box(brass, -.17, .878, -.062, .31, .028, .038);
-  for (const x of [-.67, -.84]) {
-    part("rubber", "#56534d", [x, .328, -.09], [.50, .50, .50], [0, 1.04, .12]);
-  }
+  box(iron, 0, .22, -.06, .88, .07, .52);
 
   // Drafting desk, weighted paper, plan rack, swing-arm lamp and workshop stool.
   place(GARAGE_MENU_LANDMARKS.world_editor, .57);
@@ -167,12 +157,10 @@ function buildFurnishings() {
       totalEmissiveRadiance += glassBase + vec3(.48,.32,.15)*rack*stripEnds + haze;
     `);
   };
-  const tire = new MeshStandardMaterial({ roughness: .91, emissive: "#090807" });
   const printed = new MeshBasicMaterial({ map, color: "#d4c7ac" });
   const luminous = new MeshBasicMaterial();
   const cube = new BoxGeometry();
   const tube = new CylinderGeometry(.5, .5, 1, 16);
-  const wheel = new TorusGeometry(.49, .147, 8, 24);
   const shade = new CylinderGeometry(.18, .5, 1, 16, 1, true);
   const paper = new PlaneGeometry();
   const meshes: InstancedMesh[] = [];
@@ -191,7 +179,6 @@ function buildFurnishings() {
   }
   batch("steel", cube, painted);
   batch("round", tube, painted);
-  batch("rubber", wheel, tire);
   batch("shade", shade, painted);
   batch("glass", cube, surface);
   batch("light", tube, luminous);
@@ -200,11 +187,50 @@ function buildFurnishings() {
     group,
     dispose() {
       for (const mesh of meshes) mesh.dispose();
-      for (const geometry of [cube, tube, wheel, shade, paper]) geometry.dispose();
-      for (const material of [painted, surface, tire, printed, luminous]) material.dispose();
+      for (const geometry of [cube, tube, shade, paper]) geometry.dispose();
+      for (const material of [painted, surface, printed, luminous]) material.dispose();
       map.dispose();
     },
   };
+}
+
+type WorkshopProp = "garage-door" | "metal-tool-chest" | "service-tire" | "metal-shelf";
+
+function WorkshopModel({ name }: { name: WorkshopProp }) {
+  const { scene } = useAssetGLTF(`/open-art/garage/${name}/${name}.gltf`);
+  const host = useRef<Group>(null);
+  const invalidate = useThree(state => state.invalidate);
+  useLayoutEffect(() => {
+    // These metals need the same workshop bounce as the painted fixtures. Tint their
+    // original base map so scratches and tread remain visible in the unlit recesses.
+    const object = scene.clone();
+    const materials: MeshStandardMaterial[] = [];
+    object.traverse(child => {
+      if (!(child instanceof Mesh) || !(child.material instanceof MeshStandardMaterial)) return;
+      const finish = child.material.clone();
+      finish.emissiveMap = finish.map;
+      finish.emissive.setRGB(.46, .39, .31);
+      child.material = finish;
+      materials.push(finish);
+    });
+    host.current?.add(object);
+    invalidate();
+    return () => {
+      object.removeFromParent();
+      for (const material of materials) material.dispose();
+    };
+  }, [scene, invalidate]);
+  return <group ref={host} />;
+}
+
+function WorkshopPropModel({ name, position, yaw = 0, scale = 1 }: {
+  name: WorkshopProp; position?: Triple; yaw?: number; scale?: number;
+}) {
+  return <group name={name} position={position} rotation-y={yaw} scale={scale}>
+    <AssetBoundary resetKey={name} fallback={null}>
+      <Suspense fallback={null}><WorkshopModel name={name} /></Suspense>
+    </AssetBoundary>
+  </group>;
 }
 
 export function GarageMenuFurnishings() {
@@ -220,5 +246,14 @@ export function GarageMenuFurnishings() {
       invalidate();
     };
   }, [scene, invalidate]);
-  return null;
+  const [doorX, , doorZ] = GARAGE_MENU_LANDMARKS.enter_world;
+  const [bayX, , bayZ] = GARAGE_MENU_LANDMARKS.vehicle;
+  return <>
+    <WorkshopPropModel name="garage-door" position={[doorX, 0, doorZ]} yaw={.40} />
+    <group position={[bayX, 0, bayZ]} rotation-y={.60}>
+      <WorkshopPropModel name="metal-tool-chest" position={[0, .255, -.06]} scale={1.12} />
+      <WorkshopPropModel name="service-tire" position={[-.70, 0, -.075]} yaw={.55} />
+    </group>
+    <WorkshopPropModel name="metal-shelf" position={[-3.66, 0, -3.75]} yaw={.40} />
+  </>;
 }
