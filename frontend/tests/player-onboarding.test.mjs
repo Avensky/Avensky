@@ -85,6 +85,10 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.ok(document.querySelector(".garage-entry-brand img"), "returning to sign-in restores the login badge");
     await act(async()=>button("Sign up").click());
     assert.equal(document.querySelector("select"),null);
+    const creatorBrand = document.querySelector(".creator-header .garage-entry-brand");
+    assert.equal(creatorBrand.getAttribute("aria-label"), "Back to character selection");
+    const creatorIdentity = [...creatorBrand.querySelectorAll(":scope > img, :scope > span")];
+    assert.equal(creatorIdentity.map(node => node.outerHTML).join(""), signInBrand, "creator Back uses the full shared wordmark");
     const steps = () => [...document.querySelectorAll('[aria-label="Character creation steps"] [role="tab"]')];
     const stepName = tab => (tab.getAttribute("aria-label") ?? tab.textContent).trim();
     const activeStep = () => stepName(steps().find(tab => tab.getAttribute("aria-selected") === "true"));
@@ -546,17 +550,32 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(headerActions.querySelector("button"),null);
     assert.equal(button("Profile").getAttribute("aria-pressed"),"false");
     const previousFetch = globalThis.fetch;
-    globalThis.fetch = async () => Response.json({ email: "tester@example.net", admin: false, hasMfa: true });
+    const accountReads = [];
+    globalThis.fetch = url => {
+      assert.equal(url, "/__alpha/session");
+      return new Promise(resolve => accountReads.push(resolve));
+    };
     try {
       await act(async () => button("Create character").focus());
       await act(async () => panelAction("up"));
       assert.equal(document.activeElement,button("Log out"));
       await act(async () => panelAction("right"));
       assert.equal(document.activeElement,button("Profile"));
-      await act(async () => {
-        panelAction("activate");
-        await vite.ssrLoadModule("/src/game/characters/GarageProfilePanel.tsx");
-      });
+      await act(async () => panelAction("activate"));
+      const pendingFeedback = () => document.querySelector('.garage-profile-title [role="status"]');
+      assert.match(pendingFeedback().textContent, /Loading account/);
+      assert.equal(button("Profile").getAttribute("aria-pressed"), "true");
+      await act(async () => document.querySelector('[data-profile-back]').click());
+      assert.ok(button("Create character"), "a cold account read cannot delay Back");
+      await act(async () => button("Profile").click());
+      assert.ok(pendingFeedback());
+      assert.equal(accountReads.length, 1, "a second tap reuses the same owner’s pending read");
+      await act(async () => accountReads[0](new Response(null, { status: 503 })));
+      assert.equal(pendingFeedback(), null);
+      await act(async () => button("Retry").click());
+      assert.ok(pendingFeedback(), "a failed read can be retried in place");
+      await act(async () => accountReads[1](Response.json({ email: "tester@example.net", admin: false, hasMfa: true })));
+      assert.equal(pendingFeedback(), null);
       assert.equal(document.querySelector(".garage-entry-header nav"),headerActions);
       const profileBack = document.querySelector(".garage-entry-header [data-profile-back]");
       assert.ok(profileBack, "the Profile screen puts Back in the left header");
@@ -585,9 +604,23 @@ test("the creator preserves an eight-step appearance through registration, name 
       assert.ok(button("Create character"));
       await act(async () => ui.getState().setScreen("welcome", "account"));
       assert.ok(document.querySelector('[aria-label="Account settings"]'));
+      assert.equal(accountReads.length, 2, "the same signed-in roster reopens with verified account rows immediately");
+      assert.equal(pendingFeedback(), null);
+      await act(async () => window.dispatchEvent(new window.Event("focus")));
+      assert.equal(accountReads.length, 3, "returning from authenticator setup checks the current account again");
       await act(async () => document.querySelector('[data-profile-back]').click());
       assert.equal(ui.getState().screen, "main");
       await act(async () => ui.getState().setScreen("welcome"));
+      // A fresh authenticated entry opens the roster, including after a main-menu return.
+      await act(async () => root.render(createElement(WelcomeScreen, { key: "authenticated-roster" })));
+      await act(async () => client.receiveSocialState({ ...view, profile: { ...view.profile, id: "second-owner" } }));
+      await act(async () => button("Profile").click());
+      assert.ok(pendingFeedback(), "an account switch starts with unverified rows");
+      await act(async () => accountReads[2](Response.json({ email: "former@owner.test", admin: true, hasMfa: true })));
+      assert.ok(pendingFeedback(), "an old response cannot fill the incoming owner’s Profile");
+      await act(async () => accountReads[3](Response.json({ email: "second@example.net", admin: false, hasMfa: false })));
+      assert.equal(document.querySelector('[data-profile-setting="invite"]').getAttribute("aria-disabled"), "true");
+      await act(async () => document.querySelector('[data-profile-back]').click());
     } finally { globalThis.fetch = previousFetch; }
     assert.equal(document.querySelector('button[aria-label="Back"]'), null);
     await act(async () => window.dispatchEvent(new CustomEvent("avenlab:panel-action", { detail: "back" })));

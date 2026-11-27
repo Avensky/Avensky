@@ -1,6 +1,7 @@
+import { MenuLoadingStatus } from "../../components/menus/MenuLoadingStatus";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GameButton } from "../../components/GameButton";
-import { alphaAction, alphaSession, type AlphaSession } from "../../net/stagingAccount";
+import { alphaAction, alphaSession, type AlphaSession, type RosterAccountSession } from "../../net/stagingAccount";
 import { useSocialStore } from "../../store/social/socialStore";
 import "./alphaAccountPanel.css";
 
@@ -12,10 +13,13 @@ const forms = {
   delete: { endpoint: "account/delete-request", submit: "Request profile deletion", fallback: "Deletion request submitted for review." },
 } as const;
 
-export function useAccountSettings() {
+export function useAccountSettings(accountSession?: RosterAccountSession) {
   const staging = useSocialStore(s => s.stagingSignIn);
   const owner = useSocialStore(s => s.view?.profile.id);
-  const [session, setSession] = useState<AlphaSession>();
+  const reader = staging && accountSession?.owner === owner ? accountSession : undefined;
+  const [session, setSession] = useState<AlphaSession | undefined>(() => reader?.peek());
+  const retryRead = useRef<() => void>(undefined);
+  const [reading, setReading] = useState(Boolean(staging && owner && !reader?.peek()));
   const [unavailable, setUnavailable] = useState("");
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<Feedback>();
@@ -25,19 +29,23 @@ export function useAccountSettings() {
   useEffect(() => {
     const token = ++generation.current;
     pending.current = false;
-    setSession(undefined);
+    setSession(reader?.peek());
     setUnavailable("");
+    setReading(false);
     setBusy(false);
     setFeedback(undefined);
     if (staging && owner) {
       let latestRead = 0;
       const load = () => {
         const read = ++latestRead;
-        void alphaSession().then(value => {
-          if (generation.current === token && latestRead === read) { setSession(value); setUnavailable(""); }
+        setReading(!reader?.peek());
+        setUnavailable("");
+        void (reader ? reader.read() : alphaSession()).then(value => {
+          if (generation.current === token && latestRead === read) { setSession(value); setReading(false); }
         }).catch(error => {
           if (generation.current === token && latestRead === read) {
             setSession(undefined);
+            setReading(false);
             setUnavailable(error instanceof Error ? error.message : "Account service unavailable.");
           }
         });
@@ -45,11 +53,13 @@ export function useAccountSettings() {
       load();
       // The authenticator setup lives in the existing secure account portal.
       // Read the confirmed factor and permissions when the player returns.
-      window.addEventListener("focus", load);
-      return () => { generation.current++; window.removeEventListener("focus", load); };
+      const refresh = () => { reader?.expire(); load(); };
+      retryRead.current = refresh;
+      window.addEventListener("focus", refresh);
+      return () => { generation.current++; retryRead.current = undefined; window.removeEventListener("focus", refresh); };
     }
     return () => { generation.current++; };
-  }, [staging, owner]);
+  }, [staging, owner, reader]);
 
   async function run(task: () => Promise<Feedback | void>) {
     if (pending.current) return;
@@ -66,7 +76,7 @@ export function useAccountSettings() {
       if (generation.current === token) { pending.current = false; setBusy(false); }
     }
   }
-  return { staging, session: staging ? session : undefined, unavailable, busy, feedback, run, clearFeedback: () => setFeedback(undefined) };
+  return { staging, session: staging ? session : undefined, reading, unavailable, busy, feedback, run, retry: () => retryRead.current?.(), clearFeedback: () => setFeedback(undefined) };
 }
 type AccountSettings = ReturnType<typeof useAccountSettings>;
 
@@ -158,7 +168,7 @@ function InvitationLink({ url }: { url: string }) {
 }
 
 export function AccountFeedback({ settings }: { settings: AccountSettings }) {
-  if (settings.busy) return <p role="status" className="alpha-account-response">Sending request…</p>;
+  if (settings.busy) return <MenuLoadingStatus>Sending request…</MenuLoadingStatus>;
   const result = settings.feedback;
   if (!result) return null;
   return <>

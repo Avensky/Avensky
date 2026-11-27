@@ -16,16 +16,14 @@
 }
 .creator-controls { display: contents; }
 .welcome-creator header.creator-header.angled-tab-header {
-  --angled-header-height: var(--menu-angled-header-height);
   position: absolute; top: env(safe-area-inset-top, 0px); inset-inline: 0 env(safe-area-inset-right, 0px);
   display: grid; grid-template-columns: auto minmax(0,1fr);
   align-items: start; z-index: 3;
 }
 .creator-header .creator-back:focus + .creator-tab-scroll .angled-header-tab[aria-selected="true"] {
-  color: var(--app-text); background: var(--angled-tab-surface);
+  color: var(--app-text); --angled-tab-fill: var(--angled-tab-surface);
 }
 .creator-header .creator-tab-scroll { pointer-events: auto; justify-self: start; max-width: calc(100% + var(--angled-tab-cut)); }
-.creator-header .angled-header-tab { min-width: 44px; }
 .creator-footer .creator-continue {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   min-height: 44px; box-sizing: border-box; border: 0; background: transparent;

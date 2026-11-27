@@ -82,7 +82,8 @@ test("real App removes the startup cover and opens the latest main menu without 
     const rosterBack = main.querySelector('[aria-label="Back to character selection"]');
     assert.ok(rosterBack, "the branded header returns to the character roster");
     assert.ok(rosterBack.textContent.toLowerCase().includes("avensky") || rosterBack.querySelector("img, svg"));
-    const shortcuts = main.querySelector('nav[aria-label="Main menu shortcuts"]');
+    const shortcuts = main.querySelector('nav[aria-label="Garage shortcuts"]');
+    assert.ok(shortcuts, "the garage header exposes its shortcut tabs");
     for (const name of ["Career", "Social", "Settings"]) assert.ok(shortcuts.querySelector(`[aria-label="${name}"]`), name);
     assert.deepEqual(Array.from(main.querySelectorAll("[data-station-anchor]"), station => station.dataset.stationAnchor), [
       "enter_world", "wardrobe", "vehicle", "world_editor",

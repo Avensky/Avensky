@@ -9,7 +9,7 @@ function AngledTabEdge({ separatorBefore }: { separatorBefore?: boolean }) {
 
 /** Touch-first control with the same edge, active underline and palette as other angled scene tabs. */
 export function AngledGameTab({ children, selected, ...props }: ComponentPropsWithoutRef<typeof GameButton>) {
-  return <GameButton {...props} variant="custom" role="tab" className="angled-header-tab" selected={selected} aria-selected={selected}>
+  return <GameButton {...props} variant="custom" role="tab" className="angled-header-tab angled-game-tab" selected={selected} aria-selected={selected}>
     <span className="scene-header-tab-label">{children}</span><AngledTabEdge separatorBefore />
   </GameButton>;
 }

@@ -1,9 +1,9 @@
 import { GarageCredentialFields } from "./GarageCredentialFields";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
-import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { isTypingTarget, menuActionForKey, type MenuAction } from "../../controls/inputRouting";
-import { requestSocial, selectAccount, signOutPlayerProfile } from "../../net/socialClient";
+import { requestSocial, selectAccount, signOutPlayerProfile, socialConnectionGeneration } from "../../net/socialClient";
 import { useUIStore } from "../../store/menus/uiStore";
 import { savedCharacterAppearance, useSocialStore, type PlayerProfile } from "../../store/social/socialStore";
 import { formatCharacterName } from "../characters/characterName";
@@ -17,8 +17,9 @@ import type { GarageCharacterSelection } from "../preview/RosterGaragePreview";
 import { openFieldKeyboard } from "../../components/text/openFieldKeyboard";
 import { navigateFormRows } from "../social/formRows";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
+import { createRosterAccountSession } from "../../net/stagingAccount";
 import { GarageEntryHeader } from "./GarageEntryHeader";
-import type { GarageProfileHandle } from "../characters/GarageProfilePanel";
+import { GarageProfilePanel, type GarageProfileHandle } from "../characters/GarageProfilePanel";
 import { retryEntryConnection } from "../../net/rustSocket";
 import { returnToStagingSignIn, sessionEndNotices } from "../../net/stagingAccount";
 import { stagingAccountPortal } from "./config";
@@ -27,7 +28,6 @@ import "./welcomeScreen.css";
 
 type Step = "welcome" | "create" | "register" | "characters";
 type PendingAction = { kind: "submit" } | { kind: "logout"; player: PlayerProfile };
-const GarageProfilePanel = lazy(() => import("../characters/GarageProfilePanel").then(module => ({ default: module.GarageProfilePanel })));
 type Draft = { name: string; body: CharacterBody; style: string; character: CharacterChoice };
 const starterStyle = CHARACTER_STYLES[0].id;
 
@@ -149,6 +149,16 @@ export function WelcomeScreen({ onGarageCharacter }: {
     logoutReveal.current = undefined;
     reveal();
   }, [busy, sessionPending, screen]);
+  const accountOwner = stagingSignIn && signedIn ? profile?.id : undefined;
+  const accountGeneration = stagingSignIn ? socialConnectionGeneration() : undefined;
+  const accountSession = useMemo(() => accountOwner && accountGeneration !== undefined
+    ? createRosterAccountSession(accountOwner) : undefined, [accountOwner, accountGeneration]);
+  useEffect(() => {
+    if (!accountSession) return;
+    // Also expire while the roster is visible, e.g. returning from an MFA setup tab.
+    window.addEventListener("blur", accountSession.expire);
+    return () => window.removeEventListener("blur", accountSession.expire);
+  }, [accountSession]);
   const accountOpen = accountRoot && (showSettings || openedFromMenu);
   const managing = Boolean(managedSlot && !accountOpen);
   const previousManager = useRef<string | undefined>(undefined);
@@ -501,11 +511,9 @@ export function WelcomeScreen({ onGarageCharacter }: {
       <div className="welcome-scroll">
       <div className={screen === "welcome" ? "garage-entry-body" : "welcome-layout"} data-step={accountOpen ? "account" : screen} data-session-pending={sessionPending || undefined}>
       {(sessionPending || screen === "create" || screen === "characters") && <GarageOrbitSurface />}
-      {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : screen === "create" ? "welcome-creator" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label}>
+      {!sessionPending && <section className={accountOpen ? "welcome-profile" : screen === "welcome" ? "garage-entry-card" : screen === "create" ? "welcome-creator" : "welcome-panel"} aria-label={accountOpen ? "Profile" : label} inert={accountOpen && Boolean(leavingPlayer)}>
         {!accountOpen && screen === "register" && <h1>{label}</h1>}
-        {accountOpen ? <Suspense fallback={<p role="status">Loading profile…</p>}>
-          <GarageProfilePanel ref={profilePanel} key={player?.id} onBack={leaveProfile} />
-        </Suspense> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
+        {accountOpen ? <GarageProfilePanel ref={profilePanel} key={`${accountGeneration}:${player?.id}`} accountSession={accountSession} onBack={leaveProfile} /> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
           choice={creation.choice} facePreview={facePreview} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
           style={creation.style} onStyle={chooseStyle} onPreviewStyle={setPreviewStyle} onBody={chooseBody}
           name={name} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}

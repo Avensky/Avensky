@@ -1,3 +1,4 @@
+import { MenuLoadingStatus } from "../../components/menus/MenuLoadingStatus";
 import { useId, useState, type ReactNode } from "react";
 import { selectActiveCharacterName, useSocialStore } from "../../store/social/socialStore";
 import { useUIStore } from "../../store/menus/uiStore";
@@ -76,7 +77,7 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
     {unavailable && <p role="status" className="alpha-account-hint">{unavailable}
       {" "}<a href="/__alpha/account" target="_blank" rel="noopener noreferrer">Open account portal</a>
     </p>}
-    {!session && !unavailable && isStaging && <p role="status">Loading account…</p>}
+    {!session && !unavailable && isStaging && <MenuLoadingStatus>Loading account…</MenuLoadingStatus>}
     {!isStaging && <p className="alpha-account-hint">Account tools are available to signed-in alpha testers.</p>}
     <AccountFeedback settings={settings} />
   </section>;

@@ -8,6 +8,7 @@
   color: var(--garage-menu-ink);
 }
 .garage-profile-panel::before { background: var(--garage-menu-line); }
+.garage-profile-title { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .25rem .8rem; }
 .garage-profile-heading {
   margin: 0 0 .2rem; color: inherit; font: inherit; font-size: clamp(1.2rem, 2.25vw, 2rem);
   line-height: 1.1; font-weight: 750;

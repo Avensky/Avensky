@@ -69,7 +69,7 @@
   --joined-action-fill: var(--angled-tab-surface, var(--app-panel));
   --joined-action-rule: 1px;
 }
-.joined-header-action:is(:focus-visible, [role="button"]:focus, [aria-current="page"], [aria-expanded="true"], [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) {
+.joined-header-action:is(:active, [data-pressing], :focus-visible, [role="button"]:focus, [aria-current="page"], [aria-expanded="true"], [aria-pressed="true"]):not(:disabled, [aria-disabled="true"]) {
   --joined-action-fill: var(--app-raised);
   --joined-action-rule: 2px;
 }

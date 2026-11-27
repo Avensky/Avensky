@@ -93,7 +93,8 @@
   border: 0;
   border-radius: 0;
   color: var(--app-text);
-  background: var(--angled-tab-surface);
+  --angled-tab-fill: var(--angled-tab-surface);
+  background: var(--angled-tab-fill);
   box-shadow: inset 0 var(--angled-edge-width) var(--angled-edge-color), inset 0 calc(-1 * var(--angled-edge-width)) var(--angled-edge-color);
   clip-path: polygon(var(--angled-tab-cut) 0, 100% 0, calc(100% - var(--angled-tab-cut)) 100%, 0 100%);
   font: inherit;
@@ -125,18 +126,38 @@
 .angled-header-tab[aria-selected="true"] {
   z-index: 2;
   color: var(--app-background);
-  background: var(--app-accent);
+  --angled-tab-fill: var(--app-accent);
 }
 .angled-header-tab:focus-visible:not([aria-selected="true"]):not(:disabled),
 .tabbed-angled-scroll .angled-header-tab:hover:not([aria-selected="true"]):not(:disabled) {
   z-index: 1;
-  background: var(--app-raised);
+  --angled-tab-fill: var(--app-raised);
 }
+/* Preserve the inner face while extending the game tab's hit area below it.
+   The diagonals keep neighboring controls from owning the same tap. */
+.angled-header-tabs:has(> .angled-game-tab) {
+  height: max(var(--angled-hit-min), var(--angled-tabs-height));
+}
+.angled-header-tab.angled-game-tab {
+  min-width: calc(var(--angled-hit-min) + var(--angled-tab-cut));
+  display: grid; grid-template-rows: var(--angled-tabs-height); align-content: start;
+  padding-block: 0; background: transparent; box-shadow: none;
+  clip-path: polygon(var(--angled-tab-cut) 0, 100% 0, calc(100% - var(--angled-tab-cut)) var(--angled-tabs-height),
+    calc(100% - var(--angled-tab-cut)) 100%, 0 100%, 0 var(--angled-tabs-height));
+}
+.angled-game-tab::before {
+  content: ""; position: absolute; inset: 0 0 auto; height: var(--angled-tabs-height); z-index: -1;
+  background: var(--angled-tab-fill); border-block: var(--angled-edge-width) solid var(--angled-edge-color);
+  box-sizing: border-box; pointer-events: none;
+}
+.angled-game-tab .angled-header-edge, .angled-game-tab:last-child::after { height: var(--angled-tabs-height); }
 .angled-header-tab:disabled { cursor: default; opacity: .65; }
 .angled-header-tab:focus-visible {
   outline: 2px solid var(--app-text);
   outline-offset: -4px;
 }
+.angled-game-tab:focus-visible { outline: 0; }
+.angled-game-tab:focus-visible::before { outline: 2px solid var(--app-text); outline-offset: -4px; }
 .scene-header-tab-icon {
   display: inline-flex;
   flex: 0 0 auto;

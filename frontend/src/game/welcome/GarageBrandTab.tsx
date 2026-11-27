@@ -6,11 +6,11 @@ import { entryAssets } from "./config";
 
 const { logo, name } = garageBrandIdentity(entryAssets);
 
-type Props = Omit<ComponentPropsWithRef<typeof GameButton>, "children" | "variant"> & { showLogo?: boolean };
+type Props = Omit<ComponentPropsWithRef<typeof GameButton>, "children" | "variant">;
 
-export function GarageBrandTab({ showLogo = true, onPress, className = "", ...props }: Props) {
-  const identity = <>{showLogo && <img src={logo} width={26} height={26} alt="" draggable={false} />}<span>{name}</span></>;
+export function GarageBrandTab({ onPress, className = "", ...props }: Props) {
+  const identity = <><img src={logo} width={26} height={26} alt="" draggable={false} /><span>{name}</span></>;
   if (!onPress) return <div className="garage-entry-brand">{identity}</div>;
-  return <GameButton {...props} variant="custom" className={`garage-entry-brand garage-entry-brand-back ${className}`}
+  return <GameButton {...props} pressFeedback variant="custom" className={`garage-entry-brand garage-entry-brand-back ${className}`}
     title="Back" onPress={onPress}><MenuIcon name="back" />{identity}</GameButton>;
 }

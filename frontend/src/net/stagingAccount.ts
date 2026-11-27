@@ -16,6 +16,33 @@ export async function alphaSession(): Promise<AlphaSession> {
   return { email: fields.email, admin: fields.admin, hasMfa: fields.hasMfa === true };
 }
 
+/** Kept only by the currently signed-in roster. Returning from the account portal revalidates it. */
+export function createRosterAccountSession(owner: string) {
+  let cached: AlphaSession | undefined;
+  let expires = 0;
+  let pending: Promise<AlphaSession> | undefined;
+  const peek = () => Date.now() < expires ? cached : undefined;
+
+  function read() {
+    if (pending) return pending;
+    const fresh = peek();
+    if (fresh) return Promise.resolve(fresh);
+    const request: Promise<AlphaSession> = alphaSession().then(value => {
+      if (pending === request) {
+        cached = value;
+        expires = Date.now() + 30_000;
+      }
+      return value;
+    }).finally(() => { if (pending === request) pending = undefined; });
+    pending = request;
+    return request;
+  }
+
+  function expire() { cached = undefined; pending = undefined; }
+  return { owner, peek, read, expire };
+}
+export type RosterAccountSession = ReturnType<typeof createRosterAccountSession>;
+
 export async function alphaAction(endpoint: "testers/invite" | "account/email-request" | "account/delete-request",
   fields: Record<string, string>): Promise<AlphaResponse> {
   const response = await fetch("/__alpha/" + endpoint, {

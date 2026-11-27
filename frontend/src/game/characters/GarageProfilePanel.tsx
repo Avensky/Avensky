@@ -2,6 +2,8 @@ import { useEffect, useId, useImperativeHandle, useLayoutEffect, useRef, useStat
 import { bindWelcomeMenuPanel } from "../../controls/inputRouting";
 import { GameButton } from "../../components/GameButton";
 import { MenuIcon, type MenuIconName } from "../../components/menus/MenuIcon";
+import type { RosterAccountSession } from "../../net/stagingAccount";
+import { MenuLoadingStatus } from "../../components/menus/MenuLoadingStatus";
 import { requestSocial } from "../../net/socialClient";
 import { playerDisplayName, useSocialStore } from "../../store/social/socialStore";
 import { AccountActionForm, AccountEditForm, AccountFeedback, AccountSecurity, AccountSubmit, maskAccountEmail, useAccountSettings } from "./AccountSettings";
@@ -11,10 +13,12 @@ type Setting = "name" | "email" | "security" | "invite" | "delete";
 
 export type GarageProfileHandle = { back: () => void };
 
-export function GarageProfilePanel({ ref, onBack }: { ref?: Ref<GarageProfileHandle>; onBack: () => void }) {
+export function GarageProfilePanel({ ref, onBack, accountSession }: {
+  ref?: Ref<GarageProfileHandle>; onBack: () => void; accountSession?: RosterAccountSession;
+}) {
   const player = useSocialStore(s => s.view?.profile);
   const connected = useSocialStore(s => s.available);
-  const settings = useAccountSettings();
+  const settings = useAccountSettings(accountSession);
   const { session, busy } = settings;
   const [expanded, setExpanded] = useState<Setting | null>(null);
   const panel = useRef<HTMLElement>(null);
@@ -68,7 +72,15 @@ export function GarageProfilePanel({ ref, onBack }: { ref?: Ref<GarageProfileHan
   }
   return <section ref={panel} className="garage-profile-panel menu-panel-frame" data-controller-rows aria-label="Account settings" aria-busy={busy}
     onFocusCapture={event => event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
-    <h2 className="garage-profile-heading">Profile</h2>
+    <div className="garage-profile-title">
+      <h2 className="garage-profile-heading">Profile</h2>
+      {settings.reading && <MenuLoadingStatus>Loading account…</MenuLoadingStatus>}
+    </div>
+    {settings.unavailable && <div className="garage-profile-service"><p role="status">{settings.unavailable}</p>
+      <GameButton variant="menu" data-controller-row className="account-submit" onPress={settings.retry}>Retry</GameButton>
+      <GameButton variant="menu" data-controller-row className="account-submit"
+        onPress={() => window.open("/__alpha/account", "_blank", "noopener,noreferrer")}>Open account portal</GameButton>
+    </div>}
     {row("name", "Display name", "profile", name !== undefined ? <AccountEditForm onSubmit={saveName} busy={busy}>
       <label data-controller-row>Account display name
         <input name="displayName" autoComplete="nickname" defaultValue={name} maxLength={48} required disabled={busy} />
@@ -81,12 +93,6 @@ export function GarageProfilePanel({ ref, onBack }: { ref?: Ref<GarageProfileHan
       session && !session.admin ? "Admin access required" : undefined, Boolean(session?.admin))}
     {row("delete", "Delete account", "trash", <AccountActionForm kind="delete" settings={settings} />, undefined, Boolean(session))}
     <AccountFeedback settings={settings} />
-    {settings.unavailable && <div className="garage-profile-service"><p role="status">{settings.unavailable}</p>
-      <GameButton variant="menu" data-controller-row className="account-submit"
-        onPress={() => window.open("/__alpha/account", "_blank", "noopener,noreferrer")}>Open account portal</GameButton>
-    </div>}
-    {!session && !settings.unavailable && <p role="status" className="garage-profile-service">
-      {settings.staging ? "Loading account…" : "Email and security settings are available to signed-in alpha testers."}
-    </p>}
+    {!settings.staging && <p role="status" className="garage-profile-service">Email and security settings are available to signed-in alpha testers.</p>}
   </section>;
 }
