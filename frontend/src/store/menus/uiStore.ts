@@ -27,10 +27,18 @@ export const useUIStore = create<UIState>()((set, get, api) => ({
   },
   screen: PLAYER_ONBOARDING ? "welcome" : "main",
   welcomeSection: null,
-  setScreen: (screen, section?: "account") => {
+  workshopEntry: null,
+  heroSelectionParent: "mode_select",
+  mainWorldJoining: false,
+  mainWorldError: "",
+  setScreen: (screen, section?: "account" | "wardrobe" | "vehicle") => {
     set({
       screen,
-      welcomeSection: screen === "welcome" ? section ?? null : null,
+      welcomeSection: screen === "welcome" && section === "account" ? section : null,
+      workshopEntry: screen === "heroes" && (section === "wardrobe" || section === "vehicle") ? section : null,
+      heroSelectionParent: screen === "hero_select" && get().screen === "main" ? "main" : "mode_select",
+      mainWorldJoining: false,
+      mainWorldError: "",
       overlay: null,
       vehicleSelectionParent: null,
       settingsParent: null,

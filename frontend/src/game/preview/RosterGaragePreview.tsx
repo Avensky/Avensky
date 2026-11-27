@@ -4,7 +4,12 @@ import { Box3, Group, Mesh, Raycaster, Vector2, Vector3, type Intersection } fro
 import type { CharacterChoice } from "../characters/characterCatalog";
 import type { CreatorEmoteMode } from "../characters/garageEmotes";
 import { AssetBoundary } from "../../components/debugger/AssetBoundary";
-import { getGarageMotion, setGaragePreview } from "./LiveGarage";
+import { getGarageMotion, setGaragePreview, type GarageEntryShot } from "./LiveGarage";
+import { useUIStore } from "../../store/menus/uiStore";
+import { MAIN_MENU_ITEMS } from "../menus/menuItems";
+import { garageMenuCamera } from "./garageMenuCamera";
+import { GarageMenuMarkers } from "./garageMenuMarkers";
+import { GarageMenuFurnishings } from "./GarageMenuFurnishings";
 import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { bindRosterSticks } from "./rosterStickControls";
@@ -18,17 +23,19 @@ function UnavailableRosterActor({ settled }: { settled: (available: boolean) => 
   return null;
 }
 
-function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelection & { shot: CharacterGarageShot }) {
+type ActorShot = GarageEntryShot & Partial<Pick<CharacterGarageShot, "fitPortrait">>;
+
+function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelection & { shot: ActorShot }) {
   const pivot = useRef<Group>(null);
-  const portraitRig = useRef<{ shot: CharacterGarageShot; id: string } | null>(null);
+  const portraitRig = useRef<{ shot: ActorShot; id: string } | null>(null);
   const gl = useThree(s => s.gl);
   const camera = useThree(s => s.camera);
   const invalidate = useThree(s => s.invalidate);
   const settled = useCallback((available: boolean, rigId?: string) => {
     if (available && rigId !== choice.id) return;
-    shot.subject = available ? "ready" : "unavailable";
+    if (mode !== "main") shot.subject = available ? "ready" : "unavailable";
     invalidate();
-  }, [shot, choice.id, invalidate]);
+  }, [shot, mode, choice.id, invalidate]);
   useFrame(() => {
     if ((mode !== "profile" && mode !== "create") || shot.subject !== "ready" || !pivot.current) return;
     if (portraitRig.current?.shot === shot && portraitRig.current.id === choice.id) return;
@@ -40,7 +47,7 @@ function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelec
     if (!head || !waist) return;
     const position = head.getWorldPosition(new Vector3());
     const waistHeight = waist.getWorldPosition(new Vector3()).y + .03;
-    shot.fitPortrait(position.y + (eyes ? 0 : .065), waistHeight, position.x, position.z);
+    shot.fitPortrait?.(position.y + (eyes ? 0 : .065), waistHeight, position.x, position.z);
     portraitRig.current = { shot, id: choice.id };
   }, -1.25);
   useLayoutEffect(() => {
@@ -81,13 +88,19 @@ function RosterActor({ choice, mode, creatorEmotes, shot }: GarageCharacterSelec
 }
 
 /** Install just the selected actor in the already-mounted room; row thumbnails have no scene. */
-export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes }: GarageCharacterSelection) {
+export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes }: Omit<GarageCharacterSelection, "choice"> & { choice?: CharacterChoice }) {
+  const station = useUIStore(state => mode === "main"
+    ? MAIN_MENU_ITEMS[state.selectedMenuIndexById.main]?.id ?? "enter_world" : undefined);
   // Changing rigs has a new measured endpoint. Color and makeup changes keep
   // the existing shot and in-flight interpolation.
-  const creatorRig = mode === "create" ? choice.id : undefined;
-  const shot = useMemo(() => rosterCamera(mode, creatorFrame), [mode, creatorFrame, creatorRig]);
+  const creatorRig = mode === "create" ? choice?.id : undefined;
+  const shot = useMemo(() => mode === "main" ? garageMenuCamera(station ?? "enter_world") : rosterCamera(mode, creatorFrame),
+    [mode, station, creatorFrame, creatorRig]);
   useLayoutEffect(() => {
-    setGaragePreview({ shot, demand: true, shadows: false, contents: <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} /> });
+    setGaragePreview({ shot, demand: true, shadows: false, contents: <>
+      {choice && <RosterActor shot={shot} choice={choice} mode={mode} creatorEmotes={creatorEmotes} />}
+      {mode === "main" && <><GarageMenuFurnishings /><GarageMenuMarkers /></>}
+    </> });
   }, [choice, mode, creatorEmotes, shot]);
   // Reframe the same actor when switching panels. Release the scene only on leaving this preview.
   useLayoutEffect(() => () => setGaragePreview(null), []);

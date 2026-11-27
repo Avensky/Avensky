@@ -1,35 +1,9 @@
 // Labels, routing and controller item counts share the same source of truth.
 export const MAIN_MENU_ITEMS = [
-  {
-    id: "play",
-    label: "Play",
-    description: "Choose a game mode and vehicle.",
-    screen: "mode_select",
-    available: true,
-  },
-  {id:"explore",label:"Explore",description:"Drive in the sandbox or build a world.",screen:"mode_select",available:true},
-  {id:"heroes",label:"Heroes",description:"Choose and customize heroes, vehicles and drivers.",screen:"heroes",available:true},
-  {
-    id: "career",
-    label: "Career",
-    description: "Statistics, collection and milestones.",
-    screen: "career",
-    available: true,
-  },
-  {
-    id: "social",
-    label: "Worlds & social",
-    description: "Teammates, groups and private worlds.",
-    screen: "social",
-    available: true,
-  },
-  {
-    id: "settings",
-    label: "Settings",
-    description: "Display, audio, controls and accessibility.",
-    screen: "settings",
-    available: true,
-  },
+  { id: "enter_world", label: "Enter World" },
+  { id: "wardrobe", label: "Wardrobe" },
+  { id: "vehicle", label: "Vehicle" },
+  { id: "world_editor", label: "World Editor" },
 ] as const;
 
 export const PAUSE_MENU_ITEMS = [

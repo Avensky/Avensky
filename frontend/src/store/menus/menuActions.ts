@@ -1,4 +1,4 @@
-import { useAlphaStore } from "../alpha/alphaStore";
+import { joinOpenWorld } from "../../game/social/navigation";
 import type { StateCreator } from "zustand";
 import { MAIN_MENU_ITEMS, PAUSE_MENU_ITEMS, PAUSE_RESUME_INDEX, pauseMenuRails } from "../../game/menus/menuItems";
 import { canOpenVehicleSelection } from "../alpha/matchHeroChange";
@@ -12,6 +12,8 @@ import {
   type UIOverlay,
   type UIState,
 } from "./types";
+let mainAdmission = 0;
+
 const menuItemCounts: Record<MenuId, number> = {
   main: MAIN_MENU_ITEMS.length,
   pause: PAUSE_MENU_ITEMS.length,
@@ -73,12 +75,14 @@ export const createMenuActions: StateCreator<
 
   setActiveMenuIndex: (index) => {
     const activeMenu = get().getActiveMenuId();
-    if (!activeMenu) return;
+    if (!activeMenu || (activeMenu === "main" && get().mainWorldJoining)) return;
 
     const count = menuItemCounts[activeMenu];
     const safeIndex = Math.max(0, Math.min(index, count - 1));
 
+    if (get().selectedMenuIndexById[activeMenu] === safeIndex) return;
     set({
+      ...(activeMenu === "main" ? {mainWorldError: ""} : {}),
       selectedMenuIndexById: {
         ...get().selectedMenuIndexById,
         [activeMenu]: safeIndex,
@@ -105,11 +109,18 @@ export const createMenuActions: StateCreator<
 
     if (activeMenu === "main") {
       const item = MAIN_MENU_ITEMS[index];
-      if (item?.available) {
-        if(item.id==='play')useAlphaStore.getState().chooseMode(useAlphaStore.getState().lastMatchMode);
-        else if(item.id==='explore')useAlphaStore.getState().chooseMode('sandbox');
-        get().setScreen(item.screen);
-      }
+      if (!item || get().mainWorldJoining) return;
+      if (item.id === "enter_world") {
+        const request = ++mainAdmission;
+        const stillJoining = () => request === mainAdmission && get().screen === "main" && get().mainWorldJoining;
+        set({ mainWorldJoining: true, mainWorldError: "" });
+        void joinOpenWorld(stillJoining)
+          .catch(error => {
+            if (stillJoining()) set({mainWorldError: error instanceof Error ? error.message : "Could not enter the shared world."});
+          })
+          .finally(() => { if (stillJoining()) set({mainWorldJoining: false}); });
+      } else if (item.id === "world_editor") get().setScreen("world_builder");
+      else get().setScreen("heroes", item.id);
       return;
     }
 
@@ -149,6 +160,11 @@ export const createMenuActions: StateCreator<
     if (!activeMenu) return;
 
     const index = get().selectedMenuIndexById[activeMenu] ?? 0;
+
+    if (activeMenu === "main") {
+      get().moveActiveMenuSelection(dir);
+      return;
+    }
 
     if (activeMenu === "pause") {
       get().setActiveMenuIndex(nextPauseIndex(index, dir, "horizontal"));

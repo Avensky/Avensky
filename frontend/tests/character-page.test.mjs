@@ -831,6 +831,37 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   }
 });
 
+test('spatial garage stations open the equipped dressing room and vehicle studio with a direct return', async () => {
+  const {close} = characterTestDom();
+  let vite, root;
+  try {
+    vite = await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',logLevel:'error'});
+    const load = path => vite.ssrLoadModule('/src/' + path);
+    const {HeroWorkshop} = await load('game/heroes/HeroWorkshop.tsx');
+    const {DEFAULT_CHARACTER} = await load('game/characters/characterCatalog.ts');
+    const {useUIStore: ui} = await load('store/menus/uiStore.ts');
+    const {useSocialStore: social} = await load('store/social/socialStore.ts');
+    const {useHeroLoadouts: loadouts} = await load('vehicles/cosmetics/heroLoadouts.ts');
+    const {routeMenuAction} = await load('controls/inputRouting.ts');
+    social.setState({view:{profile:{id:'driver',progression:{character:DEFAULT_CHARACTER,default_hero:'brz'}}}});
+    loadouts.getState().adopt('driver','brz');
+    const {createRoot} = await import('react-dom/client');
+    root = createRoot(document.getElementById('root'));
+    for (const [entry, selector] of [['wardrobe', '.dressing-room-title'], ['vehicle', '#vehicle-studio-tab-panel']]) {
+      ui.getState().setScreen('heroes',entry);
+      await act(async () => root.render(h(HeroWorkshop, {key:entry})));
+      assert.ok(document.querySelector(selector), entry + ' opened its editor');
+      await act(async () => routeMenuAction('back'));
+      assert.equal(ui.getState().screen,'main');
+      await act(async () => root.render(null));
+    }
+  } finally {
+    if (root) await act(async () => root.unmount());
+    await vite?.close();
+    close();
+  }
+});
+
 test('device character edits stay local when the connected profile has no character support', async t => {
   const { dom, close } = characterTestDom();
   let vite, root, client;

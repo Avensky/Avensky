@@ -128,18 +128,19 @@ export function HeroSelection({ overlay = false }: { overlay?: boolean } = {}) {
       }
       return;
     }
+    const parent = useUIStore.getState().heroSelectionParent;
     if (
       !useNetworkStore.getState().connected ||
-      (!current && !useNetworkStore.getState().worldName)
+      (parent !== "main" && !current && !useNetworkStore.getState().worldName)
     ) {
-      useUIStore.getState().setScreen("mode_select");
+      useUIStore.getState().setScreen(parent);
       return;
     }
     pending.current = true;
     setBusy(true);
     try {
-      await requestSocial("mode_cancel");
-      useUIStore.getState().setScreen("mode_select");
+      await requestSocial(parent === "main" ? "world_leave" : "mode_cancel");
+      useUIStore.getState().setScreen(parent);
     } catch (error) {
       setStatus((error as Error).message);
     } finally {

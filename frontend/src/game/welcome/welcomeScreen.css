@@ -21,7 +21,7 @@
 .welcome-screen > .garage-entry-header.angled-tab-header { inset-inline-end: 0; z-index: 3; }
 /* Paint the shared angled face at its normal height; extend only the touch
    target below it. Keep the diagonal clear for the adjacent creator tab. */
-.welcome-screen .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
+.garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
   --brand-hit-height: max(44px, var(--angled-header-height));
   height: var(--brand-hit-height);
   padding-block-end: calc(var(--brand-hit-height) - var(--angled-header-height));
@@ -38,7 +38,7 @@
 }
 .garage-entry-brand-back > .menu-icon { flex: none; width: 18px; height: 18px; }
 @media (orientation: landscape) and (pointer: coarse) {
-  .welcome-screen .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
+  .garage-entry-header.angled-tab-header > .garage-entry-brand-back:first-child {
     padding-left: max(calc(2 * var(--angled-brand-padding)), env(safe-area-inset-left, 0px));
   }
 }
@@ -76,15 +76,19 @@ html[data-entry-handoff="fading"]:has(.welcome-screen > .garage-entry-header > .
   color: var(--app-text); background: transparent;
   cursor: pointer; pointer-events: auto; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
 }
-.garage-entry-action--logout {
+.garage-entry-action--inner {
   --action-width: calc(44px + var(--angled-tab-cut));
   --action-icon-size: 17px;
   --action-face-height: var(--angled-tabs-height);
   --action-cut: var(--angled-tab-cut);
 }
+.garage-entry-actions .garage-entry-action--inner + .garage-entry-action--inner {
+  --action-padding-start: var(--angled-tab-cut);
+  margin-inline-start: calc(-1 * var(--angled-tab-cut));
+}
 /* Overlap the faces across the full diagonal. The outer tab's clip also
    routes each point on the seam to the action that owns that visible area. */
-.garage-entry-actions .garage-entry-action--profile {
+.garage-entry-actions .garage-entry-action--outer {
   --action-safe-end: env(safe-area-inset-right,0px);
   --action-width: calc(clamp(64px,6.5vw,88px) + var(--action-safe-end));
   --action-icon-size: clamp(21px,1.9vw,26px);

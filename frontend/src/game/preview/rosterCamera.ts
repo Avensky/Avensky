@@ -1,5 +1,6 @@
 import { Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
+import { placeGarageOrbit } from "./garageCameraTravel.ts";
 import type { CreatorStep } from "../welcome/CharacterCreator";
 
 // Both starter rigs face +Z, with their shoes at garage floor level.
@@ -32,7 +33,7 @@ const creatorFrames = {
   outfit: { wide: { eyeLine: .20, torsoSpan: 4.6 }, tall: { eyeLine: .15, torsoSpan: 3.3 } },
 } satisfies Record<CreatorFrame, Record<"wide" | "tall", { eyeLine: number; torsoSpan: number }>>;
 
-export function rosterCamera(view: CharacterGarageView = "roster", creatorFrame?: CreatorFrame): CharacterGarageShot {
+export function rosterCamera(view: Exclude<CharacterGarageView, "main"> = "roster", creatorFrame?: CreatorFrame): CharacterGarageShot {
   const target = new Vector3(0, .87, 0);
   let distance = 3;
   const closeUp = creatorFrame === "looks" || creatorFrame === "eyes" || creatorFrame === "makeup";
@@ -42,11 +43,7 @@ export function rosterCamera(view: CharacterGarageView = "roster", creatorFrame?
     distance = (eye - waist) * torsoSpan / viewSpan;
   }
   function orbit(camera: PerspectiveCamera, yaw: number, pitch: number) {
-    const heading = ROSTER_HEADING - yaw;
-    const elevation = .055 + pitch;
-    const radius = distance * Math.cos(elevation);
-    camera.position.set(radius * Math.sin(heading), distance * Math.sin(elevation), radius * Math.cos(heading)).add(target);
-    camera.lookAt(target);
+    placeGarageOrbit(camera, target, distance, ROSTER_HEADING - yaw, .055 + pitch);
   }
   return {
     subject: "loading", framingRevision: 0,
@@ -68,8 +65,7 @@ export function rosterCamera(view: CharacterGarageView = "roster", creatorFrame?
       torsoSpan = creator?.torsoSpan ?? (portrait && view === "profile" ? 1 / (portraitWaistLine - portraitEyeLine) : 0);
       if (torsoSpan) framePortrait();
       else {
-        const frame = !portrait || view === "profile" ? landscape : view === "main"
-          ? mainPortraitFrame(height) : portraitFrames[view];
+        const frame = !portrait || view === "profile" ? landscape : portraitFrames[view];
         target.y = frame.aimHeight;
         centerY = frame.centerY;
         distance = 1.74 / (frame.bodyFraction * viewSpan);
@@ -81,10 +77,4 @@ export function rosterCamera(view: CharacterGarageView = "roster", creatorFrame?
     },
     orbit,
   };
-}
-
-function mainPortraitFrame(height: number) {
-  // Short phones devote proportionally more room to the six menu actions.
-  const bodyFraction = Math.min(.50, Math.max(.30, .50 * height / 800));
-  return { bodyFraction, aimHeight: .87, centerY: .1 + bodyFraction / 2 };
 }

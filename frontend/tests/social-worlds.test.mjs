@@ -398,10 +398,33 @@ test("social requests, world transitions and assisted text have independent owne
       assert.deepEqual(calls.pop(), ["roster_save",{driver}]);
     });
 
-    await t.test("Play lists Open World and joins the configured hub through world admission", async () => {
-      const { MAIN_MENU_ITEMS } = await load("game/menus/menuItems.ts");
+    await t.test("Social keeps match and practice selection accessible from the garage and exposes profile controls", async () => {
+      const { SocialPanel } = await load("game/social/SocialPanel.tsx");
+      const { useAlphaStore: alpha } = await load("store/alpha/alphaStore.ts");
+      alpha.getState().chooseMode("competitive");
+      alpha.getState().chooseTeamSize(3);
+      const named = name => [...document.querySelectorAll('[role="button"]')].find(button => button.textContent === name);
+      for (const [label, mode] of [["Practice", "sandbox"], ["Find a match", "competitive"]]) {
+        await act(async () => ui.getState().setScreen("social"));
+        await render(h(SocialPanel));
+        await act(async () => named(label).click());
+        assert.equal(ui.getState().screen, "mode_select");
+        assert.equal(alpha.getState().mode, mode);
+        assert.equal(alpha.getState().teamSize, 3);
+      }
+      await act(async () => ui.getState().setScreen("social"));
+      await render(h(SocialPanel));
+      const profile = [...document.querySelectorAll('[role="tab"]')].find(tab => tab.textContent.toLowerCase() === "profile");
+      await act(async () => profile.click());
+      assert.ok(document.querySelector("[data-main-profile-toggle]"));
+      await act(async () => ui.setState({screen:"sandbox",overlay:"social"}));
+      await render(h(SocialPanel));
+      assert.equal(named("Find a match"), undefined);
+      assert.equal(named("Practice"), undefined);
+    });
+    await t.test("the Enter World station admits a player once and preserves the garage while waiting", {timeout: 15000}, async () => {
       const { findOpenWorld, OPEN_WORLD_ID, parseOpenWorldId } = await load("game/social/openWorld.ts");
-      const { ModeSelection } = await load("game/alpha/ModeSelection.tsx");
+      const { MainMenu } = await load("game/menus/MainMenu.tsx");
       const { mapCatalog, useWorldCatalog } = await load("store/selection/worldCatalog.ts");
       const { useAlphaStore: alpha } = await load("store/alpha/alphaStore.ts");
       assert.equal(OPEN_WORLD_ID, 7);
@@ -413,24 +436,20 @@ test("social requests, world transitions and assisted text have independent owne
       assert.equal(findOpenWorld([{ ...world, locked: true }]), undefined);
       assert.equal(findOpenWorld([{ ...world, listed: false }]), undefined);
       assert.equal(findOpenWorld([{ ...world, mode: "quickplay" }]), undefined);
-      const select = id => {
-        ui.setState({ screen: "main", overlay: null });
-        ui.getState().setActiveMenuIndex(MAIN_MENU_ITEMS.findIndex(item => item.id === id));
-        routeMenuAction("activate");
-      };
-      select("play");
-      assert.equal(ui.getState().screen, "mode_select");
-      assert.equal(MAIN_MENU_ITEMS.some(item=>item.id==="open_world"),false);
-
       const calls = [];
+      let requestSent = Promise.withResolvers();
       await act(async () => useWorldCatalog.setState({ maps: mapCatalog }));
       await act(async()=>{
-        client.setSocialConnection({readyState:WebSocket.OPEN,send:body=>{
-          const {action,world_id,request_id}=JSON.parse(body);
-          calls.push(action);
-          if(action==="world_join" && world_id===world.id)
-            client.receiveSocialResult({request_id,ok:true,data:{world_id,map:world.map}});
-        }});
+        client.setSocialConnection({
+          readyState: WebSocket.OPEN,
+          send: body => {
+            const request = JSON.parse(body);
+            calls.push(request);
+            requestSent.resolve(request);
+          },
+        });
+        ui.setState({screen:"main",overlay:null,isModeLoading:false});
+        ui.getState().setActiveMenuIndex(0);
         const profile = {
           ...view.profile,
           active_character_id: "saved-driver",
@@ -439,20 +458,37 @@ test("social requests, world transitions and assisted text have independent owne
         social.setState({view:{...view,profile,worlds:[world]},profileStatus:"ready"});
         network.setState({connected:true});
       });
-      await render(h(ModeSelection));
-      assert.equal(document.querySelector(".character-header-profile")?.getAttribute("aria-label"), "QA Violet");
-      const openWorld = [...document.querySelectorAll('[role="tab"]')].find(tab=>tab.textContent==="OPEN WORLD");
-      assert.ok(openWorld);
-      await act(async()=>openWorld.click());
-      const join = document.querySelector(".alpha-deploy");
-      assert.ok(join);
+      await render(h(MainMenu));
+      assert.deepEqual(calls, [], "previewing a garage station cannot join a server");
       const catalog = await readFile(new URL("../public/world-builder/catalog.json", import.meta.url), "utf8");
       const originalFetch = globalThis.fetch;
       globalThis.fetch = async () => new Response(catalog);
-      try { await act(async () => join.click()); }
-      finally { globalThis.fetch = originalFetch; }
-      assert.deepEqual(calls,["world_join"]);
+      try {
+        await act(async () => {
+          routeMenuAction("activate");
+          await requestSent.promise;
+        });
+        assert.equal(ui.getState().screen, "main", "the menu waits for admission");
+        await act(async () => routeMenuAction("activate"));
+        assert.deepEqual(calls.map(request => [request.action, request.world_id]), [["world_join", world.id]]);
+        await act(async () => client.receiveSocialResult({
+          request_id: calls[0].request_id, ok: false, message: "The Harbor garage is full.",
+        }));
+        assert.equal(ui.getState().screen, "main");
+        assert.match(document.querySelector('[role="alert"]').textContent, /garage is full/);
+        assert.equal(ui.getState().mainWorldJoining, false);
+        requestSent = Promise.withResolvers();
+        await act(async () => {
+          routeMenuAction("activate");
+          const retry = await requestSent.promise;
+          client.receiveSocialResult({request_id: retry.request_id, ok: true, data: {world_id: world.id, map: world.map}});
+        });
+        assert.deepEqual(calls.map(request => request.action), ["world_join", "world_join"]);
+      } finally {
+        globalThis.fetch = originalFetch;
+      }
       assert.equal(ui.getState().screen, "hero_select");
+      assert.equal(ui.getState().heroSelectionParent, "main");
       assert.equal(alpha.getState().mode, "sandbox", "a late lobby update cannot carry the previous match into the hub");
     });
     await t.test(

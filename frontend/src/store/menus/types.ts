@@ -71,8 +71,12 @@ export type UIState = {
   setCockpitTab: (tab: CockpitTab) => void;
   openCockpit: (tab?: CockpitTab) => void;
   screen: MenuScreen;
+  workshopEntry: "wardrobe" | "vehicle" | null;
+  heroSelectionParent: "main" | "mode_select";
+  mainWorldJoining: boolean;
+  mainWorldError: string;
   welcomeSection: "account" | null;
-  setScreen: { (screen: MenuScreen): void; (screen: "welcome", section: "account"): void };
+  setScreen: { (screen: MenuScreen): void; (screen: "welcome", section: "account"): void; (screen: "heroes", section: "wardrobe" | "vehicle"): void };
 
   overlay: UIOverlay;
   setOverlay: (overlay: UIOverlay) => void;

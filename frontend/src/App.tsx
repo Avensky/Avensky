@@ -66,7 +66,7 @@ export default function App() {
     <div className="canvas-container">
       <div className="game-viewport" inert={rotate}>
         <GarageMenuBackdrop visible={showGarageBackdrop} />
-        {garageCharacter && <RosterGaragePreview {...garageCharacter} />}
+        {(garageCharacter || screen === "main") && <RosterGaragePreview {...(garageCharacter ?? { mode: "main" })} />}
         {welcome ? <WelcomeScreen onGarageCharacter={setWelcomeCharacter} /> : <Suspense fallback={null}><GameUI /></Suspense>}
         {!rotate && <OnScreenKeyboard />}
       </div>

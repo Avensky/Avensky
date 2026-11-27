@@ -1,6 +1,12 @@
 import { MathUtils, Quaternion, Vector3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 
+export function placeGarageOrbit(camera: PerspectiveCamera, target: Vector3, distance: number, heading: number, elevation: number) {
+  const horizontal = distance * Math.cos(elevation);
+  camera.position.set(horizontal * Math.sin(heading), distance * Math.sin(elevation), horizontal * Math.cos(heading)).add(target);
+  camera.lookAt(target);
+}
+
 const TRAVEL_MS = 1000;
 
 class Lens {

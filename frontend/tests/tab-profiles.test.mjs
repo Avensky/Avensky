@@ -21,7 +21,7 @@ test('tab players preserve main credentials and Quickplay waits for a confirmed 
   const client=await load('net/socialClient.ts'),{useSocialStore:social}=await load('store/social/socialStore.ts'),{useNetworkStore:network}=await load('store/session/networkStore.ts'),{useUIStore:ui}=await load('store/menus/uiStore.ts'),{useAlphaStore:alpha}=await load('store/alpha/alphaStore.ts');
   // Compile the UI before beginning any fake server requests. The production
   // response deadline must not count cold SSR compilation during parallel tests.
-  const {ModeSelection}=await load('game/alpha/ModeSelection.tsx'),{MainMenu}=await load('game/menus/MainMenu.tsx'),{routeMenuAction:route}=await load('controls/inputRouting.ts'),{joinSelectedMode}=await load('game/alpha/sessionActions.ts');
+  const {ModeSelection}=await load('game/alpha/ModeSelection.tsx'),{MainMenuProfile}=await load('game/menus/MainMenuProfile.tsx'),{routeMenuAction:route}=await load('controls/inputRouting.ts'),{joinSelectedMode}=await load('game/alpha/sessionActions.ts');
   const key='avenlab-social-profile-v1:server-one',main={id:'main',token:'a'.repeat(64),name:'Main'},tab={id:'tab',token:'b'.repeat(64),name:'DRIVER 2'};
   const sent=[],socket={readyState:WebSocket.OPEN,send:body=>sent.push(JSON.parse(body))};
   const flush=()=>act(async()=>Promise.resolve());
@@ -76,14 +76,14 @@ test('tab players preserve main credentials and Quickplay waits for a confirmed 
    const pending=client.createTabProfile();reply(sent.at(-1),{profile_id:'old',token:'e'.repeat(64)});client.setSocialConnection(null);
    await assert.rejects(pending,/connection changed/);assert.equal(dom.window.sessionStorage.getItem(key+':tab'),null);assert.equal(JSON.parse(localStorage.getItem(key)).token,main.token);assert.equal(social.getState().profileStatus,'idle');assert.equal(social.getState().message,'Connecting to the game server…');
   });
-  await t.test('main portrait offers sign-in and a tab-only guest without replacing the saved device profile',async()=>{
+  await t.test('profile controls offer sign-in and a tab-only guest without replacing the saved device profile',async()=>{
    const menuKey='avenlab-social-profile-v1:menu-server',before=sent.length;
    await act(async()=>{
     client.setSocialConnection(socket);client.beginSocialSession('menu-server');
-    ui.setState({screen:'main',overlay:null,isModeLoading:false});root.render(h(MainMenu));
+    ui.setState({screen:'main',overlay:null,isModeLoading:false});root.render(h(MainMenuProfile,{focusMenu:()=>{}}));
    });
    assert.equal(sent.length,before);
-   const trigger=document.querySelector('.main-menu > header [data-main-profile-toggle]');assert(trigger);
+   const trigger=document.querySelector('[data-main-profile-toggle]');assert(trigger);
    const panel=document.querySelector('[aria-label="Player profile options"]');assert(panel.hidden);
    await act(async()=>route('right'));assert.equal(document.activeElement,trigger);
    await act(async()=>route('activate'));assert.equal(panel.hidden,false);
