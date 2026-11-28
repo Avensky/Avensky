@@ -44,7 +44,7 @@ export function AlphaAccountPanel({ tab }: { tab: Tab }) {
     });
   }
 
-  return <section className="alpha-account-panel menu-panel-frame" aria-label={tab === "profile" ? "Character profile" : "Account settings"} data-controller-rows>
+  return <section data-wardrobe-focus-group="content" className="alpha-account-panel menu-panel-frame" aria-label={tab === "profile" ? "Character profile" : "Account settings"} data-controller-rows>
     {tab === "profile" ? <>
       <div className="alpha-profile-hero">
         <ProfilePortrait choice={active?.appearance ?? player?.progression?.character} label={name ?? "Player portrait"} welcomePreview="selected" />

@@ -30,7 +30,7 @@ const CATEGORIES = [
   { id: "props", label: "Handheld props", group: "Accessories", icon: "props" },
 ] as const;
 const WARDROBE_GROUPS = ["Outfits", "Clothing", "Accessories"] as const;
-export type WardrobeNavigation = { back: () => boolean; cycleGroup: (direction: number) => void };
+export type WardrobeNavigation = { back: () => boolean };
 type Category = typeof CATEGORIES[number]["id"];
 type Icon = typeof CATEGORIES[number]["icon"] | "remove";
 const ICON_PATHS: Record<Icon, string> = {
@@ -464,10 +464,6 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       else return false;
       return true;
     },
-    cycleGroup(direction) {
-      const index = WARDROBE_GROUPS.indexOf(currentCategory.group);
-      selectGroup(WARDROBE_GROUPS[(index + direction + WARDROBE_GROUPS.length) % WARDROBE_GROUPS.length]);
-    },
   }));
 
   function closeCatalog() {
@@ -536,8 +532,8 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
   );
   const pieceColors = piece && <ClothingColorToolbar choice={choice} piece={piece} onChange={onColors} />;
   return <>
-    <aside className="dressing-wardrobe" aria-label="Wardrobe" hidden={Boolean(inspected)}>
-      <SecondaryTabRow aria-label="Wardrobe groups" className="dressing-groups">
+    <aside data-wardrobe-focus-group="content" className="dressing-wardrobe" aria-label="Wardrobe" hidden={Boolean(inspected)}>
+      <SecondaryTabRow navigation="arrows" aria-label="Wardrobe groups" className="dressing-groups">
         {WARDROBE_GROUPS.map(group => <GameButton key={group} variant="custom" role="tab" pressFeedback
           aria-selected={group === currentCategory.group} id={`${groupId}-${group}`} aria-controls={groupId}
           data-wardrobe-group={group} onPress={() => selectGroup(group)}>{group}</GameButton>)}
@@ -634,7 +630,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
           allowReselect clothing={{ worn: pieces, onSelect: selectWornPiece }} />
       </FittingAngleRail>
     </div>
-    <aside ref={detailsRef} className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
+    <aside data-wardrobe-focus-group="content" ref={detailsRef} className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
       {inspected && <>
         <header className="dressing-catalog-heading" data-controller-row>
           <MenuBackButton data-wardrobe-details-back label={`Back to ${currentCategory.label}`} onClick={closeDetails} />

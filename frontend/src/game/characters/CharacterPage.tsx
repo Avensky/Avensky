@@ -570,11 +570,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     : <CharacterEmoteList choice={previewChoice} group={emoteGroup === "Pose pack" || emoteGroup === "Creator" || emoteGroup === "Interactions" ? undefined : emoteGroup} search={emoteSearch} station={station} insideCar={insideCar}
     disabled={brzExiting || reducedMotion || cockpitPending} mirrorAvailable={mirrorAvailable} leanAvailable={leanAvailable} selectedId={emote?.id}
     favorites={favorites} onFavorite={toggleFavorite} onSearch={setEmoteSearch} onSelect={selectEmote} />);
-  const emoteResultsPanel = <section className={locked ? "character-controls menu-panel-frame character-controls--right" : undefined}
+  const emoteResultsPanel = <section data-wardrobe-focus-group="content" className={locked ? "character-controls menu-panel-frame character-controls--right" : undefined}
     id={emoteResultsId} aria-label={emoteDetail ? "Emote details" : "Emote results"} hidden={!resultsOpen}>
     {emoteResults}
   </section>;
-  const playback = tab === "emotes" && emoteBrowserOpen && <div className="character-playback" data-controller-row>
+  const playback = tab === "emotes" && emoteBrowserOpen && <div data-wardrobe-focus-group="content" className="character-playback" data-controller-row>
     <button type="button" className="menu-control" disabled={brzExiting || reducedMotion || (!emote && !selectedPreview.current)} onClick={() =>
       useCharacterPreviewStore.setState({ emote: selectedPreview.current && { ...selectedPreview.current }, playbackPaused: false })
     }>Play</button>
@@ -606,7 +606,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   if (!locked) return (
     <div ref={page} className="character-page character-page--setup" aria-label="Choose character gender" onFocus={revealCharacterControl}>
       <div className="character-stage" ref={observeWorkshopViewport} data-character-viewport data-character-preview={character.id} data-outfit-preview={outfit.id} />
-      <section className="character-controls menu-panel-frame">
+      <section data-wardrobe-focus-group="content" className="character-controls menu-panel-frame">
         <header className="character-description"><h2>Choose gender</h2></header>
         {modelPicker}
         <div className="character-equip" data-controller-row>
@@ -646,7 +646,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       {tab === "details" && <CharacterDetails name={characterName} gender={choice.identity ?? character.gender}
         personality={choice.appearance?.personality} bag={bag} selectedId={emote?.id} disabled={brzExiting || reducedMotion}
         onPreview={playEmote} />}
-      {tab === "emotes" && <section className="character-controls menu-panel-frame character-controls--left" aria-label="Emote filters">
+      {tab === "emotes" && <section data-wardrobe-focus-group="content" className="character-controls menu-panel-frame character-controls--left" aria-label="Emote filters">
         {emoteBrowser}
       </section>}
       {tab === "emotes" && emoteResultsPanel}
@@ -654,7 +654,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       {playback}
       {(tab === "body" || tab === "details" || tab === "emotes") && angles}
       {framing}{rotation}
-      {status === "error" && <section className="character-controls menu-panel-frame character-controls--bottom" aria-label="Recover unsaved changes">
+      {status === "error" && <section data-wardrobe-focus-group="content" className="character-controls menu-panel-frame character-controls--bottom" aria-label="Recover unsaved changes">
         <div className="character-equip" data-controller-row>
             <button type="button" className="menu-control" onClick={() => saveToProfile ? void flush() : saveLocalCharacter(choice)}>Retry</button>
             <button type="button" className="menu-control" onClick={() => {

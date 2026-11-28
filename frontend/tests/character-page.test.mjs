@@ -760,7 +760,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('[data-body-groom]');
     await click('[aria-label="Increase crown volume"]');
     await click('[data-hair-piece="left-braid"]');
-    await move('next_option');
+    await click('[data-creator-channel=roots]');
     assert.equal(find('[data-creator-channel=roots]').getAttribute('aria-selected'), 'true');
     await click('[data-creator-option=copper]');
     assert.equal(drafts.at(-1).appearance.hair_groom.pieces['left-braid'].roots, '#ae5837');
@@ -773,7 +773,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(document.activeElement.dataset.bodySection, 'hair');
     await body.open('makeup');
     const beforeBrowsing = drafts.at(-1);
-    await move('previous_option');
+    await click('[data-creator-channel=eyeliner]');
     assert.equal(find('[data-creator-channel=eyeliner]').getAttribute('aria-selected'), 'true');
     assert.equal(drafts.at(-1), beforeBrowsing, 'changing channels or focusing a swatch does not save it');
     await click('[data-creator-option=cat-eye]');
@@ -938,6 +938,209 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   }
 });
 
+test('Wardrobe cycles toolbars with number keys and controller triggers while primary tabs and nested choices keep their controls', async () => {
+  const { close } = characterTestDom();
+  const pad = { index: 0, id: 'wardrobe-controller', connected: true, axes: [0, 0, 0, 0],
+    buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })) };
+  navigator.getGamepads = () => [pad];
+  let vite, root;
+  try {
+    vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
+    const load = path => vite.ssrLoadModule('/src/' + path);
+    const { HeroWorkshop } = await load('game/heroes/HeroWorkshop.tsx');
+    const { GameController } = await load('controls/GameController.ts');
+    const { Keyboard } = await load('controls/Keyboard.ts');
+    const { DEFAULT_CHARACTER } = await load('game/characters/characterCatalog.ts');
+    const { useCharacterPreviewStore: preview } = await load('game/characters/characterPreviewStore.ts');
+    const { useUIStore: ui } = await load('store/menus/uiStore.ts');
+    const { useSocialStore: social } = await load('store/social/socialStore.ts');
+    const { useHeroLoadouts: loadouts } = await load('vehicles/cosmetics/heroLoadouts.ts');
+    social.setState({ view: { profile: { id: 'driver', active_character_id: 'ava', name: 'Ava',
+      progression: { character: DEFAULT_CHARACTER, default_hero: 'brz' } } } });
+    loadouts.getState().adopt('driver', 'brz');
+    ui.getState().setScreen('heroes', 'wardrobe');
+    const { createRoot } = await import('react-dom/client');
+    root = createRoot(document.getElementById('root'));
+    await act(async () => root.render(h('div', null, h(GameController), h(Keyboard), h(HeroWorkshop))));
+
+    const poll = () => act(async () => { await new Promise(resolve => requestAnimationFrame(resolve)); });
+    async function press(index) {
+      await poll(); // A newly focused range input rearms navigation on neutral.
+      pad.buttons[index] = { pressed: true, value: 1 };
+      await poll();
+      await poll(); // A held trigger must not skip another toolbar on the following frame.
+      pad.buttons[index] = { pressed: false, value: 0 };
+      await poll();
+    }
+    const find = selector => document.querySelector(selector);
+    const focus = element => act(async () => element.focus());
+    const key = (code, value, repeat = false) => act(async () => {
+      const event = type => new window.KeyboardEvent(type, { code, key: value, repeat, bubbles: true, cancelable: true });
+      document.activeElement.dispatchEvent(event('keydown'));
+      document.activeElement.dispatchEvent(event('keyup'));
+    });
+    const activeGroup = () => document.activeElement.closest('[data-wardrobe-focus-group]')?.dataset.wardrobeFocusGroup;
+    const selectedGroup = () => find('[data-wardrobe-group][aria-selected=true]').dataset.wardrobeGroup;
+    const selectedChannel = () => find('[data-creator-channel][aria-selected=true]').dataset.creatorChannel;
+    await poll(); // Let the neutral device connect before its first press.
+    assert.equal(document.activeElement.id, 'character-editor-tab-appearance');
+    await key('Digit3', '3');
+    assert.equal(activeGroup(), 'angles');
+    const shot = preview.getState().camera;
+    assert.equal(document.activeElement.dataset.cameraChoice, shot, 'initial focus uses the current angle');
+    const otherAngle = [...document.querySelectorAll('[data-camera-choice]')].find(button => button.dataset.cameraChoice !== shot);
+    await focus(otherAngle);
+    await press(7);
+    assert.equal(activeGroup(), 'rotation', 'RT advances once per physical press');
+    const pause = find('[aria-label="Pause pose"]');
+    await focus(pause);
+    await key('Digit3', '3');
+    assert.equal(activeGroup(), 'zoom');
+    await key('Digit3', '3', true);
+    assert.equal(activeGroup(), 'zoom', 'keyboard autorepeat does not skip groups');
+    const slider = find('.preview-zoom-slider');
+    await focus(slider);
+    const zoom = preview.getState().zoom;
+    await press(7);
+    assert.equal(activeGroup(), 'content');
+    await key('Digit3', '3');
+    assert.equal(document.activeElement, otherAngle, 'forward wrap restores the last camera button');
+    await key('Digit1', '1');
+    assert.equal(activeGroup(), 'content', 'previous wraps in the opposite direction');
+    await press(6);
+    assert.equal(document.activeElement, slider, 'LT restores the zoom slider');
+    await key('Digit1', '1');
+    assert.equal(document.activeElement, pause, 'the slider yields number keys and playback focus is restored');
+    assert.equal(preview.getState().playbackPaused, false);
+    assert.equal(preview.getState().camera, shot);
+    assert.equal(preview.getState().zoom, zoom);
+    assert.equal(selectedGroup(), 'Outfits', 'cycling neither activates a control nor changes a content tab');
+
+    const zoomGroup = find('[data-wardrobe-focus-group=zoom]');
+    zoomGroup.hidden = true;
+    await press(7);
+    assert.equal(activeGroup(), 'content', 'skip a hidden toolbar');
+    zoomGroup.hidden = false;
+    await focus(find('[data-wardrobe-group=Outfits]'));
+    await key('ArrowRight', 'ArrowRight');
+    assert.equal(document.activeElement.dataset.wardrobeGroup, 'Clothing');
+    assert.equal(selectedGroup(), 'Outfits');
+    await press(0);
+    assert.equal(selectedGroup(), 'Clothing', 'A opens the focused wardrobe category');
+    await key('KeyQ', 'q');
+    assert.equal(document.activeElement.id, 'character-editor-tab-body');
+    await press(6);
+    assert.equal(activeGroup(), 'content', 'from a primary tab LT first visits the last toolbar');
+    await act(async () => find('[data-body-section=makeup]').click());
+    const lipstick = find('[data-creator-channel=makeup]');
+    await focus(lipstick);
+    await press(15); // D-pad right
+    assert.equal(document.activeElement.dataset.creatorChannel, 'eyeshadow');
+    assert.equal(selectedChannel(), 'makeup');
+    await key('Enter', 'Enter');
+    assert.equal(selectedChannel(), 'eyeshadow', 'Enter opens the focused channel');
+    await press(7);
+    assert.equal(activeGroup(), 'angles');
+    assert.equal(selectedChannel(), 'eyeshadow');
+    await press(5); // RB
+    assert.equal(document.activeElement.id, 'character-editor-tab-appearance');
+    await act(async () => find('[data-category=outfits]').click());
+    const search = find('.dressing-search input');
+    await focus(search);
+    const number = new window.KeyboardEvent('keydown', { code: 'Digit3', key: '3', bubbles: true, cancelable: true });
+    await act(async () => assert(search.dispatchEvent(number), 'search receives numeric keystrokes for text entry'));
+    assert.equal(document.activeElement, search);
+
+    // Details can change angle without opening an inspector for a worn garment.
+    await act(async () => find('#character-editor-tab-details').click());
+    const heldFocus = find('[aria-label="Pause pose"]');
+    await focus(heldFocus);
+    const face = find('[data-camera-choice=Face]');
+    await act(async () => {
+      for (const type of ['pointerdown', 'pointerup'])
+        face.dispatchEvent(new window.PointerEvent(type, { pointerType: 'touch', pointerId: 1, isPrimary: true,
+          button: 0, bubbles: true, cancelable: true }));
+    });
+    assert.equal(preview.getState().camera, 'Face', 'tapping the camera button selects its shot');
+    assert.ok(document.activeElement === heldFocus, 'touch leaves DOM focus on the previous keyboard control');
+    await key('Digit3', '3');
+    assert.ok(document.activeElement === heldFocus, 'from the tapped camera, 3 returns to Pause even if it already has DOM focus');
+    await key('Digit1', '1');
+    assert.ok(document.activeElement === face, '1 retraces the move to the camera button that was tapped');
+    assert.equal(preview.getState().playbackPaused, false, 'focusing Pause after a tap does not activate it');
+  } finally {
+    if (root) await act(async () => root.unmount());
+    await vite?.close();
+    close();
+  }
+});
+
+test('Wardrobe keeps toolbar hints available on Details across touch, keyboard and controller input', async t => {
+  const {close} = characterTestDom();
+  let vite, root, releaseInput;
+  try {
+    vite = await createServer({server:{middlewareMode:true,hmr:false,ws:false},appType:'custom',logLevel:'error'});
+    const load = path => vite.ssrLoadModule('/src/' + path);
+    const {HeroWorkshop} = await load('game/heroes/HeroWorkshop.tsx');
+    const {DEFAULT_CHARACTER} = await load('game/characters/characterCatalog.ts');
+    const {useSocialStore: social} = await load('store/social/socialStore.ts');
+    const {useUIStore: ui} = await load('store/menus/uiStore.ts');
+    const {usePreferencesStore: prefs} = await load('store/preferences/preferencesStore.ts');
+    const {reportMenuDevice, listenForMenuInput} = await load('controls/activeMenuDevice.ts');
+    releaseInput = listenForMenuInput();
+    const {SCREEN_NOTICE_MS} = await load('components/menus/ScreenNotice.tsx');
+    const {createRoot} = await import('react-dom/client');
+    prefs.setState({inputDevice:'browser'});
+    reportMenuDevice('touch');
+    social.setState({view:{profile:{id:'driver',name:'Ava',active_character_id:'a',progression:{character:DEFAULT_CHARACTER}}}});
+    ui.getState().setScreen('heroes', 'wardrobe');
+    root = createRoot(document.getElementById('root'));
+    t.mock.timers.enable({apis:['setTimeout']});
+    await act(async () => root.render(h(HeroWorkshop)));
+    await act(async () => document.getElementById('character-editor-tab-details').click());
+    const hints = document.querySelector('.wardrobe-navigation-hints');
+    const previous = hints.querySelector('[aria-label="Previous toolbar"]');
+    const next = hints.querySelector('[aria-label="Next toolbar"]');
+    assert(hints.querySelector('button[aria-label="Back"]'));
+    assert(previous.querySelector('svg') && next.querySelector('svg'), 'touch has tappable direction glyphs');
+    const activeGroup = () => document.activeElement.closest('[data-wardrobe-focus-group]')?.dataset.wardrobeFocusGroup;
+    const tap = button => act(async () => {
+      for (const type of ['pointerdown', 'pointerup', 'click']) button.dispatchEvent(new window.PointerEvent(type, {
+        bubbles:true, cancelable:true, button:0, pointerType:'touch',
+      }));
+    });
+    await tap(next);
+    assert.equal(activeGroup(), 'angles');
+    await tap(next);
+    assert.equal(activeGroup(), 'rotation');
+    await tap(previous);
+    assert.equal(activeGroup(), 'angles');
+    assert.equal(document.querySelector('#character-editor-tab-details').getAttribute('aria-selected'), 'true');
+    await act(async () => t.mock.timers.tick(SCREEN_NOTICE_MS * 2));
+    assert.equal(document.querySelector('.screen-notice'), null, 'timed entry feedback has expired');
+    assert(hints.isConnected && next.isConnected, 'navigation hints remain on the open screen');
+    await act(async () => reportMenuDevice('keyboard'));
+    assert(previous.querySelector('[data-keyboard-key="1"]') && next.querySelector('[data-keyboard-key="3"]'));
+    await tap(next);
+    assert.equal(hints.dataset.inputDevice, 'touch', 'the first tap replaces the keyboard bindings with touch glyphs');
+    assert.equal(activeGroup(), 'rotation', 'that same tap advances exactly once');
+    await act(async () => reportMenuDevice('controller'));
+    assert(previous.querySelector('[data-controller-key="LT"]') && next.querySelector('[data-controller-key="RT"]'));
+    assert(hints.querySelector('[data-controller-key="LB"]') && hints.querySelector('[data-controller-key="RB"]'));
+    await act(async () => reportMenuDevice('touch'));
+    assert.equal(hints.getAttribute('data-input-device'), 'touch');
+    assert(previous.querySelector('svg') && next.querySelector('svg'));
+    await act(async () => document.querySelector('.garage-hide-toggle').click());
+    assert(hints.closest('[inert]'), 'Hide interface also hides its navigation hints');
+  } finally {
+    releaseInput?.();
+    t.mock.timers.reset();
+    if (root) await act(async () => root.unmount());
+    await vite?.close();
+    close();
+  }
+});
+
 test('spatial garage stations open the wardrobe and vehicle chooser, inspect their options and return', async t => {
   const {close} = characterTestDom();
   let vite, root;
@@ -1054,9 +1257,9 @@ test('spatial garage stations open the wardrobe and vehicle chooser, inspect the
         assert.equal(consumePreviewWakeInput(pad), false, 'navigation resumes after release');
         assert.equal(document.activeElement, eye);
         assert.equal(group(), 'Outfits');
-        await act(async () => routeMenuAction('next_option'));
+        await act(async () => document.querySelector('[data-wardrobe-group=Clothing]').click());
         assert.equal(group(), 'Clothing');
-        await act(async () => routeMenuAction('previous_option'));
+        await act(async () => document.querySelector('[data-wardrobe-group=Outfits]').click());
         await act(async () => document.querySelector('[data-category=outfits]').click());
         const outfit = document.querySelector('[data-wardrobe-item=dockwear]');
         for (const detail of [1, 0]) {

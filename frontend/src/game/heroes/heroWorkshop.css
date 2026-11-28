@@ -159,6 +159,40 @@
 .hero-workshop .hero-main-hold{font-size:11px;}
 .hero-workshop .alpha-selection-footer{flex-wrap:nowrap;overflow:visible;}
 .hero-workshop .controller-shortcuts{min-width:0;flex:1;flex-wrap:nowrap;overflow:hidden;}
+.hero-workshop .wardrobe-navigation-hints .controller-shortcuts { flex-wrap: wrap; overflow: visible; }
+.hero-workshop .wardrobe-navigation-hints .controller-shortcuts > [data-shortcut=navigate] { display: inline-flex; }
+.wardrobe-toolbar-hints {
+  display: inline-flex;
+  flex: none;
+  align-self: flex-end;
+  align-items: center;
+  color: var(--app-text);
+  white-space: nowrap;
+}
+.wardrobe-toolbar-hints button {
+  display: grid;
+  place-items: center;
+  min-inline-size: var(--menu-footer-action-height);
+  min-block-size: var(--menu-footer-action-height);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+/* Last-input detection can swap the glyph between pointerdown and click. */
+.wardrobe-toolbar-hints button > *, .wardrobe-navigation-hints .controller-shortcut-back > * { pointer-events: none; }
+.wardrobe-toolbar-hints button:is(:hover, :focus-visible) { color: var(--app-accent); }
+.wardrobe-toolbar-hints button:focus-visible { outline: 2px solid var(--app-accent); outline-offset: -3px; }
+.wardrobe-toolbar-hints .menu-icon { width: 1.2rem; height: 1.2rem; }
+.wardrobe-toolbar-hints button:first-child .menu-icon { transform: scaleX(-1); }
+@media (any-pointer: coarse) {
+  .wardrobe-navigation-hints :is(.wardrobe-toolbar-hints button, .controller-shortcut-back) {
+    min-inline-size: 44px; min-block-size: 44px;
+  }
+}
 .hero-workshop .hero-workshop-actions>.controller-action:not(.hero-main-hold){padding-inline:8px;gap:6px;font-size:11px;white-space:nowrap;}
 .menu-world-vehicle-overlay{display:flex;align-items:center;justify-content:flex-end;padding:12px;background:transparent!important;backdrop-filter:none!important;pointer-events:none;}
 .menu-world-vehicle-overlay .menu-vehicle-card{width:min(340px,42vw);max-height:90vh;background:var(--app-panel);pointer-events:auto;}
