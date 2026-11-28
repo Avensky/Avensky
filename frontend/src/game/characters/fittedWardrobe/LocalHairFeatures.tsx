@@ -4,7 +4,7 @@ import { persist } from "zustand/middleware";
 import { HairPaletteControls } from "./HairPaletteControls";
 import { useCharacterPreviewStore } from "../characterPreviewStore";
 
-export type LocalHairOption = { id: string; label: string; url: string; mesh?: string };
+export type LocalHairOption = { id: string; label: string; url: string; mesh?: string; editableGroom?: boolean };
 
 export const STOCK_HAIR_ID = "stock";
 export const STOCK_HAIR_LABEL = "Long braid and bonnet";
@@ -19,6 +19,7 @@ export const useLocalHairstyle = create<{id:string; choose:(id:string)=>void}>()
 export function LocalHairFeatures() {
   const id = useLocalHairstyle(state=>state.id);
   const choose = useLocalHairstyle(state=>state.choose);
+  const style = hairOptions.find(option => option.id === id);
   return <>
     <label className="character-setting" data-controller-row>Preview hairstyle
       <select className="menu-control" aria-label="Preview hairstyle" value={hairOptions.some(style=>style.id===id)?id:STOCK_HAIR_ID}
@@ -35,6 +36,6 @@ export function LocalHairFeatures() {
         {hairOptions.map(style=><option key={style.id} value={style.id}>{style.label}</option>)}
       </select>
     </label>
-    {hairOptions.some(style=>style.id===id) && <HairPaletteControls />}
+    {style && <HairPaletteControls key={style.id} style={style.id} editableGroom={style.editableGroom} />}
   </>;
 }
