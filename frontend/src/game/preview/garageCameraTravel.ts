@@ -169,7 +169,7 @@ export class GarageCameraTravel {
     this.lastFrame = now;
     if (this.time < TRAVEL_MS) {
       // Keep interior arcs in the shell; the chase shot can intentionally follow the car through a bay.
-      const indoorTrip = bounds?.containsPoint(this.sourcePosition) && bounds.containsPoint(camera.position);
+      const indoorBounds = bounds?.containsPoint(this.sourcePosition) && bounds.containsPoint(camera.position) ? bounds : undefined;
       const t = MathUtils.smootherstep(this.time, 0, TRAVEL_MS);
       if (this.arcDirection && t > 0) {
         const end = camera.position;
@@ -191,7 +191,7 @@ export class GarageCameraTravel {
         camera.position.lerpVectors(this.sourcePosition, camera.position, t);
         camera.quaternion.slerp(this.sourceOrientation, 1 - t);
       }
-      if (indoorTrip) bounds.clampPoint(camera.position, camera.position);
+      indoorBounds?.clampPoint(camera.position, camera.position);
       applyLens(camera, width, height, MathUtils.lerp(this.sourceLens.fov, lens.fov, t),
         MathUtils.lerp(this.sourceLens.x, lens.x, t), MathUtils.lerp(this.sourceLens.y, lens.y, t));
     } else applyLens(camera, width, height, lens.fov, lens.x, lens.y);
