@@ -63,7 +63,7 @@ export function interactInHub() {
   const target = hub.selected ?? hub.nearby;
   const player = useNetworkStore.getState().playerId;
   if (mode === "foot" && (target?.id !== player || !target.reachable)) {
-    useHubStore.setState({ notice: "Select your parked BRZ and stand beside its door." });
+    useHubStore.setState(state => ({ notice: "Select your parked BRZ and stand beside its door.", noticeRevision: state.noticeRevision + 1 }));
     return;
   }
   const id = ++request;

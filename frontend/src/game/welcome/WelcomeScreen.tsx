@@ -1,3 +1,4 @@
+import { ScreenNotice, useScreenNotice } from "../../components/menus/ScreenNotice";
 import { GarageCredentialFields } from "./GarageCredentialFields";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
 import { GameButton } from "../../components/GameButton";
@@ -83,7 +84,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
   const [preview, setPreview] = useState<{ owner: string; slotId: string }>();
   const [management, setManagement] = useState<{ owner: string; slotId: string }>();
   const [rosterNotice, setRosterNotice] = useState<{ owner: string; text: string }>();
-  const [error, setError] = useState("");
+  const [nameIssue, setNameIssue] = useState("");
+  const notify = useScreenNotice();
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [connectionSlow, setConnectionSlow] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -213,10 +215,15 @@ export function WelcomeScreen({ onGarageCharacter }: {
     return stagingAccountPortal ? "Signed in. Contacting the game server…" : "Contacting the game server…";
   }
 
+  function clearFeedback() {
+    setNameIssue("");
+    notify("");
+  }
+
   function recoverEntry() {
-    setError("");
+    clearFeedback();
     if (signInReason) {
-      void returnToStagingSignIn(false, signInReason).catch(() => setError("Couldn’t open sign-in. Check your connection and try again."));
+      void returnToStagingSignIn(false, signInReason).catch(() => notify("Couldn’t open sign-in. Check your connection and try again.", "alert"));
       return;
     }
     setAttempt(previous => previous + 1);
@@ -238,7 +245,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     // Never log out via Escape or controller Back. The explicit Log out
     // button is the only way to invalidate an active tester session.
     if (accountRoot) return;
-    setError("");
+    clearFeedback();
     if (step === "register" && newPlayer) { setStep("create"); return; }
     if (screen === "create") {
       const previous = CREATOR_STEPS[CREATOR_STEPS.indexOf(creatorStep) - 1];
@@ -353,9 +360,9 @@ export function WelcomeScreen({ onGarageCharacter }: {
     if (pending.current || restoring) return;
     pending.current = true;
     setPendingAction(action);
-    setError("");
+    clearFeedback();
     try { await task(); }
-    catch (failure) { setError(failure instanceof Error ? failure.message : "Could not continue."); }
+    catch (failure) { notify(failure instanceof Error ? failure.message : "Could not continue.", "alert"); }
     finally { pending.current = false; setPendingAction(null); }
   }
 
@@ -398,7 +405,17 @@ export function WelcomeScreen({ onGarageCharacter }: {
 
   async function saveCharacter(owner: string, action: "character_create_styled" | "character_select", fields: Draft | { character_id: string }) {
     await waitForProfile(owner);
-    const confirmed = await requestSocial(action, fields);
+    const confirmed = await requestSocial(action, fields).catch(reason => {
+      // Name validation belongs with this draft even after registration switches screens.
+      if (action === "character_create_styled" && reason instanceof Error &&
+          (reason.message === "That character name is already in use on this server." ||
+            reason.message === "Use 2 to 24 letters, numbers, spaces, apostrophes or hyphens. Start with a letter.")) {
+        setNameIssue(reason.message);
+        return null;
+      }
+      throw reason;
+    });
+    if (!confirmed) return;
     const savedProfile = confirmed.profile as PlayerProfile | undefined;
     const activeSlot = savedProfile?.characters?.find(slot => slot.id === savedProfile.active_character_id);
     if (savedProfile?.id !== owner || !activeSlot || !characterLook(savedProfile.progression?.character))
@@ -447,7 +464,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
     setCreation(initialDraft(adopting));
     changeCreatorStep("gender");
     setName("");
-    setError("");
+    clearFeedback();
     setStep("create");
   }
   function openCreation() {
@@ -470,7 +487,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
   }
   function changeName(value: string) {
     setName(value);
-    setError("");
+    clearFeedback();
   }
   function createDraft() {
     if (!draft || !connected || !accounts || busy || creatorStep !== "personality") return;
@@ -516,7 +533,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
         {accountOpen ? <GarageProfilePanel ref={profilePanel} key={`${accountGeneration}:${player?.id}`} accountSession={accountSession} onBack={leaveProfile} /> : screen === "create" ? <CharacterCreator step={creatorStep} onStep={changeCreatorStep}
           choice={creation.choice} facePreview={facePreview} onChoice={choice => setCreation(previous => ({ ...previous, choice }))}
           style={creation.style} onStyle={chooseStyle} onPreviewStyle={setPreviewStyle} onBody={chooseBody}
-          name={name} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}
+          name={name} nameIssue={nameIssue} onName={changeName} busy={busy} canSubmit={Boolean(draft && connected && accounts && (player || newPlayer))}
           onBack={() => back(true)} onSubmit={createDraft}
           submitLabel={player ? "Create character" : "Continue"} original={originalLook} />
         : screen === "characters" && player && managedSlot ? <RosterCharacterManager key={`${player.id}/${managedSlot.id}`}
@@ -529,10 +546,10 @@ export function WelcomeScreen({ onGarageCharacter }: {
             busy={busy} connected={connected}
             onManage={accountRoot ? slot => {
               setRosterNotice(undefined);
-              setError("");
+              clearFeedback();
               setManagement({ owner: player.id, slotId: slot.id });
             } : undefined}
-            onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setRosterNotice(undefined); setError(""); }}
+            onChoose={slot => { setPreview({ owner: player.id, slotId: slot.id }); setRosterNotice(undefined); clearFeedback(); }}
             onCreate={openCreation} onEnter={slot => void run(() =>
               saveCharacter(player.id, "character_select", { character_id: slot.id }))}
             onBack={accountRoot ? undefined : back} /> : screen === "register" ? (
@@ -561,7 +578,7 @@ export function WelcomeScreen({ onGarageCharacter }: {
             </GameButton>
             {recoveryOpen && <p>Contact your game server operator to recover this account.</p>}
             {accounts && <GameButton variant="menu" disabled={busy} onPress={() => {
-              setError("");
+              clearFeedback();
               if (profile && !registered && profile.characters?.length) setStep("register");
               else { setNewPlayer(true); beginCreation(); }
             }}>Sign up</GameButton>}
@@ -579,8 +596,8 @@ export function WelcomeScreen({ onGarageCharacter }: {
           {working ? workingMessage : restoring ? "Loading your characters…" : "Waiting for the game server…"}
         </p>}
         {!busy && !managing && !accountOpen && screen === "characters" && rosterNotice && rosterNotice.owner === player?.id &&
-          <p role="status">{rosterNotice.text}</p>}
-        {(error || (restoreError && !sessionPending)) && <p role="alert" className="welcome-error">{error || restoreError}</p>}
+          <ScreenNotice message={rosterNotice.text} />}
+        {restoreError && !sessionPending && <ScreenNotice message={restoreError} role="alert" />}
       </aside>
       </div>
       </div>

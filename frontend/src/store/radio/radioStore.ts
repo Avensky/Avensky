@@ -11,6 +11,7 @@ type RadioState = {
   volume: number;
   muted: boolean;
   message: string;
+  messageId: number;
   equipmentNotice: string;
   trackCount: number;
   trackIndex: number;
@@ -33,10 +34,14 @@ export const useRadioStore = create<RadioState>(() => ({
   volume: 0.6,
   muted: false,
   message: "",
+  messageId: 0,
   equipmentNotice: "",
   trackCount: 0,
   trackIndex: 0,
 }));
+function reportAudio(message: string) {
+  useRadioStore.setState(s => ({ message, messageId: s.messageId + 1 }));
+}
 let equipmentTimer: ReturnType<typeof setTimeout> | undefined;
 export function announceRadioEquipment(equipmentNotice: string) {
   clearTimeout(equipmentTimer);
@@ -76,7 +81,7 @@ function player() {
     audio.onerror = () => {
       if (!useRadioStore.getState().powered) return;
       playing(false);
-      useRadioStore.setState({ message: "AUDIO SOURCE UNAVAILABLE" });
+      reportAudio("AUDIO SOURCE UNAVAILABLE");
     };
   }
   return audio;
@@ -103,7 +108,7 @@ async function startRadio() {
     // Source replacement and power-off invalidate earlier play promises.
     if (attempt === playAttempt && useRadioStore.getState().powered) {
       playing(false);
-      useRadioStore.setState({ message: "PRESS PLAY TO START AUDIO" });
+      reportAudio("PRESS PLAY TO START AUDIO");
     }
   }
 }
@@ -131,7 +136,7 @@ export function toggleRadioMute() {
 export async function toggleRadio() {
   if (!useRadioStore.getState().powered) return;
   if (!source) {
-    useRadioStore.setState({ message: "CHOOSE LOCAL AUDIO FILES" });
+    reportAudio("CHOOSE LOCAL AUDIO FILES");
     return;
   }
   if (player().paused) await startRadio();
@@ -178,7 +183,7 @@ export function restartRadio() {
     try {
       audio.currentTime = 0;
     } catch {
-      useRadioStore.setState({ message: "TRACK CANNOT SEEK" });
+      reportAudio("TRACK CANNOT SEEK");
     }
   }
 }

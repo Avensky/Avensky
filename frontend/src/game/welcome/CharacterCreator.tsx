@@ -36,13 +36,13 @@ type Props = {
   choice: CharacterChoice; facePreview: CharacterChoice; onChoice: (choice: CharacterChoice) => void;
   onBody: (body: CharacterBody) => void;
   style: string; onStyle: (id: string) => void; onPreviewStyle: (id?: string) => void;
-  name: string; onName: (value: string) => void;
+  name: string; nameIssue?: string; onName: (value: string) => void;
   busy: boolean; canSubmit: boolean; submitLabel: string; onBack: () => void; onSubmit: () => void;
   original?: CharacterChoice;
 };
 
 export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, onBody, style, onStyle, onPreviewStyle,
-  name, onName, busy, canSubmit, submitLabel, onBack, onSubmit, original }: Props) {
+  name, nameIssue, onName, busy, canSubmit, submitLabel, onBack, onSubmit, original }: Props) {
   const index = CREATOR_STEPS.indexOf(step);
   const final = step === "personality";
   const panel = useRef<HTMLDivElement>(null);
@@ -222,7 +222,8 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
           <div className="creator-name-input-wrap">
             <span ref={nameRow} data-creator-name-nav className="creator-name-field chamfered-frame"
               role="group" aria-label="Character name" tabIndex={busy ? -1 : 0}>
-              <input ref={field} id={scope + "-name"} name="characterName" value={name} autoComplete="nickname" autoCapitalize="words"
+              <input ref={field} id={scope + "-name"} name="characterName" value={name}
+                aria-invalid={nameIssue ? true : undefined} aria-describedby={nameIssue ? scope + "-name-issue" : undefined} autoComplete="nickname" autoCapitalize="words"
                 minLength={2} maxLength={24} required disabled={busy} tabIndex={-1}
                 onFocus={() => setEditingName(true)} onBlur={() => setEditingName(false)}
                 onChange={event => onName(event.target.value)} onKeyDown={event => {
@@ -236,6 +237,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
               <ControlGlyph controller="B" /><span>Exit</span>
             </GameButton>}
           </div>
+          {nameIssue && <p id={scope + "-name-issue"} role="alert" className="welcome-error">{nameIssue}</p>}
         </div>
       </>}
     </div>

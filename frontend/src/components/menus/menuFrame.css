@@ -134,26 +134,32 @@ html[data-ui-theme] .menu-frame .menu-row-description{color:var(--app-muted);fon
 
 /* Scene variants keep the existing palette and the open garage between bars. */
 .menu-frame-header[data-menu-chrome=scene]{background:color-mix(in srgb,var(--menu-chrome-surface) 97%,transparent)}
-.menu-frame-footer[data-menu-chrome=scene]{background:color-mix(in srgb,var(--menu-footer-surface) 97%,transparent)}
+.menu-frame-footer[data-menu-chrome="scene"] {
+  border: 0; background: transparent; pointer-events: none; text-shadow: 0 1px 3px #000;
+}
+.menu-frame-footer[data-menu-chrome="scene"][data-input-device="touch"] { --menu-footer-action-height: 44px; }
+.menu-frame-footer[data-menu-chrome="scene"] :is(button, [role="button"], a) { pointer-events: auto; }
 .menu-frame-header .menu-control{min-height:var(--menu-action-height);padding-block:var(--menu-action-y)}
 .menu-frame-header .menu-control,.menu-frame-footer>.controller-action{padding-inline:13px;font:700 11px/1.3 system-ui;white-space:nowrap}
 .menu-frame-header :is(button,button:hover),.menu-frame-footer :is(button,button:hover){text-decoration:none!important}
 @media(max-width:760px){.menu-frame-header .menu-control,.menu-frame-footer>.controller-action{padding-inline:9px;font-size:10px}}
 
 .menu-footer[data-input-device="touch"] :is(.controller-shortcut-back, .alpha-deploy) {
-  --controller-action-border: 1px solid var(--app-line);
-  --controller-action-background: var(--app-raised);
   justify-content: center;
   min-width: 72px;
   padding-inline: 12px;
-  border: var(--controller-action-border);
+  border: var(--controller-action-border, 0);
   border-radius: 0;
-  background: var(--controller-action-background);
+  background: var(--controller-action-background, transparent);
   color: var(--app-text);
   font-size: 11px;
   font-weight: 750;
 }
-.menu-footer[data-input-device="touch"] .alpha-deploy {
+.menu-footer[data-input-device="touch"]:not([data-menu-chrome="scene"]) :is(.controller-shortcut-back, .alpha-deploy) {
+  --controller-action-border: 1px solid var(--app-line);
+  --controller-action-background: var(--app-raised);
+}
+.menu-footer[data-input-device="touch"]:not([data-menu-chrome="scene"]) .alpha-deploy {
   --controller-action-border: 1px solid var(--app-accent);
   --controller-action-background: color-mix(in srgb, var(--app-raised) 88%, var(--app-accent));
 }

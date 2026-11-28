@@ -175,9 +175,6 @@
   height: 15px;
   margin: auto;
 }
-.hud-utilities .radio-status {
-  padding: 2px 5px;
-}
 .hud-utilities .console-display-tabs {
   display: flex;
   border-top: 1px solid #45647760;
@@ -435,7 +432,6 @@
 .hud-utilities .radio-single-row .radio-volume-dial .climate-knob{box-sizing:border-box;width:24px;height:24px;margin:0}
 .radio-single-row .knob-title,.radio-single-row .radio-volume-dial output{display:none}
 .radio-single-row .radio-volume-dial .climate-knob button{font-size:7px}
-.radio-single-notice{position:absolute;right:0;top:calc(100% + 3px);z-index:10;max-width:100%;padding:4px;background:var(--app-panel);color:var(--app-text);font-size:8px;overflow-wrap:anywhere}
 .hud-utilities .radio-single-row .radio-track-name small{display:block;font:inherit;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hud-utilities{container-type:inline-size}
 @container(max-width:200px){

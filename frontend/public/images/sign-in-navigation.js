@@ -153,7 +153,8 @@
   function showError(text) {
     const card = document.querySelector(".garage-entry-card");
     if (!card) return;
-    const message = card.querySelector('[role="alert"]') ?? card.appendChild(document.createElement("p"));
+    const message = card.querySelector("[data-portal-feedback]") ?? card.appendChild(document.createElement("p"));
+    message.setAttribute("data-portal-feedback", "");
     message.setAttribute("role", "alert");
     message.textContent = text;
     window.dispatchEvent(new Event("avensky:portal-notice"));

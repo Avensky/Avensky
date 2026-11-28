@@ -170,9 +170,3 @@
   height: 20px;
   padding: 0;
 }
-.radio-status {
-  display: block;
-  font-size: 6px;
-  color: #ddb780;
-  overflow-wrap: anywhere;
-}

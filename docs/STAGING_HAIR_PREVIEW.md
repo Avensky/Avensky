@@ -68,6 +68,16 @@ from 37.8 to 40.2 ms and the 90th percentile from 58.2 to 55.0 ms. Checking
 the exact private staging GLB and measuring frame timing on a physical phone
 remain open.
 
+For a high-collar review, inspect the short side locks, nape and short back
+sections separately from the long ponytail. Apply a contrasting pigment and
+switch back to Original. The fitted material must support atlas colors,
+vertex colors and plain material colors. Check a head turn and let it settle.
+The free tips should sway slightly while the tied roots and braid contact
+points stay anchored. In the source-derived review, the Gothic-05 high collar,
+Top 03 ruffle and stock outfit cleared the nape and short back sections. The
+observed color and motion defects were reproduced in the material and sway
+paths. The review did not identify a lock that needed further trimming.
+
 ## Staging release
 
 The staging workflow packages the verified asset manifest with the frontend and

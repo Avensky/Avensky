@@ -85,7 +85,7 @@ function page(title, contents, message = "", garage = false) {
 <script src="${base}/password.js" defer></script>
 <script src="${base}/entry/sign-in-input.js" defer></script><script src="${base}/entry/sign-in-navigation.js" defer></script></head><body class="garage-entry">
 ${garageBackdrop()}${garageBrandHeader("/__alpha/entry")}<main class="garage-entry-body"><section class="garage-entry-card${garage ? "" : " garage-entry-account"}" data-controller-rows aria-label="${escape(title)}">
-${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p role="alert">${escape(message)}</p>` : ""}${contents}
+${signIn ? "" : `<h1>${escape(title)}</h1>`}${message ? `<p data-portal-feedback role="alert">${escape(message)}</p>` : ""}${contents}
 </section></main></body></html>`;
 }
 

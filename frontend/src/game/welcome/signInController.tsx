@@ -1,3 +1,4 @@
+import { createScreenNotice } from "../../components/menus/ScreenNotice";
 import { useState } from "react";
 import { GameButton } from "../../components/GameButton";
 import { GarageCredentialFields } from "./GarageCredentialFields";
@@ -11,18 +12,21 @@ import { createMenuDirections, menuNeutral } from "../../controls/menuDirections
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { navigateFormRows } from "../social/formRows";
 
+const portalNotice = createScreenNotice();
+
 function moveNotices(card: HTMLElement) {
   const body = card.closest(".garage-entry-body");
   if (!body) return;
-  let notices = body.querySelector<HTMLElement>(".garage-notices");
-  for (const message of card.querySelectorAll<HTMLElement>('[role="alert"],[role="status"]')) {
-    if (!notices) {
-      notices = document.createElement("aside");
-      notices.className = "garage-notices";
-      notices.setAttribute("aria-label", "Announcements and issues");
-      body.prepend(notices);
-    }
-    notices.append(message);
+  // Portal action results are transient. A blocked game, recovery instructions and
+  // field-associated errors remain beside their next action in the native form.
+  // Installed portals can still emit an unmarked result immediately before the login form.
+  const results = '[data-portal-feedback], .garage-notices [role="status"], .garage-entry-card > p[role="alert"]:has(+ form.garage-credentials)';
+  for (const message of body.querySelectorAll<HTMLElement>(results)) {
+    const text = message.textContent?.trim();
+    if (text) portalNotice.show(text, message.getAttribute("role") === "alert" ? "alert" : "status");
+    const owner = message.parentElement;
+    message.remove();
+    if (owner?.matches(".garage-notices:empty")) owner.remove();
   }
 }
 
@@ -200,6 +204,7 @@ function attach() {
   const card = document.querySelector<HTMLElement>(".garage-entry-card[data-controller-rows]");
   if (card && !card.querySelector(".garage-gamepad-controls")) attachController(card);
 }
+window.addEventListener("avensky:leave-portal-form", portalNotice.clear);
 window.addEventListener("avensky:portal-form", attach);
 window.addEventListener("avensky:portal-notice", () => {
   const card = document.querySelector<HTMLElement>(".garage-entry-card");

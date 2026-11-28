@@ -1,3 +1,4 @@
+import { ScreenNotice, useScreenNotice } from "../../components/menus/ScreenNotice";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { GameButton } from "../../components/GameButton";
 import { ControlGlyph, type ControlGlyphProps } from "../../components/controller/ControlGlyph";
@@ -70,7 +71,7 @@ function RoomEditor() {
   const { layout, savedLayout, status, error } = usePersonalGarage();
   const selected = useGarageEditor(s => s.selected);
   const [history, setHistory] = useState<GarageRoomLayout[]>([]);
-  const [feedback, setFeedback] = useState("");
+  const reportPlacement = useScreenNotice();
   const historyOwner = usePersonalGarage.getState().owner;
   const active = useRef(true);
   const root = useRef<HTMLElement>(null);
@@ -101,7 +102,7 @@ function RoomEditor() {
   function changeItem(delta: number) {
     const i = GARAGE_PROP_IDS.indexOf(useGarageEditor.getState().selected);
     selectGarageProp(GARAGE_PROP_IDS[(i + delta + GARAGE_PROP_IDS.length) % GARAGE_PROP_IDS.length]);
-    setFeedback("");
+    reportPlacement("");
   }
   function cycleHeader(delta: number) {
     const back = root.current?.querySelector<HTMLElement>(".garage-entry-brand");
@@ -111,7 +112,7 @@ function RoomEditor() {
     else {
       root.current?.focus({ preventScroll: true });
       selectGarageProp(GARAGE_PROP_IDS[next]);
-      setFeedback("");
+      reportPlacement("");
     }
   }
   const move = useCallback((id: GaragePropId, pose: GaragePropPose) => {
@@ -122,11 +123,11 @@ function RoomEditor() {
     const next = { ...state.layout, [id]: pose };
     const message = garagePlacementError(next) ||
       (isGaragePropOnParkedCar(id, pose) ? "Leave room for your parked vehicle." : "");
-    setFeedback(message);
+    reportPlacement(message);
     if (message) return false;
     state.setLayout(next);
     return true;
-  }, []);
+  }, [reportPlacement]);
   function shift(dx: number, dz: number, turn = 0) {
     const layout = usePersonalGarage.getState().layout, id = useGarageEditor.getState().selected;
     const current = layout[id], angle = current.yaw + turn * Math.PI / 12;
@@ -138,11 +139,11 @@ function RoomEditor() {
     if (disabled || !previous) return;
     usePersonalGarage.getState().setLayout(previous);
     setHistory(items => items.slice(0, -1));
-    setFeedback("");
+    reportPlacement("");
   }
   const needsReload = status === "error";
   function reload() {
-    setFeedback("");
+    reportPlacement("");
     void usePersonalGarage.getState().reload().then(() => setHistory([])).catch(() => {});
   }
   const route = (a: MenuAction) => {
@@ -187,7 +188,7 @@ function RoomEditor() {
         {needsReload && <Tool label="Reload saved layout" controller={!savedLayout ? "A" : undefined} press={reload}>Reload</Tool>}
       </div>
     </section>
-    <p className="garage-edit-notice" role="status">{feedback || error || (!savedLayout && status !== "error" ? "Loading your garage…" : "")}</p>
+    <ScreenNotice message={error || (!savedLayout && status !== "error" ? "Loading your garage…" : "")} />
   </main>;
 }
 

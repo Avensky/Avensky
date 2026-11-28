@@ -289,7 +289,9 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(create.vehicle,undefined);
     assert.equal(ui.getState().screen,"welcome");
     await act(async()=>reply(create,{},false,"That character name is already in use on this server."));
-    assert.match(document.querySelector('[role="alert"]').textContent,/already in use/);
+    const nameInput = document.querySelector('[name="characterName"]');
+    assert.equal(nameInput.getAttribute("aria-invalid"), "true");
+    assert.match(document.getElementById(nameInput.getAttribute("aria-describedby")).textContent, /already in use/);
     assert.equal(ui.getState().screen,"welcome");
     assert.equal(document.querySelector('[name="characterName"]').value,"Track Fox");
     await act(async()=>typeName("Track Fox II"));
@@ -326,7 +328,7 @@ test("the creator preserves an eight-step appearance through registration, name 
     assert.equal(rejected.action, "account_login");
     assert.equal(loginForm.isConnected, true, "the real form stays mounted during authentication");
     await act(async () => reply(rejected, {}, false, "That email or password is incorrect."));
-    assert.match(document.querySelector('[role="alert"]').textContent, /incorrect/);
+    assert.match(document.querySelector('.screen-notices [role="alert"]').textContent, /incorrect/);
     assert.equal(loginForm.elements.login.value, "lightfoot@example.net");
     assert.equal(loginForm.elements.password.value, "a staging passphrase for test");
     assert.equal(document.querySelector("#garage-entry-handoff"), null);

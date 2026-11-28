@@ -55,9 +55,9 @@ function garageTestServer() {
           return h('div', {'data-camera': true}, children);
         }
         export const VehiclePlatform = () => h("i", {"data-vehicle-platform": true});
-        export function GarageEnvironment({onSettled}) {
+        export function GarageEnvironment({onSettled, showroomEffects}) {
           useLayoutEffect(() => { onSettled(); }, [onSettled]);
-          return h('div',{'data-garage':true});
+          return h('div',{'data-garage':true, 'data-showroom-effects':showroomEffects});
         }
         export function PreviewTurntable({children, onReady}) {
           useLayoutEffect(() => { onReady(turntable); }, [onReady]);
@@ -118,6 +118,8 @@ test('the garage falls back to the favorite while keeping the Abilities preview 
         assert.match(render(),/data-garage-open="true"/);
         preview.insideCar=true;
         const wardrobe=renderToString(createElement(VehiclePreview,{awaitingHero:true,wardrobeOpen:true}));
+        assert.match(wardrobe,/data-showroom-effects="false"/);
+        assert.match(render(),/data-showroom-effects="true"/);
         assert.match(wardrobe,/data-model="mini"/);
         assert.match(wardrobe,/data-diagnostics="false"/);
         assert.match(render(),/data-model="mini"/);

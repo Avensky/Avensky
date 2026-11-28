@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { useConnectionView } from "../../store/session/networkViews";
 import { SceneTabHeader } from "../../components/menus/SceneTabHeader";
 import { useMenuPressOwner } from "../../components/menus/useMenuPressOwner";
@@ -204,11 +205,7 @@ export function ModeSelection() {
               {!PLAYER_ONBOARDING && <small>A guest profile keeps your styles and progress in this tab. A device profile keeps them for later visits on this device.</small>}
             </>}
           </div>}
-          {(status||recoveryNotice) && (
-            <p className="alpha-status" role="status">
-              {status||recoveryNotice}
-            </p>
-          )}
+          <ScreenNotice message={status || recoveryNotice} />
         </section>
         <div className="hero-chat-panel">
           <LobbyChat />

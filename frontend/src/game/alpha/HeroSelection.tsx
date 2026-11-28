@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { useConnectionView } from "../../store/session/networkViews";
 import {useScoreboardStore} from '../../store/hud/scoreboardStore';
 import { unavailableHeroes } from "./heroAvailability";
@@ -43,8 +44,8 @@ export function HeroSelection({ overlay = false }: { overlay?: boolean } = {}) {
   const active = view?.alpha?.active;
   const mode = overlay && active ? active.mode : selectedMode;
   const [role, setRole] = useState<HeroFilter>("all");
-  const [status, setStatus] = useState(""),
-    [busy, setBusy] = useState(false);
+  const setStatus = useScreenNotice();
+  const [busy, setBusy] = useState(false);
   const pending = useRef(false),
     root = useRef<HTMLElement>(null);
   const inMode = !!active&&canonicalGameMode(active.mode)===canonicalGameMode(mode)&&(!isMatchMode(mode)||modeTeamSize(active.mode,active.team_size)===selectedTeamSize||overlay);
@@ -242,7 +243,6 @@ export function HeroSelection({ overlay = false }: { overlay?: boolean } = {}) {
             <section className="hero-summary" aria-label="Selected hero" data-role={selected?.role}>
               <small>{selected?.role.toUpperCase() ?? "CHOOSE YOUR HERO"}</small>
               <h2>{selected?.name ?? "AWAITING PICK"}</h2>
-              {status && <p className="alpha-status" role="status">{status}</p>}
             </section>
             <div className="hero-chat-panel">
               <LobbyChat />

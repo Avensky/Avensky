@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import {useTireEffectsSettings} from '../../vehicles/effects/tireEffectsSettings';
 import {HEALTH_BAR_LABELS,cycleHealthBarMode} from "../../store/preferences/healthVisibility";
 import {NOTICE_CHANNELS,NOTICE_LABELS,DEFAULT_NOTICE_CHANNELS} from '../../combat/noticeModel';
@@ -72,7 +73,8 @@ export function SettingsMenu() {
   const [pendingBinding, setPendingBinding] = useState<BindingAction | null>(
     null,
   );
-  const [notice, setNotice] = useState("");
+  const setNotice = useScreenNotice();
+  const [bindingIssue, setBindingIssue] = useState("");
   const audioVolume=(key:keyof Pick<VehicleAudioSettings,'master'|'engines'|'tires'|'tracks'|'turbo'|'nitrous'|'echo'>,label:string):MenuRow=>({
     id:'audio-'+key,label,value:`${Math.round(audio[key]*100)}%`,adjustable:true,
     action:direction=>audio.update({[key]:Math.round((audio[key]+direction*.05)*100)/100}),
@@ -91,7 +93,7 @@ export function SettingsMenu() {
       if (
         !isBindingKey(pendingBinding,event.code)
       ) {
-        setNotice("That key is reserved. Choose a letter, number or Space.");
+        setBindingIssue("That key is reserved. Choose a letter, number or Space.");
         return;
       }
       const bindings = usePreferencesStore.getState().bindings;
@@ -100,7 +102,7 @@ export function SettingsMenu() {
           ([action, code]) => action !== pendingBinding && code === event.code,
         )
       ) {
-        setNotice("That key is already assigned to another driving action.");
+        setBindingIssue("That key is already assigned to another driving action.");
         return;
       }
       usePreferencesStore
@@ -119,7 +121,7 @@ export function SettingsMenu() {
       window.removeEventListener("keydown", capture, true);
       window.removeEventListener("avenlab:panel-action", cancelFromPad, true);
     };
-  }, [pendingBinding]);
+  }, [pendingBinding, setNotice]);
 
   const graphics = (
     key:
@@ -191,7 +193,6 @@ export function SettingsMenu() {
         eyebrow=""
         chamferTitle
         onBack={back}
-        status={notice}
         tabs={[
           {
             id: "display",
@@ -457,7 +458,7 @@ export function SettingsMenu() {
                   value: keyLabel(prefs.bindings[action]),
                   adjustable: false,
                   action: () => {
-                    setNotice(`Choose a key for ${BINDING_LABELS[action]}`);
+                    setBindingIssue("");
                     setPendingBinding(action);
                   },
                 }),
@@ -704,7 +705,7 @@ export function SettingsMenu() {
         >
           <div className="menu-bind-card">
             <h2>Press a key for {BINDING_LABELS[pendingBinding]}</h2>
-            <p role="status">{notice}</p>
+            {bindingIssue && <p role="alert">{bindingIssue}</p>}
             <button
               autoFocus
               type="button"

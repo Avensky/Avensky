@@ -42,8 +42,7 @@
 }
 .hub-actions button,
 .hub-actions p,
-.hub-target,
-.hub-notice {
+.hub-target {
   background: #142624ef;
   border: 1px solid #92c9be;
   color: inherit;
@@ -58,7 +57,7 @@
   min-height: 44px;
 }
 .hub-actions button:disabled { opacity: .52; }
-.hub-target, .hub-notice {
+.hub-target {
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -66,4 +65,3 @@
   text-align: center;
 }
 .hub-target { top: max(3.2rem, calc(env(safe-area-inset-top) + 1rem)); }
-.hub-notice { bottom: 1rem; }

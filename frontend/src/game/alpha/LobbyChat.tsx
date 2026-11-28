@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { formatCharacterName } from "../characters/characterName";
 import { useConnectionView } from "../../store/session/networkViews";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -27,8 +28,8 @@ export function LobbyChat({ driving = false }: { driving?: boolean }) {
   const lines = useChatStore((s) => s.history[context] ?? EMPTY);
   const [expanded, setExpanded] = useState(false),
     [draft, setDraft] = useState("");
-  const [notice, setNotice] = useState(""),
-    [busy, setBusy] = useState(false),
+  const setNotice = useScreenNotice();
+  const [busy, setBusy] = useState(false),
     [interaction, setInteraction] = useState(0);
   const composing = useTextKeyboardStore(
     (s) => s.session?.label === "Chat message",
@@ -331,11 +332,7 @@ export function LobbyChat({ driving = false }: { driving?: boolean }) {
               {busy ? "…" : "SEND"}
             </button>
           </form>
-          {notice && (
-            <p className="chat-notice" role="status">
-              {notice}
-            </p>
-          )}
+
         </>
       )}
     </section>

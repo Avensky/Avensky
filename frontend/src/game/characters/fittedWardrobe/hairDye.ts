@@ -1,4 +1,4 @@
-import { Color, ShaderChunk, Vector2, Vector3, type BufferGeometry, type MeshStandardMaterial } from "three";
+import { Color, Vector2, Vector3, type BufferGeometry, type MeshStandardMaterial } from "three";
 import { DEFAULT_HAIR_PALETTE, type HairPalette } from "./hairColors";
 import { DEFAULT_HAIR_GROOM, HAIR_PIECES, type HairGroom } from "./hairGroom";
 
@@ -17,6 +17,9 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
   const maskedTail = tailMask?.itemSize === 1 && tailMask.count === geometry.attributes.position.count;
   const sway = tailOffset && (groomColor || maskedTail);
   const pieces = HAIR_PIECES.length;
+  // Preserve the legacy atlas tint switch on plain hair. Groom pieces share
+  // the same source luminance for a full dye and for a single-piece override.
+  const sourceTint = material.map && !groomColor ? material.color.clone() : undefined;
   const pieceUniforms = groomColor ? {
     avenskyPieceBase: { value: HAIR_PIECES.map(() => new Color()) },
     avenskyPieceRoots: { value: HAIR_PIECES.map(() => new Color()) },
@@ -38,6 +41,10 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
     avenskyHairRootStrength: { value: material.name.endsWith("Root strands") ? .64 : .83 },
   };
   function setPalette(palette: HairPalette, original = false, groom: HairGroom = DEFAULT_HAIR_GROOM) {
+    if (sourceTint) {
+      if (original) material.color.copy(sourceTint);
+      else material.color.set(0xffffff);
+    }
     shape?.value.set(groom.volume, groom.thickness);
     if (pieceUniforms) HAIR_PIECES.forEach(([piece], i) => {
       const override = groom.pieces[piece];
@@ -57,9 +64,8 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
     uniforms.avenskyHairMix.value.set(palette.highlightStrength, palette.tipBlend);
   }
   setPalette(DEFAULT_HAIR_PALETTE, true);
-  material.color.set(0xffffff);
   material.customProgramCacheKey = () =>
-    `avensky-hair-dye-v4${sway ? "-sway" : ""}${maskedTail ? "-tail-mask" : ""}${groomColor ? "-groom" : ""}${groomShape ? "-shape" : ""}`;
+    `avensky-hair-dye-v5${sway ? "-sway" : ""}${maskedTail ? "-tail-mask" : ""}${groomColor ? "-groom" : ""}${groomShape ? "-shape" : ""}`;
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = "uniform vec2 avenskyHairRigOffset; varying vec3 vAvenskyHairRest;\n" + shader.vertexShader.replace(
@@ -70,7 +76,16 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
       const mask = maskedTail ? "_avensky_tail" : "float(abs(_avensky_groom.z - 8.0) < 0.5) * smoothstep(0.1, 1.0, _avensky_groom.x)";
       shader.vertexShader = (maskedTail ? "attribute float _avensky_tail;\n" : "") + "uniform vec3 avenskyTailOffset;\n" +
         shader.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
-          transformed += avenskyTailOffset * ${mask};
+          float looseWeight = ${mask};
+          ${groomColor ? `
+          // Side locks, nape wisps and Back_Short have their own section IDs.
+          // The ponytail-only mask is zero here in multipart groom exports.
+          bool collarLock = abs(_avensky_groom.z - 2.5) < 0.9 || abs(_avensky_groom.z - 6.5) < 0.9;
+          if (collarLock) {
+            float lowerLock = 1.0 - smoothstep(1.475, 1.545, position.y);
+            looseWeight = max(looseWeight, 0.55 * lowerLock * smoothstep(0.28, 0.92, _avensky_groom.x));
+          }` : ""}
+          transformed += avenskyTailOffset * looseWeight;
           ${groomColor ? `if (abs(_avensky_groom.z - 4.5) < 0.9) {
             // The free span can swing sideways. The ends follow the worn
             // garment through skinning and settle as they approach the chest.
@@ -97,12 +112,7 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
           transformed += _avensky_groom_lift * avenskyGroomShape.x + _avensky_groom_width * avenskyGroomShape.y;
         `);
     }
-    shader.fragmentShader = `
-      varying vec3 vAvenskyHairRest;
-      uniform vec3 avenskyHairBase, avenskyHairRoots, avenskyHairHighlights, avenskyHairTips;
-      uniform vec2 avenskyHairMix, avenskyHairProfile;
-      uniform float avenskyHairOriginal, avenskyHairRootStrength;
-    ` + shader.fragmentShader.replace("#include <map_fragment>", ShaderChunk.map_fragment.replace("diffuseColor *= sampledDiffuseColor;", `
+    const dye = `
       // Lightness carries the strand detail. Compress baked lightness variation
       // so cards from different atlas regions share the same chosen pigment.
       ${groomColor ? `
@@ -116,7 +126,7 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
         vec3 dyeHighlights = avenskyHairHighlights, dyeTips = avenskyHairTips;
       `}
       if (selected.z < 0.5) {
-        float strand = dot(sampledDiffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
+        float strand = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
         float grain = clamp(log2(max(strand, 0.008) / 0.063), -1.7, 1.7);
         float drape = clamp((1.642 - vAvenskyHairRest.y) * avenskyHairProfile.x, 0.0, 1.0);
         float shell = length((vAvenskyHairRest - vec3(0.0, 1.569, 0.012)) / vec3(0.080, 0.109, 0.103));
@@ -136,10 +146,18 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
         pigment = mix(pigment, dyeHighlights, highlight);
         // Give close midtones more separation without restoring baked color bands.
         float strandContrast = grain / (1.0 + 0.41 * abs(grain));
-        sampledDiffuseColor.rgb = pigment * (1.0 + 0.31 * strandContrast);
+        diffuseColor.rgb = pigment * (1.0 + 0.31 * strandContrast);
       }
-      diffuseColor *= sampledDiffuseColor;
-    `));
+    `;
+    // At this point Three has combined material, atlas and vertex colors.
+    // Use their luminance once so a tinted strand cannot recolor its own dye.
+    const colored = shader.fragmentShader.replace("#include <color_fragment>", "#include <color_fragment>\n" + dye);
+    shader.fragmentShader = `
+      varying vec3 vAvenskyHairRest;
+      uniform vec3 avenskyHairBase, avenskyHairRoots, avenskyHairHighlights, avenskyHairTips;
+      uniform vec2 avenskyHairMix, avenskyHairProfile;
+      uniform float avenskyHairOriginal, avenskyHairRootStrength;
+    ` + colored;
   };
   material.needsUpdate = true;
   return setPalette;

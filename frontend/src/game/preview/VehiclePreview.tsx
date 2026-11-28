@@ -464,7 +464,7 @@ export function VehiclePreview({
   const unavailable = vehicleId && <MissingVehicle model={vehicleId} onSettled={vehicleMissing} cockpit={insideCar} visible={!characterOnly} />;
   return (
     <>
-      <GarageEnvironment onSettled={roomSettled} />
+      <GarageEnvironment onSettled={roomSettled} showroomEffects={!wardrobeOpen} />
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
       <PerspectiveCamera ref={cameraRef} name="garage-preview-camera" makeDefault>

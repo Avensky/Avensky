@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import { useMenuInputDevice } from "../../components/controller/useMenuInputDevice";
 import { isMobileBrowser } from "../../controls/inputDevice";
@@ -48,6 +49,7 @@ export function HubHud({ drivingBrz, walking }: { drivingBrz: boolean; walking: 
   const target = useHubStore(s => s.selected ?? s.nearby);
   const pending = useHubStore(s => s.pending !== null);
   const notice = useHubStore(s => s.notice);
+  const noticeRevision = useHubStore(s => s.noticeRevision);
   const device = useMenuInputDevice();
   const touch = device === "touch" || isMobileBrowser();
   if (!drivingBrz && !walking) return null;
@@ -56,7 +58,7 @@ export function HubHud({ drivingBrz, walking }: { drivingBrz: boolean; walking: 
   return <div className="hub-controls" data-walking={walking}>
     {walking && touch && <MoveStick />}
     {walking && target && <p className="hub-target" aria-live="polite">{target.label}</p>}
-    {notice && <p className="hub-notice" role="status">{notice}</p>}
+    <ScreenNotice message={notice} eventId={noticeRevision} />
     <div className="hub-actions">
       {walking && touch && <button type="button" disabled={!grounded} onClick={jumpInHub}>Jump</button>}
       {touch ? <button type="button" disabled={!reachable || pending} onClick={interactInHub}>{label}</button>

@@ -1,0 +1,23 @@
+.screen-notices {
+  position: fixed;
+  z-index: 150;
+  inset-block-start: calc(env(safe-area-inset-top, 0px) + var(--menu-angled-header-height, 2.75rem) + .4rem);
+  inset-inline: max(.75rem, env(safe-area-inset-left, 0px)) max(.75rem, env(safe-area-inset-right, 0px));
+  display: grid;
+  justify-items: center;
+  gap: .25rem;
+  pointer-events: none;
+  user-select: none;
+}
+.screen-notice {
+  max-inline-size: min(100%, 40rem);
+  margin: 0;
+  padding: .36rem .8rem;
+  border-inline-start: 2px solid var(--app-accent, #ecab53);
+  background: var(--app-panel, #1b1919);
+  color: var(--app-text, #fff8ec);
+  font: 600 clamp(.8rem, 1.6vw, 1rem)/1.3 var(--app-font, system-ui, sans-serif);
+  text-align: center;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
