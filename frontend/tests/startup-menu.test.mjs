@@ -193,6 +193,18 @@ test("real App removes the startup cover and opens the latest main menu without 
     assert.equal(document.querySelector(".mobile-rotate-screen"), null);
     assert.ok(document.querySelector(".main-menu .garage-orbit-surface"));
 
+    for (const station of ["wardrobe", "vehicle"]) {
+      await act(async () => {
+        // The first focus in the room warms the station UI before activation.
+        const { loadGarageWorkshop } = await server.ssrLoadModule("/src/game/heroes/loadGarageWorkshop.ts");
+        await loadGarageWorkshop();
+        ui.getState().setScreen("heroes", station);
+      });
+      assert.equal(document.querySelector(".mobile-rotate-screen"), null, station + " opens in portrait");
+      assert.equal(document.querySelector(".game-viewport[inert]"), null);
+      await act(async () => ui.getState().setScreen("main"));
+    }
+
     const { ModeLoadingScreen } = await server.ssrLoadModule(
       "/src/game/ModeLoadingScreen.tsx",
     );

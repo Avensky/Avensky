@@ -8,7 +8,7 @@ import { GARAGE_BAY_DOORS } from "../src/game/preview/garageDoorLayout.ts";
 import { GARAGE_MENU_LANDMARKS } from "../src/game/preview/garageMenuLandmarks.ts";
 import { GARAGE_PARKING } from "../src/game/preview/garageServiceLayout.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
-import { installGarageEntryInteraction } from "../src/game/preview/garageEntryInteraction.ts";
+import { installGarageEntryInteraction, moveGarageOrbitStick } from "../src/game/preview/garageEntryInteraction.ts";
 import { bindRosterSticks, readRosterSticks, releaseRosterSticks } from "../src/game/preview/rosterStickControls.ts";
 import { prepareGaragePointLights } from "../src/game/preview/garagePointLights.ts";
 
@@ -404,5 +404,81 @@ test("controller rotation is independent of poll frequency and inactive scenes r
     assert.deepEqual(calls.at(-1), [0, 0]);
     unbind();
     assert.equal(readRosterSticks(1, 1, 1, 5000), false);
+  }
+});
+
+test("orbit holds without rendering until the player is idle, then wakes the resting camera once", t => {
+  const dom = new JSDOM('<div class="garage-orbit-surface"></div><div role="button">Preview</div>', { pretendToBeVisual: true });
+  const previous = { window: globalThis.window, document: globalThis.document };
+  const { window } = dom;
+  Object.assign(globalThis, { window, document: window.document });
+  const room = document.querySelector(".garage-orbit-surface"), root = document.documentElement;
+  root.dataset.garageReady = "true";
+  root.setPointerCapture = root.releasePointerCapture = () => {};
+  root.hasPointerCapture = () => true;
+  let now = 0, timer, frames = 0, hidden = false;
+  Object.defineProperty(document, "hidden", { get: () => hidden, configurable: true });
+  t.mock.method(performance, "now", () => now);
+  t.mock.method(window, "setTimeout", (callback, ms) => { assert(!timer); timer = { callback, at: now + ms }; return 1; });
+  t.mock.method(window, "clearTimeout", () => { timer = undefined; });
+  const advance = ms => {
+    const end = now + ms;
+    while (timer && timer.at <= end) {
+      const pending = timer;
+      now = pending.at;
+      timer = undefined;
+      pending.callback();
+    }
+    now = end;
+  };
+  const pointer = (type, x, target = room) => target.dispatchEvent(new window.PointerEvent(type, {
+    pointerId: 1, isPrimary: true, button: 0, clientX: x, bubbles: true,
+  }));
+  const motion = { yaw: 0, pitch: 0, dragging: false, invalidate: () => { frames++; } };
+  const controls = installGarageEntryInteraction(motion, () => false);
+  try {
+    pointer("pointerdown", 100);
+    pointer("pointermove", 150);
+    pointer("pointerup", 150);
+    const chosen = motion.targetYaw, released = frames;
+    assert.ok(chosen > 0);
+    advance(11_800);
+    assert.equal(motion.targetYaw, chosen);
+    assert.equal(frames, released, "waiting costs zero frames");
+    const ui = document.querySelector('[role="button"]');
+    pointer("pointerdown", 20, ui);
+    advance(16_000);
+    assert.equal(frames, released, "a held control postpones recentering");
+    pointer("pointerup", 20, ui);
+    advance(11_800);
+    window.dispatchEvent(new window.Event("avenlab:panel-action"));
+    advance(11_999);
+    assert.equal(motion.targetYaw, chosen, "controller navigation extends the hold");
+    advance(1);
+    assert.equal(motion.targetYaw, undefined);
+    assert.equal(motion.lastInput, now, "interpolation starts now, excluding the idle gap");
+    assert.equal(frames, released + 1);
+    assert.equal(timer, undefined);
+
+    for (let i = 0; i < 12; i++) moveGarageOrbitStick(motion, .8, 0, 1 / 60);
+    moveGarageOrbitStick(motion, .05, 0, 1 / 60);
+    const stickAngle = motion.targetYaw;
+    moveGarageOrbitStick(motion, 0, 0, 1 / 60);
+    assert.ok(stickAngle < -.05);
+    assert.equal(motion.targetYaw, stickAngle, "the stick's neutral position releases the angle");
+    hidden = true;
+    document.dispatchEvent(new window.Event("visibilitychange"));
+    advance(20_000);
+    assert.equal(motion.targetYaw, stickAngle);
+    hidden = false;
+    document.dispatchEvent(new window.Event("visibilitychange"));
+    advance(11_999);
+    assert.equal(motion.targetYaw, stickAngle, "restoring the tab starts a fresh idle interval");
+    controls.abort();
+    assert.equal(timer, undefined, "unmount removes the deadline");
+  } finally {
+    controls.abort();
+    dom.window.close();
+    Object.assign(globalThis, previous);
   }
 });

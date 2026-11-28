@@ -1,5 +1,7 @@
 # Garage characters
 
+From the Garage, choose Wardrobe at the mirror to open Appearance. Outfits, Clothing and Accessories group the options available to the selected rig. For a new fitting-room control, follow the [creator-to-workshop pipeline](../../../../docs/MENU_DESIGN.md#from-character-creation-to-garage-customization).
+
 Heroes and Garage use the portrait at the right of the header to open Character.
 The main menu shares the angled character header and uses it to open player options.
 Its profile tab follows the same desktop, phone and short-landscape sizes as the other menus.

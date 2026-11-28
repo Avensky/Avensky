@@ -7,6 +7,7 @@ export function navigateFormRows(
   active: HTMLElement | null,
   action: MenuAction,
   remembered: WeakMap<HTMLElement, number>,
+  { includeHeaderActions = true } = {},
 ) {
   if (!root.hasAttribute("data-controller-rows")) return false;
   const controls = "[role=button],[role=tab],button,input:not([type=hidden]),select,textarea,a[href],summary,[data-controller-selector][tabindex]";
@@ -14,6 +15,7 @@ export function navigateFormRows(
     root.querySelectorAll<HTMLElement>("[data-controller-row]"),
   )
     .filter((row) => !row.hasAttribute("data-controller-tab-only"))
+    .filter((row) => includeHeaderActions || !row.closest("[data-controller-header-action], .menu-frame-header"))
     .map((row) => ({
       row,
       items: (row.matches("button, [role=button], [role=tab], a[href], input:not([type=hidden])") ? [row] : Array.from(row.querySelectorAll<HTMLElement>(controls))).filter(

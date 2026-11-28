@@ -1,3 +1,4 @@
+import { observeWorkshopViewport } from "../preview/workshopViewport";
 import { isMirrorMakeupEmote, MAKEUP_EMOTES } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
 import { FitReview } from "./FitReview";
@@ -22,7 +23,7 @@ import { GARAGE_STATIONS } from "../preview/garageStations";
 import { CHARACTER_PERSONALITIES, type AnimationFit, type CharacterPersonality } from "./characterPersonality";
 import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
-import { DressingRoom } from "./DressingRoom";
+import { DressingRoom, type WardrobeNavigation } from "./DressingRoom";
 import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
@@ -76,11 +77,12 @@ function playEmote(item: PreviewEmote) {
   }));
 }
 
-export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
+export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNavigation }: {
   onPreview?: (choice: CharacterChoice | null) => void;
   onReady: (ready: boolean) => void;
   tab: CharacterTab;
   beforeClose: Ref<() => Promise<boolean>>;
+  wardrobeNavigation?: Ref<WardrobeNavigation>;
 }) {
   const page = useRef<HTMLDivElement>(null);
   const fittedHair = useLocalHairstyle(state => hairOptions.some(style => style.id === state.id));
@@ -150,21 +152,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     cockpitVehicle: state.cockpitVehicle, cockpitAvailable: state.cockpitAvailable, cockpitError: state.cockpitError,
     insideCar: state.insideCar, leanAvailable: state.leanAvailable, mirrorAvailable: state.mirrorAvailable, loopEmote: state.loopEmote,
   })));
-
-  useLayoutEffect(() => {
-    const element = page.current?.querySelector<HTMLElement>("[data-character-viewport]");
-    if (!element || typeof ResizeObserver === "undefined") return;
-    const updateArea = () => {
-      const { left, top, width, height } = element.getBoundingClientRect();
-      const current = useCharacterPreviewStore.getState().viewport;
-      if (current?.left !== left || current.top !== top || current.width !== width || current.height !== height) {
-        useCharacterPreviewStore.setState({ viewport: { left, top, width, height } });
-      }
-    };
-    const observer = new ResizeObserver(updateArea);
-    observer.observe(element); updateArea();
-    return () => { observer.disconnect(); useCharacterPreviewStore.setState({ viewport: null }); };
-  }, [locked, tab]);
 
   const flush = useCallback((): Promise<boolean> => {
     clearTimeout(timer.current);
@@ -624,7 +611,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
 
   if (!locked) return (
     <div ref={page} className="character-page character-page--setup" aria-label="Choose character gender" onFocus={revealCharacterControl}>
-      <div className="character-stage" data-character-viewport data-character-preview={character.id} data-outfit-preview={outfit.id} />
+      <div className="character-stage" ref={observeWorkshopViewport} data-character-viewport data-character-preview={character.id} data-outfit-preview={outfit.id} />
       <section className="character-controls menu-panel-frame">
         <header className="character-description"><h2>Choose gender</h2><p>You can switch models any time during alpha.</p></header>
         {modelPicker}
@@ -655,9 +642,9 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose }: {
     <div ref={page} className={`character-page character-page--editor character-page--${fitting ? "dressing" : tab}${emoteGroup === "Creator" && tab === "emotes" ? " character-page--creator" : ""}`}
       role="tabpanel" id="character-editor-panel" aria-labelledby={"character-editor-tab-" + tab}
       onFocus={revealCharacterControl}>
-      <div className="character-stage" data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
+      <div className="character-stage" ref={observeWorkshopViewport} data-character-viewport data-character-preview={previewChoice.id} data-outfit-preview={previewChoice.outfit}
         aria-label={`Preview of ${characterName ?? "Your character"}`} />
-      {fitting && <DressingRoom characterName={characterName} choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
+      {fitting && <DressingRoom navigation={wardrobeNavigation} characterName={characterName} choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
         onColors={saveClothingColors} />}

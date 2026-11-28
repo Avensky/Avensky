@@ -13,7 +13,7 @@ const surfaceId = "\0" + surface;
 function testSurfaces() {
   const retained = new Set(["react", "../FullCanvas", "./store/menus/uiStore",
     "./game/welcome/GarageMenuBackdrop", "./game/preview/RosterGaragePreview",
-    "./game/preview/garageParkingStore", "./preview/garageParkingStore", "./store/input/inputStore"]);
+    "./heroes/loadGarageWorkshop", "./game/preview/garageParkingStore", "./preview/garageParkingStore", "./store/input/inputStore"]);
   const stubs = {
     useSocialStore: "select => select({})",
     useBuilderStore: 'select => select({ workspace: "world" })',
@@ -25,8 +25,11 @@ function testSurfaces() {
   return {
     name: "preview-lifecycle-test-surfaces", enforce: "pre",
     transform(source, id) {
+      if (id.endsWith("/heroes/loadGarageWorkshop.ts")) {
+        return source.replace('import("./HeroWorkshop")', `import("${surface}")`);
+      }
       if (id.endsWith("/src/App.tsx") || id.endsWith("/game/GameUI.tsx") || id.endsWith("/modes/WorldContents.tsx")) {
-        return source.replace(/import\("(?:\.\/heroes\/HeroWorkshop|\.\.\/ui\/DrivingHUD)"\)/g, `import("${surface}")`)
+        return source.replace(/import\("\.\.\/ui\/DrivingHUD"\)/g, `import("${surface}")`)
           .replace(/^import\s*\{([^}\n]+)\}\s*from\s*"([^"]+)";$/gm, (line, bindings, path) => {
             if (retained.has(path)) return line;
             if (path === "../store") return line.replace(path, "../store/menus/uiStore");
@@ -122,6 +125,12 @@ test("Heroes, Main and Play hand off one startup garage; the live world owns a s
     };
 
     main();
+    for (const station of ["wardrobe", "vehicle"]) {
+      await act(async () => useUIStore.getState().setScreen("heroes", station));
+      preview("heroes");
+      assert.equal(findElement(runtime.preview.contents, VehiclePreview).props.characterOnly, station === "wardrobe");
+      await screen("main"); main();
+    }
     await screen("heroes"); preview("heroes");
     await screen("main"); main();
     await screen("mode_select"); preview("mode_select");

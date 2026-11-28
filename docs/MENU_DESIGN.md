@@ -44,6 +44,32 @@ Draw one continuous top edge across the joined right tabs and a single diagonal 
 
 Display character names with an initial capital for each part, as in **Vesper Vega** or **O’Neil**. Preserve intentionally mixed spelling such as **McKay**. Use the shared formatter when rendering a character name. Keep the original text for editing, saving and the exact-name deletion prompt. Profile’s **Display name** is the account name and keeps its owner’s spelling. [Character name formatter](../frontend/src/game/characters/characterName.ts)
 
+## From character creation to garage customization
+
+The creator took the fitting room’s visual choices and gave each decision its own tab. Go from Gender → Looks → Skin tone → Hairstyle → Hair color → Eyes → Makeup → Personality. The last step includes the player’s name. Personality changes starter clothing and gestures while retaining earlier appearance choices.
+
+Apply the same pattern when adding a garage option.
+
+1. **Start in the room.** Open Wardrobe from the mirror and lockers and Vehicle from the service bay. Frame the selected character or vehicle in the existing garage. Keep the last valid preview visible while a newly selected asset loads. Use cached images for choice tiles.
+2. **Give the decision a place.** Put the major task in the primary header. Use a secondary row for related choices, such as garment categories or paint and lights. Reveal detail for the active choice. Use a collapsible row for occasional controls such as fit details and material adjustments. Keep tab navigation separate from moving through the option grid.
+3. **Show what changes.** Crop hair tiles to include the crown and ends, eye tiles to the eyes, and garment or vehicle tiles to the relevant silhouette. Put the active name below the choices when the image conveys the difference. Use the current theme for focus, a checkmark for the applied item, and accessible names and states for both. Let the live subject show the result of an edit.
+4. **Fit the phone.** In landscape, reserve the stage on the left and put choices in a scrollable inspector on the right. In portrait, place choices below the subject. Scroll the options within their own region. Keep the current feature and the action reachable at once, even with enlarged menu text. Use shared chamfered surfaces, header insets, hit targets, and a compact action glyph in the footer. Leave the surrounding garage visible.
+5. **Keep ownership explicit.** A garment try-on or vehicle preview can change the scene immediately. Equip commits the outfit. Set main confirms the vehicle separately from its appearance edits. Keep existing profile and device save destinations, delayed-save feedback, and retry behavior. Back should return focus to the item or station the player came from.
+
+| Garage station | Path through the live preview |
+| --- | --- |
+| Wardrobe | Open Appearance at the mirror. Choose Outfits, Clothing or Accessories, then a category supported by the current rig. Outfits includes saved looks. Open one item to inspect or try it on. Back returns to its tile. |
+| Vehicle | Open Vehicles with the main car in view, or the first available vehicle on a fresh profile. A tile previews that vehicle. Customize opens Appearance, with Paint, Body, Lights and Portrait in the secondary row. Performance and Abilities are primary tabs. Back from Customize returns to the chooser. An explicit Set main hold changes the account's main vehicle. |
+
+| Reference | Guidance for implementation |
+| --- | --- |
+| Skin, hair, garments and paint | Reuse the shared swatch and secondary row. Supply the material’s own palette and supported channels. Hair can expose base, roots, highlights and tips. Car paint has separate finish and metallic controls. Use the UI theme accent on the control border and the actual material color inside the swatch. Provide a selected name or check alongside color. |
+| Saved outfits and garage vehicles | Give each item one tile. Distinguish the item being inspected from the equipped outfit or main vehicle. Keep the subject large enough to judge the change before committing. |
+| Emotes and fit | Use the existing motion search, action/object shortcuts, favorites and playback on the dressed actor. The references also propose Recent, a queue of complete motions and side-by-side outfit-fit comparison. These are design targets. The current keyframe authoring tool edits an individual motion. |
+| New wardrobe categories | Organize garments by what the player is dressing. The reference groups Outerwear, Sweaters, Corsets, Base tops and Underwear under Tops. Surface groups as their catalog items become available and keep existing item identities and layer rules. |
+
+Start from [creator options](../frontend/src/game/welcome/CreatorOption.tsx), [creator color channels](../frontend/src/game/welcome/CreatorColors.tsx) and [shared swatches](../frontend/src/components/menus/ColorSwatch.tsx). The [workshop](../frontend/src/game/heroes/HeroWorkshop.tsx) owns station entry and the return path. [CharacterPage](../frontend/src/game/characters/CharacterPage.tsx) and [DressingRoom](../frontend/src/game/characters/DressingRoom.tsx) own character preview and clothing choices. [VehicleStudio](../frontend/src/game/heroes/VehicleStudio.tsx) presents the vehicle controls and [HeroSaveQueue](../frontend/src/game/heroes/HeroSaveQueue.ts) serializes loadout saves.
+
 ## One garage and one camera
 
 Mount the real 3D garage once. Sign-in, the roster, the creator, Profile, the Garage stations, and views in Play and Heroes change the UI, actor, or camera shot on that scene. On cold entry, show the logo on neutral black, reveal the garage, then fade in the controls. On return or logout, retain the canvas and fade the UI layers. Keep the header’s size steady throughout its fade.
@@ -52,7 +78,9 @@ The shared room has a vehicle entrance wall with three roll-up doors and a perso
 
 Use the shared warm brown garage as the default. Let the fixtures illuminate the room and the mechanic’s floor catch their reflections. The segmented wall sign reads 0999 with its first zero dark. In the login resting shot the left corner pillar sits near the middle and the right edge meets the middle of the far pillar. Change the environment and its theme at their shared source so the result carries through every garage screen.
 
-Move the camera from its **displayed position and lens**, including during an unfinished move or after a drag. Looks frames the face, Eyes brings both irises close, and Makeup keeps the eyes and lips together. Measure the landmarks on the displayed rig. Honor reduced motion with settled framing. In the roster the left stick or a background drag orbits the room, while the right stick or dragging the actor turns the character. Login orbit eases back to rest. Use cached portraits for tiles and schedule rendering when something visible changes. Keep the vehicle platform tied to the presence of a vehicle.
+Move the camera from its **displayed position and lens**, including during an unfinished move or after a drag. Looks frames the face, Eyes brings both irises close, and Makeup keeps the eyes and lips together. Measure the landmarks on the displayed rig. In the roster the left stick or a background drag orbits the room, while the right stick or dragging the actor turns the character. Use cached portraits for tiles and schedule rendering when something visible changes. Keep the vehicle platform tied to the presence of a vehicle.
+
+When the player releases a manual orbit, hold the inspection angle for **12 seconds of inactivity**, then ease back to the current shot. Browsing the controls restarts that interval. A new drag takes over immediately and selecting a different camera preset takes precedence. Pause the idle timer while the app is hidden and give the player a fresh interval on return. Reduced motion uses the settled frame. While the angle is held, the timer alone should never require continuous frames. [Shared orbit timing](../frontend/src/game/preview/garageOrbitIdle.ts)
 
 ## Moving through the Garage
 
@@ -84,6 +112,8 @@ Introduce assets at the first screen that can use them. Sign-in needs the room i
 ## Before merging a menu change
 
 - Walk sign-in → roster → creator → Back → Profile → Back → main menu. From the main menu, use the branded Back tab to reach the roster and open Profile. Confirm all four stations and all three right header actions are reachable. Check focus after every handoff and verify one live garage canvas through logout.
+- At the lockers, try on an outfit, inspect a piece, then back out before equipping. Check the equipped outfit and focus on return. Repeat and equip the trial. Compare both starter rigs. At the service bay, preview another vehicle and change its paint. Confirm that the original main stays marked until the Set main hold completes. Reopen each station and check the saved state.
+- In phone portrait and short landscape, orbit to inspect a seam or a body panel. Release, browse a control near the end of the hold, and verify the camera stays put for a fresh interval. Let it return, interrupt it with another drag and change to a specific shot. Repeat with reduced motion and after backgrounding the app. Check that the inspector scrolls without moving the camera and only one garage canvas remains.
 - On a landscape phone, tap Profile during a gesture, return to the roster, and reopen it. The same actor should finish the gesture and continue its usual rest and emote cycle. Repeat with a delayed account response. The tab should acknowledge the tap immediately, pending work should be visible, and Back should remain usable. With reduced motion, the loading status should still be readable.
 - Release each direction in turn and verify focus follows the visible stations, including in portrait. Drive out with the widest road vehicle. Check shutter clearance, parking and resuming, and retrying a failed world connection.
 - Cold-start Enter World. Capture a frame with the character standing, at the door, seated, leaving through the shutter, and in the admitted world. Check that loading overlaps boarding, that repeated confirmation creates one spawn request, and that the final garage frame stays visible until the destination draws. Repeat with delayed assets, a rejected admission, reduced motion and a second account.

@@ -24,7 +24,7 @@ function garageTestServer() {
       load(id){if(id==='\0garage-test-surface')return `
         import {createElement as h, useLayoutEffect, useRef} from 'react';
         import {Group, PerspectiveCamera as Camera, Vector3} from 'three';
-        export const camera = new Camera();
+        export const camera = new Camera(), entryCamera = new Camera();
         const turntable = new Group(), scene = new Group(), invalidate = () => {};
         const motion = new Group(), characterActor = new Group(), characterTurn = new Group(), character = new Group();
         character.name = 'garage-driver'; characterTurn.add(character); characterActor.add(characterTurn);
@@ -45,7 +45,7 @@ function garageTestServer() {
         }
         export const stepCamera = () => renderFrame({ frameloop: 'always', invalidate, scene }, 1 / 60);
         export const useFrame = callback => useLayoutEffect(() => { renderFrame = callback; }, [callback]);
-        export const useThree = selector => selector({ size: { width: 1000, height: 500 }, invalidate });
+        export const useThree = selector => selector({ size: { width: 1000, height: 500 }, get: () => ({camera:entryCamera}), invalidate });
         export const Html = () => null, PreviewContactShadow = () => null;
         export const FittingCameraOrbit = () => null, FittingMirrorDisplay = () => null;
         export function PerspectiveCamera({ref, children}) {
@@ -140,7 +140,7 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     const {useGarageDrive} = await load('game/preview/garageDriveStore.ts');
     const {useCharacterPreviewStore} = await load('game/characters/characterPreviewStore.ts');
     const {useVehicleStudioStore} = await load('game/heroes/vehicleStudioStore.ts');
-    const {camera,stepCamera,waitForModel,getActorPosition,setGarageMotion} = await vite.ssrLoadModule('virtual:garage-surface');
+    const {camera,entryCamera,stepCamera,waitForModel,getActorPosition,setGarageMotion} = await vite.ssrLoadModule('virtual:garage-surface');
     useUIStore.setState({screen:'heroes'});
     useAlphaStore.setState({previewHero:'brz'});
     useVehicleStudioStore.getState().setActiveTab('performance');
@@ -166,12 +166,14 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     const actorPosition = getActorPosition();
     assert(Math.hypot(actorPosition.x, actorPosition.y - .023, actorPosition.z)<1e-8,'fitting cancels the garage motion');
     assert.equal(document.querySelector('[data-camera]'),mountedCamera,'the fitting room retains the camera');
-    assert(camera.position.distanceTo(position)>1,'opening the fitting room cuts directly to the character without crossing the garage');
-    assert(Math.abs(camera.fov-fov)>1,'the first fitting frame uses its own lens');
-    const fittingPosition = camera.position.clone(), fittingFov = camera.fov;
-    for (let frame=0;frame<180;frame++) stepCamera();
-    assert(camera.position.distanceTo(fittingPosition)<1e-8,'the fitting camera stays on its first resolved shot');
-    assert.equal(camera.fov,fittingFov);
+    const firstStep = camera.position.distanceTo(position), firstLensChange = Math.abs(camera.fov - fov);
+    assert(firstStep > 0 && firstStep < 1, 'opening the fitting room starts with an intermediate position');
+    for (let frame=0;frame<300;frame++) stepCamera();
+    assert(camera.position.distanceTo(position) > 1, 'the fitting room arrives at the character');
+    assert(Math.abs(camera.fov - fov) > firstLensChange, 'the camera blends the lens across frames');
+    const fittingPosition = camera.position.clone();
+    stepCamera();
+    assert(camera.position.distanceTo(fittingPosition)<1e-8,'the fitting camera settles');
     assert.equal(useCharacterPreviewStore.getState().cockpitVehicle,null);
     setGarageMotion(0, 0, 0);
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true,wardrobeOpen:true})));
@@ -211,6 +213,30 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     });
     assert.equal(document.querySelector('[data-model="tank"]').dataset.materializes,'false');
     assert.equal(document.querySelector('[data-driver]'),driver);
+
+    // Re-enter from the live station camera with a fresh fitting room, then return mid-gesture.
+    await act(async()=>root.render(null));
+    usePreferencesStore.getState().update({reducedMotion:false});
+    entryCamera.userData.hasGarageFrame = true;
+    entryCamera.position.set(1.5, 1.85, 3.65);
+    entryCamera.lookAt(0, .8, 0);
+    entryCamera.fov = 65;
+    entryCamera.setViewOffset(1000,500,87,-28,1000,500);
+    await act(async()=>root.render(createElement(VehiclePreview,{wardrobeOpen:true,characterOnly:true,fittingRoom:true})));
+    assert.equal(document.querySelector('[data-model]'), null, 'opening Wardrobe directly does not request a car');
+    stepCamera();
+    assert(camera.position.distanceTo(entryCamera.position)<1e-8, 'first workshop frame matches the displayed room');
+    assert(camera.quaternion.angleTo(entryCamera.quaternion)<1e-6);
+    assert(Math.abs(camera.fov - entryCamera.fov)<1e-8);
+    assert.deepEqual(camera.view, entryCamera.view);
+    for (let frame=0;frame<15;frame++) stepCamera();
+    assert(camera.position.distanceTo(entryCamera.position)>.1);
+    await act(async()=>root.render(null));
+    assert(entryCamera.position.distanceTo(camera.position)<1e-8,'return starts at the current workshop eye');
+    assert(entryCamera.quaternion.angleTo(camera.quaternion)<1e-6);
+    assert(Math.abs(entryCamera.fov - camera.getEffectiveFOV())<1e-8);
+    assert.deepEqual(entryCamera.view, camera.view);
+    assert.equal(entryCamera.userData.returnedFromWorkshop,true);
   } finally {
     await act(async()=>root.unmount());
     await vite.close();

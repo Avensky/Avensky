@@ -40,6 +40,8 @@ import { prepareBrzHardware } from "./brzHardware";
 import type { BrzClearance } from "./brzApproach";
 import { useCommittedResource } from "../characters/useCommittedResource";
 
+import { VehicleDragVolume } from "./PreviewTurntable";
+
 export type VehiclePreviewDriverFit = {
   model: VehicleModelId;
   position: [number, number, number];
@@ -335,6 +337,16 @@ export function VehiclePreviewModel({children,platform,model,showroomPath,driver
     () => fitPreviewToPlatform(measurements, platform),
     [measurements, platform],
   );
+  const showroomBounds = useMemo(() => {
+    if (measurements.bounds.isEmpty()) return;
+    const { min, max } = measurements.bounds;
+    const { scale, position } = display;
+    // Some cars are centered on their wheels. Include mirrors and other off-center bodywork.
+    const x = Math.max(Math.abs(min.x * scale + position[0]), Math.abs(max.x * scale + position[0]));
+    const z = Math.max(Math.abs(min.z * scale + position[2]), Math.abs(max.z * scale + position[2]));
+    return { radius: Math.hypot(x, z), halfHeight: (max.y - min.y) * scale / 2,
+      centerY: (max.y + min.y) * scale / 2 + position[1] };
+  }, [measurements, display]);
   const driverScale = marine ? 1.35 : display.scale;
   const panels = useMemo(() => {
     const targets: NonNullable<VehiclePreviewDriverFit["panels"]> = {};
@@ -418,9 +430,10 @@ export function VehiclePreviewModel({children,platform,model,showroomPath,driver
       {active && vehiclePainted && !revealActive && children}
       <group ref={revealRoot} scale={revealActive ? .001 : 1} visible={active}>
         <PreviewContactShadow footprint={display.footprint} offset={display.shadowOffset} />
-        <group position={display.position} scale={display.scale} name="selection-vehicle-glb">
+        <group position={display.position} scale={display.scale} name="selection-vehicle-glb" userData={{ showroomBounds }}>
           {/* Keep the prepared car alive while omitting its meshes from scene traversal. */}
           {active && <primitive object={prepared.root} dispose={null} />}
+          {active && <VehicleDragVolume bounds={measurements.bounds} />}
           {active && diagnostics && garageOpen && vehicleSystems(model) === "road" && <GarageVehicleDiagnosticsScene vehicle={model} popup={popup} />}
         </group>
       </group>

@@ -3,7 +3,7 @@ import test from 'node:test';
 import { createRoot, events, extend } from '@react-three/fiber';
 import { JSDOM } from 'jsdom';
 import { act, createElement as h, Fragment } from 'react';
-import { BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry } from 'three';
+import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Vector3 } from 'three';
 import { createServer } from 'vite';
 
 test('background mouse and touch drags orbit, while a direct mouse hit turns the model', async () => {
@@ -36,10 +36,11 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     await root.configure({ events, camera, frameloop: 'never', size: { width: 200, height: 200, top: 0, left: 0 },
       gl: { render() {}, setSize() {}, setPixelRatio() {} } });
     const deltas = [];
+    let releases = 0;
     let store, clicks = 0;
     const render = (enabled) => act(async () => {
       store = root.render(h(Fragment, null,
-        h('primitive', { object: camera }, h(FittingCameraOrbit, { onDrag: (x, y) => deltas.push([x, y]) })),
+        h('primitive', { object: camera }, h(FittingCameraOrbit, { onDrag: (x, y) => deltas.push([x, y]), onDragEnd: () => { releases++; } })),
         h(CharacterTurntable, { enabled }, h('mesh', { name: 'test-driver', onClick: () => { clicks++; } },
           h('boxGeometry', { args: [1, 1, 1] }), h('meshBasicMaterial')))));
     });
@@ -62,6 +63,7 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     pointer('pointerup', 1, 35, 33);
     assert(!captured.has(1));
     assert.deepEqual(deltas, [[15, 8]]);
+    assert.equal(releases, 1, 'a completed orbit arms the idle timer once');
     assert.equal(useFittingTurnStore.getState().characterYaw, 0);
 
     pointer('pointerdown', 2, 20, 25, 'touch');
@@ -119,6 +121,35 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     driverRaycasts = 0;
     pointer('pointermove', 7, 120, 100);
     assert.equal(driverRaycasts, 0, 'a disabled turntable ignores hovering');
+
+    const { PreviewTurntable, VehicleDragVolume } = await vite.ssrLoadModule('/src/game/preview/PreviewTurntable.tsx');
+    const bounds = new Box3(new Vector3(-.5, -.5, -.5), new Vector3(.5, .5, .5));
+    let table;
+    await act(async () => {
+      store = root.render(h(Fragment, null,
+        h('primitive', { object: camera }, h(FittingCameraOrbit, { onDrag: (x, y) => deltas.push([x, y]) })),
+        h(PreviewTurntable, { onReady: object => { table = object; }, inspectExterior: true, spin: false },
+          h(VehicleDragVolume, { bounds }))));
+    });
+    store.getState().scene.updateMatrixWorld(true);
+    const hitVolume = table.getObjectByName('vehicle-inspection-drag');
+    const before = deltas.length;
+    let vehicleRaycasts = 0;
+    const pick = hitVolume.raycast;
+    hitVolume.raycast = function (...args) { vehicleRaycasts++; return pick.apply(this, args); };
+    for (let x = 25; x < 50; x++) pointer('pointermove', 8, x, 100, 'touch');
+    assert.equal(vehicleRaycasts, 0, 'the workshop only picks the hull on press');
+    pointer('pointerdown', 8, 100, 100, 'touch');
+    pointer('pointermove', 8, 130, 100, 'touch');
+    pointer('pointerup', 8, 130, 100, 'touch');
+    store.getState().advance(0, false);
+    store.getState().advance(.1, false);
+    assert.ok(table.rotation.y > 0, 'dragging the inspected vehicle turns it');
+    assert.equal(deltas.length, before, 'turning the vehicle leaves the room camera alone');
+    pointer('pointerdown', 9, 10, 15, 'touch');
+    pointer('pointermove', 9, 22, 17, 'touch');
+    pointer('pointerup', 9, 22, 17, 'touch');
+    assert.deepEqual(deltas.at(-1), [12, 2], 'the open garage beside the vehicle orbits the camera');
   } finally {
     if (root) await act(async () => root.unmount());
     await vite?.close();

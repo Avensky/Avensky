@@ -1,7 +1,9 @@
-import { lazy, Suspense, useCallback, useEffect, useRef } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ControlGlyph } from "../../components/controller/ControlGlyph";
 import { MenuIcon } from "../../components/menus/MenuIcon";
 import { GameButton } from "../../components/GameButton";
+import { MenuLoadingStatus } from "../../components/menus/MenuLoadingStatus";
+import { loadedGarageWorkshop, loadGarageWorkshop } from "../heroes/loadGarageWorkshop";
 import type { MenuAction } from "../../controls/inputRouting";
 import { useUIStore } from "../../store";
 import { registerGarageMenuMarker } from "../preview/garageMenuMarkers";
@@ -50,6 +52,36 @@ function GarageStations() {
   const stations = useRef<HTMLElement>(null);
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const touchStart = useRef<{ pointerId: number; selected: number } | null>(null);
+  const pendingStation = useRef<{ index: number } | undefined>(undefined);
+  const [stationNotice, setStationNotice] = useState<{ index: number; failed?: boolean }>();
+  const selectedStation = MAIN_MENU_ITEMS[selectedIndex];
+  useEffect(() => {
+    if (selectedStation?.id === "wardrobe" || selectedStation?.id === "vehicle")
+      void loadGarageWorkshop().catch(() => {});
+    if (pendingStation.current?.index !== selectedIndex) pendingStation.current = undefined;
+    setStationNotice(previous => previous?.index === selectedIndex ? previous : undefined);
+  }, [selectedStation, selectedIndex]);
+
+  const openStation = useCallback(() => {
+    const ui = useUIStore.getState();
+    const index = ui.selectedMenuIndexById.main;
+    const id = MAIN_MENU_ITEMS[index]?.id;
+    if ((id !== "wardrobe" && id !== "vehicle") || loadedGarageWorkshop()) {
+      ui.activateActiveMenuSelection();
+      return;
+    }
+    if (pendingStation.current?.index === index) return;
+    const request = { index };
+    pendingStation.current = request;
+    setStationNotice(request);
+    const current = () => pendingStation.current === request && root.current?.isConnected &&
+      useUIStore.getState().screen === "main" && useUIStore.getState().selectedMenuIndexById.main === index;
+    void loadGarageWorkshop().then(() => {
+      if (current()) useUIStore.getState().activateActiveMenuSelection();
+    }).catch(() => {
+      if (current()) setStationNotice({ index, failed: true });
+    }).finally(() => { if (pendingStation.current === request) pendingStation.current = undefined; });
+  }, []);
 
   const back = () => useUIStore.getState().setScreen("welcome");
   const continueSelection = useCallback(() => {
@@ -57,8 +89,8 @@ function GarageStations() {
     if (ui.mainWorldJoining) return;
     const focused = document.activeElement;
     if (focused instanceof HTMLElement && root.current?.querySelector("header")?.contains(focused)) focused.click();
-    else ui.activateActiveMenuSelection();
-  }, []);
+    else openStation();
+  }, [openStation]);
 
   useEffect(() => {
     function focusStation() {
@@ -129,7 +161,7 @@ function GarageStations() {
               touchStart.current = null;
               ui.setActiveMenuIndex(index);
               if (touch && previous !== index) event.currentTarget.focus({ preventScroll: true });
-              else ui.activateActiveMenuSelection();
+              else openStation();
             }}>
             <span className="garage-station-face chamfered-frame">
               <span className="garage-station-title"><MenuIcon name={item.icon} />{item.label}</span>
@@ -142,6 +174,9 @@ function GarageStations() {
     {(joining || error) && <p className="garage-menu-notice" role={error ? "alert" : "status"}>
       {joining ? "Entering the Harbor…" : error}
     </p>}
+    {stationNotice?.index === selectedIndex && <p className="garage-menu-notice">{!stationNotice.failed
+      ? <MenuLoadingStatus>Opening {selectedStation.label}…</MenuLoadingStatus>
+      : <span role="alert">Couldn’t open {selectedStation.label}. Select it again to retry.</span>}</p>}
     <GameButton variant="custom" className="garage-menu-drive" data-garage-drive-start
       aria-label={vehicle.loaner ? "Drive loaner BRZ" : "Drive " + vehicle.name}
       disabled={joining} onPress={() => useGarageParking.getState().start()}>

@@ -21,7 +21,7 @@ test('shared portrait selection opens settings; only a complete X hold sets main
   assert.equal(document.querySelector('.vehicle-studio'),null);assert.equal(document.querySelectorAll('.hero-portrait-card').length,(await load('store/alpha/alphaStore.ts')).HEROES.length);assert.equal(document.querySelector('.hero-portrait-card[aria-pressed="true"]').dataset.hero,'brz');assert.equal(document.querySelectorAll('.hero-collection-tile').length,0);
   await advance(0);pad.buttons[2].pressed=true;await advance(16);await advance(1300);pad.buttons[2].pressed=false;await advance(16);assert.equal(requests.length,0);
   await act(async()=>document.querySelector('[data-hero="camaro"]').click());assert(document.querySelector('.vehicle-studio'));assert.equal(requests.length,0);
-  const chooseTab=async id=>act(async()=>document.getElementById(`vehicle-studio-tab-${id}`).click());
+  const chooseTab=async id=>act(async()=>(document.getElementById(`vehicle-studio-tab-${id}`) ?? document.getElementById(`vehicle-appearance-tab-${id}`)).click());
   const panel=document.querySelector('.vehicle-studio-panel');
   const content=panel.querySelector('.vehicle-studio-panel-content');
   const toggle=panel.querySelector('.vehicle-studio-panel-toggle');
@@ -45,7 +45,7 @@ test('shared portrait selection opens settings; only a complete X hold sets main
   assert.equal(toggle.getAttribute('aria-expanded'),'false');
   assert.equal(content.hidden,true);
   assert.equal(progress.getAttribute('aria-valuenow'),'1');
-  for(const [tab,label] of [['paint','appearance'],['body','body'],['lighting','lighting'],['studio','portrait']]){
+  for(const [tab,label] of [['paint','paint'],['body','body'],['lighting','lights'],['studio','portrait']]){
    await chooseTab(tab);
    assert.equal(content.hidden,false);
    await act(async()=>toggle.click());
@@ -69,7 +69,9 @@ test('shared portrait selection opens settings; only a complete X hold sets main
   assert.equal(cache.getState().defaultHero,'camaro');
   await act(async()=>document.querySelector('[data-hero="camaro"]').click());assert.equal(document.querySelectorAll('.hero-workshop-actions .controller-action').length,2);
   await chooseTab('paint');
-  await act(async()=>document.querySelector('[aria-label="Paint: Crimson red"]').click());await settle();assert.equal(requests.at(-1).make_default,false);assert.equal(cache.getState().defaultHero,'camaro');
+  await act(async()=>document.querySelector('[aria-label="Paint: Crimson red"]').click());
+  await act(async()=>document.querySelector('[data-finish="matte"]').click());
+  await settle();assert.equal(requests.at(-1).appearance.finish,'matte');assert.equal(requests.at(-1).make_default,false);assert.equal(cache.getState().defaultHero,'camaro');
   await act(async()=>document.querySelector('.menu-frame-title [data-header-back]').click());assert.equal(document.querySelector(".vehicle-studio"),null);await act(async()=>document.querySelector('[data-hero="brz"]').click());await key('KeyX');await advance(900);await act(async()=>window.dispatchEvent(new window.Event('blur')));await advance(500);assert.equal(cache.getState().defaultHero,'camaro');await key('KeyX','keyup');await act(async()=>window.dispatchEvent(new window.Event('focus')));await advance(0);
   await act(async()=>prefs.getState().update({inputDevice:'controller'}));
   assert(document.querySelector('.hero-main-orbit [data-controller-key=X]'));

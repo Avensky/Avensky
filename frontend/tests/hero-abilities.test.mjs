@@ -52,7 +52,7 @@ test('hero guide explains shipped actions and returns without equipping or repla
    assert.equal(document.querySelector('.hero-portrait-card[aria-pressed="true"]').dataset.hero,'brz');assert.equal(document.querySelector('.hero-main-hold').disabled,true);
    assert.equal(document.querySelector('.hero-workshop-actions [data-controller-key="Y"]'),null);
    await act(async()=>route('activate'));assert(document.querySelector('.vehicle-studio'),'A opens customization for the shown favorite');
-   await act(async()=>route('previous_tab'));
+   await act(async()=>route('next_tab'));
    assert.equal(document.getElementById('vehicle-studio-tab-abilities').getAttribute('aria-selected'),'true');
    assert.equal(document.querySelector('.hero-guide-overview h2').textContent,'BRZ');
    assert(document.querySelector('.vehicle-studio--abilities .hero-guide-overview'));

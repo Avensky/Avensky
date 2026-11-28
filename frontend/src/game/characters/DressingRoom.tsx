@@ -1,6 +1,9 @@
 import { FitBadge, FitReview } from "./FitReview";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { GameButton } from "../../components/GameButton";
+import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
+import { PreviewCameraAngles } from "../preview/PreviewControlDisclosure";
+import { useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterStyleField } from "./characterCatalog";
 import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
 import { UNDERBUST_WARDROBE_SET, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS, corsetModelUrl, hasSeparateWardrobeTop, hasTuckedUnderbust, hasUnderbustCut, resolveWardrobe, withWardrobeWaist, type WardrobeChoice } from "./wardrobe";
@@ -12,19 +15,21 @@ import { SavedOutfits } from "./SavedOutfits";
 import "./dressingRoom.css";
 
 const CATEGORIES = [
-  { id: "outfits", label: "Outfits", group: "Wardrobe", icon: "outfits" },
-  { id: "saved", label: "Saved outfits", group: "Wardrobe", icon: "saved" },
-  { id: "layers", label: "Layers", group: "Wardrobe", icon: "layers", femaleOnly: true },
-  { id: "underwear", label: "Underwear", group: "Wardrobe", icon: "layers", femaleOnly: true },
-  { id: "corsets", label: "Corsets", group: "Wardrobe", icon: "corsets", femaleOnly: true },
-  { id: "tops", label: "Tops", group: "Wardrobe", icon: "tops", femaleOnly: true },
-  { id: "bottoms", label: "Skirts", group: "Wardrobe", icon: "skirts", femaleOnly: true },
-  { id: "footwear", label: "Shoes & socks", group: "Wardrobe", icon: "footwear" },
-  { id: "headwear", label: "Headwear", group: "Finishing touches", icon: "headwear" },
-  { id: "bows", label: "Bows", group: "Finishing touches", icon: "bows", femaleOnly: true },
-  { id: "accessories", label: "Accessories", group: "Finishing touches", icon: "accessories" },
-  { id: "props", label: "Handheld props", group: "Finishing touches", icon: "props" },
+  { id: "outfits", label: "Outfits", group: "Outfits", icon: "outfits" },
+  { id: "saved", label: "Saved outfits", group: "Outfits", icon: "saved" },
+  { id: "layers", label: "Layers", group: "Clothing", icon: "layers", femaleOnly: true },
+  { id: "underwear", label: "Underwear", group: "Clothing", icon: "layers", femaleOnly: true },
+  { id: "corsets", label: "Corsets", group: "Clothing", icon: "corsets", femaleOnly: true },
+  { id: "tops", label: "Tops", group: "Clothing", icon: "tops", femaleOnly: true },
+  { id: "bottoms", label: "Skirts", group: "Clothing", icon: "skirts", femaleOnly: true },
+  { id: "footwear", label: "Shoes & socks", group: "Clothing", icon: "footwear" },
+  { id: "headwear", label: "Headwear", group: "Accessories", icon: "headwear" },
+  { id: "bows", label: "Bows", group: "Accessories", icon: "bows", femaleOnly: true },
+  { id: "accessories", label: "Accessories", group: "Accessories", icon: "accessories" },
+  { id: "props", label: "Handheld props", group: "Accessories", icon: "props" },
 ] as const;
+const WARDROBE_GROUPS = ["Outfits", "Clothing", "Accessories"] as const;
+export type WardrobeNavigation = { back: () => boolean; cycleGroup: (direction: number) => void };
 type Category = typeof CATEGORIES[number]["id"];
 type Icon = typeof CATEGORIES[number]["icon"] | "remove";
 const ICON_PATHS: Record<Icon, string> = {
@@ -111,7 +116,8 @@ function inspectWardrobe(focus: WardrobeFocus) {
 
 /** One live scene; browsing the catalog never changes or saves the equipped look. */
 export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
-  equipPreview, onDiscardPreview, onEndPreview, cameraTools, onColors = onChange }: {
+  equipPreview, onDiscardPreview, onEndPreview, cameraTools, navigation, onColors = onChange }: {
+  navigation?: Ref<WardrobeNavigation>;
   choice: CharacterChoice; characterName?: string; onChange: (choice: CharacterChoice) => void;
   onPreviewOutfit?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
   equipPreview?: { disabled: boolean; hint?: string; onEquip: () => void };
@@ -125,11 +131,12 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
   const [search, setSearch] = useState("");
   const [alphaOnly, setAlphaOnly] = useState(false);
   const [layer, setLayer] = useState<ClothingLayer>("Inner");
-  const catalogId = useId(), detailsId = useId();
+  const catalogId = useId(), detailsId = useId(), groupId = useId();
+  const detailsRef = useRef<HTMLElement>(null);
+  const restoreItem = useRef<string>(undefined);
   const catalogRef = useRef<HTMLElement>(null);
   const categoryRef = useRef<HTMLElement>(null);
   const focusLayer = useRef(false);
-  const shortcutTarget = useRef<string | undefined>(undefined);
   const look = characterLook(choice)!;
   const { character, outfit, appearance, wardrobe, corset, garments, overEase, outfitRemovals, removedClothing } = look;
   const waistSelection = removedClothing.includes("corset") || removedClothing.includes("top") || hasSeparateWardrobeTop(choice) ? undefined : corset ?? wardrobe;
@@ -178,13 +185,18 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
   }, [catalogOpen, category]);
 
   useLayoutEffect(() => {
-    if (!shortcutTarget.current) return;
-    const card = catalogRef.current?.querySelector<HTMLButtonElement>("[data-inspected]");
-    if (card?.dataset.wardrobeItem === shortcutTarget.current) {
-      card.scrollIntoView?.({ block: "nearest", inline: "nearest" });
-      shortcutTarget.current = undefined;
+    if (inspectedId) {
+      detailsRef.current?.querySelector<HTMLElement>("[data-wardrobe-details-back]")?.focus({ preventScroll: true });
+      return;
     }
-  });
+    if (restoreItem.current) {
+      const cards = catalogRef.current?.querySelectorAll<HTMLElement>("[data-wardrobe-item]");
+      const card = Array.from(cards ?? []).find(node => node.dataset.wardrobeItem === restoreItem.current);
+      (card ?? catalogRef.current?.querySelector<HTMLElement>("[data-wardrobe-back]"))?.focus({ preventScroll: true });
+      card?.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+      restoreItem.current = undefined;
+    }
+  }, [inspectedId]);
 
   function edit(field: CharacterStyleField, value: string) {
     onChange({ ...choice, appearance: { ...appearance, [field]: value } });
@@ -408,6 +420,38 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
     showCatalog(next);
     inspectWardrobe(categoryFocus[next]);
   }
+  function selectGroup(group: typeof WARDROBE_GROUPS[number]) {
+    const first = categories.find(item => item.group === group);
+    if (!first) return;
+    if (category === first.id && !catalogOpen) {
+      categoryRef.current?.querySelector<HTMLElement>("[data-category]")?.focus({ preventScroll: true });
+      return;
+    }
+    focusLayer.current = true;
+    setCategory(first.id);
+    setCatalogOpen(false);
+    setInspectedId(undefined);
+    setSearch("");
+  }
+
+  function closeDetails() {
+    restoreItem.current = inspectedId;
+    setInspectedId(undefined);
+  }
+
+  useImperativeHandle(navigation, () => ({
+    back() {
+      if (inspected) closeDetails();
+      else if (catalogOpen) closeCatalog();
+      else return false;
+      return true;
+    },
+    cycleGroup(direction) {
+      const index = WARDROBE_GROUPS.indexOf(currentCategory.group);
+      selectGroup(WARDROBE_GROUPS[(index + direction + WARDROBE_GROUPS.length) % WARDROBE_GROUPS.length]);
+    },
+  }));
+
   function closeCatalog() {
     focusLayer.current = true;
     setCatalogOpen(false);
@@ -415,12 +459,8 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
   }
 
   function revealCameraItem(category: Category, item: Item) {
-    shortcutTarget.current = item.id;
     showCatalog(category, item);
     if (item.unavailable || item.alphaStatus === "development") setAlphaOnly(false);
-    // The same shortcut can bring an already inspected card back into view.
-    const current = catalogRef.current?.querySelector<HTMLButtonElement>("[data-inspected]");
-    if (current?.dataset.wardrobeItem === item.id) current.scrollIntoView?.({ block: "nearest", inline: "nearest" });
   }
 
   function inspectWornPiece(piece: ClothingPiece) {
@@ -465,17 +505,22 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
   }
 
   return <>
-    <aside className="dressing-wardrobe" aria-label="Wardrobe">
-      <h2>Wardrobe</h2>
-      <nav ref={categoryRef} className="dressing-categories" aria-label="Dressing room categories" hidden={catalogOpen}>
-        {categories.map((item, index) => <div key={item.id}>
-          {index > 0 && item.group !== categories[index - 1].group && <h3 className="dressing-group-label">{item.group}</h3>}
-          <div data-controller-row><button type="button" className="dressing-category menu-control" data-category={item.id}
-            aria-controls={catalogId} aria-expanded={catalogOpen && category === item.id} onClick={() => openCategory(item.id)}>
-            <WardrobeIcon name={item.icon} /><span>{item.label}</span>{item.id !== "saved" && <small>{allItems[item.id].length}</small>}
-          </button></div>
-        </div>)}
-      </nav>
+    <aside className="dressing-wardrobe" aria-label="Wardrobe" hidden={Boolean(inspected)}>
+      <SecondaryTabRow aria-label="Wardrobe groups" className="dressing-groups">
+        {WARDROBE_GROUPS.map(group => <GameButton key={group} variant="custom" role="tab" pressFeedback
+          aria-selected={group === currentCategory.group} id={`${groupId}-${group}`} aria-controls={groupId}
+          data-wardrobe-group={group} onPress={() => selectGroup(group)}>{group}</GameButton>)}
+      </SecondaryTabRow>
+      <div id={groupId} role="tabpanel" aria-labelledby={`${groupId}-${currentCategory.group}`} className="dressing-browser">
+        <nav ref={categoryRef} className="dressing-categories" aria-label="Dressing room categories" hidden={catalogOpen}>
+          <div className="dressing-category-grid" data-controller-row data-controller-columns="2">
+            {categories.filter(item => item.group === currentCategory.group).map(item =>
+              <GameButton key={item.id} variant="custom" pressFeedback className="dressing-category menu-control" data-category={item.id}
+                aria-controls={catalogId} onPress={() => openCategory(item.id)}>
+                <WardrobeIcon name={item.icon} /><span>{item.label}</span>
+              </GameButton>)}
+          </div>
+        </nav>
       <section ref={catalogRef} className="dressing-catalog" id={catalogId} aria-label={currentCategory.label} hidden={!catalogOpen}>
         <div className="dressing-catalog-toolbar">
           <header className="dressing-catalog-heading" data-controller-row>
@@ -484,7 +529,7 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
           </header>
           {catalogOpen && category !== "saved" && <div className="dressing-search" data-controller-row><input type="search" aria-label={`Search ${currentCategory.label}`} placeholder="Find an item…" value={search} onChange={event => setSearch(event.target.value)} /></div>}
         </div>
-        {category === "saved" ? <SavedOutfits choice={choice} onTryOn={onLoad} onEndPreview={onEndPreview} clearPreview /> : catalogOpen && <>
+        {category === "saved" && catalogOpen ? <SavedOutfits choice={choice} onTryOn={onLoad} onEndPreview={onEndPreview} clearPreview /> : catalogOpen && <>
         {category === "outfits" && female && <div className="dressing-layer-options" data-controller-row>
           <button type="button" className="menu-control" data-remove-outfit disabled={outfitRemoved} onClick={removeOutfit}>Remove outfit</button>
         </div>}
@@ -518,12 +563,12 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
                   clearSection(cleared);
                 }}>Clear</button>
             </header>
-            <div className="dressing-items" data-controller-row data-controller-columns="1">
-              {items.filter(item => item.section === section).map(item => <button key={item.id} type="button" data-wardrobe-item={item.id}
+            <div className="dressing-items" data-controller-row data-controller-columns="2">
+              {items.filter(item => item.section === section).map(item => <GameButton key={item.id} variant="custom" pressFeedback data-wardrobe-item={item.id}
                 data-inspected={inspected?.id === item.id || undefined} data-unavailable={item.unavailable ? true : undefined}
                 data-alpha-status={item.alphaStatus}
                 className={`dressing-item menu-control${item.icon === "remove" ? " dressing-item--remove" : ""}`} aria-pressed={item.selected ?? false}
-                aria-controls={item.icon === "remove" ? undefined : detailsId} onClick={() => {
+                aria-controls={item.icon === "remove" ? undefined : detailsId} onPress={() => {
                   setInspectedId(item.icon === "remove" ? undefined : item.id);
                   item.choose?.();
                   inspectWardrobe(item.focus ?? categoryFocus[category]);
@@ -535,15 +580,17 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
                   <span className="dressing-item-name">{item.label}</span>
                   {item.alphaStatus && <span className="dressing-alpha-badge" data-alpha-status={item.alphaStatus}>{ALPHA_STATUSES[item.alphaStatus].label}</span>}
                   {item.set && !item.unavailable && item.selected && <FitBadge choice={choice} piece="corset" itemId={item.id} />}
-                  {item.icon !== "remove" && <small>{item.unavailable ?? (item.selected ? (item.trial || onDiscardPreview ? "Trying on" : "Wearing") : item.detail ?? "Available to try on")}</small>}
+                  {item.icon !== "remove" && (item.unavailable || item.selected || item.detail) &&
+                    <small>{item.unavailable ?? (item.selected ? (item.trial || onDiscardPreview ? "Trying on" : "Wearing") : item.detail)}</small>}
                 </span>
-              </button>)}
+              </GameButton>)}
             </div>
           </section>;
         })}
         {!items.length && <p className="dressing-empty" role="status">{query ? "No items match your search." : alphaOnly ? "No alpha items in this category yet." : "No separate pieces for this character yet."}</p>}
         </>}
       </section>
+      </div>
     </aside>
     <div className="dressing-camera-block">
       <header className="dressing-room-title">
@@ -551,12 +598,14 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
         <h2>{characterName ?? "Your character"}</h2>
       </header>
       <aside className="dressing-camera-shortcuts fitting-camera-toolbar" aria-label="Fitting room camera shortcuts">
+        <PreviewCameraAngles>
         <FittingCameraSelect views={["Full body", "Face", "Hands"] as const} vertical allowReselect
           view={camera} onViewChange={view => {
             if (view === "Full body" || view === "Face" || view === "Hands") selectCameraView(view);
           }} />
         <FittingWearableShortcuts vertical pieces={wearableOrder.filter(item => pieces.includes(item))}
           active={camera === "Selected item" ? selectedPiece : undefined} onSelect={selectWornPiece} />
+        </PreviewCameraAngles>
       </aside>
       {onDiscardPreview && (
         <div className="dressing-preview-actions" data-controller-row>
@@ -570,9 +619,12 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
         </div>
       )}
     </div>
-    <aside className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
+    <aside ref={detailsRef} className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
       {inspected && <>
-        <header><h2>{inspected.label}</h2></header>
+        <header className="dressing-catalog-heading" data-controller-row>
+          <MenuBackButton data-wardrobe-details-back label={`Back to ${currentCategory.label}`} onClick={closeDetails} />
+          <h2>{inspected.label}</h2>
+        </header>
         {inspected.alphaStatus && <p className="dressing-alpha-summary"><span className="dressing-alpha-badge" data-alpha-status={inspected.alphaStatus}>{ALPHA_STATUSES[inspected.alphaStatus].label}</span><span>{ALPHA_STATUSES[inspected.alphaStatus].description}</span></p>}
         {inspected.description && <p className="dressing-item-description">{inspected.description}</p>}
         {underbustOver && !hasUnderbustCut(corset.cut) &&
@@ -585,7 +637,7 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
           <button type="button" className="menu-control" data-remove-try-on onClick={() => {
             inspected.remove?.();
             inspectWardrobe(categoryFocus[category]);
-            catalogRef.current?.querySelector<HTMLButtonElement>(alphaOnly ? "[data-wardrobe-back]" : "[data-inspected]")?.focus();
+            closeDetails();
           }}>{inspected.focus === "shirt" || inspected.focus === "armor" ? "Remove top" : inspected.focus === "corset" ? "Remove corset" : inspected.focus === "skirt" ? "Remove skirt" : inspected.included ? "Remove piece" : inspected.focus === "dress" || inspected.pieces === "outfit" ? "Remove dress" : "Clear try-on"}</button>
         </div>}
         {(underwearColor === "bra" || underbust) && <div data-controller-row>

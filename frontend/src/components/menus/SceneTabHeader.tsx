@@ -4,7 +4,8 @@ import { APP_BRANDING } from "../../theme/branding";
 import type { MatchTeam } from "../../theme/matchTeamTheme";
 import type { CharacterHeaderProfileProps } from "../../game/characters/CharacterHeaderProfile";
 import { MenuFrameHeader } from "./MenuFrame";
-import { MenuTabButton } from "./MenuTabButton";
+import { GarageBrandTab } from "../../game/welcome/GarageBrandTab";
+import { AngledGameTab, MenuTabButton } from "./MenuTabButton";
 import { useAngledMenuHeader } from "./useAngledMenuHeader";
 
 export type SceneHeaderTab = {
@@ -34,6 +35,7 @@ export function SceneTabHeader({
   character,
   busy = false,
   titleTeam,
+  station = false,
   backAction,
 }: {
   title: string;
@@ -51,12 +53,19 @@ export function SceneTabHeader({
   character?: CharacterHeaderProfileProps;
   busy?: boolean;
   titleTeam?: MatchTeam;
+  station?: boolean;
   backAction: BackShortcutAction;
 }) {
   const angled = useAngledMenuHeader();
-  const navigation = (
+  const stationHeader = station && angled;
+  const navigation = tabs.length > 0 && (
     <nav className={`${angled ? "angled-header-tabs" : "classic-header-tabs"} ${tablistClassName}`} role="tablist" aria-label={tablistLabel} data-controller-tab-only>
-      {tabs.map(tab => (
+      {tabs.map(tab => stationHeader ?
+        <AngledGameTab key={tab.id} id={idPrefix + "-tab-" + tab.id}
+          aria-controls={panelId} aria-label={tab.label} title={tab.description}
+          selected={activeTab === tab.id} disabled={busy} onPress={() => onTabChange(tab.id)}>
+          {tab.label}
+        </AngledGameTab> : (
         <MenuTabButton
           key={tab.id}
           id={idPrefix + "-tab-" + tab.id}
@@ -93,9 +102,11 @@ export function SceneTabHeader({
         titleTeam={titleTeam}
         backAction={backAction}
         variant="scene"
-        className={angled ? "angled-tab-header" : undefined}
+        brandBack={stationHeader ? <GarageBrandTab data-header-back aria-label={backAction.label ?? "Back"}
+          disabled={backAction.disabled} onPress={backAction.onClick} /> : undefined}
+        className={stationHeader ? "garage-station-header garage-entry-header angled-tab-header" : angled ? "angled-tab-header" : undefined}
       >
-        {angled && navigation}
+        {angled && navigation && (stationHeader ? <div className="tabbed-angled-scroll">{navigation}</div> : navigation)}
       </MenuFrameHeader>
       {!angled && navigation}
     </>

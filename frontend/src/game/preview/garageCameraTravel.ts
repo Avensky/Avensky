@@ -75,6 +75,10 @@ export class GarageCameraTravel {
         yaw: number, pitch: number, now: number, reducedMotion: boolean) {
     if (width <= 0 || height <= 0) return; // The persistent canvas may briefly move between DOM parents.
     const firstFrame = this.width === 0;
+    if (firstFrame) camera.userData.hasGarageFrame = true;
+    // Returning to the same station still needs a fresh trip from the inspector's last frame.
+    const returned = camera.userData.returnedFromWorkshop === true;
+    if (returned) delete camera.userData.returnedFromWorkshop;
     const waiting = requested?.subject === "loading";
     const missing = requested?.subject === "unavailable";
     const shot = waiting || (firstFrame && !reducedMotion) ? this.shot : missing ? undefined : requested;
@@ -82,7 +86,7 @@ export class GarageCameraTravel {
     // A late head/waist measurement is a new destination even for the same
     // shot. Start that adjustment from the lens currently on screen.
     const revision = shot?.framingRevision ?? 0;
-    const changed = this.shot !== shot || this.framingRevision !== revision;
+    const changed = returned || this.shot !== shot || this.framingRevision !== revision;
     if (changed || resized || this.dpr !== dpr) {
       if (changed || resized && this.time < TRAVEL_MS) {
         this.sourcePosition.copy(camera.position);

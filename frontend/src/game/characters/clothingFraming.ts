@@ -27,11 +27,6 @@ export function orientFittingCameraOffset(offset: Vector3, actorRotation: Quater
   return offset.applyQuaternion(characterOnly ? STAGE_FITTING_FRONT : actorRotation);
 }
 
-/** Avoid interpolating the camera through walls when a tab/outfit cuts to a new shot. */
-export function cutToFittingView(wardrobeOpen: boolean, viewChanged: boolean, anchorReappeared: boolean) {
-  return wardrobeOpen && (viewChanged || anchorReappeared);
-}
-
 /** Orbit the current close-up at its existing distance, keeping the eye above the floor. */
 export function orbitFittingCamera(position: Vector3, target: Vector3, yaw: number, pitch: number, sphere: Spherical) {
   sphere.setFromVector3(position.sub(target));

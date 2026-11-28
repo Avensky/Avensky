@@ -1,4 +1,7 @@
+import { observeWorkshopViewport } from "../preview/workshopViewport";
 import { useId, useState, type ReactNode } from "react";
+import { GameButton } from "../../components/GameButton";
+import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
 import { MenuPanelHeading } from "../../components/menus/CollapsibleMenuPanel";
 import type { VehicleStudioTab } from "./vehicleStudioStore";
 import { getPerformanceReadouts, getVehicleStockPerformance, getVehicleTuningLimits, type VehiclePerformanceSummary } from "./vehiclePerformance";
@@ -11,13 +14,21 @@ import { vehicleSystems } from "../../vehicles/vehicleSystems";
 import { PreviewZoom } from "../preview/PreviewZoom";
 
 export const VEHICLE_STUDIO_TABS = [
-  { id: "abilities", label: "ABILITIES", description: "Weapons and abilities for this vehicle" },
-  { id: "performance", label: "PERFORMANCE", description: "Power, drivetrain and handling" },
-  { id: "paint", label: "APPEARANCE", description: "Color, glass and finish" },
-  { id: "body", label: "BODY", description: "Doors, panels and glass" },
-  { id: "lighting", label: "LIGHTING", description: "Headlights, signals and lamps" },
-  { id: "studio", label: "PORTRAIT", description: "Preview the current look" },
+  { id: "paint", label: "Appearance" },
+  { id: "performance", label: "Performance" },
+  { id: "abilities", label: "Abilities" },
 ] as const;
+
+export const VEHICLE_APPEARANCE_TABS = [
+  { id: "paint", label: "Paint" },
+  { id: "body", label: "Body" },
+  { id: "lighting", label: "Lights" },
+  { id: "studio", label: "Portrait" },
+] as const;
+
+export function vehicleStudioSection(tab: VehicleStudioTab) {
+  return tab === "performance" || tab === "abilities" ? tab : "paint";
+}
 
 export type { VehicleStudioTab };
 export type { VehiclePerformanceSummary } from "./vehiclePerformance";
@@ -58,6 +69,7 @@ export function VehicleStudio({
   summary = STOCK_VEHICLE_SUMMARY,
   tab,
   footer,
+  changeTab,
   children,
 }: {
   name: string;
@@ -68,6 +80,7 @@ export function VehicleStudio({
   stages?: Record<string, number>;
   summary?: VehiclePerformanceSummary;
   tab: VehicleStudioTab;
+  changeTab: (tab: VehicleStudioTab) => void;
   footer?: ReactNode;
   children: ReactNode;
 }) {
@@ -78,13 +91,8 @@ export function VehicleStudio({
   const contentId = useId();
   const zoom = <PreviewZoom vertical />;
 
-  if (tab === "abilities") {
-    return <div className="vehicle-studio vehicle-studio--abilities" id="vehicle-studio-tab-panel" role="tabpanel"
-      aria-labelledby="vehicle-studio-tab-abilities">{children}{zoom}</div>;
-  }
-
   const rows = getPerformanceReadouts(summary, speedUnit, vehicleId);
-  const selected = VEHICLE_STUDIO_TABS.find((item) => item.id === tab)!;
+  const section = vehicleStudioSection(tab);
   const limits = getVehicleTuningLimits(vehicleId);
   const systems = vehicleSystems(vehicleId);
   const marine = systems === "marine";
@@ -101,59 +109,59 @@ export function VehicleStudio({
     ...(systems === "road" ? [{ key: "nitrous", label: "NITROUS", valueText: stage("nitrous") ? `STAGE ${stage("nitrous")}` : "STOCK", ratio: stage("nitrous") / limits.maxStage * 1.25, title: "Selected nitrous upgrade stage" }] : []),
     { key: "intercooler", label: "COOLING", valueText: coolingBonus ? `+${coolingBonus}%` : "STOCK", ratio: 1 + coolingBonus / 100, title: "Cooling capacity relative to stock" },
   ]);
-  const panelTitle = tab === "performance" ? "Upgrades" : selected.label.toLowerCase();
+  const panelTitle = tab === "performance" ? "Upgrades" : VEHICLE_APPEARANCE_TABS.find(item => item.id === tab)?.label ?? "Abilities";
+  const panelOwner = section === "paint" ? "vehicle-appearance-tab-" + tab : "vehicle-studio-tab-" + tab;
 
   return (
-    <div className="vehicle-studio">
+    <div className={`vehicle-studio${tab === "abilities" ? " vehicle-studio--abilities" : ""}`}>
       <div className="vehicle-studio-main">
-        <aside className="vehicle-studio-details" aria-label="Vehicle details and performance"
-          onFocus={event => (event.target as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
-          <section className="vehicle-studio-baseline menu-panel-frame" data-collapsed={Boolean(collapsedPanels.stats)} aria-label="Stats">
-            <MenuPanelHeading title="Stats" contentId={contentId + "-stats"} collapsed={Boolean(collapsedPanels.stats)} toggle={() => toggle("stats")} />
-            <div id={contentId + "-stats"} className="vehicle-studio-panel-content" hidden={collapsedPanels.stats}>
-              <header className="vehicle-studio-identity">
-                <h2>{name}</h2>
-                <p><strong>{role.toUpperCase()}</strong> · {note}</p>
-              </header>
-              <div className="vehicle-studio-power" aria-label="Vehicle performance statistics">
-                {pairs.map(pair => <div className="vehicle-studio-stat-pair" key={pair[0].key} data-count={pair.length}>
-                  {pair.map(row => <GarageStatCell key={row.key} row={row} />)}
-                </div>)}
-              </div>
-            </div>
-          </section>
-          <section className="vehicle-studio-drivetrain menu-panel-frame" data-collapsed={Boolean(collapsedPanels.drivetrain)} aria-label={drivetrainTitle}>
-            <MenuPanelHeading title={drivetrainTitle} contentId={contentId + "-drivetrain"}
-              collapsed={Boolean(collapsedPanels.drivetrain)} toggle={() => toggle("drivetrain")}>
-              <small>{drivetrainProfileFor(vehicleId).driveLayout}</small>
+        <div className="vehicle-studio-preview-area" ref={observeWorkshopViewport} data-workshop-viewport />
+        <div className="vehicle-studio-inspector">
+          {section === "paint" && <SecondaryTabRow className="workshop-appearance-tabs" aria-label="Vehicle appearance" data-controller-tab-only>
+            {VEHICLE_APPEARANCE_TABS.map(item => <GameButton key={item.id} variant="custom" role="tab"
+              id={`vehicle-appearance-tab-${item.id}`} aria-selected={item.id === tab} aria-controls="vehicle-studio-tab-panel"
+              onPress={() => changeTab(item.id)}>{item.label}</GameButton>)}
+          </SecondaryTabRow>}
+          {tab === "abilities" ? <section className="vehicle-studio-reference" role="tabpanel" id="vehicle-studio-tab-panel" aria-labelledby={panelOwner}>{children}</section>
+          : <section className="vehicle-studio-panel menu-panel-frame" data-collapsed={collapsed}
+            role="tabpanel" id="vehicle-studio-tab-panel" aria-labelledby={panelOwner}>
+            <MenuPanelHeading title={panelTitle} contentId={contentId} collapsed={collapsed} toggle={() => toggle(tab)}>
+              {tab === "performance" && <VehicleUpgradeProgress vehicle={vehicleId} stages={stages} maxStage={limits.maxStage} />}
             </MenuPanelHeading>
-            <div id={contentId + "-drivetrain"} className="vehicle-studio-panel-content" hidden={collapsedPanels.drivetrain}>
-              <VehicleDrivetrainSummary vehicle={vehicleId} weight={rows.find(row => row.key === "mass")?.valueText ?? "—"} economy={rows.find(row => row.key === "fuel_economy")?.valueText}
-                suspension={stage("suspension")} damping={summary.suspension_damping_ratio} yawDamping={summary.angular_damping} />
+            <div id={contentId} hidden={collapsed} className="vehicle-studio-panel-content" data-controller-row={tab !== "paint" || undefined} data-controller-columns="1"
+              onFocus={event => (event.target as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
+              {children}
             </div>
-          </section>
-        </aside>
-
-        <section
-          className="vehicle-studio-panel menu-panel-frame"
-          data-collapsed={collapsed}
-          role="tabpanel"
-          id="vehicle-studio-tab-panel"
-          aria-labelledby={"vehicle-studio-tab-" + tab}
-        >
-          <MenuPanelHeading title={panelTitle} contentId={contentId} collapsed={collapsed} toggle={() => toggle(tab)}>
-            {tab === "performance" && <VehicleUpgradeProgress vehicle={vehicleId} stages={stages} maxStage={limits.maxStage} />}
-          </MenuPanelHeading>
-          <div id={contentId} hidden={collapsed} className="vehicle-studio-panel-content" data-controller-row data-controller-columns="1"
-            onFocus={event => (event.target as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
-            {children}
-          </div>
-          {!collapsed && footer && <div className="vehicle-studio-panel-actions" data-controller-row>{footer}</div>}
-        </section>
-      </div>
-
-      <div className="vehicle-studio-rotate-hint" aria-hidden="true">
-        <span>↔</span> DRAG TO ROTATE
+            {!collapsed && footer && <div className="vehicle-studio-panel-actions" data-controller-row>{footer}</div>}
+          </section>}
+          {tab === "performance" && <aside className="vehicle-studio-details" aria-label="Vehicle details and performance"
+              onFocus={event => (event.target as HTMLElement).scrollIntoView?.({ block: "nearest", inline: "nearest" })}>
+              <section className="vehicle-studio-baseline menu-panel-frame" data-collapsed={Boolean(collapsedPanels.stats)} aria-label="Stats">
+                <MenuPanelHeading title="Stats" contentId={contentId + "-stats"} collapsed={Boolean(collapsedPanels.stats)} toggle={() => toggle("stats")} />
+                <div id={contentId + "-stats"} className="vehicle-studio-panel-content" hidden={collapsedPanels.stats}>
+                  <header className="vehicle-studio-identity">
+                    <h2>{name}</h2>
+                    <p><strong>{role.toUpperCase()}</strong> · {note}</p>
+                  </header>
+                  <div className="vehicle-studio-power" aria-label="Vehicle performance statistics">
+                    {pairs.map(pair => <div className="vehicle-studio-stat-pair" key={pair[0].key} data-count={pair.length}>
+                      {pair.map(row => <GarageStatCell key={row.key} row={row} />)}
+                    </div>)}
+                  </div>
+                </div>
+              </section>
+              <section className="vehicle-studio-drivetrain menu-panel-frame" data-collapsed={Boolean(collapsedPanels.drivetrain)} aria-label={drivetrainTitle}>
+                <MenuPanelHeading title={drivetrainTitle} contentId={contentId + "-drivetrain"}
+                  collapsed={Boolean(collapsedPanels.drivetrain)} toggle={() => toggle("drivetrain")}>
+                  <small>{drivetrainProfileFor(vehicleId).driveLayout}</small>
+                </MenuPanelHeading>
+                <div id={contentId + "-drivetrain"} className="vehicle-studio-panel-content" hidden={collapsedPanels.drivetrain}>
+                  <VehicleDrivetrainSummary vehicle={vehicleId} weight={rows.find(row => row.key === "mass")?.valueText ?? "—"} economy={rows.find(row => row.key === "fuel_economy")?.valueText}
+                    suspension={stage("suspension")} damping={summary.suspension_damping_ratio} yawDamping={summary.angular_damping} />
+                </div>
+              </section>
+            </aside>}
+        </div>
       </div>
       {zoom}
     </div>

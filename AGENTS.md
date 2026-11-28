@@ -17,7 +17,7 @@ Build and validation
 - For performance changes, supply a reproducible baseline, measurements, parity checks and environmental limits.
 Garage presentation
 - Sign-in, character selection, Play and Heroes share the authored garage_special.glb and LiveGarage scene. Make garage edits there for all four screens.
-- For sign-in, character selection, creation, Profile, or their menu handoffs, read [the approved menu guide](docs/MENU_DESIGN.md). It records the shared controls, visual rules, scene ownership, and acceptance checks to carry into the final game.
+- For sign-in, character selection, creation, Profile, or their menu handoffs, read [the approved menu guide](docs/MENU_DESIGN.md). For Wardrobe and Vehicle, follow its [creator-to-workshop pipeline](docs/MENU_DESIGN.md#from-character-creation-to-garage-customization) and exercise the station round trips before merging.
 - Use the shared angled header components and theme styles for menu changes. Center the brand in the painted tab face, give joined tabs a continuous themed top edge and a single themed divider, and preserve the larger mobile touch target. Check both orientations when a shared header changes.
 - Keep the two corner tabs prominent and the inner tabs shorter. Use the shared face heights, spacing and safe-area padding across the roster, Profile and creator. The A-shaped brand mark supplies the initial letter. Profile transitions retain the selected actor and its current gesture. Show pending work in the UI layer.
 - Treat the Garage as the player's private room and its four stations as the menu. Keep one garage canvas, carry the selected actor and vehicle forward, and introduce detail as the player reaches each stage.
