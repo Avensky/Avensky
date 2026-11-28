@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type Ref } from "react";
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { GameButton } from "../../components/GameButton";
 import { ColorSwatch } from "../../components/menus/ColorSwatch";
 import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
@@ -31,9 +31,9 @@ const linerStrokes: Record<string, string> = {
   graphic: "M4 18 Q12 9 23 15 L29 10 M21 18 Q25 18 28 15",
 };
 
-export function CreatorColors({ step, choice, onChoice, busy, onContinue, channelNavigation }: {
+export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardrobe = false }: {
   step: Step; choice: CharacterChoice; onChoice: (next: CharacterChoice, change: Partial<CharacterAppearance>) => void; busy: boolean; onContinue?: () => void;
-  channelNavigation?: Ref<(direction: number) => void>;
+  wardrobe?: boolean;
 }) {
   const [requested, setChannel] = useState<Channel>("base");
   const id = useId();
@@ -96,7 +96,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, channe
   }
   useLayoutEffect(() => {
     focusSwatch();
-    if (!channelNavigation) return;
+    if (!wardrobe) return;
     const tab = document.getElementById(id + channel);
     const row = tab?.parentElement;
     if (tab && row && row.scrollWidth > row.clientWidth) {
@@ -105,25 +105,24 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, channe
       if (tabBounds.left < panelBounds.left) row.scrollLeft += tabBounds.left - panelBounds.left;
       else if (tabBounds.right > panelBounds.right) row.scrollLeft += tabBounds.right - panelBounds.right;
     }
-  }, [channel, channelNavigation, id]);
+  }, [channel, wardrobe, id]);
   function moveChannel(direction: number) {
     if (busy || channels.length < 2 || group.current?.closest("[inert]") || useTextKeyboardStore.getState().session) return;
     openChannel(channels[(channels.indexOf(channel) + direction + channels.length) % channels.length]);
   }
-  useImperativeHandle(channelNavigation, () => moveChannel);
   const cycle = useEffectEvent((event: Event) => {
     const action = (event as CustomEvent<MenuAction>).detail;
     if (action === "previous_option" || action === "next_option") moveChannel(action === "previous_option" ? -1 : 1);
   });
   useEffect(() => {
-    if (channelNavigation) return;
+    if (wardrobe) return;
     window.addEventListener("avenlab:panel-action", cycle);
     return () => window.removeEventListener("avenlab:panel-action", cycle);
-  }, [channelNavigation]);
+  }, [wardrobe]);
   const activeLabel = values.find(option => option.id === active)?.label ??
     (channel === "presets" ? "Custom" : palette && HAIR_COLOR_ZONES.includes(channel as HairColorZone) ? palette[channel as HairColorZone] : "Original");
   return <>
-    {channels.length > 1 && <SecondaryTabRow className="creator-color-channels" aria-label={step === "hair" ? "Hair color channels" : "Makeup channels"}>
+    {channels.length > 1 && <SecondaryTabRow navigation={wardrobe ? "arrows" : "triggers"} className="creator-color-channels" aria-label={step === "hair" ? "Hair color channels" : "Makeup channels"}>
       {channels.map(key => <GameButton key={key} variant="custom" role="tab" data-creator-channel={key}
         id={id + key} aria-selected={key === channel} aria-controls={id + "-colors"} disabled={busy}
         onPress={() => openChannel(key)}>{labels[key]}</GameButton>)}
@@ -148,7 +147,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, channe
             ) : color ? <ColorSwatch color={color} /> : <span aria-hidden="true">∅</span>}
           </CreatorOption>;
         })}
-        {channelNavigation && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
+        {wardrobe && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
           <label className="creator-option wardrobe-custom-dye chamfered-frame" title="Custom color">
             <span aria-hidden="true">+</span><input type="color" disabled={busy} value={currentPalette[channel as HairColorZone]}
               aria-label={labels[channel] + " custom color"}

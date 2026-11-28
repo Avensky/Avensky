@@ -7,7 +7,7 @@ Use sign-in, character selection, and character creation as the references for n
 | Intent | Controller | Keyboard | Behavior |
 | --- | --- | --- | --- |
 | Cycle the primary header | LB / RB | Q / E | Move through reachable header tabs in visual order and wrap at the ends. Content tabs open their preview. Back and account actions take focus and wait for confirmation. |
-| Cycle a secondary row | LT / RT | 1 / 3 | Switch the visible channels, such as Base, Roots, Highlights, and Tips. Preserve the chosen value when opening another channel. |
+| Cycle a secondary row | LT / RT | 1 / 3 | In Wardrobe, move focus through the visible toolbars and inspector. In character creation, switch the visible channels, such as Base, Roots, Highlights, and Tips. |
 | Browse choices and settings | D-pad | Arrow keys / WASD | Follow the visible rows and columns, including after a phone rotates. The left stick also browses creator choices and Profile settings. Up/Down stays in the Profile settings list. |
 | Confirm | A | Enter | Activate the focused control once. A tap activates its target directly. Preview an unselected roster character first, then confirm the selected tile to enter. |
 | Back or finish editing | B | Esc | Give the open editor or expanded row the first chance to handle Back. Leaving the creator’s name input keeps the text. Use explicit Log out for ending a session. |
@@ -59,6 +59,8 @@ Apply the same pattern when adding a garage option.
 Light the Wardrobe actor with the same garage fixtures, indirect light and exposure as the character in the Garage. Compare the same face, hair and fabric on both sides of the handoff. Check a dark dye and a pale dye under a high collar while the head turns. The strands should retain their color and show movement in the loose lengths.
 
 Anchor the hair heading, active value and actions while browsing styles or swatches. Give vertical scrolling to the collection that overflows. Show bottom hints as a glyph and an action over the room, with open space between controls where the player can drag the camera. Keep the tap target and visible focus on each actionable hint.
+
+On Wardrobe Details, the secondary cycle runs **Camera angles → Rotate and play → Zoom and hide → Details**, then wraps to Camera angles. Reverse follows the same stops backwards. A visit focuses a control and waits for confirmation. Return to the last usable control in that group and skip groups with no available actions. Use the same order for the other Wardrobe inspectors, with their active content as the final stop. Within the inspector, arrows and the D-pad reach category tabs, color channels and choices. Keep the toolbar hints visible while the interface is shown, including on touch and after inactivity. Hide interface takes the hints away with the controls, and waking restores both.
 
 In Wardrobe, a drag beginning on the character turns the body. A drag beginning in the room orbits the camera. Keep that choice for the whole gesture, even if the pointer crosses the silhouette. A tap on the character can still play a gesture. Center the pose play/pause control between the two body-rotation arrows. The two outer double arrows orbit the garage camera. Leave the space around these controls open to the scene.
 

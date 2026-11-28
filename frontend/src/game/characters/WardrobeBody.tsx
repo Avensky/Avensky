@@ -29,7 +29,6 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
   const piece = groomLayer && groomLayer !== "sections" ? groomLayer : null;
   const panel = useRef<HTMLElement>(null);
   const focusTarget = useRef<string>(null);
-  const channel = useRef<(direction: number) => void>(null);
   const appearance = choice.appearance ?? characterAppearance(choice);
   const groom = appearance.hair_groom ?? DEFAULT_HAIR_GROOM;
   const look = characterLook(choice);
@@ -52,7 +51,7 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
     } else return false;
     return true;
   }
-  useImperativeHandle(navigation, () => ({ back, cycleGroup: direction => channel.current?.(direction) }));
+  useImperativeHandle(navigation, () => ({ back }));
   useLayoutEffect(() => { focusWardrobeFeature(section); }, [section]);
   useLayoutEffect(() => () => focusWardrobeFeature(null), []);
   useLayoutEffect(() => {
@@ -93,7 +92,7 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
     hair_palette: groom.pieces[piece] ?? appearanceHairPalette(appearance) ?? { ...DEFAULT_HAIR_PALETTE,
       base: look!.hair, roots: look!.hair, highlights: look!.hair, tips: look!.hair },
   } } : choice;
-  return <section ref={panel} className="character-controls menu-panel-frame character-body-style" aria-label="Body customization">
+  return <section data-wardrobe-focus-group="content" ref={panel} className="character-controls menu-panel-frame character-body-style" aria-label="Body customization">
     <header className="wardrobe-body-heading">
       {section && <GameButton variant="custom" className="wardrobe-body-back" data-body-back data-controller-row
         aria-label={"Back to " + (piece ? "hair sections" : groomLayer ? "hair color" : "Body")} onPress={back}><MenuIcon name="back" /></GameButton>}
@@ -141,7 +140,7 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
           {options.tattoo.map(option => <CreatorOption key={option.id} id={option.id} label={option.label}
             selected={option.id === (appearance.tattoo ?? "none")} busy={disabled || !tattoosAvailable}
             onPick={() => onChange({ tattoo: option.id })}>{option.label}</CreatorOption>)}
-        </div> : <CreatorColors step={section} choice={colorChoice} onChoice={pickColor} busy={disabled} channelNavigation={channel} />}
+        </div> : <CreatorColors step={section} choice={colorChoice} onChoice={pickColor} busy={disabled} wardrobe />}
     </div>}
   </section>;
 }

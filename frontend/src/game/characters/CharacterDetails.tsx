@@ -19,7 +19,7 @@ export function CharacterDetails({ name, gender, personality, bag, selectedId, d
   const traits = characterPersonality(personality);
   const style = CHARACTER_STYLES.find(item => item.attitude === traits.id);
   const emotes = useMemo(() => traits.emotes.flatMap(id => findGaragePreviewEmote(id, bag) ?? []), [traits, bag]);
-  return <section className="character-controls menu-panel-frame character-details" aria-label="Character details">
+  return <section data-wardrobe-focus-group="content" className="character-controls menu-panel-frame character-details" aria-label="Character details">
     <header className="character-description"><h2>{name ?? "Your character"}</h2></header>
     <dl className="character-traits">
       <dt>Gender</dt><dd>{CHARACTER_IDENTITIES.find(item => item.id === gender)?.label ?? gender}</dd>

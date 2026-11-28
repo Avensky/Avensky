@@ -1,5 +1,8 @@
 import { ScreenNotice } from "../../components/menus/ScreenNotice";
+import { useTextKeyboardStore } from "../../store/text/keyboardStore";
+import { createWardrobeToolbarNavigation, wardrobeFocusGroup } from "../characters/wardrobeToolbarNavigation";
 import { WardrobeImmersion } from "../characters/WardrobeImmersion";
+import { WardrobeToolbarHints } from "../characters/WardrobeToolbarHints";
 import { observeWorkshopViewport } from "../preview/workshopViewport";
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import type { WardrobeNavigation } from "../characters/DressingRoom";
@@ -115,6 +118,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const characterTab=!stagingSignedIn&&(selectedCharacterTab==="profile"||selectedCharacterTab==="account")?"appearance":selectedCharacterTab;
  const [characterReady,setCharacterReady]=useState(false);
  const wardrobeNavigation=useRef<WardrobeNavigation>(null);
+ const [wardrobeToolbars]=useState(createWardrobeToolbarNavigation);
  const beforeCharacterClose=useRef<()=>Promise<boolean>>(null);
  const previousCharacterPage=useRef<WorkshopPage|"main">(entry==="wardrobe"?"main":"heroes");
  const openCharacter=()=>{
@@ -246,7 +250,11 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
   const index=VEHICLE_APPEARANCE_TABS.findIndex(tab=>tab.id===studioTab);
   setStudioTab(VEHICLE_APPEARANCE_TABS[(index+direction+VEHICLE_APPEARANCE_TABS.length)%VEHICLE_APPEARANCE_TABS.length].id);
  };
- useSelectionNavigation(root,{navigateOptionFields:Boolean(entry),confirm:()=>{
+ const cycleWardrobeToolbar=(direction:number)=>{
+  if(!characterOpen||!root.current||root.current.inert||useGarageDrive.getState().panelsHidden||useTextKeyboardStore.getState().session)return;
+  wardrobeToolbars.cycle(root.current,direction);
+ };
+ useSelectionNavigation(root,{navigateOptionFields:Boolean(entry)||characterOpen,confirm:()=>{
   if(useGarageDrive.getState().panelsHidden){useGarageDrive.setState({panelsHidden:false});return;}
   const active=document.activeElement as HTMLElement;
   if(active===root.current&&page==="heroes"&&!viewingReference)openHero();else if(root.current?.contains(active))active.click();
@@ -275,11 +283,14 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
    active.dispatchEvent(new Event("change",{bubbles:true}));
   }else if(root.current){
    const enterBody=action==="down"&&active?.closest("[data-controller-header-action]");
-   navigateFormRows(root.current,enterBody?null:active as HTMLElement,action,remembered.current,{includeHeaderActions:!entry});
+   const group=characterOpen&&wardrobeFocusGroup(active);
+   navigateFormRows(root.current,enterBody?null:active as HTMLElement,action,remembered.current,{
+    includeHeaderActions:!entry, includeRow:group?row=>wardrobeFocusGroup(row)===group:undefined,
+   });
   }
  },option:direction=>{
   if(useGarageDrive.getState().panelsHidden)return;
-  if(characterOpen)wardrobeNavigation.current?.cycleGroup(direction);
+  if(characterOpen)cycleWardrobeToolbar(direction);
   else if(editing)cycleVehicleAppearance(direction);
  },tab:direction=>{
   if(useGarageDrive.getState().panelsHidden)return;
@@ -336,7 +347,9 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
   <span className="hero-workshop-main-name">{headerVehicle?.name??"Vehicles"}</span>
  </button>;
  const customizationHeader={onOpen:openCharacter,leadingAction:vehicleAction,active:characterOpen};
- return <><section {...pressOwner} ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null||(characterOpen&&panelsHidden)} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
+ return <><section {...pressOwner} ref={root}
+  onFocusCapture={characterOpen?event=>wardrobeToolbars.remember(event.target):undefined}
+  onPointerUpCapture={characterOpen?event=>wardrobeToolbars.remember(event.target,true):undefined} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null||(characterOpen&&panelsHidden)} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
   <ScreenNotice message={status==="error" ? message : status==="saved" ? "Vehicle style saved to your profile." :
     status==="pending" || status==="saving" ? "Saving vehicle style…" : ""}/>
   {characterOpen?characterReady?<SceneTabHeader station={Boolean(entry)} title="" tablistLabel="Character sections" compact tabs={visibleCharacterTabs} activeTab={characterTab}
@@ -459,7 +472,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
    {editing&&definition&&<GaragePreviewControls vehicle={definition.vehicle}/>}
    {((characterOpen&&!characterReady)||viewingConcepts||(!characterOpen&&!definition))&&<div className="hero-garage-controls" data-controller-row><PreviewVisibilityToggle/></div>}
   </div>
-  <SelectionFooter tabs={!characterOpen||characterReady} selectLabel={editing&&studioTab==="abilities"?"Toggle":undefined} hasPrimaryAction={!characterOpen&&(!editing||studioTab!=="abilities")}>{!characterOpen&&<div className="hero-workshop-actions" data-controller-row={stationEntry||undefined}>
+  <SelectionFooter className={characterOpen?"wardrobe-navigation-hints":undefined} backAction={characterOpen?{onClick:back}:undefined} tabs={!characterOpen||characterReady} selectLabel={editing&&studioTab==="abilities"?"Toggle":undefined} hasPrimaryAction={!characterOpen&&(!editing||studioTab!=="abilities")}>{characterOpen?<WardrobeToolbarHints onCycle={cycleWardrobeToolbar}/>:<div className="hero-workshop-actions" data-controller-row={stationEntry||undefined}>
    {!viewingReference&&<ControllerAction button="A" type="button" className="menu-control" disabled={!owner} tabIndex={stationEntry?0:-1} onClick={()=>editing?void back():openHero()}>{stationEntry?(editing?"Done":"Customize"):(editing?"APPLY":"OPEN GARAGE")}</ControllerAction>}
    <HoldMainButton key={`${owner}:${hero}:${editing}:${viewingReference}:${main===hero}:${status==="error"}`} disabled={overlay!==null||viewingReference||!owner||!hero||main===hero||status==="error"} selected={hero!==null&&main===hero} onComplete={()=>mainChoice()}/>
   </div>}</SelectionFooter>

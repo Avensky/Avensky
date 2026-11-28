@@ -31,7 +31,7 @@ export function FittingRotationControls({ characterDisabled, garageDisabled, pau
   characterDisabled: boolean; garageDisabled: boolean; paused: boolean; reducedMotion: boolean; onTogglePose: () => void;
 }) {
   const label = reducedMotion ? "Pose playback paused by Reduced Motion" : paused ? "Resume pose" : "Pause pose";
-  return <div className="fitting-rotation-grid" role="group" aria-label="Rotation and pose playback" data-controller-row>
+  return <div data-wardrobe-focus-group="rotation" className="fitting-rotation-grid" role="group" aria-label="Rotation and pose playback" data-controller-row>
     <RotationButton subject="garage" direction={-1} disabled={garageDisabled} />
     <RotationButton subject="character" direction={-1} disabled={characterDisabled} />
     <GameButton variant="custom" pressFeedback className="fitting-rotation-button"

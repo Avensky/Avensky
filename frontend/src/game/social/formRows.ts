@@ -1,5 +1,12 @@
 import type { MenuAction } from "../../controls/inputRouting";
 
+export const FORM_CONTROL_SELECTOR = "[role=button],[role=tab],button,input:not([type=hidden]),select,textarea,a[href],summary,[data-controller-selector][tabindex]";
+
+export function usableFormControl(node: HTMLElement) {
+  return node.tabIndex >= 0 && !node.matches(":disabled,[aria-disabled=true]")
+    && !node.closest("[hidden],[inert]") && node.checkVisibility?.() !== false;
+}
+
 /** Row groups describe visible layout, so horizontal menus never turn into a
  * vertical list. Runs only on navigation events, without measuring the scene. */
 export function navigateFormRows(
@@ -7,24 +14,17 @@ export function navigateFormRows(
   active: HTMLElement | null,
   action: MenuAction,
   remembered: WeakMap<HTMLElement, number>,
-  { includeHeaderActions = true } = {},
+  { includeHeaderActions = true, includeRow }: { includeHeaderActions?: boolean; includeRow?: (row: HTMLElement) => boolean } = {},
 ) {
   if (!root.hasAttribute("data-controller-rows")) return false;
-  const controls = "[role=button],[role=tab],button,input:not([type=hidden]),select,textarea,a[href],summary,[data-controller-selector][tabindex]";
   const rows = Array.from(
     root.querySelectorAll<HTMLElement>("[data-controller-row]"),
   )
-    .filter((row) => !row.hasAttribute("data-controller-tab-only"))
+    .filter((row) => !row.hasAttribute("data-controller-tab-only") && (!includeRow || includeRow(row)))
     .filter((row) => includeHeaderActions || !row.closest("[data-controller-header-action], .menu-frame-header"))
     .map((row) => ({
       row,
-      items: (row.matches("button, [role=button], [role=tab], a[href], input:not([type=hidden])") ? [row] : Array.from(row.querySelectorAll<HTMLElement>(controls))).filter(
-        (node) =>
-          !node.matches(":disabled,[aria-disabled=true]") &&
-          !node.closest("[hidden],[inert]") &&
-          node.checkVisibility?.() !== false &&
-          node.tabIndex >= 0,
-      ),
+      items: (row.matches("button, [role=button], [role=tab], a[href], input:not([type=hidden])") ? [row] : Array.from(row.querySelectorAll<HTMLElement>(FORM_CONTROL_SELECTOR))).filter(usableFormControl),
     }))
     .filter((group) => group.items.length);
   const index = rows.findIndex((group) => group.items.includes(active!));

@@ -522,8 +522,8 @@ still shows through the waistband.
 
 ## Garage presentation fixes
 
-The eye toggle is part of the bottom camera toolbar, including the character
-camera controls, and remains available after hiding the interface. The circular
+In the fitting room, the eye beneath the zoom slider hides the interface.
+The next deliberate input restores the controls. The circular
 reflective platform and its turntable portal are restored from 8e0b729, retaining
 the newer camera envelope and reflection budgets. Reduced Motion still pauses
 automatic rotation.
@@ -570,9 +570,11 @@ Captured movement turns the character without testing each skinned garment again
 
 Choose a shot for the active tab on the camera rail. Appearance includes worn
 garments in head-to-toe order. On a landscape phone the rail uses two columns.
-Reset view above the zoom
-slider restores the current framing. Hide interface below the slider leaves the
-live character in view. The next deliberate input restores the controls.
+Use LT/RT, the 1/3 keys or the on-screen toolbar arrows to move between camera
+angles, rotation and playback, zoom, and the current inspector. The group cycle
+wraps in both directions. Use directional input to browse controls within a group.
+Reset view above the zoom slider restores the current framing. Keep the toolbar
+hints visible while the fitting-room interface is open, including after touch input.
 The Heroes Fitting Room uses the garage with an angled
 mirror that reflects the live character. Ruffled Corset first equips in
 Over skirt.
