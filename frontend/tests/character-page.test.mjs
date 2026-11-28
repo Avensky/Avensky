@@ -136,12 +136,11 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       setValue.call(input, String(value));
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const cameraTools = 'button[aria-label="Camera tools"]';
-    const cameraView = label => [...document.querySelectorAll('[aria-label="Preview camera"] button, .dressing-wearable-shortcuts button')]
+    const poseTools = '[aria-label="Pose tools"]';
+    const posePanel = () => document.getElementById(find(poseTools).getAttribute('aria-controls'));
+    const cameraView = label => [...document.querySelectorAll('[data-camera-choice]')]
       .find(button => button.getAttribute('aria-label') === label);
     const chooseCameraView = async label => {
-      if (cameraView(label)?.closest('.dressing-camera-shortcuts [hidden]'))
-        await click('.dressing-camera-shortcuts [aria-label="Camera angles"]');
       const button = cameraView(label);
       assert(button && !button.closest('[hidden]'), `${label} is an available camera view`);
       await act(async () => button.click());
@@ -344,8 +343,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));
     assert(find('[aria-label="Emote collection"]').closest('.character-controls--left'));
     assert.equal(find('[data-character-option]'), null, 'Emotes uses the active character model');
-    assert(find('.dressing-toolbar .fitting-camera-toolbar'), 'Emotes uses the Dressing Room camera toolbar');
-    assert(find('.dressing-toolbar button[aria-label="Hide interface"]'));
+    assert(cameraView('Full body') && !cameraView('Full body').closest('[hidden]'), 'Emotes exposes the character camera rail');
+    assert(find('.dressing-preview-zoom [aria-label="Hide interface"]'));
     assert.equal(find('select[aria-label="Preview camera"]'), null);
     await openEmotes();
     const searchMotions = value => act(async () => {
@@ -414,14 +413,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id] .emote-name').textContent, 'Steering test · Right');
     assert.equal(find('[aria-label="Driving emotes"] button:first-child').disabled, false);
     const cameraAngles = 'button[aria-label="Camera angles"]';
-    await click(cameraAngles);
     assert.equal(cameraView('Driver').getAttribute('aria-pressed'), 'true');
     await chooseCameraView('Whole vehicle');
     await click('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id]');
     assert.equal(preview.getState().emote.id, '200');
     assert.equal(preview.getState().camera, 'Whole car');
-    assert(find('.fitting-camera-angles').hidden, 'selecting an emote dismisses the camera popover');
-    await click(cameraAngles);
+    assert(!cameraView('Whole vehicle').closest('[hidden]'), 'cockpit views stay available during an emote');
     assert.equal(cameraView('Whole vehicle').getAttribute('aria-pressed'), 'true');
     await chooseCameraView('Driver');
     assert.equal(preview.getState().camera, 'Full body');
@@ -434,7 +431,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await browseWardrobe('outfits');
     assert.equal(cameraView('Coat').getAttribute('aria-pressed'), 'true');
     for (const category of ['hair', 'face', 'skin']) assert.equal(find(`[data-category=${category}]`), null);
-    assert(find('.dressing-toolbar button[aria-label="Hide interface"]'), 'dressing room keeps the eye beside its camera');
+    assert(find('.dressing-preview-zoom [aria-label="Hide interface"]'), 'Dressing Room keeps the eye on the zoom rail');
     assert.equal(preview.getState().insideCar, false);
     assert.equal(preview.getState().emote, null);
     await click('#character-editor-tab-body');
@@ -455,37 +452,39 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(cameraView('Glasses').getAttribute('aria-pressed'), 'true');
     assert.equal(find('[aria-label="Clothing piece"]'), null, 'the camera selector also inspects clothing');
     assert(find('.dressing-camera-shortcuts [aria-label="Preview camera"]'), "camera shortcuts stay on the wardrobe rail");
-    assert(find('.fitting-camera-panel:not(.fitting-camera-angles)').hidden, 'camera adjustments start collapsed');
+    assert(posePanel().hidden, 'additional pose actions start collapsed');
     const fittingZoom = '.dressing-preview-zoom input[aria-label="Preview zoom"][aria-orientation="vertical"]';
     assert(find(fittingZoom));
     await slide(fittingZoom, 1.2);
     assert.equal(preview.getState().zoom, 1.2);
-    await slide(fittingZoom, 1);
-    await click(cameraTools);
-    assert.equal(find('.fitting-camera-panel:not(.fitting-camera-angles)').hidden, false);
-    assert(find('.fitting-camera-panel:not(.fitting-camera-angles)').contains(document.activeElement), 'keyboard activation focuses a camera adjustment');
-    assert.equal(find('.fitting-camera-panel:not(.fitting-camera-angles)').textContent.trim(), '', 'the camera popup uses icons');
-    await click('.fitting-camera-panel [aria-label="Look away"]');
+    const inspectionRevision = preview.getState().focusRevision;
+    await click('.dressing-preview-zoom [aria-label="Reset view"]');
+    assert.equal(preview.getState().zoom, 1);
+    assert.ok(preview.getState().focusRevision > inspectionRevision, 'reset requests a fresh framing of the shot');
+    assert.equal(preview.getState().camera, 'Selected item');
+    assert.equal(preview.getState().selectedPiece, 'glasses', 'reset returns to the current inspection target');
+    await click(poseTools);
+    assert.equal(posePanel().hidden, false);
+    assert(posePanel().contains(document.activeElement), 'keyboard activation focuses a pose action');
+    assert.equal(posePanel().textContent.trim(), '', 'the pose tools use labeled icons');
+    await click('[aria-label="Look away"]');
     assert.equal(preview.getState().emote?.id, 'look-away', 'wardrobe can play the glance on its own stage');
     await act(async () => preview.setState({ emote: null }));
     for (const [label, id] of [['Check makeup', 'makeup-check'], ['Redo lipstick', 'redo-lipstick'], ['Apply eyeliner', 'apply-eyeliner']]) {
-      await click(`.fitting-camera-panel [aria-label="${label}"]`);
+      await click(`[aria-label="${label}"]`);
       assert.equal(preview.getState().emote?.id, id);
       assert.equal(preview.getState().camera, 'Face');
     }
     await act(async () => preview.setState({ emote: null, camera: 'Full body' }));
     assert(cameraView('Glasses').querySelector('svg'), 'the clothing close-up has a labeled icon');
-    await click('.fitting-camera-panel [aria-label="Zoom in"]');
-    assert.equal(preview.getState().zoom, 1.05);
-    await click('.fitting-camera-panel [aria-label="Zoom out"]');
-    assert.equal(preview.getState().zoom, 1);
     await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', {
       key: 'Escape', code: 'Escape', bubbles: true, cancelable: true,
     })));
-    assert(find('.fitting-camera-panel:not(.fitting-camera-angles)').hidden);
-    assert.equal(document.activeElement, find(cameraTools));
+    assert(posePanel().hidden);
+    assert.equal(document.activeElement, find(poseTools));
     assert.equal(cameraView('Whole car'), undefined);
-    assert.equal(find('.dressing-toolbar [data-rotation=vehicle]'), null);
+    assert.deepEqual([...document.querySelectorAll('[aria-label="Rotate character and garage"] [data-rotation]')].map(button => button.getAttribute('aria-label')),
+      ['Rotate garage left', 'Rotate character left', 'Rotate character right', 'Rotate garage right']);
     await chooseCameraView('Full body');
     assert.equal(preview.getState().camera, 'Full body');
     await chooseCameraView('Glasses');
@@ -496,10 +495,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const palette = document.getElementById(paletteToggle.getAttribute('aria-controls'));
     assert.equal(palette.childElementCount, 0, 'the closed palette keeps its panel ID without mounting swatches');
     assert.equal(paletteToggle.textContent, '', 'the toolbar uses a swatch icon');
-    await click(cameraTools);
+    await click(poseTools);
     await click('[aria-label="Open clothing colors"]');
     assert.equal(find('.dressing-color-panel').hidden, false);
-    assert(find('.fitting-camera-panel').hidden, 'opening colors closes the zoom and rotation popup');
+    assert(posePanel().hidden, 'opening colors closes the pose tools');
     const initialMain = find('input[aria-label="Custom main color"]').value;
     await click('button[aria-label="Accent color: Crimson"]');
     assert.equal(find('input[aria-label="Custom main color"]').value, initialMain);
@@ -904,7 +903,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   }
 });
 
-test('spatial garage stations open the wardrobe and vehicle chooser, inspect their options and return', async () => {
+test('spatial garage stations open the wardrobe and vehicle chooser, inspect their options and return', async t => {
   const {close} = characterTestDom();
   let vite, root;
   try {
@@ -916,18 +915,28 @@ test('spatial garage stations open the wardrobe and vehicle chooser, inspect the
     const {useSocialStore: social} = await load('store/social/socialStore.ts');
     const {useHeroLoadouts: loadouts} = await load('vehicles/cosmetics/heroLoadouts.ts');
     const {usePreferencesStore: prefs} = await load('store/preferences/preferencesStore.ts');
+    const {useCharacterPreviewStore: preview} = await load('game/characters/characterPreviewStore.ts');
     const {routeMenuAction} = await load('controls/inputRouting.ts');
-    social.setState({view:{profile:{id:'driver',progression:{character:DEFAULT_CHARACTER,default_hero:'brz'}}}});
+    social.setState({view:{profile:{id:'driver',active_character_id:'ava',name:'ava',progression:{character:DEFAULT_CHARACTER,default_hero:'brz'}}}});
     loadouts.getState().adopt('driver','brz');
     const {createRoot} = await import('react-dom/client');
     root = createRoot(document.getElementById('root'));
     const key = code => act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', {code, bubbles:true, cancelable:true})));
     const controller = action => act(async () => routeMenuAction(action));
-    for (const [entry, selector] of [['wardrobe', '.dressing-room-title'], ['vehicle', '.hero-workshop-picker[data-vehicle-picker]']]) {
+    const {SCREEN_NOTICE_MS} = await load('components/menus/ScreenNotice.tsx');
+    for (const [entry, selector] of [['wardrobe', '.dressing-camera-shortcuts'], ['vehicle', '.hero-workshop-picker[data-vehicle-picker]']]) {
       prefs.setState({menuHeaderStyle:entry === 'wardrobe' ? 'angled' : 'classic'});
+      if (entry === 'wardrobe') t.mock.timers.enable({apis:['setTimeout']});
       ui.getState().setScreen('heroes',entry);
       await act(async () => root.render(h(HeroWorkshop, {key:entry})));
       assert.ok(document.querySelector(selector), entry + ' opened its editor');
+      if (entry === 'wardrobe') {
+        const arrival = document.querySelector('.screen-notice small')?.parentElement;
+        assert.equal(arrival?.textContent, 'Fitting room Ava');
+        await act(async () => t.mock.timers.tick(SCREEN_NOTICE_MS));
+        assert.equal(arrival.isConnected, false);
+        t.mock.timers.reset();
+      }
       const tabs = [...document.querySelectorAll('.menu-frame-header [data-controller-tab-only] [role=tab], .hero-workshop > [data-controller-tab-only] [role=tab]')];
       const originalTab = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
       const backButton = document.querySelector('.menu-frame-header [data-header-back]');
@@ -952,7 +961,46 @@ test('spatial garage stations open the wardrobe and vehicle chooser, inspect the
       assert.equal(document.activeElement, contentStart, 'up at the first content row stays in the body');
       await act(async () => originalTab.click());
       if (entry === 'wardrobe') {
+        assert.equal(document.querySelector('.screen-notice small'), null, 'switching wardrobe tabs leaves the entry notice dismissed');
+        const slider = document.querySelector('.preview-zoom-slider[aria-label="Preview zoom"]');
+        const initialZoom = preview.getState().zoom;
+        slider.focus();
+        await controller('right');
+        assert.equal(preview.getState().zoom, initialZoom + .05, 'controller Right increases the current shot zoom');
+        assert.equal(document.activeElement, slider);
+        await key('ArrowLeft');
+        assert.equal(preview.getState().zoom, initialZoom, 'keyboard Left takes one zoom step back');
+        assert.equal(document.activeElement, slider);
         const group = () => document.querySelector('[data-wardrobe-group][aria-selected=true]').textContent;
+        const eye = document.querySelector('.garage-hide-toggle');
+        const immersed = () => document.documentElement.hasAttribute('data-wardrobe-immersive');
+        const hide = () => act(async () => { eye.focus(); eye.click(); });
+        await hide();
+        assert.ok(immersed() && document.querySelector('.hero-workshop').hasAttribute('inert'));
+        await key('Escape');
+        assert.equal(document.activeElement, eye, 'keyboard wake restores the same tool');
+        assert.ok(!immersed() && ui.getState().screen === 'heroes', 'Back wakes without leaving');
+        assert.equal(eye.dispatchEvent(new window.KeyboardEvent('keydown', {code:'Escape', repeat:true, bubbles:true, cancelable:true})), false);
+        eye.dispatchEvent(new window.KeyboardEvent('keyup', {code:'Escape', bubbles:true, cancelable:true}));
+        await hide();
+        await act(async () => document.querySelector('.wardrobe-wake-surface').click());
+        assert.equal(document.activeElement, eye);
+        const {consumePreviewWakeInput} = await load('controls/previewWakeInput.ts');
+        const pad = {buttons:[{pressed:true}], axes:[0,0,0,0]};
+        assert.equal(consumePreviewWakeInput(pad), false);
+        await hide();
+        assert.equal(consumePreviewWakeInput(pad), true);
+        assert.ok(immersed(), 'the held button that hid the editor cannot wake it');
+        pad.buttons[0].pressed = false;
+        assert.equal(consumePreviewWakeInput(pad), true);
+        pad.axes[2] = .7;
+        await act(async () => assert.equal(consumePreviewWakeInput(pad), true));
+        assert.ok(!immersed());
+        assert.equal(consumePreviewWakeInput(pad), true, 'held wake stick cannot immediately navigate');
+        pad.axes[2] = 0;
+        assert.equal(consumePreviewWakeInput(pad), true);
+        assert.equal(consumePreviewWakeInput(pad), false, 'navigation resumes after release');
+        assert.equal(document.activeElement, eye);
         assert.equal(group(), 'Outfits');
         await act(async () => routeMenuAction('next_option'));
         assert.equal(group(), 'Clothing');

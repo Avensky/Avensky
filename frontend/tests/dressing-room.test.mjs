@@ -224,12 +224,14 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
       assert.deepEqual([...document.querySelectorAll('[data-category]')].map(button => button.dataset.category), sets[index]);
     }
     await act(async () => groups[0].click());
-    assert.equal(find('.dressing-camera-block').previousElementSibling, find('.dressing-wardrobe'));
-    assert.equal(find('.dressing-room-title').nextElementSibling, find('.dressing-camera-shortcuts'));
+    const cameraRail = find('.dressing-camera-shortcuts');
+    const views = [...cameraRail.querySelectorAll('[data-camera-choice]')];
+    assert.deepEqual(views.slice(0, 3).map(button => button.dataset.cameraChoice), ['Full body', 'Face', 'Hands']);
+    assert(views.every(button => !button.closest('[hidden]')), 'camera and worn-item views are directly available');
     assert(find('[data-wearable-quick-select="corset"]'));
     assert(!find('[data-wearable-quick-select="bra"]'));
     assert.equal(find('[data-category=colors]'), null, 'presets live in the color toolbar');
-    assert.deepEqual([...find('.dressing-room-title').children].map(label => label.textContent), ['Fitting room', 'Your character']);
+    assert.equal(find('.dressing-room-title'), null, 'the camera rail has no permanent nameplate');
     assert.equal(find('.dressing-catalog').hidden, true);
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'entering the fitting room mounts only visible wardrobe controls');
     assert.equal(find('.dressing-details').hidden, true);
@@ -442,7 +444,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(changes.at(-1).outfit, 'medieval-05');
     assert.equal(changes.at(-1).garments, undefined, 'a whole outfit clears try-on pieces');
     assert.equal(preview.getState().camera, 'Full body');
-    const outfitColors = '.dressing-toolbar .dressing-color-toolbar';
+    const outfitColors = '.dressing-details .dressing-color-toolbar';
     const existingDyes = changes.at(-1).appearance.item_colors;
     await click(`${outfitColors} .dressing-color-toggle`);
     for (const label of ['Gown fabric', 'Inset panels', 'Hood and cuffs', 'Bodice laces']) {

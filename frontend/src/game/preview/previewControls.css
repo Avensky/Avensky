@@ -4,11 +4,8 @@
   min-width: 0;
   pointer-events: auto;
 }
-.fitting-camera-row, .fitting-camera-adjustments, .fitting-camera-range { display: flex; align-items: center; gap: 3px; }
-.fitting-camera-row { flex-wrap: wrap; justify-content: center; }
-.fitting-camera-adjustments { justify-content: center; gap: 5px; }
-.fitting-camera-toolbar .menu-control.fitting-tool-icon,
-.fitting-camera-toolbar .fitting-rotation-grid .menu-control {
+.fitting-camera-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 3px; }
+.fitting-camera-toolbar .menu-control.fitting-tool-icon {
   display: grid;
   flex: none;
   place-items: center;
@@ -23,7 +20,7 @@
   color: var(--app-text);
 }
 .fitting-camera-toolbar .menu-control:is(:hover, :focus-visible, [aria-expanded="true"], [aria-pressed="true"]):not(:disabled) { border-color: var(--app-accent); color: var(--app-accent); }
-.fitting-camera-toolbar :is(.fitting-tool-icon, .fitting-rotation-grid) svg { width: 16px; height: 16px; }
+.fitting-camera-toolbar .fitting-tool-icon svg { width: 16px; height: 16px; }
 .fitting-camera-panel {
   position: absolute;
   left: 50%;
@@ -55,8 +52,7 @@
   max-width: calc(7 * var(--fitting-tool-size) + 12px);
   gap: 2px;
 }
-.fitting-camera-choices + .fitting-camera-choices,
-.fitting-camera-select + .fitting-camera-adjustments {
+.fitting-camera-choices + .fitting-camera-choices {
   border-top: 1px solid var(--app-line);
   padding-top: 4px;
 }
@@ -64,7 +60,3 @@
   background: color-mix(in srgb, var(--app-raised), var(--app-accent) 18%);
   box-shadow: inset 0 -2px var(--app-accent);
 }
-.fitting-camera-range { justify-content: center; }
-.fitting-camera-panel .fitting-rotation-grid { display: flex; justify-content: center; }
-.fitting-camera-panel .fitting-rotation-grid [data-rotation="vehicle"] { color: var(--app-accent); }
-.fitting-camera-panel .fitting-rotation-grid [data-rotation="character"] { color: var(--app-text); }

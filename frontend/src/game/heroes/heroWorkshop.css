@@ -190,7 +190,12 @@
 
 .hero-workshop .garage-hide-toggle{position:static;flex:none;width:32px;height:30px;min-height:30px;display:grid;place-items:center;padding:0;pointer-events:auto;}
 .hero-workshop.hero-workshop--hidden{visibility:hidden;pointer-events:none;}
-.hero-workshop--hidden .garage-hide-toggle{visibility:visible;pointer-events:auto;}
+.hero-workshop--hidden:not([data-character-page]) .garage-hide-toggle{visibility:visible;pointer-events:auto;}
+html[data-wardrobe-immersive] .screen-notices { visibility: hidden; }
+.wardrobe-wake-surface {
+  position: fixed; inset: 0; z-index: 100; touch-action: none; outline: 0;
+  background: transparent; border: 0; -webkit-tap-highlight-color: transparent;
+}
 
 .hero-workshop-picker[data-vehicle-picker] {
   --hero-panel-width: min(41%, 30rem);

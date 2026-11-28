@@ -185,6 +185,25 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     assert.ok(document.querySelector('[data-vehicle-platform]'), 'vehicle emotes restore the car platform');
     assert.equal(vehicle.dataset.active,'true','the Emotes tab keeps its vehicle');
     assert.equal(useCharacterPreviewStore.getState().cockpitVehicle,'brz');
+    const {turnCharacter, turnGarage, useFittingTurnStore} = await load('game/characters/fittingControlsStore.ts');
+    useCharacterPreviewStore.setState({camera:'Whole car'});
+    for (let frame=0;frame<300;frame++) stepCamera();
+    const wholeCarPosition = camera.position.clone();
+    turnCharacter(1);
+    for (let frame=0;frame<60;frame++) stepCamera();
+    assert(camera.position.distanceTo(wholeCarPosition)<1e-6, 'the inner control leaves the garage fixed');
+    const characterYaw = useFittingTurnStore.getState().characterYaw;
+    turnGarage(-1);
+    stepCamera();
+    const firstOrbitStep = camera.position.distanceTo(wholeCarPosition);
+    for (let frame=0;frame<300;frame++) stepCamera();
+    assert(firstOrbitStep > 0 && firstOrbitStep < camera.position.distanceTo(wholeCarPosition),
+      'the outer control smoothly orbits even in the Emotes whole-car shot');
+    assert.equal(useFittingTurnStore.getState().characterYaw, characterYaw);
+    turnGarage(1);
+    for (let frame=0;frame<300;frame++) stepCamera();
+    assert(camera.position.distanceTo(wholeCarPosition)<1e-6, 'opposite garage nudges return to the original view');
+    useCharacterPreviewStore.setState({camera:'Full body'});
     await act(async()=>root.render(createElement(VehiclePreview,{awaitingHero:true})));
     stepCamera();
     assert.equal(driver.dataset.upright,'false');

@@ -6,7 +6,7 @@ import { act, createElement as h, Fragment } from 'react';
 import { Box3, BoxGeometry, Group, Mesh, MeshBasicMaterial, PerspectiveCamera, PlaneGeometry, Vector3 } from 'three';
 import { createServer } from 'vite';
 
-test('background mouse and touch drags orbit, while a direct mouse hit turns the model', async () => {
+test('mouse and touch drags pick the actor or orbit the garage independently', async () => {
   const dom = new JSDOM('<div id="preview"><canvas></canvas></div>', { url: 'http://localhost/', pretendToBeVisual: true });
   const globals = new Map();
   for (const [key, value] of Object.entries({ window: dom.window, document: dom.window.document,
@@ -20,8 +20,8 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
   canvas.setPointerCapture = id => captured.add(id);
   canvas.hasPointerCapture = id => captured.has(id);
   canvas.releasePointerCapture = id => captured.delete(id);
-  const pointer = (type, pointerId, clientX, clientY, pointerType = 'mouse') => canvas.dispatchEvent(
-    new dom.window.PointerEvent(type, { bubbles: true, pointerId, clientX, clientY, pointerType }),
+  const pointer = (type, pointerId, clientX, clientY, pointerType = 'mouse', isPrimary = true) => canvas.dispatchEvent(
+    new dom.window.PointerEvent(type, { bubbles: true, pointerId, clientX, clientY, pointerType, isPrimary }),
   );
   let vite, root;
   try {
@@ -67,6 +67,10 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     assert.equal(useFittingTurnStore.getState().characterYaw, 0);
 
     pointer('pointerdown', 2, 20, 25, 'touch');
+    pointer('pointerdown', 20, 100, 100, 'touch', false);
+    pointer('pointermove', 20, 127, 100, 'touch', false);
+    pointer('pointerup', 20, 127, 100, 'touch', false);
+    assert.equal(useFittingTurnStore.getState().characterYaw, 0, 'another finger cannot steal a room drag');
     pointer('pointermove', 2, 28, 39, 'touch');
     pointer('pointercancel', 2, 28, 39, 'touch');
     pointer('pointermove', 2, 50, 50, 'touch');
@@ -98,6 +102,28 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     pointer('pointerup', 5, 100, 100);
     pointer('click', 5, 100, 100);
     assert.equal(clicks, 1, 'a tap still reaches the actor click handler');
+    assert.equal(useFittingTurnStore.getState().suppressClickUntil, 0);
+
+    const beforeTouch = useFittingTurnStore.getState().characterYaw;
+    pointer('pointerdown', 12, 100, 100, 'touch');
+    assert(captured.has(12), 'touching the actor owns the drag');
+    pointer('pointermove', 12, 102, 101, 'touch');
+    assert.equal(useFittingTurnStore.getState().characterYaw, beforeTouch, 'tap jitter does not turn the model');
+    pointer('pointermove', 12, 145, 105, 'touch');
+    pointer('pointerup', 12, 145, 105, 'touch');
+    assert(Math.abs(useFittingTurnStore.getState().characterYaw - beforeTouch - .36) < 1e-9);
+    assert.equal(deltas.length, 3, 'turning the actor on touch does not move the garage');
+
+    pointer('pointerdown', 13, 100, 100, 'touch');
+    pointer('pointermove', 13, 100, 122, 'touch');
+    pointer('pointermove', 13, 100, 100, 'touch');
+    pointer('pointerup', 13, 100, 100, 'touch');
+    assert(useFittingTurnStore.getState().suppressClickUntil > performance.now(),
+      'a vertical touch drag that returns to its origin cannot trigger a tap emote');
+    pointer('pointerdown', 14, 100, 100, 'touch');
+    pointer('pointerup', 14, 100, 100, 'touch');
+    pointer('click', 14, 100, 100, 'touch');
+    assert.equal(clicks, 2, 'a deliberate actor tap after dragging still works');
     assert.equal(useFittingTurnStore.getState().suppressClickUntil, 0);
 
     for (const end of ['pointercancel', 'lostpointercapture']) {

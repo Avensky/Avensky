@@ -542,10 +542,9 @@ and the queue preview. Use the Heroes tab to edit the character and wardrobe.
 
 ## Piece colors, inspection, and personality
 
-The fitting-room label sits above the character name at the top left of the
-stage. The selected piece appears at top right.
-Both sidebars extend beside the center color and camera toolbars to the footer.
-Choose an equipped piece in the center toolbar, or click its catalog card, to
+Entering the equipped Wardrobe shows a four-second Fitting room notice with the
+active character’s name. Browsing inspector tabs keeps the stage clear. The selected piece appears at top right.
+Choose an equipped piece from the camera rail or click its catalog card to
 inspect it. Selected item measures the visible garment or accessory, including
 glasses and the bag. Camera presets ease between angles. Manual editor
 orbit/pan cancels the transition.
@@ -564,16 +563,15 @@ excluding the preceding click. It uses the normal lazy clip/prop loader and
 crossfades from the current gesture. Reduced Motion and seated driving disable
 click gestures. Character drag and pointer cancellation do not trigger an emote.
 
-Inner rotation arrows turn the character; outer arrows turn the vehicle display.
-Dragging directly on the character with a mouse turns the model independently.
-The initial press hit-tests the visible model. Once the drag starts, pointer
-movement turns the character without testing each skinned garment again.
-In the Fitting Room, dragging the scene background orbits the camera around its
-current framing target. Touch supports one-finger orbit. The garage vehicle
-display keeps its turntable drag.
+The two inner circular arrows turn the character. The two outer double arrows
+orbit the fitting-room camera around the current framing target. Mouse and touch
+use the initial press to distinguish the dressed character from the room.
+Captured movement turns the character without testing each skinned garment again.
 
-The Camera tools icon opens view and garment close-up buttons, a zoom bar,
-rotation, and Reframe. The Heroes Fitting Room uses the garage with an angled
+Choose a shot or garment close-up on the camera rail. Reset view above the zoom
+slider restores the current framing. Hide interface below the slider leaves the
+live character in view. The next deliberate input restores the controls.
+The Heroes Fitting Room uses the garage with an angled
 mirror that reflects the live character. Ruffled Corset first equips in
 Over skirt.
 

@@ -6,11 +6,13 @@ Sign-in, character selection, the Play menu, and Heroes share the live `/models/
 
 To change selection-stage placement, edit previewPlacement.ts / garagePlacement.ts. For a placeable garage, change worldBuilder/models and rebuild measured placement colliders; preview decoration must not become guessed physics.
 
-Garage and Character use `PreviewCameraSelect` for the camera buttons and
-`PreviewCameraAngles` for the popover. The popover owns keyboard focus,
-Escape, and controller Back. Adjust shared control styles in `previewControls.css`
-and palette colors in the [theme catalog](../../theme/README.md).
-`FittingCameraSelect` adds garment close-ups and their selection state.
+Garage and Wardrobe share camera icons through `PreviewCameraViewIcon`.
+Vehicle views use `PreviewCameraSelect` inside the `PreviewCameraAngles`
+popover, which owns keyboard focus, Escape and controller Back. Wardrobe uses
+`FittingCameraSelect` for the vertical rail of body shots and garment close-ups.
+Its inner rotation controls turn the actor, and the outer pair orbit the room.
+Adjust shared control styles in
+`previewControls.css` and palette colors in the [theme catalog](../../theme/README.md).
 
 ## Heroes vehicle loading
 

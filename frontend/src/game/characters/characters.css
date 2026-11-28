@@ -178,9 +178,8 @@ button.character-header-profile { cursor: pointer; }
   box-sizing: border-box;
 }
 .character-stage { min-height: 0; pointer-events: none; }
-.character-page--setup:has(> .dressing-toolbar) { grid-template-rows: minmax(0, 1fr) auto; }
+.character-page--setup:has(> .fitting-rotation-grid) { grid-template-rows: minmax(0, 1fr) auto; }
 .character-page--setup > .character-controls { grid-area: 1 / 2 / -1 / 3; }
-.character-page--setup > .dressing-toolbar { grid-area: 2 / 1; }
 .character-controls.menu-panel-frame {
   --menu-panel-fill: var(--app-panel);
   background: var(--menu-panel-fill);
