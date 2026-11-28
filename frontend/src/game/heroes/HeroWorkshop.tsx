@@ -1,6 +1,7 @@
 import { observeWorkshopViewport } from "../preview/workshopViewport";
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import type { WardrobeNavigation } from "../characters/DressingRoom";
+import {useMenuPressOwner} from "../../components/menus/useMenuPressOwner";
 import {GameButton} from "../../components/GameButton";
 import {VehicleMods} from "./VehicleMods";
 import {CollapsibleMenuPanel} from "../../components/menus/CollapsibleMenuPanel";
@@ -92,6 +93,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  onCharacterPreviewChange?:(choice:CharacterChoice|null)=>void;
 }={}){
  const inputDevice=useMenuInputDevice();
+ const pressOwner=useMenuPressOwner();
  const overlay=useUIStore(s=>s.overlay);
  const entry=useUIStore(s=>s.workshopEntry);
  const owner=useSocialStore(s=>s.view?.profile.id??s.profileOwner);
@@ -328,7 +330,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
   <span className="hero-workshop-main-name">{headerVehicle?.name??"Vehicles"}</span>
  </button>;
  const customizationHeader={onOpen:openCharacter,leadingAction:vehicleAction,active:characterOpen};
- return <section ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
+ return <section {...pressOwner} ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
   {characterOpen?characterReady?<SceneTabHeader station={Boolean(entry)} title="" tablistLabel="Character sections" compact tabs={visibleCharacterTabs} activeTab={characterTab}
     character={customizationHeader} backAction={{onClick:back}}
     onTabChange={id=>setCharacterTab(id as CharacterTab)} idPrefix="character-editor" panelId="character-editor-panel"/>

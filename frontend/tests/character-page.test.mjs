@@ -893,10 +893,19 @@ test('spatial garage stations open the wardrobe and vehicle chooser, inspect the
         assert.equal(group(), 'Clothing');
         await act(async () => routeMenuAction('previous_option'));
         await act(async () => document.querySelector('[data-category=outfits]').click());
-        await act(async () => document.querySelector('[data-wardrobe-item=dockwear]').click());
-        assert.equal(document.querySelector('.dressing-wardrobe').hidden, true, 'item details replace the catalog');
-        await act(async () => routeMenuAction('back'));
-        assert.equal(document.activeElement.dataset.wardrobeItem, 'dockwear');
+        const outfit = document.querySelector('[data-wardrobe-item=dockwear]');
+        for (const detail of [1, 0]) {
+          const touch = (element, type) => element.dispatchEvent(new window.PointerEvent(type, {
+            bubbles: true, cancelable: true, pointerType: 'touch', button: 0, detail,
+          }));
+          await act(async () => { touch(outfit, 'pointerdown'); touch(outfit, 'pointerup'); });
+          assert.equal(document.querySelector('.dressing-wardrobe').hidden, true, 'item details replace the catalog');
+          const shoes = document.querySelector('.dressing-details [data-dressing-piece=shoes]');
+          assert.ok(shoes, 'the inspector now has a different action under the tapping finger');
+          await act(async () => assert.equal(touch(shoes, 'click'), false, 'the release belongs to the original outfit tile'));
+          await act(async () => routeMenuAction('back'));
+          assert.equal(document.activeElement, outfit, 'Back restores the outfit in the original category');
+        }
         await act(async () => routeMenuAction('back'));
         assert.equal(document.activeElement.dataset.category, 'outfits');
       } else {

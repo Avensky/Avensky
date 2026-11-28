@@ -283,6 +283,13 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       }
       await act(async () => stationControl("wardrobe").focus());
       await click(continueControl());
+      if (ui.getState().screen === "main") {
+        assert.match(document.querySelector(".garage-menu-notice").textContent, /Opening Wardrobe/);
+        await act(async () => {
+          const { loadGarageWorkshop } = await load("game/heroes/loadGarageWorkshop.ts");
+          await loadGarageWorkshop();
+        });
+      }
       assert.equal(ui.getState().screen, "heroes");
       assert.equal(ui.getState().workshopEntry, "wardrobe");
     });
