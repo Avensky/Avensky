@@ -32,6 +32,7 @@ import { useRenderSettingsStore } from "../store/presentation/renderSettingsStor
 import { stepManualGear } from "./drivetrainActions";
 import { calibratedSteering, controllerAxis as axis } from "./controllerAxes";
 import { routePhysicalMenuPress } from "./physicalMenuPress";
+import { consumePreviewWakeInput } from "./previewWakeInput";
 import { togglePerformanceCapture } from "../performance/captureActions";
 import {
   minimizePerformanceOverlay,
@@ -191,6 +192,12 @@ export function GameController() {
       if (!focused || document.visibilityState === "hidden") {
         releasePanelPress();
         release();
+        return;
+      }
+      if (consumePreviewWakeInput(pad)) {
+        releaseRosterSticks();
+        releasePanelPress();
+        menuDirections.reset();
         return;
       }
       if (panelPressHeld && !pressed(0)) releasePanelPress(false);

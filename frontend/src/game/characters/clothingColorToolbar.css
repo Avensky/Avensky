@@ -48,7 +48,7 @@
   scrollbar-width: thin;
 }
 .dressing-color-panel[hidden] { display: none; }
-.dressing-details .dressing-color-panel {
+:is(.dressing-details, .dressing-wardrobe) .dressing-color-panel {
   position: static;
   width: 100%;
   transform: none;

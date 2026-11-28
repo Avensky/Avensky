@@ -41,6 +41,7 @@ export function FittingCameraOrbit({ onDrag, onDragEnd }: {
   return <mesh name="fitting-camera-drag-surface" position={[0, 0, -12]}
     onPointerDown={event => {
       if (event.button !== 0 || drag.current || useFittingTurnStore.getState().dragging) return;
+      if (event.pointerType === "touch" && !event.isPrimary) return;
       event.stopPropagation();
       drag.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, travel: 0 };
       (event.target as Element).setPointerCapture(event.pointerId);

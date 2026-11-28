@@ -2,6 +2,10 @@ import { garageDoorForEmote, garagePanelForEmote } from "./garageInteractions";
 import { GARAGE_LEAN_ID } from "./garageLean";
 import { isMirrorMakeupEmote } from "./mirrorCheck";
 
+export function characterTurnLocked(insideCar: boolean, emoteId?: string) {
+  return insideCar || Boolean(garageDoorForEmote(emoteId)) || isMirrorMakeupEmote(emoteId);
+}
+
 /** Ordinary emotes share the stable, character-only fitting stage.
  * Switch to the garage/vehicle only for shots that actually use a car. */
 export function characterEmoteNeedsGarage(

@@ -60,7 +60,11 @@ Light the Wardrobe actor with the same garage fixtures, indirect light and expos
 
 Anchor the hair heading, active value and actions while browsing styles or swatches. Give vertical scrolling to the collection that overflows. Show bottom hints as a glyph and an action over the room, with open space between controls where the player can drag the camera. Keep the tap target and visible focus on each actionable hint.
 
-Show brief save and action feedback in the shared notice area just below the top safe area and header. A confirmation replaces its own saving message and clears after four seconds. Reserve space in the editing panel only for actions the player still needs, such as Retry or Revert. Test a delayed save, a failure and two consecutive edits while watching the hair panel and its controls stay in place.
+In Wardrobe, a drag beginning on the character turns the body. A drag beginning in the room orbits the camera. Keep that choice for the whole gesture, even if the pointer crosses the silhouette. A tap on the character can still play a gesture. The bottom-center controls follow the same distinction. The two inner circular arrows turn the body, and the two outer double arrows orbit the garage camera. Leave the space between controls open to the scene.
+
+Keep camera presets in a vertical rail. Put Reset view above the zoom slider and Hide interface below it. Reset returns to the current shot at its default zoom. Hide removes the controls, including the eye itself, and keeps the live preview running. The first deliberate touch, key or controller input restores the interface and its focus. Check that this input cannot also equip an item, change a tab or turn the camera.
+
+Show brief save and action feedback in the shared notice area just below the top safe area and header. Give these notices the fitting-room nameplate’s translucent panel, slim theme accent and optional small heading above the message. Wardrobe announces the character once on entry. A confirmation replaces its own saving message and clears after four seconds. Reserve space in the editing panel only for actions the player still needs, such as Retry or Revert. Test a delayed save, a failure and two consecutive edits while watching the hair panel and its controls stay in place.
 
 | Garage station | Path through the live preview |
 | --- | --- |

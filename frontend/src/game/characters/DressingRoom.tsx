@@ -2,14 +2,14 @@ import { FitBadge, FitReview } from "./FitReview";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { GameButton } from "../../components/GameButton";
 import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
-import { PreviewCameraAngles } from "../preview/PreviewControlDisclosure";
+import { FittingAngleRail } from "./FittingCameraToolbar";
 import { useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterStyleField } from "./characterCatalog";
 import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
 import { UNDERBUST_WARDROBE_SET, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS, corsetModelUrl, hasSeparateWardrobeTop, hasTuckedUnderbust, hasUnderbustCut, resolveWardrobe, withWardrobeWaist, type WardrobeChoice } from "./wardrobe";
 import { ClothingColorToolbar } from "./ClothingColorToolbar";
-import { braFitsWith, CLOTHING_PIECES, clothingPieceLabel, UNDERWEAR_PIECES, underwearColors, wornClothing, type ClothingPiece, type UnderwearPiece } from "./clothingPieces";
-import { FittingCameraSelect, FittingWearableShortcuts } from "./FittingCameraSelect";
+import { braFitsWith, clothingPieceLabel, UNDERWEAR_PIECES, underwearColors, wornClothing, type ClothingPiece, type UnderwearPiece } from "./clothingPieces";
+import { FittingCameraSelect } from "./FittingCameraSelect";
 import { getWardrobeGarment, importedWardrobeItems, setWardrobeGarment, setWardrobeRemoval, wardrobeGarmentModelUrl, villageWardrobeItems, wardrobeRemovalPieces, type WardrobeGarmentSlot, type WardrobeRemoval } from "./wardrobeGarments";
 import { WardrobeThumbnail, type WardrobeTilePreview } from "./WardrobeThumbnail";
 import { SavedOutfits } from "./SavedOutfits";
@@ -54,7 +54,6 @@ function WardrobeIcon({ name }: { name: Icon }) {
 
 const LAYERS = ["Underwear", "Inner", "Middle", "Outer", "Overwear"] as const;
 const OUTFIT_LAYERS: readonly WardrobeRemoval[] = ["dress", "top", "corset", "skirt", "hat", "shoes", "socks", "bow", "harness", "bracer", "coat", "sleeves", "underskirt", "belt"];
-const wearableOrder = [...CLOTHING_PIECES].sort((a, b) => b.center - a.center).map(item => item.id);
 type ClothingLayer = typeof LAYERS[number];
 const GARMENT_LAYERS: Record<WardrobeGarmentSlot, ClothingLayer> = {
   top: "Middle", skirt: "Outer", coat: "Overwear", dress: "Outer", hat: "Overwear", socks: "Inner", bow: "Overwear", harness: "Overwear", bracer: "Overwear",
@@ -116,14 +115,14 @@ function inspectWardrobe(focus: WardrobeFocus) {
 }
 
 /** One live scene; browsing the catalog never changes or saves the equipped look. */
-export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
-  equipPreview, onDiscardPreview, onEndPreview, cameraTools, navigation, onColors = onChange }: {
+export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
+  equipPreview, onDiscardPreview, onEndPreview, poseTools, navigation, onColors = onChange }: {
   navigation?: Ref<WardrobeNavigation>;
-  choice: CharacterChoice; characterName?: string; onChange: (choice: CharacterChoice) => void;
+  choice: CharacterChoice; onChange: (choice: CharacterChoice) => void;
   onPreviewOutfit?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
   equipPreview?: { disabled: boolean; hint?: string; onEquip: () => void };
   onDiscardPreview?: () => void;
-  onLoad?: (choice: CharacterChoice) => void; onEndPreview?: () => void; cameraTools?: ReactNode;
+  onLoad?: (choice: CharacterChoice) => void; onEndPreview?: () => void; poseTools?: ReactNode;
   onColors?: (choice: CharacterChoice) => void;
 }) {
   const [category, setCategory] = useState<Category>("outfits");
@@ -524,6 +523,18 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
     return <section className="dressing-layer-group" aria-label={title}><h3>{title}</h3><div className="dressing-layer-options" data-controller-row data-controller-columns={columns}>{children}</div></section>;
   }
 
+  const previewActions = onDiscardPreview && (
+    <div className="dressing-preview-actions" data-controller-row>
+      {equipPreview && (
+        <button type="button" className="menu-control" data-equip-outfit title={equipPreview.hint} disabled={equipPreview.disabled} onClick={equipPreview.onEquip}>
+          Equip outfit
+        </button>
+      )}
+      <button type="button" className="menu-control" data-discard-outfit-preview onClick={onDiscardPreview}>Discard preview</button>
+      <small className="dressing-note">{equipPreview?.hint ?? (equipPreview ? "Equip to save this outfit." : "Fitting preview. Use Saved outfits to keep your custom combination.")}</small>
+    </div>
+  );
+  const pieceColors = piece && <ClothingColorToolbar choice={choice} piece={piece} onChange={onColors} />;
   return <>
     <aside className="dressing-wardrobe" aria-label="Wardrobe" hidden={Boolean(inspected)}>
       <SecondaryTabRow aria-label="Wardrobe groups" className="dressing-groups">
@@ -615,33 +626,15 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
         </>}
       </section>
       </div>
+      {!inspected && <>{pieceColors}{previewActions}</>}
     </aside>
     <div className="dressing-camera-block">
-      <header className="dressing-room-title">
-        <small>Fitting room</small>
-        <h2>{characterName ?? "Your character"}</h2>
-      </header>
-      <aside className="dressing-camera-shortcuts fitting-camera-toolbar" aria-label="Fitting room camera shortcuts">
-        <PreviewCameraAngles>
-        <FittingCameraSelect views={["Full body", "Face", "Hands"] as const} vertical allowReselect
+      <FittingAngleRail tools={poseTools}>
+        <FittingCameraSelect views={["Full body", "Face", "Hands"] as const} choice={choice} allowReselect
           view={camera} onViewChange={view => {
             if (view === "Full body" || view === "Face" || view === "Hands") selectCameraView(view);
-          }} />
-        <FittingWearableShortcuts vertical pieces={wearableOrder.filter(item => pieces.includes(item))}
-          active={camera === "Selected item" ? selectedPiece : undefined} onSelect={selectWornPiece} />
-        </PreviewCameraAngles>
-      </aside>
-      {onDiscardPreview && (
-        <div className="dressing-preview-actions" data-controller-row>
-          {equipPreview && (
-            <button type="button" className="menu-control" data-equip-outfit title={equipPreview.hint} disabled={equipPreview.disabled} onClick={equipPreview.onEquip}>
-              Equip outfit
-            </button>
-          )}
-          <button type="button" className="menu-control" data-discard-outfit-preview onClick={onDiscardPreview}>Discard preview</button>
-          <small className="dressing-note">{equipPreview?.hint ?? (equipPreview ? "Equip to save this outfit." : "Fitting preview. Use Saved outfits to keep your custom combination.")}</small>
-        </div>
-      )}
+          }} onSelectPiece={selectWornPiece} />
+      </FittingAngleRail>
     </div>
     <aside ref={detailsRef} className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>
       {inspected && <>
@@ -699,14 +692,12 @@ export function DressingRoom({ choice, characterName, onChange, onPreviewOutfit 
             aria-pressed={corset.cut === cut} onClick={() => {
               if (corset.cut !== cut) onTryOn({ ...choice, wardrobeTrial: { ...corset, cut } });
             }}>{cut === "original" ? "Original Cut" : "Restored Cut"}</button>), 2)}
+        {!underwearColor && pieceColors}
+        {previewActions}
         <FitReview key={inspected.id} compact choice={choice} piece={reviewPiece}
           note={underbustOver ? "Changing linked dye groups together still needs testing." : undefined}
           subject={{ id: inspected.id, label: inspected.label, kind: "garment" }} />
       </>}
     </aside>
-    <div className="dressing-toolbar">
-      {cameraTools}
-      {!underwearColor && piece && <ClothingColorToolbar choice={choice} piece={piece} onChange={onColors} />}
-    </div>
   </>;
 }

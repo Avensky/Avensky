@@ -1,0 +1,44 @@
+.character-page > .fitting-rotation-grid {
+  grid-area: 2 / 1;
+  place-self: end center;
+  display: flex;
+  gap: 2px;
+  z-index: 2;
+  pointer-events: none;
+}
+:is(.character-page--profile, .character-page--account) > .fitting-rotation-grid { grid-column: 2; }
+.character-page--emotes > .fitting-rotation-grid { grid-area: 3 / 2; }
+.fitting-rotation-grid .fitting-rotation-button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--app-text);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.fitting-rotation-button svg {
+  box-sizing: border-box;
+  width: 34px;
+  height: 34px;
+  padding: 5px;
+  border-radius: 50%;
+  border: 1px solid var(--app-line);
+  background: color-mix(in srgb, var(--app-panel) 65%, transparent);
+}
+.fitting-rotation-button[data-rotation="garage"] { color: var(--app-accent); }
+.fitting-rotation-button:is(:focus-visible, [data-pressing], :active):not([aria-disabled="true"]) svg {
+  border-color: var(--app-accent);
+  background: var(--app-raised);
+}
+@media (hover: hover) {
+  .fitting-rotation-button:hover:not([aria-disabled="true"]) svg { border-color: var(--app-accent); }
+}
+@media (orientation: portrait) and (max-width: 480px) {
+  .character-page--emotes > .fitting-rotation-grid { grid-column: 1 / -1; }
+  .character-page--editor.character-page--emotes :is(.character-controls--left, .character-controls--right) { grid-row-end: 3; }
+}

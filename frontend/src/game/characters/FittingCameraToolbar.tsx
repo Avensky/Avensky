@@ -1,44 +1,37 @@
 import type { ReactNode } from "react";
-import { PreviewCameraAngles, PreviewControlDisclosure } from "../preview/PreviewControlDisclosure";
-import { PreviewToolButton } from "../preview/PreviewToolButton";
+import { GameButton } from "../../components/GameButton";
+import { PreviewControlDisclosure } from "../preview/PreviewControlDisclosure";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
-import { FittingRotationControls } from "./FittingRotationControls";
+import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
+import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
+import { CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 
-export function FittingCameraToolbar({ camera, visibility, actions, paused, onPause, onZoomOut, onZoomIn,
-  zoomOutDisabled, zoomInDisabled, onReframe, vehicle = false, rotationDisabled = false, splitCamera = false }: {
-  camera?: ReactNode;
-  visibility: ReactNode;
-  actions?: ReactNode;
-  paused: boolean;
-  onPause: () => void;
-  onZoomOut?: () => void;
-  onZoomIn?: () => void;
-  zoomOutDisabled?: boolean;
-  zoomInDisabled?: boolean;
-  onReframe?: () => void;
-  vehicle?: boolean;
-  rotationDisabled?: boolean;
-  splitCamera?: boolean;
-}) {
-  const pauseLabel = paused ? "Resume pose" : "Hold pose";
-  const zoomControls = (onZoomOut || onZoomIn) && <div className="fitting-camera-range" role="group" aria-label="Camera zoom" data-controller-row>
-    {onZoomOut && <PreviewToolButton label="Zoom out" disabled={zoomOutDisabled} onClick={onZoomOut}><PreviewToolIcon icon="zoomOut" /></PreviewToolButton>}
-    {onZoomIn && <PreviewToolButton label="Zoom in" disabled={zoomInDisabled} onClick={onZoomIn}><PreviewToolIcon icon="zoomIn" /></PreviewToolButton>}
-  </div>;
-  const adjustments = (!rotationDisabled || onReframe || zoomControls) && <div className="fitting-camera-adjustments">
-    {zoomControls}
-    {!rotationDisabled && <FittingRotationControls compact vehicle={vehicle} />}
-    {onReframe && <div data-controller-row><PreviewToolButton label="Reframe" onClick={onReframe}><PreviewToolIcon icon="reframe" /></PreviewToolButton></div>}
-  </div>;
-  return <div className="fitting-camera-toolbar" role="group" aria-label="Character camera tools">
-    <div className="fitting-camera-row" data-controller-row>
-      {splitCamera && camera && <PreviewCameraAngles>{camera}</PreviewCameraAngles>}
-      {((!splitCamera && camera) || adjustments || (splitCamera && actions)) && <PreviewControlDisclosure label="Camera tools" icon={<PreviewToolIcon icon={splitCamera ? "adjustments" : "camera"} />}>
-        {!splitCamera && camera}{adjustments}{splitCamera && actions}
-      </PreviewControlDisclosure>}
-      <PreviewToolButton label={pauseLabel} aria-pressed={paused} onClick={onPause}><PreviewToolIcon icon={paused ? "resume" : "hold"} /></PreviewToolButton>
-      {visibility}
-      {!splitCamera && actions}
-    </div>
+export function FittingAngleRail({ children, tools }: { children: ReactNode; tools?: ReactNode }) {
+  return <aside className="dressing-camera-shortcuts fitting-camera-toolbar" aria-label="Fitting room camera shortcuts">
+    <div className="wardrobe-camera-presets">{children}</div>
+    {tools}
+  </aside>;
+}
+
+export function FittingPoseTools({ children }: { children: ReactNode }) {
+  return <PreviewControlDisclosure label="Pose tools" icon={<PreviewToolIcon icon="adjustments" />}>
+    {children}
+  </PreviewControlDisclosure>;
+}
+
+export function FittingZoomRail({ insideCar }: { insideCar: boolean }) {
+  const zoom = useCharacterPreviewStore(state => state.zoom);
+  function resetView() {
+    useCharacterPreviewStore.setState(s => ({ zoom: 1, focusRevision: s.focusRevision + 1 }));
+  }
+  return <div className="dressing-preview-zoom fitting-camera-toolbar" role="group" aria-label="Camera framing"
+    data-controller-row data-controller-columns="1">
+    {!insideCar && <>
+      <GameButton variant="menu" className="fitting-tool-icon" aria-label="Reset view" title="Reset view"
+        pressFeedback onPress={resetView}><PreviewToolIcon icon="reframe" /></GameButton>
+      <PreviewZoomSlider label="Preview zoom" min={CHARACTER_ZOOM_MIN} max={CHARACTER_ZOOM_MAX} step={.05}
+        value={zoom} valueText={`${Math.round(zoom * 100)}%`} onChange={value => useCharacterPreviewStore.setState({ zoom: value })} />
+    </>}
+    <PreviewVisibilityToggle />
   </div>;
 }

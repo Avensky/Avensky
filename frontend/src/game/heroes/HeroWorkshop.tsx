@@ -1,4 +1,5 @@
 import { ScreenNotice } from "../../components/menus/ScreenNotice";
+import { WardrobeImmersion } from "../characters/WardrobeImmersion";
 import { observeWorkshopViewport } from "../preview/workshopViewport";
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import type { WardrobeNavigation } from "../characters/DressingRoom";
@@ -263,7 +264,10 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
    (document.activeElement as HTMLElement|null)?.scrollIntoView?.({block:"nearest"});
    return;
   }
-  if(editing&&studioTab==="paint"&&(action==="left"||action==="right")&&active instanceof window.HTMLInputElement&&active.type==="range"){
+  if(characterOpen&&(action==="left"||action==="right")&&active instanceof window.HTMLInputElement&&active.matches(".preview-zoom-slider")){
+   if(action==="left")active.stepDown();else active.stepUp();
+   active.dispatchEvent(new Event("input",{bubbles:true}));
+  }else if(editing&&studioTab==="paint"&&(action==="left"||action==="right")&&active instanceof window.HTMLInputElement&&active.type==="range"){
    if(action==="left")active.stepDown();else active.stepUp();
    edit({metallic:active.valueAsNumber});
   }else if(active instanceof HTMLSelectElement&&(action==="left"||action==="right")){
@@ -332,7 +336,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
   <span className="hero-workshop-main-name">{headerVehicle?.name??"Vehicles"}</span>
  </button>;
  const customizationHeader={onOpen:openCharacter,leadingAction:vehicleAction,active:characterOpen};
- return <section {...pressOwner} ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
+ return <><section {...pressOwner} ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null||(characterOpen&&panelsHidden)} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
   <ScreenNotice message={status==="error" ? message : status==="saved" ? "Vehicle style saved to your profile." :
     status==="pending" || status==="saving" ? "Saving vehicle style…" : ""}/>
   {characterOpen?characterReady?<SceneTabHeader station={Boolean(entry)} title="" tablistLabel="Character sections" compact tabs={visibleCharacterTabs} activeTab={characterTab}
@@ -459,5 +463,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
    {!viewingReference&&<ControllerAction button="A" type="button" className="menu-control" disabled={!owner} tabIndex={stationEntry?0:-1} onClick={()=>editing?void back():openHero()}>{stationEntry?(editing?"Done":"Customize"):(editing?"APPLY":"OPEN GARAGE")}</ControllerAction>}
    <HoldMainButton key={`${owner}:${hero}:${editing}:${viewingReference}:${main===hero}:${status==="error"}`} disabled={overlay!==null||viewingReference||!owner||!hero||main===hero||status==="error"} selected={hero!==null&&main===hero} onComplete={()=>mainChoice()}/>
   </div>}</SelectionFooter>
- </section>;
+ </section>
+ {characterOpen&&!overlay&&<WardrobeImmersion root={root} hiddenUI={panelsHidden}/>}
+ </>;
 }

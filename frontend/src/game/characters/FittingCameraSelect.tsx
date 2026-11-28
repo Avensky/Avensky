@@ -1,9 +1,9 @@
-import { PreviewCameraSelect, type PreviewCameraSelectProps } from "../preview/PreviewCameraSelect";
-import { PreviewToolButton } from "../preview/PreviewToolButton";
+import { PreviewCameraViewIcon, type PreviewCameraSelectProps } from "../preview/PreviewCameraSelect";
+import { GameButton } from "../../components/GameButton";
 import { PREVIEW_BOOT_ICON, PREVIEW_HAND_ICON, PreviewCameraChoiceIcon } from "../preview/PreviewToolIcon";
 import type { CharacterChoice } from "./characterCatalog";
 import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
-import { clothingPieceLabel, wornClothing, type ClothingPiece } from "./clothingPieces";
+import { CLOTHING_PIECES, clothingPieceLabel, wornClothing, type ClothingPiece } from "./clothingPieces";
 
 const PIECE_ICONS: Record<ClothingPiece, string> = {
   corset: "M5 5l3 2 4 1 4-1 3-2-2 9 1 5-6 2-6-2 1-5zm4 4 6 7m0-7-6 7",
@@ -32,32 +32,38 @@ const PIECE_ICONS: Record<ClothingPiece, string> = {
   bracer: "M8 5h8l1 14H7zM8 9h8m-8 4h8m-9 4h10",
 };
 
-export function FittingWearableShortcuts({ pieces, active, vertical = false, onSelect }: {
-  pieces: readonly ClothingPiece[];
-  active?: ClothingPiece;
-  vertical?: boolean;
-  onSelect: (piece: ClothingPiece) => void;
-}) {
-  if (!pieces.length) return null;
-  return <div className={vertical ? "dressing-wearable-shortcuts fitting-camera-toolbar" : "fitting-camera-choices"}
-    role="group" aria-label="Clothing close-ups" data-controller-row data-controller-columns={vertical ? 1 : 7}>
-    {pieces.map(piece => {
-      const label = clothingPieceLabel(piece);
-      return <PreviewToolButton key={piece} label={label}
-        data-camera-choice={`piece:${piece}`} data-wearable-quick-select={vertical ? piece : undefined}
-        aria-pressed={active === piece}
-        onClick={() => onSelect(piece)}><PreviewCameraChoiceIcon path={PIECE_ICONS[piece]} /></PreviewToolButton>;
-    })}
-  </div>;
-}
+const topToBottom = [...CLOTHING_PIECES].sort((a, b) => b.center - a.center).map(piece => piece.id);
 
-export function FittingCameraSelect<View extends string>({ choice, views, ...props }: PreviewCameraSelectProps<View> & {
+export function FittingCameraSelect<View extends string>({ choice, views, view, viewLabels, onViewChange,
+  onSelectPiece = focusClothingPiece, allowReselect = false, driver = false }: PreviewCameraSelectProps<View> & {
   choice?: CharacterChoice;
+  onSelectPiece?: (piece: ClothingPiece) => void;
+  driver?: boolean;
 }) {
-  const selected = useCharacterPreviewStore(state => choice ? state.selectedPiece : undefined);
-  const pieces = choice ? wornClothing(choice) : [];
-  return <PreviewCameraSelect {...props} views={views.filter(view => view !== "Selected item")} showDriverIcon={!choice}>
-    <FittingWearableShortcuts pieces={pieces} active={props.view === "Selected item" ? selected : undefined}
-      onSelect={item => { if (props.view !== "Selected item" || item !== selected) focusClothingPiece(item); }} />
-  </PreviewCameraSelect>;
+  const selected = useCharacterPreviewStore(state => state.selectedPiece);
+  const worn = choice ? wornClothing(choice) : [];
+  return <div className="fitting-camera-select" role="group" aria-label="Preview camera">
+    <div className="fitting-camera-choices" role="group" aria-label="Views" data-controller-row data-controller-columns="1">
+      {views.filter(item => item !== "Selected item").map(item => {
+        const name = viewLabels?.[item] ?? item;
+        return <GameButton key={item} variant="menu" className="fitting-tool-icon" pressFeedback
+          title={name} aria-label={name} aria-pressed={item === view} data-camera-choice={item}
+          onPress={() => { if (allowReselect || view !== item) onViewChange(item); }}>
+          <PreviewCameraViewIcon view={item} driver={driver} />
+        </GameButton>;
+      })}
+    </div>
+    {worn.length > 0 && <div className="dressing-wearable-shortcuts" role="group" aria-label="Clothing close-ups"
+      data-controller-row data-controller-columns="1">
+      {topToBottom.filter(piece => worn.includes(piece)).map(piece => {
+        const name = clothingPieceLabel(piece);
+        return <GameButton key={piece} variant="menu" className="fitting-tool-icon" pressFeedback
+          title={name} aria-label={name} aria-pressed={view === "Selected item" && selected === piece}
+          data-camera-choice={`piece:${piece}`} data-wearable-quick-select={piece}
+          onPress={() => { if (allowReselect || view !== "Selected item" || selected !== piece) onSelectPiece(piece); }}>
+          <PreviewCameraChoiceIcon path={PIECE_ICONS[piece]} />
+        </GameButton>;
+      })}
+    </div>}
+  </div>;
 }

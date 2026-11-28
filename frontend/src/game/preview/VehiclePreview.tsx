@@ -22,6 +22,7 @@ import { blendCharacterCamera, clothingFrame, orbitFittingCamera, orientFittingC
 import { createGarageOrbitIdle } from "./garageOrbitIdle";
 import { FITTING_BODY_DIRECTION, fullBodyZoom, type FittingBodyFrame } from "../characters/fullBodyFraming";
 import { FittingCameraOrbit } from "../characters/FittingCameraOrbit";
+import { useFittingTurnStore } from "../characters/fittingControlsStore";
 import { FittingMirrorDisplay } from "../characters/FittingMirrorDisplay";
 import { GARAGE_LEAN_ID } from "../characters/garageLean";
 import { isMirrorMakeupEmote } from "../characters/mirrorCheck";
@@ -180,8 +181,16 @@ export function VehiclePreview({
   if (cameraAim.current === null) cameraAim.current = createPreviewAim();
   if (fittingOrbit.current === null) fittingOrbit.current = { yaw: 0, pitch: 0, sphere: new Spherical() };
   const exteriorInspection = workshop && !wardrobeOpen && !stationActive && !closeShot;
-  const fittingOrbitEnabled = wardrobeOpen && characterOnly || exteriorInspection;
+  const fittingOrbitEnabled = wardrobeOpen && !insideCar || exteriorInspection;
   const orbitIdle = useRef<ReturnType<typeof createGarageOrbitIdle> | null>(null);
+  const orbitBy = useCallback((yaw: number, pitch: number) => {
+    const rotation = fittingOrbit.current!;
+    rotation.yaw += yaw;
+    rotation.pitch += pitch;
+    cameraAim.current!.held = false;
+    requestFrame();
+  }, [requestFrame]);
+
   useLayoutEffect(() => {
     if (!fittingOrbitEnabled) return;
     const idle = createGarageOrbitIdle(() => {
@@ -190,16 +199,22 @@ export function VehiclePreview({
       requestFrame();
     });
     orbitIdle.current = idle;
-    return () => { idle.cancel(); orbitIdle.current = null; };
-  }, [fittingOrbitEnabled, requestFrame]);
+    const unsubscribe = wardrobeOpen && useFittingTurnStore.subscribe((state, previous) => {
+      if (state.garageYaw === previous.garageYaw) return;
+      // Move the room in the indicated direction, as if dragging the backdrop.
+      orbitBy(previous.garageYaw - state.garageYaw, 0);
+      idle.arm();
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+      idle.cancel();
+      orbitIdle.current = null;
+    };
+  }, [fittingOrbitEnabled, wardrobeOpen, orbitBy, requestFrame]);
   const finishOrbit = useCallback(() => orbitIdle.current?.arm(), []);
   const orbitCamera = (x: number, y: number) => {
-    const rotation = fittingOrbit.current!;
     const sensitivity = usePreferencesStore.getState().cameraSensitivity * .006;
-    rotation.yaw -= x * sensitivity;
-    rotation.pitch -= y * sensitivity;
-    cameraAim.current!.held = false;
-    requestFrame();
+    orbitBy(-x * sensitivity, -y * sensitivity);
   };
   const [turntable, setTurntable] = useState<Group | null>(null);
   const [currentDriverFit, setCurrentDriverFit] = useState<VehiclePreviewDriverFit>();
@@ -472,7 +487,7 @@ export function VehiclePreview({
       </PerspectiveCamera>
 
       <PreviewTurntable onReady={setTurntable} inspectExterior={exteriorInspection} spin={showPlatform && !wardrobeOpen && !stationary && !reducedMotion && garageView === "Showroom"}
-        locked={!vehicleId || characterOnly || stationActive && garageView !== "Showroom"} restoreAngle={wardrobeOpen}>
+        locked={!vehicleId || wardrobeOpen || stationActive && garageView !== "Showroom"} restoreAngle={wardrobeOpen}>
         <group rotation={[0, Math.PI / 2, 0]}>
           <group ref={motion}>
             {activeDriver && (characterOnly || driverPose) && <group ref={characterActor} matrixAutoUpdate={!characterOnly}
