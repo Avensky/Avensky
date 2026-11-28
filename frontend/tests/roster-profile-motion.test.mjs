@@ -23,6 +23,10 @@ test("the same gesture keeps advancing through roster, profile and back", async 
     // Use the game's real animation player and the stock actor's exported skeleton.
     // The headless renderer samples bones without GPU draws.
     const model = await new GLTFLoader().parseAsync(await readFile("tests/fixtures/villager-male-rig.json", "utf8"), "");
+    const fabric = new THREE.Mesh(new THREE.BoxGeometry(), new THREE.MeshStandardMaterial());
+    fabric.name = "lighting-sample";
+    model.scene.add(fabric);
+    t.after(() => { fabric.geometry.dispose(); fabric.material.dispose(); });
     vite = await createServer({ server: { middlewareMode: true, hmr: false, ws: false }, appType: "custom", logLevel: "error",
       define: { __STAGING_ASSET_RELEASE__: "null", __ROOK_MODEL_URL__: JSON.stringify("/models/actor.glb"), __ROOK_PORTRAIT_URL__: JSON.stringify("/models/actor.glb") },
       plugins: [{
@@ -35,7 +39,7 @@ test("the same gesture keeps advancing through roster, profile and back", async 
     (await vite.ssrLoadModule("virtual:roster-rig")).setRig(model);
     const { RosterGaragePreview } = await vite.ssrLoadModule("/src/game/preview/RosterGaragePreview.tsx");
     // Resolve the lazy component before driving the deterministic frame clock.
-    await vite.ssrLoadModule("/src/game/characters/GarageDriver.tsx");
+    const { GarageDriver } = await vite.ssrLoadModule("/src/game/characters/GarageDriver.tsx");
     const { RosterEmotePlayback } = await vite.ssrLoadModule("/src/game/characters/rosterEmotePlayback.ts");
     const choice = { id: "jules-okafor", outfit: "night-run" };
     const canvas = document.querySelector("canvas");
@@ -80,6 +84,15 @@ test("the same gesture keeps advancing through roster, profile and back", async 
       assert.equal(sampled, action, "the panel keeps the same animation action and its mixer");
       assert.ok(action.time > previous, "the gesture continues from its previous frame");
     }
+    await t.test("Wardrobe receives the roster's fixture lighting", async () => {
+      const materialKey = () => store.getState().scene.getObjectByName(fabric.name).material.customProgramCacheKey();
+      const rosterKey = materialKey();
+      assert.match(rosterKey, /garage-point-lights-subject/);
+      await act(async () => {
+        store = renderer.render(createElement(GarageDriver, { choice, previewPacks: true, upright: true }));
+      });
+      assert.equal(materialKey(), rosterKey.replace("-handoff", ""));
+    });
   } finally {
     if (renderer) await act(async () => renderer.unmount());
     await vite?.close();

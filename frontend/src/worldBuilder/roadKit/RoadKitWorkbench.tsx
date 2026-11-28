@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { MenuLogo } from "../../components/menus/MenuLogo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import bundle from "virtual:road-kit-bundle";
@@ -218,8 +219,8 @@ export default function RoadKitWorkbench() {
     [guides, setGuides] = useState(true),
     [basis, setBasis] = useState<StageState["basis"]>("outer"),
     [snap, setSnap] = useState(true),
-    [radius, setRadius] = useState(1),
-    [status, setStatus] = useState("Opening your original GLBs…");
+    [radius, setRadius] = useState(1);
+  const notice = useScreenNotice();
   const [blockWidth, setBlockWidth] = useState(120),
     [blockDepth, setBlockDepth] = useState(160),
     [innerSidewalk, setInnerSidewalk] = useState(true);
@@ -227,10 +228,10 @@ export default function RoadKitWorkbench() {
       setTemplate(t);
       setPose({ x: dimensions(t.surface)[0] + 3, z: 2, yaw: Math.PI });
     }, []),
-    committed = useCallback((p: Pose) => setPose(p), []),
-    notice = useCallback((text: string) => setStatus(text), []);
+    committed = useCallback((p: Pose) => setPose(p), []);
   useEffect(() => {
     if (!host.current) return;
+    notice("Opening your original GLBs…");
     try {
       const engine = new RoadKitStage(host.current, loaded, committed, notice);
       stage.current = engine;
@@ -308,7 +309,7 @@ export default function RoadKitWorkbench() {
     setPose({ x: surface[0] + 0.35, z: 0.3, yaw: Math.PI });
     setMode("join");
     setTarget("b");
-    setStatus(
+    notice(
       "Two original road copies. Adjacent sidewalk groups are hidden. Drag orange B toward blue A.",
     );
   };
@@ -338,7 +339,7 @@ export default function RoadKitWorkbench() {
         radius,
       );
     setPose(result.pose);
-    setStatus(
+    notice(
       result.lock
         ? "Bottom corners joined exactly. Paint direction and sidewalk visibility remain separate settings."
         : "Increase snap radius to reach this corner.",
@@ -775,8 +776,6 @@ export default function RoadKitWorkbench() {
         </aside>
       </main>
       <footer className="rk-footer">
-        <span>●</span>
-        <output role="status">{status}</output>
         <small>THREE ORIGINAL GLBs / ROAD FOUNDATION</small>
       </footer>
     </div>

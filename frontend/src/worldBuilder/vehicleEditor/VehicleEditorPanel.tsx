@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { CharacterHeaderProfile } from "../../game/characters/CharacterHeaderProfile";
 import { WeaponEditor } from "../../combat/WeaponEditor";
 import type { MenuAction } from "../../controls/inputRouting";
@@ -35,7 +36,7 @@ export function VehicleEditorPanel() {
     const [reply, setReply] = useState<Reply | null>(null);
     const [draft, setDraft] = useState<Tuning>({});
     const [busy, setBusy] = useState(false);
-    const [status, setStatus] = useState('');
+    const notify = useScreenNotice();
     const [tab, setTab] = useState('Body');
     const history = useRef<Tuning[]>([]);
     const pending = useRef(false);
@@ -58,20 +59,20 @@ export function VehicleEditorPanel() {
                 if (token === sequence.current)
                     receive(value);
             }).catch(e => { if (token === sequence.current)
-                setStatus(e.message); });
+                notify(e.message); });
         return () => { requestSequence.current++; };
-    }, [live]);
+    }, [live, notify]);
     const run = async (operation: () => Promise<void>) => {
         if (pending.current)
             return;
         pending.current = true;
         setBusy(true);
-        setStatus('');
+        notify('');
         try {
             await operation();
         }
         catch (e) {
-            setStatus((e as Error).message);
+            notify((e as Error).message);
         }
         finally {
             pending.current = false;
@@ -88,11 +89,11 @@ export function VehicleEditorPanel() {
     };
     const apply = () => run(async () => {
         receive(await requestSocial('editor_vehicle_apply', { tuning: draft }));
-        setStatus('Applied. Vehicle stopped and suspension rebuilt at its current location.');
+        notify('Applied. Vehicle stopped and suspension rebuilt at its current location.');
     });
     const publish = () => run(async () => {
         receive(await requestSocial('editor_vehicle_publish',{tuning:draft}));
-        setStatus('SAVED TO SERVER · New vehicles of this model in every world inherit this validated tune. Existing vehicles keep their current physics.');
+        notify('SAVED TO SERVER · New vehicles of this model in every world inherit this validated tune. Existing vehicles keep their current physics.');
     });
     const test = () => { useInputStore.getState().releaseControls(); useUIStore.getState().closeOverlay(); };
     useEffect(() => {
@@ -185,11 +186,10 @@ export function VehicleEditorPanel() {
             setDraft(previous); }}>UNDO</button>
         <button disabled={!reply || busy} onClick={() => { setDraft(tuningOnly(reply!.current)); history.current = []; }}>REVERT DRAFT</button>
         <button disabled={!reply || busy} onClick={() => { history.current.push(draft); setDraft(tuningOnly(reply!.factory)); }}>FACTORY PHYSICS</button>
-        <button disabled={!reply || busy} onClick={() => { editor.save(vehicle, draft); setStatus('Preset saved in this browser. Apply physics to activate it.'); }}>SAVE PRESET</button>
+        <button disabled={!reply || busy} onClick={() => { editor.save(vehicle, draft); notify('Preset saved in this browser. Apply physics to activate it.'); }}>SAVE PRESET</button>
         <button disabled={!editor.presets[vehicle] || busy} onClick={() => { const p = editor.presets[vehicle]; history.current.push(draft); setDraft({ ...p.tuning }); editor.setCamera(vehicle, { ...p.camera }); }}>LOAD PRESET</button>
       </footer>}
       {!['Weapons','Camera','Materials'].includes(tab) && <p>APPLY changes only your test vehicle. PUBLISH saves a factory-relative default on the server for new spawns in every world; existing vehicles are not forcibly rebuilt. Naval mass/propeller tuning will get a dedicated editor.</p>}
     </>}
-    <output role="status">{status}</output>
   </section>;
 }

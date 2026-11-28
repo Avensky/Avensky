@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import {
   EMPTY_GARAGE_TEST, garageMounts, useGarageDiagnostics,
   type GarageMount, type GaragePoint, type GarageVehicleTest,
@@ -56,7 +56,7 @@ export function GarageVehicleDiagnostics({ vehicle }: { vehicle: string }) {
   const lensCount = useGarageDiagnostics(state => state.lensVehicle === vehicle ? state.lensCount : null);
   const update = useGarageDiagnostics(state => state.update);
   const reset = useGarageDiagnostics(state => state.reset);
-  const [copyStatus, setCopyStatus] = useState("");
+  const setCopyStatus = useScreenNotice();
   const headlights = garageMounts(vehicle, "headlights", test);
   const exhaust = garageMounts(vehicle, "exhaust", test);
   const change = (next: Partial<Omit<GarageVehicleTest, "positions">>) => update(vehicle, next);
@@ -105,7 +105,6 @@ export function GarageVehicleDiagnostics({ vehicle }: { vehicle: string }) {
         <button type="button" className="menu-control" onClick={() => void copyPositions()}>Copy positions</button>
         <button type="button" className="menu-control" onClick={() => { reset(vehicle); setCopyStatus(""); }}>Reset tests</button>
       </div>
-      {copyStatus && <p role="status">{copyStatus}</p>}
     </section>
   </>;
 }

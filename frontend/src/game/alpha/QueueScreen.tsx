@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { CharacterHeaderProfile } from "../characters/CharacterHeaderProfile";
 import { useConnectionView } from "../../store/session/networkViews";
 import { useCallback, useRef, useState } from "react";
@@ -14,8 +15,8 @@ import "./alpha.css";
 export function QueueScreen() {
   const queue = useSocialStore((s) => s.view?.alpha?.queue),
     connected = useConnectionView(s => s.connected);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const showNotice = useScreenNotice();
   const pending = useRef(false);
   const root = useRef<HTMLElement>(null);
   const cancel = useCallback(() => {
@@ -28,21 +29,21 @@ export function QueueScreen() {
     setBusy(true);
     void requestSocial("mode_cancel")
       .then(() => useUIStore.getState().setScreen("mode_select"))
-      .catch((reason) => setError((reason as Error).message))
+      .catch((reason) => showNotice((reason as Error).message))
       .finally(() => {
         pending.current = false;
         setBusy(false);
       });
-  }, []);
+  }, [showNotice]);
   const retry = async () => {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
-    setError("");
+    showNotice("");
     try {
       await joinSelectedMode();
     } catch (reason) {
-      setError((reason as Error).message);
+      showNotice((reason as Error).message);
     } finally {
       pending.current = false;
       setBusy(false);
@@ -86,7 +87,6 @@ export function QueueScreen() {
           <br />A disconnected player has a short reconnect window before their
           seat opens. Your position updates automatically when a seat opens.
         </p>
-        {error && <p role="status">{error}</p>}
         <MenuFooter className="alpha-queue-footer">
           {connected && !queue && (
             <button

@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { requestSocial } from "../../net/socialClient";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
@@ -70,7 +71,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
   }, []);
   const [name, setName] = useState("");
   const [pending, setPending] = useState(false);
-  const [message, setMessage] = useState("");
+  const setMessage = useScreenNotice();
   const requestPending = useRef(false);
   const nameInput = useRef<HTMLInputElement>(null);
   const entries = Object.entries(records ?? {});
@@ -123,7 +124,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
     if (requestPending.current || !owner || useSocialStore.getState().view?.profile.id !== owner) return;
     requestPending.current = true;
     setPending(true);
-    setMessage("");
+    setMessage("Updating saved outfits…");
     try {
       const result = await requestSocial(action, character ? { name, character } : { name });
       const outfits = result.character_outfits;
@@ -152,7 +153,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
 
   const profileReadOnly = source === "profile" && !owner;
   const readOnly = !editingAllowed || profileReadOnly;
-  const notice = pending ? "Updating saved outfits…" : message || saveProblem;
+
 
   return <div className="saved-outfits">
     <div className="saved-outfit-sources" role="group" aria-label="Outfit storage" data-controller-row>
@@ -186,7 +187,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
       </div>
     </form>
     {profileReadOnly && <p className="saved-outfit-message">Connect your profile to change profile saves. Cached outfits can still be tried on.</p>}
-    {notice && <p className="saved-outfit-message" role="status">{notice}</p>}
+    {saveProblem && <p className="saved-outfit-message" role="status">{saveProblem}</p>}
     {looks.length > 0 ? <ul className="saved-outfit-list" aria-label="Saved outfits">
       {looks.map(([outfitName, outfit]) => {
         const savedLook = outfitForCharacter(source === "device" ? restoreLocalOutfitHair(outfit) : outfit, choice);

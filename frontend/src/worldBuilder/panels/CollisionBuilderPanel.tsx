@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { CharacterHeaderProfile } from "../../game/characters/CharacterHeaderProfile";
 import { useCallback, useEffect, useMemo, useRef } from "react";
@@ -495,7 +496,7 @@ export function CollisionBuilderPanel({
       </main>
       <footer>
         <span>{state.source}</span>
-        <output role="status">{state.status}</output>
+        <ScreenNotice message={state.status} />
       </footer>
     </section>
   );

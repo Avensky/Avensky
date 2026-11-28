@@ -10,8 +10,9 @@ type HubState = {
   nearby: HubTarget | null;
   pending: number | null;
   notice: string | null;
+  noticeRevision: number;
 };
-const empty: HubState = { world: null, tick: -1, actors: {}, selected: null, nearby: null, pending: null, notice: null };
+const empty: HubState = { world: null, tick: -1, actors: {}, selected: null, nearby: null, pending: null, notice: null, noticeRevision: 0 };
 export const useHubStore = create<HubState>(() => empty);
 export const hubEnabled = import.meta.env?.MODE === "staging";
 

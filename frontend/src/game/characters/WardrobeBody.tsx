@@ -98,6 +98,11 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
       {section && <GameButton variant="custom" className="wardrobe-body-back" data-body-back data-controller-row
         aria-label={"Back to " + (piece ? "hair sections" : groomLayer ? "hair color" : "Body")} onPress={back}><MenuIcon name="back" /></GameButton>}
       <h2>{title}</h2>
+      {section === "hair" && style?.editableGroom && groomLayer !== "sections" && (piece
+        ? <GameButton variant="menu" data-controller-row disabled={disabled || !groom.pieces[piece]} onPress={clearPiece}>Use overall hair color</GameButton>
+        : <GameButton variant="menu" data-controller-row data-body-groom onPress={() => {
+          focusTarget.current = "[data-hair-piece]"; setGroomLayer("sections");
+        }}>Hair sections</GameButton>)}
     </header>
     {!section ? <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto">
       {(Object.keys(sections) as BodySection[]).map(id => <GameButton key={id} variant="menu" className="wardrobe-body-category"
@@ -114,6 +119,10 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
       <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto">
         {HAIR_PIECES.map(([id, label]) => <GameButton key={id} variant="menu" data-hair-piece={id} disabled={disabled}
           onPress={() => { focusTarget.current = '[data-creator-option][aria-pressed="true"]'; setGroomLayer(id); }}>{label}</GameButton>)}
+        <GameButton variant="menu"
+          disabled={disabled || (!appearance.hair_palette && appearance.hair_color === "original" && !Object.keys(groom.pieces).length)}
+          onPress={() => onChange({ hair_color: "original", hair_palette: undefined,
+            hair_groom: appearance.hair_groom && { ...groom, pieces: {} } })}>Reset hair colors</GameButton>
       </div>
       {(["volume", "thickness"] as const).map(key => <div key={key} className="wardrobe-groom-amount" data-controller-row>
         <span>{key === "volume" ? "Crown volume" : "Crown strand width"}</span>
@@ -133,17 +142,6 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
             selected={option.id === (appearance.tattoo ?? "none")} busy={disabled || !tattoosAvailable}
             onPick={() => onChange({ tattoo: option.id })}>{option.label}</CreatorOption>)}
         </div> : <CreatorColors step={section} choice={colorChoice} onChoice={pickColor} busy={disabled} channelNavigation={channel} />}
-      {section === "hair" && style?.editableGroom && (piece
-        ? <GameButton variant="menu" data-controller-row disabled={disabled || !groom.pieces[piece]} onPress={clearPiece}>Use overall hair color</GameButton>
-        : <>
-          <GameButton variant="menu" data-controller-row data-body-groom onPress={() => {
-            focusTarget.current = "[data-hair-piece]"; setGroomLayer("sections");
-          }}>Hair sections</GameButton>
-          <GameButton variant="menu" data-controller-row
-            disabled={disabled || (!appearance.hair_palette && appearance.hair_color === "original" && !Object.keys(groom.pieces).length)}
-            onPress={() => onChange({ hair_color: "original", hair_palette: undefined,
-              hair_groom: appearance.hair_groom && { ...groom, pieces: {} } })}>Reset hair colors</GameButton>
-        </>)}
     </div>}
   </section>;
 }

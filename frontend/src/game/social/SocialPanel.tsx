@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { formatCharacterName } from "../characters/characterName";
 import {MenuTabButton} from "../../components/menus/MenuTabButton";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -167,10 +168,10 @@ export function SocialPanel() {
     available = useSocialStore((s) => s.available),
     connectionMessage = useSocialStore((s) => s.message);
   const [tab, setTab] = useState<(typeof TABS)[number]>("WORLDS"),
-    [status, setStatus] = useState(""),
     [busy, setBusy] = useState(false);
   const root = useRef<HTMLElement>(null);
   const inFlight = useRef(false);
+  const setStatus = useScreenNotice();
   const back = useCallback(() => useUIStore.getState().backToParentMenu(), []);
   const cycle = useCallback(
     (direction: number) =>
@@ -313,7 +314,7 @@ export function SocialPanel() {
             )}
           </fieldset>
         </div>
-        <MenuFrameFooter className="social-footer" status={status || connectionMessage} backAction={{ onClick: back }}>
+        <MenuFrameFooter className="social-footer" status={!available ? connectionMessage : undefined} backAction={{ onClick: back }}>
           <ControllerAction
             button="X"
             keyboard="X"

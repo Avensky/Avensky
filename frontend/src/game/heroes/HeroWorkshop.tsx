@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { observeWorkshopViewport } from "../preview/workshopViewport";
 import {useCallback,useEffect,useLayoutEffect,useMemo,useRef,useState,type CSSProperties,type ReactNode} from "react";
 import type { WardrobeNavigation } from "../characters/DressingRoom";
@@ -332,6 +333,8 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  </button>;
  const customizationHeader={onOpen:openCharacter,leadingAction:vehicleAction,active:characterOpen};
  return <section {...pressOwner} ref={root} className={`game-ui menu-surface alpha-selection hero-selection hero-workshop${panelsHidden?" hero-workshop--hidden":""}${viewingConcepts?" hero-ability-guide":""}`} data-character-page={characterOpen||undefined} inert={overlay!==null} tabIndex={-1} aria-label={characterOpen?"Character":"Heroes garage"} data-controller-form data-controller-rows>
+  <ScreenNotice message={status==="error" ? message : status==="saved" ? "Vehicle style saved to your profile." :
+    status==="pending" || status==="saving" ? "Saving vehicle style…" : ""}/>
   {characterOpen?characterReady?<SceneTabHeader station={Boolean(entry)} title="" tablistLabel="Character sections" compact tabs={visibleCharacterTabs} activeTab={characterTab}
     character={customizationHeader} backAction={{onClick:back}}
     onTabChange={id=>setCharacterTab(id as CharacterTab)} idPrefix="character-editor" panelId="character-editor-panel"/>
@@ -365,7 +368,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
          <p>Hold {inputDevice==="touch"?"Set Main":"X"} to set your favorite.</p>
         </div>
       </section>}
-        {status!=="idle"&&<div className="hero-collection-save-status" role="status">{status==="error"?`NOT SAVED · ${message}`:status==="saved"?"SAVED TO YOUR PLAYER":"SAVING YOUR STYLE…"}{status==="error"&&<button className="menu-control" onClick={()=>void queue.flush()}>RETRY SAVE</button>}</div>}
+        {status==="error"&&<button className="menu-control" onClick={()=>void queue.flush()}>RETRY SAVE</button>}
         {definition&&<PreviewZoom visibilityToggle/>}
     </div>
     <HeroRoster showFilters={false} allowBoats selected={hero} main={main} filter={role} busy={!owner} onConfirmPreview={stationEntry?openHero:undefined} onChoose={stationEntry?preview:openHero} onFilter={setRole}/>
@@ -446,7 +449,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
      <HeroPortrait hero={definition.id} appearance={appearance} className="vehicle-studio-portrait" windowTone={marine?DEFAULT_WINDOW_TONE:glassStyle}/>
      <p>The portrait refreshes with your current appearance.</p>
     </section>}
-    {(!owner||status!=="idle")&&<p className="vehicle-studio-save-status" role="status" aria-live="polite">{!owner?"CONNECT YOUR PLAYER PROFILE":status==="pending"||status==="saving"?"SAVING YOUR STYLE…":status==="error"?`NOT SAVED · ${message}`:status==="saved"?"SAVED TO YOUR PLAYER · SHARED IN GAME":"Appearance changes save automatically for this vehicle."}</p>}
+    {!owner&&<p className="vehicle-studio-save-status">Connect your player profile to save vehicle changes.</p>}
     {status==="error"&&<button className="menu-control" onClick={()=>void queue.flush()}>RETRY SAVE</button>}
    </VehicleStudio>}
    {editing&&definition&&<GaragePreviewControls vehicle={definition.vehicle}/>}

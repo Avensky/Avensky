@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { CharacterHeaderProfile } from "../characters/CharacterHeaderProfile";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
@@ -12,8 +13,8 @@ export function SessionMenu() {
   const dialog = useRef<HTMLElement>(null);
   const id = useId();
   const pending = useRef(false);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const showNotice = useScreenNotice();
   const cancel = useCallback(() => {
     if (!pending.current) useUIStore.getState().backToParentMenu();
   }, []);
@@ -21,7 +22,7 @@ export function SessionMenu() {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
-    setError("");
+    showNotice("");
     void (async () => {
       try {
         // Explicit leave releases the seat before reconnect; a network drop
@@ -32,13 +33,13 @@ export function SessionMenu() {
         useUIStore.getState().setScreen("main");
         connectRustServer();
       } catch (reason) {
-        setError((reason as Error).message);
+        showNotice((reason as Error).message);
       } finally {
         pending.current = false;
         setBusy(false);
       }
     })();
-  }, []);
+  }, [showNotice]);
   useEffect(() => {
     dialog.current?.focus({ preventScroll: true });
   }, []);
@@ -84,7 +85,6 @@ export function SessionMenu() {
         </header>
         <div className="menu-confirm-body">
           <p id={`${id}-message`}>Are you sure you want to leave game?</p>
-          {error && <p role="status">{error}</p>}
         </div>
         <nav className="menu-confirm-actions" aria-label="Leave game actions">
           {(["confirm", "cancel"] as const).map((action) => (

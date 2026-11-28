@@ -119,7 +119,7 @@ export function VehiclePlatform({ turntable, selectionLighting, floorCaptureRate
   </>;
 }
 
-export function GarageEnvironment({ onSettled }: { onSettled: () => void }) {
+export function GarageEnvironment({ onSettled, showroomEffects }: { onSettled: () => void; showroomEffects: boolean }) {
   useLayoutEffect(onSettled, [onSettled]);
-  return <GarageGlow />;
+  return showroomEffects ? <GarageGlow /> : null;
 }

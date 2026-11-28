@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { CharacterHeaderProfile } from "../../game/characters/CharacterHeaderProfile";
 import { MenuHeaderBack } from "../../components/menus/MenuFrame";
 import { kitAsset } from "../mapKit/catalog";
@@ -755,8 +756,7 @@ function LayoutPanel({
         )}
       </div>
       <footer className="le-footer">
-        <span className="le-status-dot" />
-        <output role="status">{s.status}</output>
+        <ScreenNotice message={s.status} />
         <span className="le-footer-map">
           {s.doc?.map_id ?? "AVENLAB"}
           <span> / </span>

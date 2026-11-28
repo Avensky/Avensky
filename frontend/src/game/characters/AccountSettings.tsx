@@ -1,4 +1,4 @@
-import { MenuLoadingStatus } from "../../components/menus/MenuLoadingStatus";
+import { ScreenNotice, useScreenNotice } from "../../components/menus/ScreenNotice";
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { GameButton } from "../../components/GameButton";
 import { alphaAction, alphaSession, type AlphaSession, type RosterAccountSession } from "../../net/stagingAccount";
@@ -147,7 +147,7 @@ export function AccountSecurity({ session }: { session: AlphaSession }) {
 
 function InvitationLink({ url }: { url: string }) {
   const field = useRef<HTMLInputElement>(null);
-  const [message, setMessage] = useState("");
+  const setMessage = useScreenNotice();
   async function copy() {
     try {
       await navigator.clipboard.writeText(url);
@@ -163,16 +163,15 @@ function InvitationLink({ url }: { url: string }) {
       <input ref={field} value={url} readOnly onFocus={event => event.currentTarget.select()} />
     </label>
     <div data-controller-row><GameButton variant="menu" className="account-submit" onPress={() => void copy()}>Copy invite link</GameButton></div>
-    {message && <p role="status">{message}</p>}
   </>;
 }
 
 export function AccountFeedback({ settings }: { settings: AccountSettings }) {
-  if (settings.busy) return <MenuLoadingStatus>Sending request…</MenuLoadingStatus>;
+  if (settings.busy) return <ScreenNotice message="Sending request…" />;
   const result = settings.feedback;
   if (!result) return null;
   return <>
-    <p role={result.error ? "alert" : "status"} className="alpha-account-response">{result.message}</p>
+    {result.error ? <p role="alert" className="alpha-account-response">{result.message}</p> : <ScreenNotice message={result.message} />}
     {settings.session?.admin && result.inviteUrl && <InvitationLink key={result.inviteUrl} url={result.inviteUrl} />}
   </>;
 }

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createServer } from "vite";
-import { Bone, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, MeshStandardMaterial, Skeleton, SkinnedMesh, Uint16BufferAttribute, Vector3 } from "three";
+import { Bone, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, MeshStandardMaterial, ShaderLib, Skeleton, SkinnedMesh, Texture, Uint16BufferAttribute, Vector3 } from "three";
 
 test("Mia's ponytail shortens and her face braids hang onto the worn torso through head turns", async () => {
   const vite = await createServer({ configFile: false, optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true, hmr: false, ws: false }, logLevel: "error" });
@@ -123,4 +123,43 @@ test("Mia's ponytail shortens and her face braids hang onto the worn torso throu
     assert.equal(sway.offset.length(), 0);
     assert.equal(sway.step(1 / 60, true), false);
   } finally { await vite.close(); }
+});
+
+test("Mia collar locks share the selected dye across atlas and vertex-colored exports", async () => {
+  const vite = await createServer({ configFile: false, optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true, hmr: false, ws: false }, logLevel: "error" });
+  const geometry = new BufferGeometry(), atlas = new Texture(), spring = new Vector3();
+  geometry.setAttribute("position", new Float32BufferAttribute([0, 1.47, 0], 3));
+  geometry.setAttribute("_avensky_groom", new Float32BufferAttribute([1, .5, 6], 3));
+  geometry.setAttribute("_avensky_tail", new Float32BufferAttribute([0], 1));
+  try {
+    const { prepareHairDye } = await vite.ssrLoadModule("/src/game/characters/fittedWardrobe/hairDye.ts");
+    const { HAIR_COLOR_THEMES } = await vite.ssrLoadModule("/src/game/characters/fittedWardrobe/hairColors.ts");
+    const { DEFAULT_HAIR_GROOM } = await vite.ssrLoadModule("/src/game/characters/fittedWardrobe/hairGroom.ts");
+    for (const map of [null, atlas]) {
+      const material = new MeshStandardMaterial({ color: 0x776650, map, vertexColors: true });
+      const setPalette = prepareHairDye(material, geometry, false, spring);
+      const shader = { uniforms: {}, vertexShader: ShaderLib.standard.vertexShader, fragmentShader: ShaderLib.standard.fragmentShader };
+      material.onBeforeCompile(shader);
+      const { avenskyPieceBase, avenskyPieceMix, avenskyTailOffset } = shader.uniforms;
+      assert.equal(avenskyTailOffset.value, spring);
+      assert.ok(shader.fragmentShader.indexOf("vec3 pigment") > shader.fragmentShader.indexOf("#include <color_fragment>"),
+        "dye replaces the final baked hue, including base-color factors and vertex colors");
+      const palette = HAIR_COLOR_THEMES.Red;
+      setPalette(palette);
+      assert.equal(material.color.getHex(), 0x776650, "whole and per-section dye see the same original strand luminance");
+      for (const index of [2, 3, 6, 7]) {
+        assert.equal(avenskyPieceMix.value[index].z, 0);
+        assert.equal("#" + avenskyPieceBase.value[index].getHexString(), palette.base);
+      }
+      setPalette(palette, true, { ...DEFAULT_HAIR_GROOM, pieces: { nape: palette } });
+      assert.equal(avenskyPieceMix.value[6].z, 0, "an explicit nape pigment can override Original");
+      assert.equal(avenskyPieceMix.value[7].z, 1);
+      setPalette(palette, true);
+      assert.equal(avenskyPieceMix.value[6].z, 1);
+      assert.equal(material.color.getHex(), 0x776650, "Original restores the strand material color");
+      material.dispose();
+    }
+  } finally {
+    geometry.dispose(); atlas.dispose(); await vite.close();
+  }
 });

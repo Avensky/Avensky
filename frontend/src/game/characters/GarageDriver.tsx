@@ -120,6 +120,8 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   const femaleWithBag = look.female && bag;
   const wetEyes = !victory;
   const fitted = usesFittedAnimation(look);
+  // Wardrobe and roster actors receive the same bounce from the live garage fixtures.
+  const garageSubject = Boolean(rosterPreview || previewPacks);
   // Appearance edits can recreate the removal array without changing the rig.
   const removalKey = [...look.removedClothing].sort().join(",");
   const removedClothing = useMemo(() => removalKey ? removalKey.split(",") as WardrobeRemoval[] : [], [removalKey]);
@@ -128,9 +130,9 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
       female: look.female, animateFace: true, bag: femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, removedClothing,
       corsetSource: corsetScene && corsetSet ? { set: corsetSet, scene: corsetScene } : undefined,
     });
-    if (rosterPreview) prepareGaragePointLights(model.root, "subject", coverage);
+    if (garageSubject) prepareGaragePointLights(model.root, "subject", coverage);
     return model;
-  }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, rosterPreview, coverage]);
+  }, [scene, look.female, removedClothing, femaleWithBag, wetEyes, fitted, garments, garmentBody, hairSource, corsetScene, corsetSet, garageSubject, coverage]);
   const model = useCommittedResource(createModel);
   useLayoutEffect(() => { if (model) onSettled?.(true, look.character.id); }, [model, onSettled, look.character.id]);
   return model ? <>

@@ -48,14 +48,11 @@
 .garage-plan-prop { fill:var(--garage-menu-muted); stroke:var(--garage-menu-ink); stroke-width:.08; }
 .garage-plan-heading { stroke:var(--garage-menu-ink); stroke-width:.10; }
 .garage-floor-plan [data-active="true"] .garage-plan-prop { fill:var(--garage-menu-accent); }
-.garage-edit-notice { position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:max(12px,env(safe-area-inset-left)); max-width: min(42vw,28rem); padding:.55rem .8rem; color:var(--garage-menu-ink); background:var(--garage-menu-row); }
-.garage-edit-notice:empty { display:none; }
 @media (orientation:portrait) {
   .garage-editor { --edit-panel: min(92vw, 19rem); }
   .garage-project-choices, .garage-edit-tools { right:50%; transform:translateX(50%); }
   .garage-project-choices { transform:translate(50%,-50%); }
   .garage-floor-plan { width:var(--edit-panel); height: clamp(6rem, 19svh, 10rem); right:50%; transform:translateX(50%); }
-  .garage-edit-notice { top:max(4rem,calc(3rem + env(safe-area-inset-top))); bottom:auto; max-width:90vw; }
 }
 @media (orientation: landscape) and (max-height:370px) {
   .garage-floor-plan { width: min(25vw, 10rem); height: 34vh; }

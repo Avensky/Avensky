@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { observeWorkshopViewport } from "../preview/workshopViewport";
 import { isMirrorMakeupEmote, MAKEUP_EMOTES } from "./mirrorCheck";
 import { useFittingTurnStore } from "./fittingControlsStore";
@@ -132,7 +133,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   const previewChoice = wardrobeChoice;
   const [locked, setLocked] = useState(Boolean(initialChoice));
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "local" | "error">("idle");
-  const [message, setMessage] = useState("");
+  const notify = useScreenNotice();
   const [emoteBrowserOpen, setEmoteBrowserOpen] = useState(false);
   const [emotePacksOpen, setEmotePacksOpen] = useState(false);
   const [emoteGroup, setEmoteGroup] = useState<EmoteSection>();
@@ -160,6 +161,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     if (!queued.current.size) return Promise.resolve(true);
     const drain = async () => {
       setStatus("saving");
+      notify("Saving…");
       while (queued.current.size) {
         if (!canEditCharacter()) return false;
         const [id, next] = queued.current.entries().next().value!;
@@ -181,17 +183,19 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
           // Keep another model's pending edits and the order in which the player selected them.
           if (!queued.current.has(id)) queued.current = new Map([[id, next], ...queued.current]);
           setStatus("error");
-          setMessage(error instanceof Error ? error.message : "Could not save your character.");
+          const detail = error instanceof Error ? error.message : "Could not save your character.";
+          notify(detail);
           return false;
         }
       }
       if (acknowledged.current) setChoice(acknowledged.current);
       setStatus("saved");
+      notify("Saved to your profile.");
       return true;
     };
     running.current = drain().finally(() => { running.current = null; });
     return running.current;
-  }, [owner, slotId]);
+  }, [owner, slotId, notify]);
 
   useLayoutEffect(() => {
     if (saved && characterLook(saved) && !running.current && !queued.current.size) {
@@ -256,10 +260,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       writeLocalCharacter(next);
       acknowledged.current = next;
       setStatus("local");
+      notify("Saved on this device.");
       setLocked(true);
     } catch {
       setStatus("error");
-      setMessage("Browser storage could not save this character.");
+      notify("Browser storage could not save this character.");
     }
   }
 
@@ -271,7 +276,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     if (preview) setTrial(preview);
     else clearFittingPreview();
     setChoice(next);
-    setMessage("");
     if (!locked) return;
     if (!saveToProfile) {
       saveLocalCharacter(next);
@@ -280,6 +284,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     queued.current.delete(next.id);
     queued.current.set(next.id, next);
     setStatus("pending");
+    notify("Saving…");
     clearTimeout(timer.current);
     timer.current = setTimeout(() => void flush(), 300);
   }
@@ -625,7 +630,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
           {(!connectedOwner || saved === undefined) && <button type="button" className="menu-control" disabled={!editingAllowed} onClick={() => saveLocalCharacter(choice)}>
             Use locally
           </button>}
-          <p role="status">{message || (!connectedOwner ? "Connect your player profile to confirm." : saved === undefined ? "Update the game server to choose a character." : "")}</p>
+          {(!connectedOwner || saved === undefined) && <p role="status">{!connectedOwner ? "Connect your player profile to confirm." : "Update the game server to choose a character."}</p>}
         </div>
         {emoteBrowser}
         {emoteResultsPanel}
@@ -658,10 +663,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       {playback}
       {!fitting && <div className="dressing-toolbar">{cameraTools}</div>}
       {previewZoom}
-      <section className="character-controls menu-panel-frame character-controls--bottom" aria-label="Save status" hidden={status === "idle"}>
+      {status === "error" && <section className="character-controls menu-panel-frame character-controls--bottom" aria-label="Recover unsaved changes">
         <div className="character-equip" data-controller-row>
-          <p role="status">{status === "error" ? message : status === "saved" ? "Saved to your profile." : status === "local" ? "Saved on this device." : "Saving…"}</p>
-          {status === "error" && <>
             <button type="button" className="menu-control" onClick={() => saveToProfile ? void flush() : saveLocalCharacter(choice)}>Retry</button>
             <button type="button" className="menu-control" onClick={() => {
               if (!canEditCharacter()) return;
@@ -669,10 +672,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
               clearFittingPreview();
               if (acknowledged.current) setChoice(acknowledged.current);
               setStatus("idle");
+              notify("");
             }}>Revert unsaved</button>
-          </>}
         </div>
-      </section>
+      </section>}
     </div>
   );
 }

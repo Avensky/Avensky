@@ -96,7 +96,16 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, channe
   }
   useLayoutEffect(() => {
     focusSwatch();
-  }, [channel]);
+    if (!channelNavigation) return;
+    const tab = document.getElementById(id + channel);
+    const row = tab?.parentElement;
+    if (tab && row && row.scrollWidth > row.clientWidth) {
+      const panelBounds = row.getBoundingClientRect();
+      const tabBounds = tab.getBoundingClientRect();
+      if (tabBounds.left < panelBounds.left) row.scrollLeft += tabBounds.left - panelBounds.left;
+      else if (tabBounds.right > panelBounds.right) row.scrollLeft += tabBounds.right - panelBounds.right;
+    }
+  }, [channel, channelNavigation, id]);
   function moveChannel(direction: number) {
     if (busy || channels.length < 2 || group.current?.closest("[inert]") || useTextKeyboardStore.getState().session) return;
     openChannel(channels[(channels.indexOf(channel) + direction + channels.length) % channels.length]);
@@ -139,12 +148,13 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, channe
             ) : color ? <ColorSwatch color={color} /> : <span aria-hidden="true">∅</span>}
           </CreatorOption>;
         })}
+        {channelNavigation && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
+          <label className="creator-option wardrobe-custom-dye chamfered-frame" title="Custom color">
+            <span aria-hidden="true">+</span><input type="color" disabled={busy} value={currentPalette[channel as HairColorZone]}
+              aria-label={labels[channel] + " custom color"}
+              onChange={event => apply({ hair_palette: { ...currentPalette, [channel]: event.target.value } })} />
+          </label>}
       </div>
-      {channelNavigation && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
-        <label className="wardrobe-custom-dye" data-controller-row>Custom color
-          <input type="color" disabled={busy} value={currentPalette[channel as HairColorZone]} aria-label={labels[channel] + " custom color"}
-            onChange={event => apply({ hair_palette: { ...currentPalette, [channel]: event.target.value } })} />
-        </label>}
       {mix && <div className="creator-mix" data-controller-row role="group" aria-label={mixLabel}>
         <span>{mixLabel}</span>
         {([-1, 1] as const).map(direction => {

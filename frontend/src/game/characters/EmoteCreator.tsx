@@ -1,3 +1,4 @@
+import { useScreenNotice } from "../../components/menus/ScreenNotice";
 import { useState } from "react";
 import { CHARACTER_POSE_GROUPS } from "./posePack";
 import { CREATED_EMOTE_ID, CREATOR_EASE, CREATOR_FACING, CREATOR_HANDS, CREATOR_MAX_FRAMES, creatorTimeline, defaultEmoteFrame, writeCreatedEmotes, type CreatedEmote, type EmoteFrame } from "./emoteAuthoring";
@@ -11,7 +12,7 @@ export function EmoteCreator({ disabled, owner, saved, onSave }: {
     name: "", frames: [defaultEmoteFrame(), defaultEmoteFrame("pose-greeting")],
   }));
   const [selected, setSelected] = useState(0);
-  const [message, setMessage] = useState("");
+  const setMessage = useScreenNotice();
   const frame = draft.frames[selected];
   const timeline = creatorTimeline(draft.frames);
   const update = (change: Partial<EmoteFrame>) => {
@@ -93,6 +94,5 @@ export function EmoteCreator({ disabled, owner, saved, onSave }: {
       }}>Remove pose</button>
       <button type="submit" className="menu-control">Save emote</button>
     </div>
-    {message && <p role="status">{message}</p>}
   </form>;
 }

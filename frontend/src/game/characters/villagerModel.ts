@@ -125,9 +125,9 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
       if (existing) return existing;
       const copy = material.clone();
       if (detachedCorset?.authoredLacedBodice && part === detachedCorset.group) copy.userData.rebuiltLacedBodice = true;
-      if ((copy.map && copy.name === "MAT_Hair") || (fittedPart && (copy.map || object.geometry.hasAttribute("_avensky_groom")))) {
+      const taggedHair = object.geometry.hasAttribute("_avensky_groom") || object.geometry.hasAttribute("_avensky_tail");
+      if ((copy.map && copy.name === "MAT_Hair") || (fittedPart && (copy.map || taggedHair))) {
         hairDyes.set(copy, prepareHairDye(copy, object.geometry, false, fittedPart ? ponySway?.offset : undefined, !female));
-        if (!copy.map) copy.color.copy(material.color);
       }
       // Fitted primitives can share a source material but export different groom channels.
       if (fittedPart) hairMaterials.push(copy);
@@ -314,8 +314,7 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
   if (model.hat) model.hat.visible = !model.fittedHair;
   if (model.fittedHair) model.fittedHair.visible = !cropped && !tucksHair;
   const palette = appearanceHairPalette(look.appearance);
-  for (const [material, setPalette] of model.hairDyes) {
-    if (palette && material.map) material.color.set(0xffffff);
+  for (const setPalette of model.hairDyes.values()) {
     setPalette(palette ?? DEFAULT_HAIR_PALETTE, !palette, model.ponySway ? look.appearance.hair_groom : undefined);
   }
   if (model.longHair) model.longHair.visible = !model.fittedHair && !cropped && !tucksHair;

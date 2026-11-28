@@ -179,8 +179,6 @@
  .garage-studio-tabs .angled-header-tab{gap:2px;padding-inline:3px;}
  .garage-studio-tabs .scene-header-tab-icon svg{width:11px;height:11px;}
  .garage-studio-tabs .angled-header-tab--performance{flex-grow:1.3;}
- .hero-workshop .menu-frame-footer .controller-shortcuts{flex:0 0 auto;}
- .hero-workshop .controller-shortcuts>span{display:none;}
  .hero-workshop-actions{margin-inline-start:auto;gap:5px;}
  .hero-workshop .hero-main-hold{font-size:9px;}
  .hero-workshop .hero-workshop-actions>.controller-action:not(.hero-main-hold){padding-inline:4px;font-size:10px;}

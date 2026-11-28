@@ -1,3 +1,4 @@
+import { ScreenNotice } from "../../components/menus/ScreenNotice";
 import { useMotionView } from "../../store/session/networkViews";
 import { lazy, Suspense } from "react";
 import { useSocialStore } from "../../store/social/socialStore";
@@ -158,16 +159,7 @@ function LegacyVehicleMenu() {
             </button>
           ))}
         </div>
-        {pending && (
-          <p role="status" className="menu-vehicle-notice">
-            CHANGING VEHICLE…
-          </p>
-        )}
-        {error && (
-          <p role="alert" className="menu-vehicle-notice">
-            {error}
-          </p>
-        )}
+        <ScreenNotice message={error || (pending ? "Changing vehicle…" : "")} role={error ? "alert" : "status"} />
         <MenuFooter className="menu-vehicle-footer">
           <MenuShortcuts navigate={false} tabs={false} selectAction={false} backAction={{ onClick: back }} />
         </MenuFooter>

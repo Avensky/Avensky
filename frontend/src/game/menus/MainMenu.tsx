@@ -1,3 +1,4 @@
+import { ScreenNotice, useScreenNotice } from "../../components/menus/ScreenNotice";
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { ControlGlyph } from "../../components/controller/ControlGlyph";
 import { MenuIcon } from "../../components/menus/MenuIcon";
@@ -53,7 +54,8 @@ function GarageStations() {
   const pointer = useRef<{ x: number; y: number } | null>(null);
   const touchStart = useRef<{ pointerId: number; selected: number } | null>(null);
   const pendingStation = useRef<{ index: number } | undefined>(undefined);
-  const [stationNotice, setStationNotice] = useState<{ index: number; failed?: boolean }>();
+  const [stationNotice, setStationNotice] = useState<{ index: number }>();
+  const showStationResult = useScreenNotice();
   const selectedStation = MAIN_MENU_ITEMS[selectedIndex];
   useEffect(() => {
     if (selectedStation?.id === "wardrobe" || selectedStation?.id === "vehicle")
@@ -79,9 +81,12 @@ function GarageStations() {
     void loadGarageWorkshop().then(() => {
       if (current()) useUIStore.getState().activateActiveMenuSelection();
     }).catch(() => {
-      if (current()) setStationNotice({ index, failed: true });
+      if (current()) {
+        setStationNotice(undefined);
+        showStationResult(`Couldn’t open ${MAIN_MENU_ITEMS[index].label}. Select it again to retry.`, "alert");
+      }
     }).finally(() => { if (pendingStation.current === request) pendingStation.current = undefined; });
-  }, []);
+  }, [showStationResult]);
 
   const back = () => useUIStore.getState().setScreen("welcome");
   const continueSelection = useCallback(() => {
@@ -179,12 +184,11 @@ function GarageStations() {
         </div>)}
       </div>
     </section>
-    {(joining || error) && <p className="garage-menu-notice" role={error ? "alert" : "status"}>
-      {joining ? "Entering the Harbor…" : error}
+    <ScreenNotice message={joining ? undefined : error} role="alert" />
+    {joining && <p className="garage-menu-notice"><MenuLoadingStatus>Entering the Harbor…</MenuLoadingStatus></p>}
+    {stationNotice?.index === selectedIndex && <p className="garage-menu-notice">
+      <MenuLoadingStatus>Opening {selectedStation.label}…</MenuLoadingStatus>
     </p>}
-    {stationNotice?.index === selectedIndex && <p className="garage-menu-notice">{!stationNotice.failed
-      ? <MenuLoadingStatus>Opening {selectedStation.label}…</MenuLoadingStatus>
-      : <span role="alert">Couldn’t open {selectedStation.label}. Select it again to retry.</span>}</p>}
     <GameButton variant="custom" className="garage-menu-drive" data-garage-drive-start
       aria-label={vehicle.loaner ? "Drive loaner BRZ" : "Drive " + vehicle.name}
       disabled={joining} onPress={() => useGarageParking.getState().start()}>
