@@ -153,6 +153,7 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
   const previousFrame = useRef(performance.now());
   const reducedMotion = useMemo(() => window.matchMedia?.("(prefers-reduced-motion: reduce)"), []);
   const travel = useMemo(() => new GarageCameraTravel(), []);
+  const renderedShot = useRef(shot);
   useLayoutEffect(() => {
     if (!active) return;
     runtime.motion.invalidate = invalidate;
@@ -168,6 +169,8 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
     document.addEventListener("visibilitychange", visibility);
     invalidate();
     return () => {
+      runtime.motion.idle?.cancel();
+      runtime.motion.targetYaw = runtime.motion.targetPitch = undefined;
       runtime.motion.invalidate = undefined;
       preferences.disconnect();
       reducedMotion?.removeEventListener("change", changed);
@@ -183,9 +186,17 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
     const started = motion.dragging ? motion.dragStarted : motion.lastInput;
     const elapsed = Math.max(0, now - Math.max(previousFrame.current, started ?? 0)) / 1000;
     previousFrame.current = now;
-    const yaw = motion.dragging ? motion.targetYaw ?? motion.yaw : motion.stickYaw ?? 0;
-    const pitch = motion.dragging ? motion.targetPitch ?? motion.pitch : motion.stickPitch ?? 0;
-    const following = motion.dragging || Boolean(motion.stickYaw || motion.stickPitch);
+    if (renderedShot.current !== shot && shot?.subject !== "loading") {
+      renderedShot.current = shot;
+      if (!motion.dragging && !motion.stickActive) {
+        motion.idle?.cancel();
+        motion.targetYaw = motion.targetPitch = undefined;
+        motion.yaw = motion.pitch = 0;
+      }
+    }
+    const yaw = motion.targetYaw ?? 0;
+    const pitch = motion.targetPitch ?? 0;
+    const following = motion.targetYaw !== undefined;
     const immediate = reducedMotion?.matches || document.documentElement.dataset.reduceMotion === "true";
     const blend = immediate ? 1 : -Math.expm1(-(following ? 16 : 1.7) * elapsed);
     motion.yaw += (yaw - motion.yaw) * blend;

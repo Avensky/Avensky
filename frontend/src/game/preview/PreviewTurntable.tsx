@@ -1,8 +1,19 @@
 import { useFittingTurnStore } from "../characters/fittingControlsStore";
-import { useEffect, useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useMemo, useEffect, useCallback, useLayoutEffect, useRef, type ReactNode } from "react";
 import { useFrame, useThree, type ThreeEvent } from "@react-three/fiber";
-import { DoubleSide, Group, MathUtils } from "three";
+import { DoubleSide, Group, MathUtils, Vector3, type Box3 } from "three";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
+
+type TurntableDrag = (event: ThreeEvent<PointerEvent>) => void;
+const VehicleDrag = createContext<TurntableDrag | undefined>(undefined);
+
+/** Pick the already-measured hull once on press, independently of its displayed LOD. */
+export function VehicleDragVolume({ bounds }: { bounds: Box3 }) {
+  const begin = useContext(VehicleDrag);
+  const [center, size] = useMemo(() => [bounds.getCenter(new Vector3()), bounds.getSize(new Vector3())], [bounds]);
+  return begin && !bounds.isEmpty() ? <mesh name="vehicle-inspection-drag" visible={false}
+    position={center} scale={size} onPointerDown={begin}><boxGeometry /></mesh> : null;
+}
 
 export function PreviewTurntable({
   children,
@@ -10,17 +21,20 @@ export function PreviewTurntable({
   spin = true,
   locked = false,
   restoreAngle = false,
+  inspectExterior = false,
 }: {
   children: ReactNode;
   onReady: (group: Group | null) => void;
   spin?: boolean;
   locked?: boolean;
   restoreAngle?: boolean;
+  inspectExterior?: boolean;
 }) {
   const group = useRef<Group>(null);
   const angle = useRef(0);
   const lastVehicleYaw = useRef(useFittingTurnStore.getState().vehicleYaw);
-  const drag = useRef<{ pointerId: number; clientX: number } | null>(null);
+  const drag = useRef<{ pointerId: number; clientX: number; target: Element } | null>(null);
+  const connected = useThree(s => s.events.connected);
   const attach = useCallback(
     (object: Group | null) => {
       group.current = object;
@@ -60,38 +74,49 @@ export function PreviewTurntable({
   }, -1);
 
   const beginDrag = (event: ThreeEvent<PointerEvent>) => {
-    if (locked || event.button !== 0 || useFittingTurnStore.getState().dragging) return;
+    if (locked || drag.current || event.button !== 0 || useFittingTurnStore.getState().dragging) return;
     event.stopPropagation();
-    drag.current = { pointerId: event.pointerId, clientX: event.clientX };
-    (event.target as EventTarget & { setPointerCapture(pointerId: number): void }).setPointerCapture(event.pointerId);
+    const target = event.nativeEvent.target as Element;
+    target.setPointerCapture(event.pointerId);
+    drag.current = { pointerId: event.pointerId, clientX: event.clientX, target };
   };
-  const continueDrag = (event: ThreeEvent<PointerEvent>) => {
-    if (locked || !drag.current || drag.current.pointerId !== event.pointerId) return;
-    const deltaX = event.clientX - drag.current.clientX;
-    drag.current.clientX = event.clientX;
-    angle.current += deltaX * cameraSensitivity * 0.006;
-    invalidate();
-  };
-  const endDrag = (event: ThreeEvent<PointerEvent>) => {
-    if (drag.current?.pointerId !== event.pointerId) return;
-    drag.current = null;
-    const target = event.target as EventTarget & { hasPointerCapture(pointerId: number): boolean; releasePointerCapture(pointerId: number): void };
-    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
-  };
+  useEffect(() => {
+    if (locked || !connected) return;
+    const move = (event: PointerEvent) => {
+      const pointer = drag.current;
+      if (pointer?.pointerId !== event.pointerId) return;
+      angle.current += (event.clientX - pointer.clientX) * cameraSensitivity * .006;
+      pointer.clientX = event.clientX;
+      invalidate();
+    };
+    const release = (event?: PointerEvent) => {
+      const pointer = drag.current;
+      if (!pointer || event && pointer.pointerId !== event.pointerId) return;
+      drag.current = null;
+      if (pointer.target.hasPointerCapture(pointer.pointerId)) pointer.target.releasePointerCapture(pointer.pointerId);
+    };
+    connected.addEventListener("pointermove", move);
+    connected.addEventListener("pointerup", release);
+    connected.addEventListener("pointercancel", release);
+    connected.addEventListener("lostpointercapture", release);
+    return () => {
+      connected.removeEventListener("pointermove", move);
+      connected.removeEventListener("pointerup", release);
+      connected.removeEventListener("pointercancel", release);
+      connected.removeEventListener("lostpointercapture", release);
+      release();
+    };
+  }, [connected, locked, cameraSensitivity, invalidate]);
 
-  // A transparent ground plane makes the whole preview stage a drag surface.
-  // Pointer input rotates the vehicle and turntable together, never the camera.
+  // Exterior inspection reserves the room for orbit. Other previews keep their existing floor drag.
   return (
     <group ref={attach} name="vehicle-turntable">
-      {children}
-      {!locked && <mesh
+      <VehicleDrag.Provider value={inspectExterior && !locked ? beginDrag : undefined}>{children}</VehicleDrag.Provider>
+      {!inspectExterior && !locked && <mesh
         name="vehicle-turntable-drag-surface"
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, -0.065, 0]}
         onPointerDown={beginDrag}
-        onPointerMove={continueDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
       >
         <planeGeometry args={[40, 40]} />
         <meshBasicMaterial visible={false} side={DoubleSide} />

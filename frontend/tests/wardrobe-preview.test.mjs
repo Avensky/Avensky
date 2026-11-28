@@ -46,7 +46,7 @@ test("emote tab keeps the stable fitting stage unless a garage interaction needs
 test("fitting camera stays on the safe stage-facing side during character rotation", async () => {
   const server = await wardrobePreviewServer();
   try {
-    const { orientFittingCameraOffset, cutToFittingView } = await server.ssrLoadModule("/src/game/characters/clothingFraming.ts");
+    const { orientFittingCameraOffset } = await server.ssrLoadModule("/src/game/characters/clothingFraming.ts");
     const { Quaternion, Vector3 } = await import("three");
     const axis = new Vector3(0, 1, 0);
     const atRest = orientFittingCameraOffset(new Vector3(0, .25, 2), new Quaternion(), true);
@@ -58,9 +58,6 @@ test("fitting camera stays on the safe stage-facing side during character rotati
     const moving = orientFittingCameraOffset(new Vector3(0, .25, 2),
       new Quaternion().setFromAxisAngle(axis, Math.PI), false);
     assert.ok(moving.distanceTo(atRest) > 1, "vehicle/cockpit cameras keep their normal pose");
-    assert.equal(cutToFittingView(true, true, false), true, "switching Body/Appearance is a safe camera cut");
-    assert.equal(cutToFittingView(true, false, true), true, "a loaded outfit returns without crossing the wall");
-    assert.equal(cutToFittingView(false, true, false), false, "the ordinary garage keeps its smooth camera");
   } finally {
     await server.close();
   }

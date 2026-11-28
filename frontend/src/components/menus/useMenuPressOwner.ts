@@ -1,5 +1,7 @@
 import { useRef, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 
+const PRESS_TARGET = 'button, [role="button"], [role="tab"]';
+
 /** A release belongs to the control that received its press, even across menus. */
 export function useMenuPressOwner() {
   const pointerOwner = useRef<Element | null>(null);
@@ -8,17 +10,19 @@ export function useMenuPressOwner() {
   return {
     onPointerDownCapture(event: PointerEvent<HTMLElement>) {
       pointerOwner.current = event.button === 0
-        ? (event.target as Element).closest("button")
+        ? (event.target as Element).closest(PRESS_TARGET)
         : null;
     },
     onPointerCancelCapture() {
       pointerOwner.current = null;
     },
     onClickCapture(event: MouseEvent<HTMLElement>) {
-      if (event.detail === 0) return;
+      const native = event.nativeEvent;
+      // Controller/assistive clicks have no pointer. Some touch clicks have zero detail.
+      if (event.detail === 0 && !("pointerType" in native && native.pointerType)) return;
       const owner = pointerOwner.current;
       pointerOwner.current = null;
-      if (owner !== (event.target as Element).closest("button")) {
+      if (owner !== (event.target as Element).closest(PRESS_TARGET)) {
         event.preventDefault();
         event.stopPropagation();
       }

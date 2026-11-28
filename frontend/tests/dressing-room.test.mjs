@@ -195,14 +195,28 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     const find = selector => document.querySelector(selector);
     const click = async selector => act(async () => { assert(find(selector), selector); find(selector).click(); });
     const open = async category => {
+      if (!find('.dressing-details').hidden) await click('.dressing-details .menu-back-button');
       if (!find('.dressing-catalog').hidden) await click('[data-wardrobe-back]');
+      if (!find(`[data-category=${category}]`)) {
+        for (const group of document.querySelectorAll('[data-wardrobe-group]')) {
+          await act(async () => group.click());
+          if (find(`[data-category=${category}]`)) break;
+        }
+      }
       await click(`[data-category=${category}]`);
     };
     root = createRoot(find('#root'));
     preview.setState({ camera: 'Hands', zoom: 1.2 });
     await act(async () => root.render(h(Harness, { initial: DEFAULT_CHARACTER })));
-    assert.deepEqual([...document.querySelectorAll('[data-category]')].map(button => button.dataset.category),
-      ['outfits', 'saved', 'layers', 'underwear', 'corsets', 'tops', 'bottoms', 'footwear', 'headwear', 'bows', 'accessories', 'props']);
+    const groups = [...document.querySelectorAll('[role=tab][data-wardrobe-group]')];
+    assert.deepEqual(groups.map(button => button.textContent), ['Outfits', 'Clothing', 'Accessories']);
+    const sets = [['outfits', 'saved'], ['layers', 'underwear', 'corsets', 'tops', 'bottoms', 'footwear'], ['headwear', 'bows', 'accessories', 'props']];
+    for (const [index, group] of groups.entries()) {
+      await act(async () => group.click());
+      assert.equal(group.getAttribute('aria-selected'), 'true');
+      assert.deepEqual([...document.querySelectorAll('[data-category]')].map(button => button.dataset.category), sets[index]);
+    }
+    await act(async () => groups[0].click());
     assert.equal(find('.dressing-camera-block').previousElementSibling, find('.dressing-wardrobe'));
     assert.equal(find('.dressing-room-title').nextElementSibling, find('.dressing-camera-shortcuts'));
     assert(find('[data-wearable-quick-select="corset"]'));
@@ -212,8 +226,8 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(find('.dressing-catalog').hidden, true);
     assert.equal(find('.dressing-catalog [data-wardrobe-item]'), null, 'entering the fitting room mounts only visible wardrobe controls');
     assert.equal(find('.dressing-details').hidden, true);
-    assert.equal(find('.dressing-catalog').parentElement, find('.dressing-categories').parentElement, 'catalog shares the left wardrobe rail');
-    assert.equal(preview.getState().camera, 'Full body');
+    assert.equal(find('.dressing-catalog').parentElement, find('.dressing-categories').parentElement, 'catalog and categories share one inspector');
+    assert.equal(preview.getState().camera, 'Hands', 'entering the wardrobe and browsing groups preserves the current character shot');
     const assertPiece = piece => {
       assert.equal(preview.getState().camera, 'Selected item');
       assert.equal(preview.getState().selectedPiece, piece);
@@ -278,7 +292,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
         const grade = status === 'passed' ? 'Alpha Pass' : status === 'near-pass' ? 'Alpha — Nearly Passing' : 'Under Development';
         assert.equal(card.dataset.alphaStatus, status, `${item.id} has the correct project alpha grade`);
         assert.equal(card.querySelector('.dressing-alpha-badge').textContent, grade);
-        assert.equal(card.disabled, false, 'development and unavailable items remain inspectable');
+        assert.equal(card.getAttribute('aria-disabled'), 'false', 'development and unavailable items remain inspectable');
         const availability = item.id === missingImport ? /Pack not installed/
           : item.id === revisedImport ? /Revised model/ : /Try-on/;
         assert.match(card.textContent, availability);
@@ -407,10 +421,13 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     const first = find('[aria-label="Complete outfits"] [data-wardrobe-item]');
     first.focus();
     const memory = new WeakMap();
-    assert.equal(first.parentElement.dataset.controllerColumns, '1');
+    const outfitTiles = first.parentElement.querySelectorAll('[data-wardrobe-item]');
+    assert.equal(first.parentElement.dataset.controllerColumns, '2');
     navigateFormRows(find('#root'), first, 'right', memory);
-    assert.equal(document.activeElement, first, 'right stays on the only item in the row');
-    navigateFormRows(find('#root'), first, 'down', memory);
+    assert.equal(document.activeElement, outfitTiles[1] ?? first, 'right moves within the two-column outfit grid');
+    const lastTile = outfitTiles[outfitTiles.length - 1];
+    lastTile.focus();
+    navigateFormRows(find('#root'), lastTile, 'down', memory);
     assert.equal(document.activeElement.closest('.dressing-section').getAttribute('aria-label'), 'Sleepwear');
     await click('[data-wardrobe-item=medieval-05]');
     assert.equal(changes.at(-1).outfit, 'medieval-05');
@@ -546,9 +563,10 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     assert.equal(trials.at(-1).garments.bracer, 'bracer-01');
 
     assertPiece('corset');
+    const lastZoom = preview.getState().zoom;
     await act(async () => root.unmount()); root = null;
-    assert.equal(preview.getState().camera, 'Hands', 'leaving restores the previous camera');
-    assert.equal(preview.getState().zoom, 1.2);
+    assertPiece('corset');
+    assert.equal(preview.getState().zoom, lastZoom, 'leaving keeps the current shot for the next transition');
 
     root = createRoot(find('#root'));
     await act(async () => root.render(h(Harness, { initial: DEFAULT_CHARACTER })));

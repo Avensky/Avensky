@@ -9,6 +9,8 @@ import {HeroAbilities} from "./heroes/HeroAbilities";
 import {openHeroGuide} from "../store/hud/heroGuideStore";
 import { CombatHUD } from "../combat/CombatHUD";
 import { HeroLoadoutSync } from "./heroes/HeroLoadoutSync";
+import { loadedGarageWorkshop, loadGarageWorkshop } from "./heroes/loadGarageWorkshop";
+import { MenuLoadingStatus } from "../components/menus/MenuLoadingStatus";
 import type { CharacterChoice } from "./characters/characterCatalog";
 import type { CharacterTab } from "./characters/CharacterPage";
 import { useCharacterPreviewStore } from "./characters/characterPreviewStore";
@@ -38,7 +40,7 @@ import { useRenderSettingsStore } from "../store/presentation/renderSettingsStor
 import { ModeSelection } from "./alpha/ModeSelection";
 import { QueueScreen } from "./alpha/QueueScreen";
 
-const HeroWorkshop = lazy(() => import("./heroes/HeroWorkshop").then(module => ({ default: module.HeroWorkshop })));
+const LazyWorkshop = lazy(loadGarageWorkshop);
 const HeroSelection = lazy(() => import("./alpha/HeroSelection").then(module => ({ default: module.HeroSelection })));
 
 const WorldBuilderPanel = lazy(() =>
@@ -56,6 +58,24 @@ const DebugMenu = lazy(() => import("../components/debugger/DebugMenu").then(mod
 const DrivingOverlay = lazy(() => import("../ui/DrivingHUD").then(module => ({ default: module.DrivingOverlay })));
 
 
+function GarageWorkshopScene({ entry }: { entry: "wardrobe" | "vehicle" | null }) {
+  const Workshop = loadedGarageWorkshop() ?? LazyWorkshop;
+  const [tab, setTab] = useState<CharacterTab | null>(entry === "wardrobe" ? "appearance" : null);
+  const [draft, setDraft] = useState<CharacterChoice | null>(null);
+  const [roomReady, setRoomReady] = useState(false);
+  const camera = useCharacterPreviewStore(s => s.camera);
+  const emote = useCharacterPreviewStore(s => s.emote?.id);
+  const insideCar = useCharacterPreviewStore(s => s.insideCar);
+  return <>
+    <Workshop onCharacterViewChange={setTab} onCharacterPreviewChange={setDraft} />
+    <FullCanvas preview roomReady={roomReady}>
+      <VehiclePreview previewScreen="heroes" heroLayout awaitingHero onRoomReadyChange={setRoomReady}
+        characterDraft={draft} wardrobeOpen={tab !== null} fittingRoom={tab === "appearance"}
+        characterOnly={tab !== null && !characterEmoteNeedsGarage(tab, camera, emote, insideCar)} />
+    </FullCanvas>
+  </>;
+}
+
 export function GameUI() {
   useAlphaFlow();
   const hud = useRenderSettingsStore((s) => s.hud);
@@ -72,20 +92,13 @@ export function GameUI() {
     window.history.replaceState(null, "", url);
     useUIStore.getState().setScreen("social");
   }, [socialReady]);
-  const menuPreview = screen === "heroes" || screen === "hero_select" || screen === "mode_select"
+  const menuPreview = screen === "hero_select" || screen === "mode_select"
     || screen === "sandbox_setup";
   const previewScreen = menuPreview ? screen : null;
   const needsCanvas = previewScreen !== null || screen === "sandbox"
     || screen === "world_builder";
   const heroOwner = useSocialStore(s=>s.view?.profile.id??s.profileOwner??"guest");
-  const [characterTab, setCharacterTab] = useState<CharacterTab | null>(null);
-  const [characterDraft, setCharacterDraft] = useState<CharacterChoice | null>(null);
-  const previewCamera = useCharacterPreviewStore(s => s.camera);
-  const previewEmoteId = useCharacterPreviewStore(s => s.emote?.id);
-  const previewInsideCar = useCharacterPreviewStore(s => s.insideCar);
-  // Opening the Emotes panel must not swap the model onto a moving vehicle
-  // stage; only actual garage interaction shots need that environment.
-  const vehicleEmote = characterEmoteNeedsGarage(characterTab, previewCamera, previewEmoteId, previewInsideCar);
+  const station = useUIStore(s => s.workshopEntry);
   const [collapsed, setCollapsed] = useState(false);
   const [roomReady, setRoomReady] = useState(false);
 
@@ -99,8 +112,10 @@ export function GameUI() {
       <HeroLoadoutSync />
       <MinimapSessionLifecycle />
       <CtfMissionLifecycle />
-      {screen === "heroes" && <Suspense fallback={<div role="status" className="menu-loading">Opening Heroes…</div>}>
-        <HeroWorkshop key={heroOwner} onCharacterViewChange={setCharacterTab} onCharacterPreviewChange={setCharacterDraft} />
+      {screen === "heroes" && <Suspense fallback={<div className="garage-menu-notice">
+        <MenuLoadingStatus>Opening {station === "vehicle" ? "Vehicle" : station === "wardrobe" ? "Wardrobe" : "garage"}…</MenuLoadingStatus>
+      </div>}>
+        <GarageWorkshopScene key={heroOwner} entry={station} />
       </Suspense>}
       {/* Requires Canvas */}
       {needsCanvas && (
@@ -114,11 +129,7 @@ export function GameUI() {
               onRoomReadyChange={setRoomReady}
               previewScreen={previewScreen}
               heroLayout={previewScreen !== "sandbox_setup"}
-              awaitingHero={previewScreen === "hero_select" || previewScreen === "heroes"}
-              characterDraft={screen === "heroes" ? characterDraft : null}
-              wardrobeOpen={screen === "heroes" && characterTab !== null}
-              characterOnly={screen === "heroes" && characterTab !== null && !vehicleEmote}
-              fittingRoom={screen === "heroes" && characterTab === "appearance"}
+              awaitingHero={previewScreen === "hero_select"}
             />
           )}
           {(screen === "world_builder" || screen === "sandbox") && (

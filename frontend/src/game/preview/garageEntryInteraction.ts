@@ -1,6 +1,9 @@
+import { createGarageOrbitIdle } from "./garageOrbitIdle.ts";
+
 export type EntryMotion = {
   yaw: number; pitch: number; dragging: boolean; lastInput?: number; dragStarted?: number; targetYaw?: number; targetPitch?: number;
-  stickYaw?: number; stickPitch?: number;
+  stickActive?: boolean;
+  idle?: ReturnType<typeof createGarageOrbitIdle>;
   invalidate?: () => void;
 };
 
@@ -11,6 +14,13 @@ export const MAX_PITCH = .09;
 
 /** Input lives with the room, so grabbing during GLB loading cancels the entrance offset too. */
 export function installGarageEntryInteraction(motion: EntryMotion, interactivePreview: () => boolean, getActor?: () => ActorInput | undefined) {
+  motion.idle = createGarageOrbitIdle(() => {
+    motion.targetYaw = undefined;
+    motion.targetPitch = undefined;
+    // An on-demand room may have drawn its previous frame before the entire hold.
+    motion.lastInput = performance.now();
+    motion.invalidate?.();
+  });
   let pointer: { id: number; x: number; y: number; actor?: ActorInput } | null = null;
   let idleTimer = 0;
   let lastActivity = 0;
@@ -54,6 +64,7 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     root.setPointerCapture(event.pointerId);
     event.preventDefault();
     if (hit) return;
+    motion.idle?.cancel();
     motion.dragging = true;
     motion.dragStarted = performance.now();
     motion.lastInput = motion.dragStarted;
@@ -86,8 +97,8 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
       event.preventDefault(); event.stopImmediatePropagation();
     }
     if (!pointer || pointer.id !== event.pointerId) return;
+    if (motion.dragging && (motion.targetYaw || motion.targetPitch)) motion.idle?.arm();
     pointer = null; motion.dragging = false;
-    motion.targetYaw = undefined; motion.targetPitch = undefined;
     motion.lastInput = performance.now();
     if (root.hasPointerCapture(event.pointerId)) root.releasePointerCapture(event.pointerId);
     motion.invalidate?.();
@@ -119,13 +130,39 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) {
       pointer = null; motion.dragging = false; wakePointer = undefined;
-      motion.targetYaw = undefined; motion.targetPitch = undefined;
+      if (motion.targetYaw || motion.targetPitch) motion.idle?.arm();
     } else {
       motion.lastInput = performance.now();
       wake();
       if (motion.yaw || motion.pitch) motion.invalidate?.();
     }
   }, { signal: scope.signal });
-  scope.signal.addEventListener("abort", () => window.clearTimeout(idleTimer), { once: true });
+  scope.signal.addEventListener("abort", () => {
+    window.clearTimeout(idleTimer);
+    motion.idle?.cancel();
+    motion.idle = undefined;
+  }, { once: true });
   return scope;
+}
+
+/** Integrate deflection so slowly letting go also keeps the chosen angle. */
+export function moveGarageOrbitStick(motion: EntryMotion, x: number, y: number, elapsed: number) {
+  const active = Boolean(x || y);
+  if (motion.dragging || !active && !motion.stickActive) return;
+  if (active) {
+    if (!motion.stickActive) {
+      motion.lastInput = performance.now();
+      motion.idle?.cancel();
+    }
+    const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, (motion.targetYaw ?? motion.yaw) - x * MAX_YAW * 2 * elapsed));
+    const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, (motion.targetPitch ?? motion.pitch) + y * MAX_PITCH * 2 * elapsed));
+    motion.stickActive = true;
+    if (yaw === motion.targetYaw && pitch === motion.targetPitch) return;
+    motion.targetYaw = yaw;
+    motion.targetPitch = pitch;
+    motion.invalidate?.();
+  } else {
+    motion.stickActive = false;
+    if (motion.targetYaw || motion.targetPitch) motion.idle?.arm();
+  }
 }

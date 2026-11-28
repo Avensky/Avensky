@@ -1,6 +1,6 @@
 import {useUIStore} from "../../store/menus/uiStore";
 import { useEffect, type RefObject } from "react";
-import { isTypingTarget, type MenuAction } from "../../controls/inputRouting";
+import { isTypingTarget, menuActionForKey, type MenuAction } from "../../controls/inputRouting";
 
 type Handlers = {
   confirm: () => void;
@@ -8,13 +8,14 @@ type Handlers = {
   direction: (action: MenuAction) => void;
   tab: (direction: number) => void;
   option?: (direction: number) => void;
+  navigateOptionFields?: boolean;
 };
 
 /** Controller confirm uses the screen's primary action. A focused tab or Back
  * button keeps its keyboard action, and chat owns its input while open. */
 export function useSelectionNavigation(
   root: RefObject<HTMLElement | null>,
-  { confirm, back, direction, tab, option }: Handlers,
+  { confirm, back, direction, tab, option, navigateOptionFields = false }: Handlers,
 ) {
   useEffect(() => {
     const action = (next: MenuAction, keyboard = false) => {
@@ -64,35 +65,15 @@ export function useSelectionNavigation(
         event.stopPropagation();
         return;
       }
-      if (
-        isTypingTarget(event.target) ||
-        (event.target as HTMLElement).closest(".lobby-chat")
-      )
-        return;
-      const key = (
-        {
-          ArrowUp: "up",
-          ArrowDown: "down",
-          ArrowLeft: "left",
-          ArrowRight: "right",
-          Numpad8: "up",
-          Numpad2: "down",
-          Numpad4: "left",
-          Numpad6: "right",
-          Enter: "activate",
-          Space: "activate",
-          Escape: "back",
-          KeyQ: "previous_tab",
-          KeyE: "next_tab",
-          PageUp: "previous_tab",
-          PageDown: "next_tab",
-          Digit1: "previous_option",
-          Digit3: "next_option",
-          Numpad1: "previous_option",
-          Numpad3: "next_option",
-        } as Record<string, MenuAction>
-      )[event.code || event.key];
+      const target = event.target as HTMLElement;
+      if (target.closest(".lobby-chat")) return;
+      const key = menuActionForKey(event);
       if (!key) return;
+      if (isTypingTarget(target)) {
+        // Text entry and native picker activation keep their browser semantics.
+        const optionField = navigateOptionFields && target.matches('select,input[type="range"],input[type="color"]');
+        if (!optionField || key === "activate" || key === "back") return;
+      }
       event.preventDefault();
       event.stopPropagation();
       if (!event.repeat || ["up", "down", "left", "right"].includes(key))
@@ -105,5 +86,5 @@ export function useSelectionNavigation(
       window.removeEventListener("avenlab:panel-action", panel);
       element?.removeEventListener("keydown", keyboard);
     };
-  }, [root, confirm, back, direction, tab, option]);
+  }, [root, confirm, back, direction, tab, option, navigateOptionFields]);
 }

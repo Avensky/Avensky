@@ -94,8 +94,14 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       await click('.character-emote-back');
     };
     const browseWardrobe = async category => {
-      const back = find('[data-wardrobe-back]');
-      if (back && !back.closest('[hidden]')) await click('[data-wardrobe-back]');
+      if (!find('.dressing-details').hidden) await click('.dressing-details .menu-back-button');
+      if (!find('.dressing-catalog').hidden) await click('[data-wardrobe-back]');
+      if (!find(`[data-category=${category}]`)) {
+        for (const group of document.querySelectorAll('[data-wardrobe-group]')) {
+          await act(async () => group.click());
+          if (find(`[data-category=${category}]`)) break;
+        }
+      }
       await click(`[data-category=${category}]`);
     };
     const select = (label, value) => act(async () => {
@@ -112,11 +118,13 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const cameraTools = 'button[aria-label="Camera tools"]';
     const cameraView = label => [...document.querySelectorAll('[aria-label="Preview camera"] button, .dressing-wearable-shortcuts button')]
       .find(button => button.getAttribute('aria-label') === label);
-    const chooseCameraView = label => act(async () => {
+    const chooseCameraView = async label => {
+      if (cameraView(label)?.closest('.dressing-camera-shortcuts [hidden]'))
+        await click('.dressing-camera-shortcuts [aria-label="Camera angles"]');
       const button = cameraView(label);
       assert(button && !button.closest('[hidden]'), `${label} is an available camera view`);
-      button.click();
-    });
+      await act(async () => button.click());
+    };
     const move = action => act(async () => route(action));
     const title = () => find('.menu-frame-header h1').textContent;
 
@@ -831,7 +839,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
   }
 });
 
-test('spatial garage stations open the equipped dressing room and vehicle studio with a direct return', async () => {
+test('spatial garage stations open the wardrobe and vehicle chooser, inspect their options and return', async () => {
   const {close} = characterTestDom();
   let vite, root;
   try {
@@ -842,16 +850,91 @@ test('spatial garage stations open the equipped dressing room and vehicle studio
     const {useUIStore: ui} = await load('store/menus/uiStore.ts');
     const {useSocialStore: social} = await load('store/social/socialStore.ts');
     const {useHeroLoadouts: loadouts} = await load('vehicles/cosmetics/heroLoadouts.ts');
+    const {usePreferencesStore: prefs} = await load('store/preferences/preferencesStore.ts');
     const {routeMenuAction} = await load('controls/inputRouting.ts');
     social.setState({view:{profile:{id:'driver',progression:{character:DEFAULT_CHARACTER,default_hero:'brz'}}}});
     loadouts.getState().adopt('driver','brz');
     const {createRoot} = await import('react-dom/client');
     root = createRoot(document.getElementById('root'));
-    for (const [entry, selector] of [['wardrobe', '.dressing-room-title'], ['vehicle', '#vehicle-studio-tab-panel']]) {
+    const key = code => act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', {code, bubbles:true, cancelable:true})));
+    const controller = action => act(async () => routeMenuAction(action));
+    for (const [entry, selector] of [['wardrobe', '.dressing-room-title'], ['vehicle', '.hero-workshop-picker[data-vehicle-picker]']]) {
+      prefs.setState({menuHeaderStyle:entry === 'wardrobe' ? 'angled' : 'classic'});
       ui.getState().setScreen('heroes',entry);
       await act(async () => root.render(h(HeroWorkshop, {key:entry})));
       assert.ok(document.querySelector(selector), entry + ' opened its editor');
-      await act(async () => routeMenuAction('back'));
+      const tabs = [...document.querySelectorAll('.menu-frame-header [data-controller-tab-only] [role=tab], .hero-workshop > [data-controller-tab-only] [role=tab]')];
+      const originalTab = tabs.find(tab => tab.getAttribute('aria-selected') === 'true');
+      const backButton = document.querySelector('.menu-frame-header [data-header-back]');
+      const rightActions = document.querySelectorAll('.menu-frame-header [data-selection-action]:not(:disabled)');
+      assert.equal(document.activeElement, originalTab);
+      await act(async () => tabs[0].click());
+      await key('KeyQ');
+      assert.equal(document.activeElement, backButton, 'Q focuses Back without leaving');
+      await controller('previous_tab');
+      assert.equal(document.activeElement, rightActions[rightActions.length - 1], 'LB wraps to the outermost right action');
+      assert.equal(tabs[0].getAttribute('aria-selected'), 'true', 'focusing a header action preserves the current section');
+      await key('KeyE');
+      assert.equal(document.activeElement, backButton);
+      await controller('next_tab');
+      await controller('next_tab');
+      assert.equal(document.activeElement, tabs[1]);
+      assert.equal(tabs[1].getAttribute('aria-selected'), 'true', 'section activates on bumper navigation');
+      await key('KeyS');
+      const contentStart = document.activeElement;
+      assert.ok(contentStart.closest('.hero-workshop-body, .hero-workshop-actions'), 'WASD enters the options');
+      await key('KeyW');
+      assert.equal(document.activeElement, contentStart, 'up at the first content row stays in the body');
+      await act(async () => originalTab.click());
+      if (entry === 'wardrobe') {
+        const group = () => document.querySelector('[data-wardrobe-group][aria-selected=true]').textContent;
+        assert.equal(group(), 'Outfits');
+        await act(async () => routeMenuAction('next_option'));
+        assert.equal(group(), 'Clothing');
+        await act(async () => routeMenuAction('previous_option'));
+        await act(async () => document.querySelector('[data-category=outfits]').click());
+        const outfit = document.querySelector('[data-wardrobe-item=dockwear]');
+        for (const detail of [1, 0]) {
+          const touch = (element, type) => element.dispatchEvent(new window.PointerEvent(type, {
+            bubbles: true, cancelable: true, pointerType: 'touch', button: 0, detail,
+          }));
+          await act(async () => { touch(outfit, 'pointerdown'); touch(outfit, 'pointerup'); });
+          assert.equal(document.querySelector('.dressing-wardrobe').hidden, true, 'item details replace the catalog');
+          const shoes = document.querySelector('.dressing-details [data-dressing-piece=shoes]');
+          assert.ok(shoes, 'the inspector now has a different action under the tapping finger');
+          await act(async () => assert.equal(touch(shoes, 'click'), false, 'the release belongs to the original outfit tile'));
+          await act(async () => routeMenuAction('back'));
+          assert.equal(document.activeElement, outfit, 'Back restores the outfit in the original category');
+        }
+        await act(async () => routeMenuAction('back'));
+        assert.equal(document.activeElement.dataset.category, 'outfits');
+      } else {
+        const chosen = () => document.querySelector('[data-hero][aria-pressed=true]')?.dataset.hero;
+        assert.equal(chosen(), 'brz');
+        await act(async () => document.querySelector('[data-hero="camaro"]').click());
+        assert.equal(chosen(), 'camaro');
+        assert.equal(loadouts.getState().defaultHero, 'brz', 'previewing a portrait preserves the equipped main');
+        assert.equal(document.querySelector('.vehicle-studio'), null);
+        await act(async () => [...document.querySelectorAll('.hero-workshop-actions [type=button]')].find(item => item.textContent.includes('Customize')).click());
+        assert.equal(document.getElementById('vehicle-appearance-tab-paint').getAttribute('aria-selected'), 'true');
+        document.querySelector('input[aria-label="Metallic reflection strength"]').focus();
+        await key('KeyE');
+        assert.equal(document.activeElement.id, 'vehicle-studio-tab-performance', 'Q/E leaves an option field for primary sections');
+        await key('KeyQ');
+        assert.equal(document.activeElement.id, 'vehicle-studio-tab-paint');
+        await act(async () => routeMenuAction('next_option'));
+        assert.equal(document.getElementById('vehicle-appearance-tab-body').getAttribute('aria-selected'), 'true');
+        await act(async () => routeMenuAction('previous_option'));
+        assert.equal(document.getElementById('vehicle-appearance-tab-paint').getAttribute('aria-selected'), 'true');
+        await act(async () => routeMenuAction('back'));
+        assert.equal(chosen(), 'camaro', 'Back restores the previewed vehicle');
+        assert.equal(loadouts.getState().defaultHero, 'brz');
+      }
+      const firstSection = document.querySelector('.menu-frame-header [data-controller-tab-only] [role=tab], .hero-workshop > [data-controller-tab-only] [role=tab]');
+      await act(async () => {firstSection.click(); firstSection.focus();});
+      await controller('previous_tab');
+      assert.ok(document.activeElement.hasAttribute('data-header-back'));
+      await controller('activate');
       assert.equal(ui.getState().screen,'main');
       await act(async () => root.render(null));
     }

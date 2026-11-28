@@ -124,35 +124,6 @@
 .garage-preview-buttons .menu-control{min-height:28px;padding:0 7px;font-size:clamp(9px,1.7vw,12px);white-space:nowrap;}
 .garage-drive-status{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);white-space:nowrap;padding:3px 7px;background:var(--app-background);color:var(--app-text);font-size:11px;pointer-events:none;}
 .hero-workshop .hero-guide-scroll{pointer-events:auto;}
-.vehicle-studio--abilities .hero-guide-body {
- display:grid;
- grid-template-columns:var(--vehicle-studio-column) minmax(0,1fr) var(--vehicle-studio-column);
- grid-template-rows:minmax(0,1fr);
- width:100%;
- min-width:0;
- min-height:0;
- max-width:none;
- margin:0;
- padding:0;
-}
-.vehicle-studio--abilities :is(.hero-guide-overview,.hero-guide-details) {
- min-width:0;
- max-height:100%;
- overflow:auto;
- overscroll-behavior:contain;
- scrollbar-width:thin;
- pointer-events:auto;
-}
-.vehicle-studio--abilities .hero-guide-details {grid-column:3;display:flex;}
-.vehicle-studio--abilities .hero-guide-showcase {grid-template-columns:minmax(0,1fr);}
-.vehicle-studio--abilities :is(.hero-weapon-grid,.hero-ability-grid,.hero-effect-grid) {grid-template-columns:minmax(0,1fr);}
-.vehicle-studio--abilities :is(.hero-guide-overview,.hero-guide-details) .menu-panel-frame {
- --menu-panel-fill:var(--vehicle-studio-panel);
-}
-@media(max-width:760px) {
- .vehicle-studio.vehicle-studio--abilities {--vehicle-studio-column:min(30vw,220px);}
- .vehicle-studio--abilities ~ .hero-garage-controls {width:38%;flex-direction:column;}
-}
 .hero-workshop .hero-main-portrait-badge{position:absolute;right:3px;bottom:3px;display:flex;align-items:center;gap:3px;padding:0;background:transparent;color:white;font-size:7px;text-shadow:0 1px 3px #000,0 0 4px #000;pointer-events:none;}
 .hero-workshop .hero-main-portrait-badge :is(.controller-key,.keyboard-key){width:13px;min-width:13px;height:13px;min-height:13px;padding:0;font-size:9px;}
 .hero-workshop .hero-portrait-art{background:var(--app-raised);}
@@ -222,3 +193,47 @@
 .hero-workshop .garage-hide-toggle{position:static;flex:none;width:32px;height:30px;min-height:30px;display:grid;place-items:center;padding:0;pointer-events:auto;}
 .hero-workshop.hero-workshop--hidden{visibility:hidden;pointer-events:none;}
 .hero-workshop--hidden .garage-hide-toggle{visibility:visible;pointer-events:auto;}
+
+.hero-workshop-picker[data-vehicle-picker] {
+  --hero-panel-width: min(41%, 30rem);
+  column-gap: clamp(6px, 1vw, 14px);
+}
+.hero-workshop-picker[data-vehicle-picker] > .hero-roster {
+  align-self: center;
+  max-height: calc(100% - 12px);
+  margin: 6px;
+}
+.hero-workshop-picker[data-vehicle-picker] .hero-roster-grid {
+  grid-auto-rows: max-content;
+  align-content: start;
+  gap: 5px;
+}
+.hero-workshop-picker .vehicle-choice {
+  --menu-panel-fill: var(--garage-menu-row);
+  display: grid; grid-template-rows: minmax(0,1fr) auto;
+  min-height: 56px; text-align: center; touch-action: pan-y;
+}
+.hero-workshop-picker .vehicle-choice .hero-portrait-art {
+  width: 100%; height: auto; aspect-ratio: 1.65; background: transparent;
+}
+.vehicle-choice .vehicle-choice-name {
+  padding: 3px 0; font: 650 clamp(.75rem,1.15vw,1rem)/1.15 system-ui; color: var(--garage-menu-ink);
+}
+.vehicle-choice .vehicle-choice-main {
+  position: absolute; top: 3px; right: 5px;
+  color: var(--garage-menu-ink); font-size: 1rem; text-shadow: 0 1px 3px #000;
+}
+.hero-workshop-picker .vehicle-choice:is([aria-pressed="true"],[data-pressing],:focus-visible) {
+  --hero-card-edge: var(--garage-menu-accent); --hero-card-edge-width: 2px;
+}
+.hero-workshop-picker .vehicle-choice[aria-pressed="true"] { --menu-panel-fill: var(--garage-menu-selected); }
+.hero-workshop:has([data-vehicle-picker]) .hero-workshop-actions > .controller-action { min-height: 44px; }
+@media (orientation: portrait) and (max-width:760px) {
+  .hero-workshop-picker[data-vehicle-picker] {
+    grid-template-columns: minmax(0,1fr); grid-template-rows: minmax(0,1fr) auto;
+  }
+  .hero-workshop-picker[data-vehicle-picker] > .hero-roster {
+    grid-area: 2 / 1; align-self: end; max-height: min(43dvh,27rem);
+    margin: 4px max(10px,3vw);
+  }
+}

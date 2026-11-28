@@ -63,7 +63,7 @@ export function welcomeUsesMenuStick() {
 export function hasSecondaryMenuControls(ui: ReturnType<typeof useUIStore.getState>) {
   if (ui.overlay) return ui.overlay === "match_results";
   if (ui.screen === "main" && useGarageEditor.getState().page === "room") return true;
-  if (ui.screen === "mode_select") return true;
+  if (ui.screen === "mode_select" || ui.screen === "heroes") return true;
   return ui.screen === "welcome" && Boolean(welcomeMenuPanel?.querySelector("[data-creator-channel]"));
 }
 

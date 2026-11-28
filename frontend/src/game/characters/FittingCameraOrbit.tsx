@@ -3,7 +3,9 @@ import { useThree, type ThreeEvent } from "@react-three/fiber";
 import { useFittingTurnStore } from "./fittingControlsStore";
 
 /** The camera-facing surface is behind the model, so a direct hit still turns the character. */
-export function FittingCameraOrbit({ onDrag }: { onDrag: (x: number, y: number) => void }) {
+export function FittingCameraOrbit({ onDrag, onDragEnd }: {
+  onDrag: (x: number, y: number) => void; onDragEnd?: () => void;
+}) {
   const drag = useRef<{ pointerId: number; x: number; y: number; travel: number } | null>(null);
   const connected = useThree(state => state.events.connected);
 
@@ -11,7 +13,11 @@ export function FittingCameraOrbit({ onDrag }: { onDrag: (x: number, y: number) 
     if (!connected) return;
     // Fiber clears its own capture on these events without dispatching to the mesh.
     const cancel = (event: Event) => {
-      if (drag.current?.pointerId === (event as PointerEvent).pointerId) drag.current = null;
+      const pointer = drag.current;
+      if (pointer && pointer.pointerId === (event as PointerEvent).pointerId) {
+        drag.current = null;
+        if (pointer.travel > 3) onDragEnd?.();
+      }
     };
     connected.addEventListener("pointercancel", cancel);
     connected.addEventListener("lostpointercapture", cancel);
@@ -19,11 +25,14 @@ export function FittingCameraOrbit({ onDrag }: { onDrag: (x: number, y: number) 
       connected.removeEventListener("pointercancel", cancel);
       connected.removeEventListener("lostpointercapture", cancel);
     };
-  }, [connected]);
+  }, [connected, onDragEnd]);
 
   function end(event: ThreeEvent<PointerEvent>) {
     if (drag.current?.pointerId !== event.pointerId) return;
-    if (drag.current.travel > 3) useFittingTurnStore.setState({ suppressClickUntil: performance.now() + 250 });
+    if (drag.current.travel > 3) {
+      useFittingTurnStore.setState({ suppressClickUntil: performance.now() + 250 });
+      onDragEnd?.();
+    }
     drag.current = null;
     const target = event.target as Element;
     if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);

@@ -1,3 +1,4 @@
+import { GameButton } from "../../components/GameButton";
 import {MenuTabButton} from "../../components/menus/MenuTabButton";
 import {
   HEROES,
@@ -11,6 +12,7 @@ import { heroMatchesFilter } from "./heroRoleFilters";
 
 export function HeroRoster({
   selected,
+  onConfirmPreview,
   main,
   filter,
   busy,
@@ -21,6 +23,7 @@ export function HeroRoster({
   showFilters = true,
 }: {
   selected: string | null;
+  onConfirmPreview?: (hero: string) => void;
   main?: string | null;
   filter: HeroFilter;
   busy: boolean;
@@ -47,7 +50,21 @@ export function HeroRoster({
       >
         {visibleHeroes.length === 0 && <span className="hero-roster-empty" role="status">{filter === "air" ? "AIR VEHICLES ARRIVING" : "NO VEHICLES IN THIS CLASS"}</span>}
         {visibleHeroes.map(
-          (hero) => (
+          (hero) => onConfirmPreview ? (
+            <GameButton key={hero.id} variant="custom" className="hero-portrait-card menu-panel-frame vehicle-choice"
+              data-hero={hero.id} data-grid-item data-role={hero.role} data-unavailable={false}
+              aria-label={hero.name + (main === hero.id ? " · Main vehicle" : "")}
+              aria-pressed={selected === hero.id} disabled={busy} pressFeedback
+              onFocusCapture={event => {
+                event.currentTarget.scrollIntoView?.({ block: "nearest", inline: "nearest" });
+                if (!busy && selected !== hero.id) onChoose(hero.id);
+              }}
+              onPress={() => selected === hero.id ? onConfirmPreview(hero.id) : onChoose(hero.id)}>
+              <HeroPortrait hero={hero.id} cacheOnly showStyleStatus={false} />
+              <span className="vehicle-choice-name">{hero.name}</span>
+              {main === hero.id && <span className="vehicle-choice-main" aria-hidden="true">✓</span>}
+            </GameButton>
+          ) : (
             <button
               key={hero.id}
               type="button"
@@ -69,7 +86,7 @@ export function HeroRoster({
             </button>
           ),
         )}
-        {(filter === "all" || filter === "support") && ["mechanic", "logistics"].filter(id => !HEROES.some(hero => hero.id === id)).map(slot =>
+        {!onConfirmPreview && (filter === "all" || filter === "support") && ["mechanic", "logistics"].filter(id => !HEROES.some(hero => hero.id === id)).map(slot =>
           <span key={slot} className="hero-roster-vacancy" role="img" aria-label="Unassigned support vehicle" />
         )}
       </div>

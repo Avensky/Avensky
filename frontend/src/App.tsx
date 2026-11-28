@@ -32,7 +32,7 @@ export default function App() {
     ? welcomeCharacter : equipped && { choice: equipped, mode: welcome ? "roster" : "main" };
   const showGarageBackdrop = useUIStore(state =>
     state.isModeLoading || state.overlay === "team_lineup" || (state.screen !== "sandbox" && state.screen !== "world_builder"));
-  const rotate = mobilePortrait && !welcome && screen !== "main" && !holdingGarage;
+  const rotate = mobilePortrait && !welcome && screen !== "main" && screen !== "heroes" && !holdingGarage;
   useAppTheme();
 
   useEffect(() => {

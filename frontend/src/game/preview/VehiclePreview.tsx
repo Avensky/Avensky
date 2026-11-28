@@ -1,3 +1,4 @@
+import { copyGarageView, showroomZoom, type ShowroomBounds } from "./workshopFraming";
 import { useUIStore, type MenuScreen } from "../../store/menus/uiStore";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { MathUtils, Matrix4, Quaternion, Spherical, Vector2, Vector3, type Group, type Object3D, type PerspectiveCamera as ThreePerspectiveCamera } from "three";
@@ -16,7 +17,8 @@ import { PreviewTurntable } from "./PreviewTurntable";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
 import { useSocialStore } from "../../store/social/socialStore";
 import { usePlayerCharacter } from "../characters/localOutfits";
-import { clothingFrame, cutToFittingView, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
+import { clothingFrame, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
+import { createGarageOrbitIdle } from "./garageOrbitIdle";
 import { FittingCameraOrbit } from "../characters/FittingCameraOrbit";
 import { FittingMirrorDisplay } from "../characters/FittingMirrorDisplay";
 import { GARAGE_LEAN_ID } from "../characters/garageLean";
@@ -75,7 +77,7 @@ function createPreviewAim() {
     anchors: new Map<string, Object3D>(), cameraMin: new Vector3(), cameraMax: new Vector3(),
     renderedVehicle: undefined as string | undefined, renderedView: "", drivingSetShot: undefined as string | undefined, inStation: false, held: false,
     heldPosition: new Vector3(), heldTarget: new Vector3(), heldOffset: new Vector2(), heldFov: 0, heldNear: 0,
-    initializedCamera: null as ThreePerspectiveCamera | null, missingActorShot: false,
+    initializedCamera: null as ThreePerspectiveCamera | null,
   };
 }
 
@@ -104,7 +106,7 @@ export function VehiclePreview({
   const garageView = useGarageDrive(s => workshop && !wardrobeOpen ? garageCamera(s) : "Showroom");
   const garageStation = useGarageDrive(s => garageOpen && s.stage !== "idle");
   const stationActive = garageStation && !wardrobeOpen;
-  const panelsHidden = useGarageDrive(s => wardrobeOpen && s.panelsHidden);
+  const panelsHidden = useGarageDrive(s => workshop && s.panelsHidden);
   const zoom = usePreviewZoom(s => !wardrobeOpen && (workshop || screen === "hero_select") ? PREVIEW_ZOOM_LEVELS[s.level] : 1);
   const sandboxPicker = screen === "hero_select" && mode === "sandbox";
   const driverStage = workshop || ["mode_select", "hero_select", "queue", "sandbox_setup"].includes(screen);
@@ -155,18 +157,43 @@ export function VehiclePreview({
   const compact = isCompactPreview(width);
   const requestFrame = useThree(s => s.invalidate);
   const cameraRef = useRef<ThreePerspectiveCamera>(null);
+  // Drei adopts the inspection camera after mounting. Keep the outgoing room camera for the return trip.
+  const getCanvas = useThree(s => s.get);
+  const [mountedCamera] = useState(() => getCanvas?.().camera as ThreePerspectiveCamera | undefined);
+  const roomCamera = workshop && mountedCamera?.userData.hasGarageFrame ? mountedCamera : null;
+  useLayoutEffect(() => {
+    const inspector = cameraRef.current;
+    if (!inspector || !roomCamera || inspector === roomCamera) return;
+    copyGarageView(roomCamera, inspector);
+    return () => {
+      copyGarageView(inspector, roomCamera);
+      roomCamera.userData.returnedFromWorkshop = true;
+    };
+  }, [roomCamera]);
   const characterActor = useRef<Group>(null);
   const motion = useRef<Group>(null);
   const cameraAim = useRef<ReturnType<typeof createPreviewAim>>(null);
   const fittingOrbit = useRef<{ yaw: number; pitch: number; sphere: Spherical }>(null);
   if (cameraAim.current === null) cameraAim.current = createPreviewAim();
   if (fittingOrbit.current === null) fittingOrbit.current = { yaw: 0, pitch: 0, sphere: new Spherical() };
-  const fittingOrbitEnabled = wardrobeOpen && characterOnly;
+  const exteriorInspection = workshop && !wardrobeOpen && !stationActive && !closeShot;
+  const fittingOrbitEnabled = wardrobeOpen && characterOnly || exteriorInspection;
+  const orbitIdle = useRef<ReturnType<typeof createGarageOrbitIdle> | null>(null);
+  useLayoutEffect(() => {
+    if (!fittingOrbitEnabled) return;
+    const idle = createGarageOrbitIdle(() => {
+      const rotation = fittingOrbit.current!;
+      rotation.yaw = rotation.pitch = 0;
+      requestFrame();
+    });
+    orbitIdle.current = idle;
+    return () => { idle.cancel(); orbitIdle.current = null; };
+  }, [fittingOrbitEnabled, requestFrame]);
+  const finishOrbit = useCallback(() => orbitIdle.current?.arm(), []);
   const orbitCamera = (x: number, y: number) => {
     const rotation = fittingOrbit.current!;
     const sensitivity = usePreferencesStore.getState().cameraSensitivity * .006;
-    // The wardrobe background may orbit a little, but never put the camera
-    // outside the room. Rotate the character pivot for the full 360-degree view.
+    // Orbit the room within its walls. Direct subject drags retain the full turntable rotation.
     rotation.yaw = MathUtils.clamp(rotation.yaw - x * sensitivity, -Math.PI / 3, Math.PI / 3);
     rotation.pitch = MathUtils.clamp(rotation.pitch - y * sensitivity, -.45, .45);
     cameraAim.current!.held = false;
@@ -216,11 +243,12 @@ export function VehiclePreview({
     const wardrobe = wardrobeOpen ? useCharacterPreviewStore.getState() : null;
     const emotesInGarage = Boolean(wardrobe && !characterOnly &&
       (import.meta.env.DEV || import.meta.env.MODE === "staging"));
-    const area = !insideCar && !panelsHidden ? wardrobe?.viewport : null;
+    const area = workshop && !closeShot && !panelsHidden ? useCharacterPreviewStore.getState().viewport : null;
     const viewKey = wardrobe ? `wardrobe:${wardrobe.camera}:${wardrobe.focusRevision}:${insideCar}:${characterOnly}` : `garage:${garageView}`;
     const firstFrame = aim.initializedCamera !== camera;
     const viewChanged = aim.renderedView !== viewKey;
-    if (fittingOrbitEnabled && (firstFrame || viewChanged)) {
+    if (firstFrame || viewChanged) {
+      orbitIdle.current?.cancel();
       rotation.yaw = 0;
       rotation.pitch = 0;
     }
@@ -315,16 +343,26 @@ export function VehiclePreview({
         position.copy(target).add(offset);
       }
     }
+    if (area?.width && area.height && !wardrobeOpen && garageView === "Showroom" && !stationActive && vehicleId === settledVehicle && vehicleResult?.available) {
+      const bounds = findPreviewAnchor(aim.anchors, turntable, "selection-vehicle-glb")?.userData.showroomBounds as ShowroomBounds | undefined;
+      if (bounds && bounds.radius > 0) {
+        target.y = bounds.centerY;
+        const depth = position.distanceTo(target);
+        const elevation = Math.asin(MathUtils.clamp((position.y - target.y) / depth, -1, 1));
+        lensZoom *= Math.min(1, showroomZoom(bounds, depth, elevation, fov, height, area.width, area.height));
+      }
+    }
+    if (firstFrame && roomCamera && !reducedMotion) {
+      aim.initializedCamera = camera;
+      pivot.set(0, 0, -1).applyQuaternion(camera.quaternion)
+        .multiplyScalar(Math.max(.1, camera.position.distanceTo(target))).add(camera.position);
+      invalidate();
+      return;
+    }
     // Garments can temporarily remove their anchor while the replacement GLB
     // loads. Preserve the last *visible* frame rather than jumping to the
     // default camera behind the garage and blending back through its walls.
-    if (missingActorShot && !firstFrame) {
-      position.copy(camera.position);
-      target.copy(pivot);
-      lensZoom = camera.zoom;
-    }
-    const actorShotRestored = aim.missingActorShot && !missingActorShot;
-    aim.missingActorShot = missingActorShot;
+    if (missingActorShot && !firstFrame) return;
     if (aim.held) {
       position.copy(aim.heldPosition);
       target.copy(aim.heldTarget);
@@ -332,7 +370,7 @@ export function VehiclePreview({
       if (wardrobe?.camera === "Whole car" && !insideCar) lensZoom = wardrobe.zoom;
     }
     const orbiting = fittingOrbitEnabled && (rotation.yaw !== 0 || rotation.pitch !== 0);
-    if (orbiting) rotation.pitch = orbitFittingCamera(position, target, rotation.yaw, rotation.pitch, rotation.sphere);
+    if (orbiting && !aim.held) rotation.pitch = orbitFittingCamera(position, target, rotation.yaw, rotation.pitch, rotation.sphere);
     let boundedCamera = false;
     // A newly selected outfit resets the orbit. Its default framing and the
     // transition from the previous shot still need to stay inside the room.
@@ -348,12 +386,14 @@ export function VehiclePreview({
       }
     }
     const garageOffset = workshop && !wardrobeOpen && !closeShot && garageTab !== "abilities" ? .07 : 0;
-    const offsetX = aim.held ? aim.heldOffset.x * width : area?.width ? width / 2 - (area.left + area.width / 2) : width * (sandboxPicker ? .15 : garageOffset);
-    const offsetY = aim.held ? aim.heldOffset.y * height : area?.height ? height / 2 - (area.top + area.height / 2) : wardrobeOpen && !panelsHidden ? height * .055 : heroLayout && aspect < 1 ? -height * .04 : 0;
+    const offsetX = panelsHidden ? 0 : area?.width ? width / 2 - (area.left + area.width / 2)
+      : aim.held ? aim.heldOffset.x * width : width * (sandboxPicker ? .15 : garageOffset);
+    const offsetY = panelsHidden ? 0 : area?.height ? height / 2 - (area.top + area.height / 2)
+      : aim.held ? aim.heldOffset.y * height : wardrobeOpen ? height * .055 : heroLayout && aspect < 1 ? -height * .04 : 0;
     aim.initializedCamera = camera;
     const drivingSetCut = drivingSetShot && drivingSetShot !== aim.drivingSetShot;
     aim.drivingSetShot = drivingSetShot;
-    const blend = firstFrame || reducedMotion || drivingSetCut || cutToFittingView(wardrobeOpen, viewChanged, actorShotRestored)
+    const blend = firstFrame || reducedMotion || drivingSetCut
       ? 1 : 1 - Math.exp(-(closeShot ? 2.8 : 4.5) * Math.min(delta, .1));
     if (blend === 1) {
       pivot.copy(target);
@@ -369,8 +409,8 @@ export function VehiclePreview({
     }
     if (boundedCamera) camera.position.clamp(aim.cameraMin, aim.cameraMax);
     camera.quaternion.setFromRotationMatrix(lookAt.lookAt(camera.position, pivot, camera.up));
-    const currentX = camera.view?.offsetX ?? offsetX;
-    const currentY = camera.view?.offsetY ?? offsetY;
+    const currentX = camera.view?.offsetX ?? (roomCamera ? 0 : offsetX);
+    const currentY = camera.view?.offsetY ?? (roomCamera ? 0 : offsetY);
     const cameraFov = aim.held ? aim.heldFov : fov;
     const cameraNear = aim.held ? aim.heldNear : near;
     const reframing = Math.abs(currentX - offsetX) > .01 || Math.abs(currentY - offsetY) > .01
@@ -394,10 +434,10 @@ export function VehiclePreview({
       {fittingRoom && roomReady && <FittingMirrorDisplay />}
       {loadLabel && <PreviewLoadingStatus label={loadLabel} />}
       <PerspectiveCamera ref={cameraRef} name="garage-preview-camera" makeDefault>
-        {fittingOrbitEnabled && <FittingCameraOrbit onDrag={orbitCamera} />}
+        {fittingOrbitEnabled && <FittingCameraOrbit onDrag={orbitCamera} onDragEnd={finishOrbit} />}
       </PerspectiveCamera>
 
-      <PreviewTurntable onReady={setTurntable} spin={showPlatform && !wardrobeOpen && !stationary && !reducedMotion && garageView === "Showroom"}
+      <PreviewTurntable onReady={setTurntable} inspectExterior={exteriorInspection} spin={showPlatform && !wardrobeOpen && !stationary && !reducedMotion && garageView === "Showroom"}
         locked={!vehicleId || characterOnly || stationActive && garageView !== "Showroom"} restoreAngle={wardrobeOpen}>
         <group rotation={[0, Math.PI / 2, 0]}>
           <group ref={motion}>
@@ -413,7 +453,7 @@ export function VehiclePreview({
                   cockpit={!characterOnly && (vehicleEmotes || garageOpen) ? vehicleFit?.cockpit : undefined} />
               </GaragePanelTarget.Provider>
             </group>}
-            {vehicleId && <AssetBoundary
+            {vehicleId && (!characterOnly || settledVehicle === vehicleId) && <AssetBoundary
               key={vehicleId}
               fallback={unavailable}
             >

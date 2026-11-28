@@ -21,7 +21,7 @@ import { GarageExitApron } from "./GarageExitApron";
 import { useSocialStore } from "../../store/social/socialStore";
 import { GarageMenuMarkers } from "./garageMenuMarkers";
 import { GarageMenuFurnishings } from "./GarageMenuFurnishings";
-import { MAX_PITCH, MAX_YAW } from "./garageEntryInteraction";
+import { moveGarageOrbitStick } from "./garageEntryInteraction";
 import { PreviewContactShadow } from "./PreviewContactShadow";
 import { bindRosterSticks } from "./rosterStickControls";
 import { ROSTER_HEADING, rosterCamera, type CharacterGarageShot, type CharacterGarageView, type CreatorFrame } from "./rosterCamera";
@@ -168,18 +168,15 @@ export function RosterGaragePreview({ choice, mode, creatorFrame, creatorEmotes 
   useLayoutEffect(() => {
     const motion = getGarageMotion();
     if (driving || departure || editorFrame) {
-      motion.stickYaw = motion.stickPitch = 0;
+      moveGarageOrbitStick(motion, 0, 0, 0);
       return;
     }
     return bindRosterSticks((x, y, turn, elapsed) => {
-      const yaw = -x * MAX_YAW, pitch = y * MAX_PITCH;
-      if (yaw !== (motion.stickYaw ?? 0) || pitch !== (motion.stickPitch ?? 0)) {
-        if (!motion.stickYaw && !motion.stickPitch || !yaw && !pitch) motion.lastInput = performance.now();
-        motion.stickYaw = yaw;
-        motion.stickPitch = pitch;
-        motion.invalidate?.();
+      moveGarageOrbitStick(motion, x, y, elapsed);
+      if (turn) {
+        motion.idle?.activity();
+        shot.actor?.turn(turn * elapsed * 2.6);
       }
-      if (turn) shot.actor?.turn(turn * elapsed * 2.6);
     });
   }, [shot, driving, departure, editorFrame]);
   return null;

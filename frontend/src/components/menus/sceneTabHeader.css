@@ -329,3 +329,19 @@
     gap: 1px 4px;
   }
 }
+
+/* The station overlay owns its safe areas. Keep the shared brand and section
+   tabs in the layout while letting touches on the empty header reach the room. */
+header.garage-station-header.garage-entry-header.angled-tab-header {
+  position: relative;
+  top: 0;
+  flex: none;
+  margin-inline-start: calc(-1 * env(safe-area-inset-left, 0px));
+  pointer-events: none;
+}
+.garage-station-header > :is(.tabbed-angled-scroll, .menu-header-actions) { pointer-events: auto; }
+.garage-station-header .tabbed-angled-scroll { max-width: 100%; }
+.garage-station-header .angled-header-tabs { max-width: none; }
+.garage-station-header .garage-entry-brand-back:is(:hover, :focus-visible, [data-pressing]) {
+  --angled-title-fill: var(--app-raised);
+}
