@@ -1,9 +1,8 @@
 import { PreviewCameraViewIcon, type PreviewCameraSelectProps } from "../preview/PreviewCameraSelect";
 import { GameButton } from "../../components/GameButton";
 import { PREVIEW_BOOT_ICON, PREVIEW_HAND_ICON, PreviewCameraChoiceIcon } from "../preview/PreviewToolIcon";
-import type { CharacterChoice } from "./characterCatalog";
-import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
-import { CLOTHING_PIECES, clothingPieceLabel, wornClothing, type ClothingPiece } from "./clothingPieces";
+import { useCharacterPreviewStore } from "./characterPreviewStore";
+import { CLOTHING_PIECES, type ClothingPiece } from "./clothingPieces";
 
 const PIECE_ICONS: Record<ClothingPiece, string> = {
   corset: "M5 5l3 2 4 1 4-1 3-2-2 9 1 5-6 2-6-2 1-5zm4 4 6 7m0-7-6 7",
@@ -32,38 +31,34 @@ const PIECE_ICONS: Record<ClothingPiece, string> = {
   bracer: "M8 5h8l1 14H7zM8 9h8m-8 4h8m-9 4h10",
 };
 
-const topToBottom = [...CLOTHING_PIECES].sort((a, b) => b.center - a.center).map(piece => piece.id);
+const topToBottom = [...CLOTHING_PIECES].sort((a, b) => b.center - a.center);
 
-export function FittingCameraSelect<View extends string>({ choice, views, view, viewLabels, onViewChange,
-  onSelectPiece = focusClothingPiece, allowReselect = false, driver = false }: PreviewCameraSelectProps<View> & {
-  choice?: CharacterChoice;
-  onSelectPiece?: (piece: ClothingPiece) => void;
+type CameraProps<View extends string> = Pick<PreviewCameraSelectProps<View>, "views" | "viewLabels" | "onViewChange" | "allowReselect"> & {
+  view: string;
   driver?: boolean;
-}) {
+  clothing?: { worn: readonly ClothingPiece[]; onSelect: (piece: ClothingPiece) => void };
+};
+
+export function FittingCameraSelect<View extends string>({ views, view, viewLabels, onViewChange,
+  allowReselect = false, driver = false, clothing }: CameraProps<View>) {
   const selected = useCharacterPreviewStore(state => state.selectedPiece);
-  const worn = choice ? wornClothing(choice) : [];
-  return <div className="fitting-camera-select" role="group" aria-label="Preview camera">
-    <div className="fitting-camera-choices" role="group" aria-label="Views" data-controller-row data-controller-columns="1">
-      {views.filter(item => item !== "Selected item").map(item => {
-        const name = viewLabels?.[item] ?? item;
-        return <GameButton key={item} variant="menu" className="fitting-tool-icon" pressFeedback
-          title={name} aria-label={name} aria-pressed={item === view} data-camera-choice={item}
-          onPress={() => { if (allowReselect || view !== item) onViewChange(item); }}>
-          <PreviewCameraViewIcon view={item} driver={driver} />
-        </GameButton>;
-      })}
-    </div>
-    {worn.length > 0 && <div className="dressing-wearable-shortcuts" role="group" aria-label="Clothing close-ups"
-      data-controller-row data-controller-columns="1">
-      {topToBottom.filter(piece => worn.includes(piece)).map(piece => {
-        const name = clothingPieceLabel(piece);
-        return <GameButton key={piece} variant="menu" className="fitting-tool-icon" pressFeedback
-          title={name} aria-label={name} aria-pressed={view === "Selected item" && selected === piece}
-          data-camera-choice={`piece:${piece}`} data-wearable-quick-select={piece}
-          onPress={() => { if (allowReselect || view !== "Selected item" || selected !== piece) onSelectPiece(piece); }}>
-          <PreviewCameraChoiceIcon path={PIECE_ICONS[piece]} />
-        </GameButton>;
-      })}
-    </div>}
+  return <div className="fitting-camera-choices" role="group" aria-label="Preview camera"
+    data-controller-row data-controller-columns="auto">
+    {views.map(item => {
+      const name = viewLabels?.[item] ?? item;
+      return <GameButton key={item} variant="menu" className="fitting-tool-icon" pressFeedback
+        title={name} aria-label={name} aria-pressed={item === view} data-camera-choice={item}
+        onPress={() => { if (allowReselect || view !== item) onViewChange(item); }}>
+        <PreviewCameraViewIcon view={item} driver={driver} />
+      </GameButton>;
+    })}
+    {clothing && topToBottom.filter(piece => clothing.worn.includes(piece.id)).map(({ id, label }) => {
+      const active = view === "Selected item" && selected === id;
+      return <GameButton key={id} variant="menu" className="fitting-tool-icon" pressFeedback
+        title={label} aria-label={label} aria-pressed={active} data-camera-choice={`piece:${id}`}
+        data-wearable-quick-select={id} onPress={() => { if (allowReselect || !active) clothing.onSelect(id); }}>
+        <PreviewCameraChoiceIcon path={PIECE_ICONS[id]} />
+      </GameButton>;
+    })}
   </div>;
 }

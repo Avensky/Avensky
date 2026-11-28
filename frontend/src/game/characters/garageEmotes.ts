@@ -613,7 +613,8 @@ export function emoteCollection(group: EmoteGroup, bag: boolean, includeWalks = 
   if (group === "Starter") return availableStarterEmotes(bag);
   if (group === "Starter Comedy") return STARTER_COMEDY_EMOTES;
   if (group === "Race Reactions") return availableRaceReactions(bag);
-  if (bag) return [garageBreathing(true), ...GARAGE_EMOTES.slice(1).filter(item => compatibleGarageEmotes(item.id)), ...BAG_EMOTES, ...SELECTION_EMOTES];
+  if (bag) return [garageBreathing(true), ...GARAGE_EMOTES.slice(1).filter(item => compatibleGarageEmotes(item.id)),
+    ...BAG_EMOTES, ...SELECTION_EMOTES, ...(includeWalks ? [LOOK_AWAY_EMOTE] : [])];
   return [...GARAGE_EMOTES, ...SELECTION_EMOTES, ...(includeWalks ? [LOOK_AWAY_EMOTE, ...WALK_EMOTES] : [])];
 }
 

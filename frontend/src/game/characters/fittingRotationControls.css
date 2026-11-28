@@ -6,11 +6,15 @@
   z-index: 2;
   pointer-events: none;
 }
-:is(.character-page--profile, .character-page--account) > .fitting-rotation-grid { grid-column: 2; }
+.character-page:is(.character-page--profile, .character-page--account) { position: relative; }
+:is(.character-page--profile, .character-page--account) > .fitting-rotation-grid { grid-column: 1 / -1; }
+/* Keep the account sheet in the stage row, clear of its playback controls. */
+:is(.character-page--profile, .character-page--account) > .alpha-account-panel { grid-row: 1 / 2; bottom: 0; }
 .character-page--emotes > .fitting-rotation-grid { grid-area: 3 / 2; }
 .fitting-rotation-grid .fitting-rotation-button {
   display: grid;
   place-items: center;
+  flex: 0 0 44px;
   width: 44px;
   height: 44px;
   padding: 0;
@@ -31,14 +35,19 @@
   background: color-mix(in srgb, var(--app-panel) 65%, transparent);
 }
 .fitting-rotation-button[data-rotation="garage"] { color: var(--app-accent); }
-.fitting-rotation-button:is(:focus-visible, [data-pressing], :active):not([aria-disabled="true"]) svg {
+.fitting-rotation-button:is(:focus-visible, [data-pressing], [aria-pressed="true"], :active):not([aria-disabled="true"]) svg {
   border-color: var(--app-accent);
   background: var(--app-raised);
 }
 @media (hover: hover) {
   .fitting-rotation-button:hover:not([aria-disabled="true"]) svg { border-color: var(--app-accent); }
 }
-@media (orientation: portrait) and (max-width: 480px) {
-  .character-page--emotes > .fitting-rotation-grid { grid-column: 1 / -1; }
+@media (max-width: 520px) {
+  :is(.character-page--emotes, .character-page--setup) > .fitting-rotation-grid { grid-column: 1 / -1; }
+  .character-page--setup > .character-controls { grid-row-end: 2; }
   .character-page--editor.character-page--emotes :is(.character-controls--left, .character-controls--right) { grid-row-end: 3; }
+}
+@media (orientation: landscape) and (max-width: 520px) {
+  :is(.character-page--dressing, .character-page--details, .character-page--body) > .fitting-rotation-grid { grid-column: 1 / -1; }
+  .character-page--editor > :is(.dressing-wardrobe, .dressing-details, .character-details, .character-body-style) { grid-row-end: 2; }
 }

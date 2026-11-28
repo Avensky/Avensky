@@ -9,8 +9,9 @@ To change selection-stage placement, edit previewPlacement.ts / garagePlacement.
 Garage and Wardrobe share camera icons through `PreviewCameraViewIcon`.
 Vehicle views use `PreviewCameraSelect` inside the `PreviewCameraAngles`
 popover, which owns keyboard focus, Escape and controller Back. Wardrobe uses
-`FittingCameraSelect` for the vertical rail of body shots and garment close-ups.
-Its inner rotation controls turn the actor, and the outer pair orbit the room.
+`FittingCameraSelect` for its camera rail. Landscape phones show two columns.
+The center control pauses or resumes the pose, its neighbors turn the actor,
+and the outer pair orbit the room.
 Adjust shared control styles in
 `previewControls.css` and palette colors in the [theme catalog](../../theme/README.md).
 

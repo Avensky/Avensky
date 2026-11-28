@@ -136,8 +136,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       setValue.call(input, String(value));
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
-    const poseTools = '[aria-label="Pose tools"]';
-    const posePanel = () => document.getElementById(find(poseTools).getAttribute('aria-controls'));
+    const cameraViewNames = () => [...document.querySelectorAll('.dressing-camera-shortcuts [data-camera-choice]')]
+      .map(button => button.getAttribute('aria-label'));
     const cameraView = label => [...document.querySelectorAll('[data-camera-choice]')]
       .find(button => button.getAttribute('aria-label') === label);
     const chooseCameraView = async label => {
@@ -315,6 +315,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(document.activeElement, identityControl);
     assert.equal(identityControl.getAttribute('aria-selected'), 'true');
     assert.equal(identityControl.tabIndex, 0);
+    assert.deepEqual(cameraViewNames(), ['Full body', 'Hair', 'Face', 'Eyes', 'Makeup', 'Hands']);
     const panel = document.getElementById(identityControl.getAttribute('aria-controls'));
     assert.equal(panel.getAttribute('role'), 'tabpanel');
     assert.equal(panel.getAttribute('aria-labelledby'), identityControl.id);
@@ -329,6 +330,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyE', bubbles: true, cancelable: true })));
     assert.equal(document.activeElement, find('#character-editor-tab-appearance'));
     await click('#character-editor-tab-details');
+    assert.deepEqual(cameraViewNames(), ['Full body', 'Face', 'Hands']);
     const detailTraits = () => [...document.querySelectorAll('.character-details dd')].map(node => node.textContent);
     assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
     assert.equal(find('.character-details select, .character-details [data-character-option], [aria-label="Character identity"]'), null);
@@ -343,7 +345,10 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));
     assert(find('[aria-label="Emote collection"]').closest('.character-controls--left'));
     assert.equal(find('[data-character-option]'), null, 'Emotes uses the active character model');
-    assert(cameraView('Full body') && !cameraView('Full body').closest('[hidden]'), 'Emotes exposes the character camera rail');
+    const emoteViews = ['Full body', 'Face', 'Hands'];
+    if (preview.getState().cockpitVehicle) emoteViews.push('Whole car');
+    assert.deepEqual(cameraViewNames(), emoteViews);
+    assert(!cameraView('Full body').closest('[hidden]'), 'Emotes exposes the character camera rail');
     assert(find('.dressing-preview-zoom [aria-label="Hide interface"]'));
     assert.equal(find('select[aria-label="Preview camera"]'), null);
     await openEmotes();
@@ -352,6 +357,27 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set.call(input, value);
       input.dispatchEvent(new Event('input', { bubbles: true }));
     });
+    const gestures = [
+      ['Look away', 'look-away'], ['Check makeup', 'makeup-check'],
+      ['Redo lipstick', 'redo-lipstick'], ['Apply eyeliner', 'apply-eyeliner'],
+    ];
+    for (const [label, id] of gestures) {
+      await searchMotions(label);
+      const matches = document.querySelectorAll(`[aria-label="Emote results"] [data-emote-id="${id}"]`);
+      assert.equal(matches.length, 1, label + ' appears once in Emotes');
+      await playEmote(`[data-emote-id="${id}"]`);
+      assert.equal(preview.getState().emote?.id, id);
+      if (id !== 'look-away') assert.equal(preview.getState().camera, 'Face');
+    }
+    const playing = preview.getState().emote;
+    const playbackButton = find('[aria-label="Pause pose"]');
+    playbackButton.focus();
+    await move('activate');
+    assert.equal(preview.getState().playbackPaused, true, 'controller confirm pauses an active emote');
+    assert.equal(preview.getState().emote, playing);
+    await move('activate');
+    assert.equal(preview.getState().playbackPaused, false);
+    assert.equal(preview.getState().emote, playing, 'resuming continues the same emote instance');
     await searchMotions('shy hello');
     assert(find('[data-emote-id="033"]'), 'finds Half hidden greeting from the default Gestures page');
     assert.equal(find('[data-emote-id="010"]'), null, 'all search terms must match');
@@ -413,6 +439,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id] .emote-name').textContent, 'Steering test · Right');
     assert.equal(find('[aria-label="Driving emotes"] button:first-child').disabled, false);
     const cameraAngles = 'button[aria-label="Camera angles"]';
+    assert.deepEqual(cameraViewNames(), ['Driver', 'Whole vehicle']);
     assert.equal(cameraView('Driver').getAttribute('aria-pressed'), 'true');
     await chooseCameraView('Whole vehicle');
     await click('[aria-label="Driving emotes"] .character-emote-row:last-child [data-emote-id]');
@@ -452,7 +479,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(cameraView('Glasses').getAttribute('aria-pressed'), 'true');
     assert.equal(find('[aria-label="Clothing piece"]'), null, 'the camera selector also inspects clothing');
     assert(find('.dressing-camera-shortcuts [aria-label="Preview camera"]'), "camera shortcuts stay on the wardrobe rail");
-    assert(posePanel().hidden, 'additional pose actions start collapsed');
+    const railControls = [...find('.dressing-camera-shortcuts').querySelectorAll('button, [role=button]')];
+    assert(railControls.every(button => button.hasAttribute('data-camera-choice')), 'only camera presets are on the camera rail');
     const fittingZoom = '.dressing-preview-zoom input[aria-label="Preview zoom"][aria-orientation="vertical"]';
     assert(find(fittingZoom));
     await slide(fittingZoom, 1.2);
@@ -463,28 +491,30 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.ok(preview.getState().focusRevision > inspectionRevision, 'reset requests a fresh framing of the shot');
     assert.equal(preview.getState().camera, 'Selected item');
     assert.equal(preview.getState().selectedPiece, 'glasses', 'reset returns to the current inspection target');
-    await click(poseTools);
-    assert.equal(posePanel().hidden, false);
-    assert(posePanel().contains(document.activeElement), 'keyboard activation focuses a pose action');
-    assert.equal(posePanel().textContent.trim(), '', 'the pose tools use labeled icons');
-    await click('[aria-label="Look away"]');
-    assert.equal(preview.getState().emote?.id, 'look-away', 'wardrobe can play the glance on its own stage');
-    await act(async () => preview.setState({ emote: null }));
-    for (const [label, id] of [['Check makeup', 'makeup-check'], ['Redo lipstick', 'redo-lipstick'], ['Apply eyeliner', 'apply-eyeliner']]) {
-      await click(`[aria-label="${label}"]`);
-      assert.equal(preview.getState().emote?.id, id);
-      assert.equal(preview.getState().camera, 'Face');
-    }
-    await act(async () => preview.setState({ emote: null, camera: 'Full body' }));
     assert(cameraView('Glasses').querySelector('svg'), 'the clothing close-up has a labeled icon');
-    await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', {
-      key: 'Escape', code: 'Escape', bubbles: true, cancelable: true,
-    })));
-    assert(posePanel().hidden);
-    assert.equal(document.activeElement, find(poseTools));
     assert.equal(cameraView('Whole car'), undefined);
-    assert.deepEqual([...document.querySelectorAll('[aria-label="Rotate character and garage"] [data-rotation]')].map(button => button.getAttribute('aria-label')),
-      ['Rotate garage left', 'Rotate character left', 'Rotate character right', 'Rotate garage right']);
+    const rotationBar = find('[aria-label="Rotation and pose playback"]');
+    const rotationButtons = [...rotationBar.querySelectorAll('[role=button], button')];
+    assert.deepEqual(rotationButtons.map(button => button.getAttribute('aria-label')),
+      ['Rotate garage left', 'Rotate character left', 'Pause pose', 'Rotate character right', 'Rotate garage right']);
+    const transport = rotationButtons[2];
+    const beforePause = preview.getState().emote;
+    await act(async () => transport.click());
+    assert.equal(preview.getState().playbackPaused, true);
+    assert.equal(transport.getAttribute('aria-label'), 'Resume pose');
+    assert.equal(transport.getAttribute('aria-pressed'), 'true');
+    await act(async () => transport.click());
+    assert.equal(preview.getState().playbackPaused, false);
+    assert.equal(transport.getAttribute('aria-label'), 'Pause pose');
+    assert.equal(transport.getAttribute('aria-pressed'), 'false');
+    assert.equal(preview.getState().emote, beforePause, 'pause and resume preserve the current motion');
+    const { usePreferencesStore: preferences } = await load('store/preferences/preferencesStore.ts');
+    await act(async () => preferences.setState({ reducedMotion: true }));
+    assert.equal(transport.getAttribute('aria-disabled'), 'true');
+    await act(async () => transport.click());
+    assert.equal(preview.getState().playbackPaused, false, 'Reduced Motion keeps the manual playback setting intact');
+    await act(async () => preferences.setState({ reducedMotion: false }));
+    assert.equal(transport.getAttribute('aria-label'), 'Pause pose');
     await chooseCameraView('Full body');
     assert.equal(preview.getState().camera, 'Full body');
     await chooseCameraView('Glasses');
@@ -495,10 +525,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const palette = document.getElementById(paletteToggle.getAttribute('aria-controls'));
     assert.equal(palette.childElementCount, 0, 'the closed palette keeps its panel ID without mounting swatches');
     assert.equal(paletteToggle.textContent, '', 'the toolbar uses a swatch icon');
-    await click(poseTools);
     await click('[aria-label="Open clothing colors"]');
     assert.equal(find('.dressing-color-panel').hidden, false);
-    assert(posePanel().hidden, 'opening colors closes the pose tools');
     const initialMain = find('input[aria-label="Custom main color"]').value;
     await click('button[aria-label="Accent color: Crimson"]');
     assert.equal(find('input[aria-label="Custom main color"]').value, initialMain);
@@ -578,6 +606,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(drafts.at(-1).prop, 'shop-bag');
     await click('#character-editor-tab-emotes');
     await openEmotes();
+    await chooseEmoteGroup('All');
+    for (const [label, id] of gestures) {
+      await searchMotions(label);
+      assert.equal(document.querySelectorAll(`[aria-label="Emote results"] [data-emote-id="${id}"]`).length, 1,
+        label + ' stays searchable with a bag equipped');
+    }
     await chooseEmoteGroup('Garage');
     assert.equal(find(cockpitToggle).disabled, false, 'a prop never prevents driving previews');
     assert([...document.querySelectorAll('.character-emotes [data-emote-id]')].some(button => button.querySelector('.emote-name')?.textContent === 'Lift the bag'));
@@ -875,7 +909,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     for (const passenger of [false, true]) {
       await act(async () => preview.setState({ cockpitVehicle: 'brz', cockpitAvailable: true, insideCar: true,
         brzPassenger: passenger, brzExitSupported: true, brzExitReady: false, brzExiting: false }));
-      const exit = () => find(`button[aria-label="Get out of ${passenger ? 'passenger' : 'driver'} seat"]`);
+      const exit = () => namedButton(`Get out of ${passenger ? 'passenger' : 'driver'} seat`);
+      assert(exit().closest('[aria-label="Emote filters"]'), 'cockpit exit stays in the station controls');
       assert.equal(exit().disabled, true, 'wait until the seated pose is ready');
       await act(async () => preview.setState({ brzExitReady: true }));
       await act(async () => exit().click());
@@ -962,6 +997,23 @@ test('spatial garage stations open the wardrobe and vehicle chooser, inspect the
       await act(async () => originalTab.click());
       if (entry === 'wardrobe') {
         assert.equal(document.querySelector('.screen-notice small'), null, 'switching wardrobe tabs leaves the entry notice dismissed');
+        const viewButtons = [...document.querySelectorAll('.dressing-camera-shortcuts [data-camera-choice]')];
+        const choices = viewButtons[0].closest('[data-controller-row]');
+        assert.equal(choices.dataset.controllerColumns, 'auto', 'the camera grid follows the column count on screen');
+        assert(viewButtons.every(button => button.closest('[data-controller-row]') === choices));
+        // jsdom has no layout. Supply the bounds of the two columns on a landscape phone.
+        viewButtons.forEach((button, i) => {
+          button.getBoundingClientRect = () => new window.DOMRect((i % 2) * 44, Math.floor(i / 2) * 44, 44, 44);
+        });
+        viewButtons[0].focus();
+        await controller('right');
+        assert.equal(document.activeElement, viewButtons[1]);
+        await controller('down');
+        assert.equal(document.activeElement, viewButtons[3], 'Down crosses from standard shots to clothing in the same column');
+        await key('ArrowLeft');
+        assert.equal(document.activeElement, viewButtons[2]);
+        await key('ArrowUp');
+        assert.equal(document.activeElement, viewButtons[0]);
         const slider = document.querySelector('.preview-zoom-slider[aria-label="Preview zoom"]');
         const initialZoom = preview.getState().zoom;
         slider.focus();

@@ -5,7 +5,7 @@ import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
 import { FittingAngleRail } from "./FittingCameraToolbar";
 import { useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from "react";
 import { CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterStyleField } from "./characterCatalog";
-import { focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
+import { CHARACTER_CAMERAS, focusClothingPiece, useCharacterPreviewStore } from "./characterPreviewStore";
 import { UNDERBUST_WARDROBE_SET, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS, corsetModelUrl, hasSeparateWardrobeTop, hasTuckedUnderbust, hasUnderbustCut, resolveWardrobe, withWardrobeWaist, type WardrobeChoice } from "./wardrobe";
 import { ClothingColorToolbar } from "./ClothingColorToolbar";
 import { braFitsWith, clothingPieceLabel, UNDERWEAR_PIECES, underwearColors, wornClothing, type ClothingPiece, type UnderwearPiece } from "./clothingPieces";
@@ -116,13 +116,13 @@ function inspectWardrobe(focus: WardrobeFocus) {
 
 /** One live scene; browsing the catalog never changes or saves the equipped look. */
 export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onTryOn, onLoad = onTryOn,
-  equipPreview, onDiscardPreview, onEndPreview, poseTools, navigation, onColors = onChange }: {
+  equipPreview, onDiscardPreview, onEndPreview, navigation, onColors = onChange }: {
   navigation?: Ref<WardrobeNavigation>;
   choice: CharacterChoice; onChange: (choice: CharacterChoice) => void;
   onPreviewOutfit?: (choice: CharacterChoice) => void; onTryOn: (choice: CharacterChoice) => void;
   equipPreview?: { disabled: boolean; hint?: string; onEquip: () => void };
   onDiscardPreview?: () => void;
-  onLoad?: (choice: CharacterChoice) => void; onEndPreview?: () => void; poseTools?: ReactNode;
+  onLoad?: (choice: CharacterChoice) => void; onEndPreview?: () => void;
   onColors?: (choice: CharacterChoice) => void;
 }) {
   const [category, setCategory] = useState<Category>("outfits");
@@ -503,7 +503,7 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
     inspectWornPiece(piece);
   }
 
-  function selectCameraView(view: "Full body" | "Face" | "Hands") {
+  function selectCameraView(view: typeof CHARACTER_CAMERAS[number]) {
     focusView(view);
     if (view === "Full body") {
       const dress = getWardrobeGarment(garments?.dress);
@@ -629,11 +629,9 @@ export function DressingRoom({ choice, onChange, onPreviewOutfit = onChange, onT
       {!inspected && <>{pieceColors}{previewActions}</>}
     </aside>
     <div className="dressing-camera-block">
-      <FittingAngleRail tools={poseTools}>
-        <FittingCameraSelect views={["Full body", "Face", "Hands"] as const} choice={choice} allowReselect
-          view={camera} onViewChange={view => {
-            if (view === "Full body" || view === "Face" || view === "Hands") selectCameraView(view);
-          }} onSelectPiece={selectWornPiece} />
+      <FittingAngleRail>
+        <FittingCameraSelect views={CHARACTER_CAMERAS} view={camera} onViewChange={selectCameraView}
+          allowReselect clothing={{ worn: pieces, onSelect: selectWornPiece }} />
       </FittingAngleRail>
     </div>
     <aside ref={detailsRef} className="dressing-details" id={detailsId} aria-label="Item details" hidden={!inspected}>

@@ -5,10 +5,10 @@ import { create } from "zustand";
 import type { WardrobePortrait } from "../preview/portraitFraming";
 import type { VehicleModelId } from "../../vehicles/tools/vehicleModelPaths";
 
-export const CHARACTER_CAMERAS = ["Full body", "Selected item", "Face", "Hands", "Whole car"] as const;
+export const CHARACTER_CAMERAS = ["Full body", "Face", "Hands"] as const;
 export const CHARACTER_ZOOM_MIN = .8;
 export const CHARACTER_ZOOM_MAX = 1.25;
-type Camera = typeof CHARACTER_CAMERAS[number] | WardrobePortrait;
+type Camera = typeof CHARACTER_CAMERAS[number] | WardrobePortrait | "Selected item" | "Whole car";
 
 const featureCameras = {
   hairstyle: "Hair", hair: "Hair", eyes: "Eyes", brows: "Eyes",
