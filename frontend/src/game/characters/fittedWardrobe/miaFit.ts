@@ -1,14 +1,19 @@
 import { BufferGeometry, DoubleSide, MathUtils, Ray, SkinnedMesh, type Intersection, type Object3D } from "three";
 import { wardrobeCoverageSurface } from "../wardrobeCoverage";
-import { clothingPieceFor } from "../clothingPieces";
+import { clothingPieceFor, type ClothingPiece } from "../clothingPieces";
 import { HAIR_PIECES } from "./hairGroom";
 
 const leftBraid = HAIR_PIECES.findIndex(([id]) => id === "left-braid");
 const rightBraid = HAIR_PIECES.findIndex(([id]) => id === "right-braid");
 const tail = HAIR_PIECES.findIndex(([id]) => id === "ponytail");
 const sliceHeight = .008;
+const jawHeight = 1.465;
+const braidGap = .003;
+const rearClothing = new Set<ClothingPiece>(["shirt", "corset", "coat"]);
+const chestClothing = new Set<ClothingPiece>([...rearClothing, "dress", "bra", "collar", "armor", "harness"]);
+type TorsoSurface = { mesh: SkinnedMesh; rear: boolean };
 
-type Strand = { section: number; top: number; bottom: number; rootY: number; rootCount: number; inner: number[] };
+type Strand = { section: number; top: number; bottom: number; rootY: number; rootCount: number; hangX: number; hangCount: number; inner: number[] };
 
 function strandProfiles(meshes: SkinnedMesh[]) {
   const profiles = new Map<number, Strand>();
@@ -21,10 +26,14 @@ function strandProfiles(meshes: SkinnedMesh[]) {
       if (section !== leftBraid && section !== rightBraid && section !== tail) continue;
       let strand = profiles.get(section);
       if (!strand) {
-        strand = { section, top: -Infinity, bottom: Infinity, rootY: 0, rootCount: 0, inner: [] };
+        strand = { section, top: -Infinity, bottom: Infinity, rootY: 0, rootCount: 0, hangX: 0, hangCount: 0, inner: [] };
         profiles.set(section, strand);
       }
       const y = position.getY(i), z = position.getZ(i);
+      if (section !== tail && y <= jawHeight) {
+        strand.hangX += position.getX(i);
+        strand.hangCount++;
+      }
       if (groom.getX(i) < .035) {
         strand.rootY += y;
         strand.rootCount++;
@@ -51,23 +60,29 @@ function strandProfiles(meshes: SkinnedMesh[]) {
 
 // Fit once in bind space. Each grid ray is shared by all strands; a strand
 // never needs to raycast or solve a collision while the actor animates.
-function torsoDepth(body: SkinnedMesh, garments: SkinnedMesh[], range: readonly [number, number]) {
-  const surfaces = [body, ...garments].flatMap(mesh => {
-    const surface = wardrobeCoverageSurface(mesh.geometry, range);
-    return surface ? [{ surface, mesh }] : [];
+function torsoDepth(body: SkinnedMesh, garments: TorsoSurface[], range: readonly [number, number]) {
+  const surfaces = [{ mesh: body, rear: true }, ...garments].flatMap(source => {
+    const surface = wardrobeCoverageSurface(source.mesh.geometry, range);
+    return surface ? [{ surface, ...source }] : [];
   });
   type Depth = { depth: number; skin: Map<string, number> };
-  const ray = new Ray(), step = .008;
-  const first = Math.floor(range[0] / step), last = Math.ceil(range[1] / step);
+  const ray = new Ray();
+  // A face braid is narrower than a rear lock. Sample its actual footprint
+  // closely enough to avoid a fold sitting several millimetres to its side.
+  function gridScale(step: number) {
+    return { step, first: Math.floor(range[0] / step), last: Math.ceil(range[1] / step) };
+  }
+  const frontGrid = gridScale(.0035), rearGrid = gridScale(.008);
   const grid = new Map<number, Depth | undefined>();
   function sampleGrid(x: number, y: number, rear: boolean) {
+    const { step } = rear ? rearGrid : frontGrid;
     const sign = rear ? -1 : 1, key = sign * ((x + 256) * 1024 + y);
     if (grid.has(key)) return grid.get(key);
     ray.origin.set(x * step, y * step, sign * .4);
     ray.direction.set(0, 0, -sign);
     let nearest = .4, contact: Intersection | undefined, source: SkinnedMesh | undefined;
-    for (const { surface, mesh } of surfaces) {
-      if (rear && mesh !== body && y * step > 1.42) continue;
+    for (const { surface, mesh, rear: supportsRear } of surfaces) {
+      if (rear && (!supportsRear || (mesh !== body && y * step > 1.42))) continue;
       const hit = surface.raycastFirst(ray, DoubleSide, 0, nearest);
       if (hit) { nearest = hit.distance; source = mesh; contact = hit; }
     }
@@ -96,23 +111,26 @@ function torsoDepth(body: SkinnedMesh, garments: SkinnedMesh[], range: readonly 
     const key = (rear ? -1 : 1) * (x + 256);
     const existing = columns.get(key);
     if (existing) return existing;
+    const { step, first, last } = rear ? rearGrid : frontGrid;
     const profile: (Depth | undefined)[] = new Array(last - first + 1);
     function support(row: number, candidate: Depth | undefined, fall: number) {
       if (candidate && candidate.depth - fall > (profile[row]?.depth ?? -Infinity)) {
         profile[row] = { depth: candidate.depth - fall, skin: candidate.skin };
       }
     }
+    const edge = rear ? 1 : 0;
     for (let row = first; row <= last; row++) {
-      for (let dx = -1; dx <= 1; dx++) support(row - first, sampleGrid(x + dx, row, rear), Math.abs(dx) * .002);
+      for (let dx = -edge; dx <= edge; dx++) support(row - first, sampleGrid(x + dx, row, rear), Math.abs(dx) * .002);
     }
-    const fall = step * (rear ? .55 : .92);
+    const fall = step * (rear ? .55 : 1.3);
     for (let j = 1; j < profile.length; j++) support(j, profile[j - 1], fall);
     for (let j = profile.length - 2; j >= 0; j--) support(j, profile[j + 1], fall);
     columns.set(key, profile);
     return profile;
   }
   return {
-    sample(x: number, y: number, rear: boolean, skin: Map<string, number>) {
+    sample(x: number, y: number, rear: boolean, skin?: Map<string, number>) {
+      const { step, first, last } = rear ? rearGrid : frontGrid;
       const xx = x / step, col = Math.floor(xx), yy = MathUtils.clamp(y / step, first, last) - first;
       const row = Math.floor(yy);
       let sum = 0, weight = 0;
@@ -124,15 +142,42 @@ function torsoDepth(body: SkinnedMesh, garments: SkinnedMesh[], range: readonly 
           const w = (a ? xx - col : 1 - (xx - col)) * (b ? yy - row : 1 - (yy - row));
           sum += w * hit.depth;
           weight += w;
-          if (!rear && w > 0) for (const [bone, influence] of hit.skin) skin.set(bone, (skin.get(bone) ?? 0) + w * influence);
+          if (skin && !rear && w > 0) for (const [bone, influence] of hit.skin) skin.set(bone, (skin.get(bone) ?? 0) + w * influence);
         }
       }
       if (weight < .001) return;
-      if (weight < .999) for (const [bone, influence] of skin) skin.set(bone, influence / weight);
+      if (skin && weight < .999) for (const [bone, influence] of skin) skin.set(bone, influence / weight);
       return (rear ? -sum : sum) / weight;
     },
     dispose() { for (const { surface } of surfaces) surface.geometry.dispose(); },
   };
+}
+
+function insideOfStrand(strand: Strand, y: number) {
+  const row = MathUtils.clamp(y / sliceHeight, Math.round(strand.bottom / sliceHeight), Math.round(strand.top / sliceHeight));
+  return MathUtils.lerp(strand.inner[Math.floor(row)], strand.inner[Math.ceil(row)], row % 1);
+}
+
+function hangingBraid(strand: Strand, chest: ReturnType<typeof torsoDepth>) {
+  if (!strand.hangCount || strand.section === tail) return;
+  const x = strand.hangX / strand.hangCount;
+  const release = MathUtils.clamp(jawHeight, strand.bottom, strand.top);
+  const from = insideOfStrand(strand, release);
+  // Drop a plumb line from the jaw until the wearer actually supports the
+  // braid. In particular, an empty neck hollow cannot pull a hanging braid in.
+  let touching = false;
+  for (let y = release; y >= strand.bottom; y -= .005) {
+    const surface = chest.sample(x, y, false);
+    const hit = surface !== undefined && surface + braidGap >= from;
+    if (hit && touching) return { release, landing: y + .005, from, to: from };
+    touching = hit;
+  }
+  // An authored groom can sit entirely forward of a slimmer wearer. Join
+  // the release point to the chest over the free length, then let the tips
+  // rest on the local garment, even when it recedes behind that line.
+  const landing = Math.max(strand.bottom, release - .135);
+  const surface = chest.sample(x, landing, false);
+  return { release, landing, from, to: surface === undefined ? from : surface + braidGap };
 }
 
 /** Fit tagged Mia locks once for this wearer. Shared GLB attributes remain immutable. */
@@ -141,16 +186,17 @@ export function fitMiaPonytail(hair: Object3D, actor: Object3D, body: SkinnedMes
   hair.traverse(part => { if (part instanceof SkinnedMesh) meshes.push(part); });
   const profiles = strandProfiles(meshes);
   if (!profiles.size) return () => {};
-  const surfaces: SkinnedMesh[] = [];
+  const surfaces: TorsoSurface[] = [];
   actor.traverseVisible(part => {
     if (!(part instanceof SkinnedMesh)) return;
     const piece = clothingPieceFor(part);
-    if (piece && ["shirt", "corset", "coat"].includes(piece) && part.geometry !== body.geometry) {
-      surfaces.push(part);
+    if (piece && chestClothing.has(piece) && part.geometry !== body.geometry) {
+      surfaces.push({ mesh: part, rear: rearClothing.has(piece) });
     }
   });
   const spans = [...profiles.values()];
   const depth = torsoDepth(body, surfaces, [Math.min(...spans.map(s => s.bottom)) - .02, Math.max(...spans.map(s => s.top)) + .02]);
+  const hanging = new Map(spans.map(strand => [strand.section, hangingBraid(strand, depth)]));
   const owned: BufferGeometry[] = [];
   for (const mesh of meshes) {
     const original = mesh.geometry;
@@ -172,28 +218,31 @@ export function fitMiaPonytail(hair: Object3D, actor: Object3D, body: SkinnedMes
       const anchor = strand.rootCount ? strand.rootY / strand.rootCount : strand.top;
       const drop = Math.max(0, anchor - oldY);
       const loose = MathUtils.smoothstep(groom.getX(i), .04, .27);
-      const shortened = oldY + drop * (rear ? .28 : .09) * loose;
+      // Carry each front braid down past the top edge of a bodice. Its
+      // authored length remains available to settle on the chest underneath.
+      const shortened = rear ? oldY + drop * .28 * loose : oldY;
       const contact = loose * MathUtils.smoothstep(drop, .025, rear ? .105 : .14)
         * (rear ? 1 : 1 - MathUtils.smoothstep(shortened, 1.39, 1.49));
       geometry ??= original.clone();
       influences.clear();
       const surface = contact ? depth.sample(x, shortened, rear, influences) : undefined;
-      const row = MathUtils.clamp(oldY / sliceHeight, Math.round(strand.bottom / sliceHeight), Math.round(strand.top / sliceHeight));
-      const inner = MathUtils.lerp(strand.inner[Math.floor(row)], strand.inner[Math.ceil(row)], row % 1);
+      const inner = insideOfStrand(strand, oldY);
       // Preserve the taper and folds. At the nape let the hair pass through
       // the collar; below it the loose lengths lie against the torso.
       const relief = MathUtils.clamp(z - inner, rear ? -.028 : 0, rear ? 0 : .009);
       let fittedZ = z;
       if (surface !== undefined) {
-        let target = surface + (rear ? -.005 : .007) + relief;
-        if (!rear) {
-          // Gravity leaves a free braid hanging from the jaw until the chest
-          // meets it. Round the join where its original fall first touches cloth.
-          const blend = Math.max(0, .006 - Math.abs(z - target));
-          target = Math.max(z, target) + blend * blend / .024;
+        let target = surface + (rear ? -.005 : braidGap) + relief;
+        const hang = hanging.get(strand.section);
+        if (hang && shortened > hang.landing - .02) {
+          const span = Math.max(.001, hang.release - hang.landing);
+          const t = MathUtils.smoothstep((hang.release - shortened) / span, 0, 1);
+          const line = MathUtils.lerp(hang.from, hang.to, t) + relief;
+          const free = MathUtils.smoothstep(shortened, hang.landing - .02, hang.landing);
+          target += free * Math.max(0, line - target);
         }
         fittedZ = MathUtils.lerp(z, target, contact);
-        if (!rear) fittedZ = MathUtils.lerp(fittedZ, Math.max(fittedZ, surface + .006),
+        if (!rear) fittedZ = MathUtils.lerp(fittedZ, Math.max(fittedZ, surface + .0025),
           loose * (1 - MathUtils.smoothstep(shortened, 1.39, 1.45)));
       }
       geometry.getAttribute("position").setXYZ(i, x, shortened, fittedZ);

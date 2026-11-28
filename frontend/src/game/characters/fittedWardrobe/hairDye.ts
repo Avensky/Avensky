@@ -72,8 +72,11 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
         shader.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
           transformed += avenskyTailOffset * ${mask};
           ${groomColor ? `if (abs(_avensky_groom.z - 4.5) < 0.9) {
-            float looseBraid = smoothstep(0.22, 0.96, _avensky_groom.x);
-            transformed += vec3(avenskyTailOffset.x * 0.40, 0.0, -avenskyTailOffset.z * 0.27) * looseBraid;
+            // The free span can swing sideways. The ends follow the worn
+            // garment through skinning and settle as they approach the chest.
+            float freeBraid = smoothstep(0.18, 0.52, _avensky_groom.x)
+                            * (1.0 - smoothstep(0.63, 0.88, _avensky_groom.x));
+            transformed.x += avenskyTailOffset.x * 0.35 * freeBraid;
           }` : ""}
         `);
     }
