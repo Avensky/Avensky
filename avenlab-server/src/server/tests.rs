@@ -179,6 +179,31 @@ async fn creator_saves_the_preview_and_slot_together_and_restores_them_after_res
 }
 
 #[tokio::test]
+async fn wardrobe_equip_preserves_saved_character_traits() {
+    let mut server = server(1, 4);
+    server.accounts = Some(AccountAccess::default());
+    let (player, _, _) = client(&server, "Wardrobe tester").await;
+    let created = server.handle(&player, json!({"action":"character_create", "name":"Harbor Driver",
+        "style":"street", "body":"female"})).await.unwrap();
+    let mut borrowed = created["profile"]["progression"]["character"].clone();
+    borrowed["identity"] = json!("nonbinary");
+    borrowed["appearance"]["personality"] = json!("mechanic");
+    borrowed["appearance"]["hair_color"] = json!("copper");
+    let equip = |character: Value| json!({"action":"character_equip", "character":character});
+    let styled = server.handle(&player, equip(borrowed)).await.unwrap();
+    assert_eq!(styled["character"]["identity"], "female");
+    assert_eq!(styled["character"]["appearance"]["personality"], "racer");
+    assert_eq!(styled["character"]["appearance"]["hair_color"], "copper");
+
+    let legacy = json!({"id":"mara-vega", "outfit":"dockwear"});
+    let dressed = server.handle(&player, equip(legacy)).await.unwrap();
+    assert_eq!(dressed["character"]["outfit"], "dockwear");
+    assert_eq!(dressed["character"]["identity"], "female");
+    assert_eq!(dressed["character"]["appearance"], styled["character"]["appearance"]);
+    cleanup(server).await;
+}
+
+#[tokio::test]
 async fn account_survives_a_restart_and_restores_the_same_character_and_outfit() {
     let mut server = server(3, 8);
     let (desktop, legacy, mut view) = client(&server, "River").await;

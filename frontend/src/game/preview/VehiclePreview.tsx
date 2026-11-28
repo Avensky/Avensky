@@ -194,9 +194,8 @@ export function VehiclePreview({
   const orbitCamera = (x: number, y: number) => {
     const rotation = fittingOrbit.current!;
     const sensitivity = usePreferencesStore.getState().cameraSensitivity * .006;
-    // Orbit the room within its walls. Direct subject drags retain the full turntable rotation.
-    rotation.yaw = MathUtils.clamp(rotation.yaw - x * sensitivity, -Math.PI / 3, Math.PI / 3);
-    rotation.pitch = MathUtils.clamp(rotation.pitch - y * sensitivity, -.45, .45);
+    rotation.yaw -= x * sensitivity;
+    rotation.pitch -= y * sensitivity;
     cameraAim.current!.held = false;
     requestFrame();
   };

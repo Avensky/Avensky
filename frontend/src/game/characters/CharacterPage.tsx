@@ -11,7 +11,8 @@ import { requestSocial } from "../../net/socialClient";
 import { selectActiveCharacterName, selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, CHARACTER_IDENTITIES, DEFAULT_CHARACTER, ROOK_ID, availableHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, DEFAULT_CHARACTER, ROOK_ID, availableHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CharacterDetails } from "./CharacterDetails";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { AlphaAccountPanel } from "./AlphaAccountPanel";
 import { CHARACTER_CAMERAS, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
@@ -20,7 +21,7 @@ import { CharacterPosePack } from "./CharacterPosePack";
 import { CharacterEmoteList, type PreviewEmote, type PreviewEmoteGroup } from "./CharacterEmoteList";
 import { unlockVehicleAudio } from "../../audio/sharedAudio";
 import { GARAGE_STATIONS } from "../preview/garageStations";
-import { CHARACTER_PERSONALITIES, type AnimationFit, type CharacterPersonality } from "./characterPersonality";
+import { CHARACTER_PERSONALITIES, type AnimationFit } from "./characterPersonality";
 import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom, type WardrobeNavigation } from "./DressingRoom";
@@ -143,7 +144,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   const selectedPreview = useRef<ReturnType<typeof useCharacterPreviewStore.getState>["emote"]>(null);
   const acknowledged = useRef(locked ? choice : null);
   const queued = useRef(new Map<string, CharacterChoice>());
-  const drafts = useRef(new Map<string, CharacterChoice>());
   const running = useRef<Promise<boolean> | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const { character, outfit, appearance } = characterLook(previewChoice)!;
@@ -173,7 +173,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
           }
           profile.acknowledgeProgression(owner, progression => ({ ...progression, character: confirmed }), result);
           acknowledged.current = useSocialStore.getState().view?.profile.progression?.character ?? confirmed;
-          if (drafts.current.get(id) === next) drafts.current.delete(id);
           setLocked(true);
         } catch (error) {
           // Keep another model's pending edits and the order in which the player selected them.
@@ -268,7 +267,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     setChoice(next);
     setMessage("");
     if (!locked) return;
-    drafts.current.set(next.id, next);
     if (!saveToProfile) {
       saveLocalCharacter(next);
       return;
@@ -377,21 +375,19 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       }
     : undefined;
 
-  const modelPicker = <div className={locked ? "character-outfits" : "character-cast"} role="group"
-    aria-label={locked ? "Character model" : "Gender"} data-controller-row>
+  const modelPicker = <div className="character-cast" role="group" aria-label="Gender" data-controller-row>
     {PREVIEW_CAST.map(({ gender, choice: next }) => <button key={next.id} type="button" className="menu-control"
-      disabled={!locked && status === "saving"} data-character-option={next.id} aria-pressed={choice.id === next.id}
+      disabled={status === "saving"} data-character-option={next.id} aria-pressed={choice.id === next.id}
       onClick={() => {
         if (next.id === choice.id) return;
         useCharacterPreviewStore.setState({ emote: null });
         const state = useSocialStore.getState();
         const progression = state.view?.profile.progression ?? state.cachedCosmetics;
-        const preset = drafts.current.get(next.id) ?? (progression?.character?.id === next.id
-          ? progression.character : progression?.character_presets?.[next.id]);
-        update({ ...(preset && characterLook(preset) ? preset : next), identity: choice.identity });
+        const preset = progression?.character?.id === next.id ? progression.character : progression?.character_presets?.[next.id];
+        update(preset && characterLook(preset) ? preset : next);
       }}>
-      {!locked && <CharacterPortrait choice={next} />}
-      <span>{gender === "female" ? "Female" : "Male"}{locked ? " body" : ""}</span>
+      <CharacterPortrait choice={next} />
+      <span>{gender === "female" ? "Female" : "Male"}</span>
     </button>)}
   </div>;
   const bag = Boolean(previewChoice.prop);
@@ -613,7 +609,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     <div ref={page} className="character-page character-page--setup" aria-label="Choose character gender" onFocus={revealCharacterControl}>
       <div className="character-stage" ref={observeWorkshopViewport} data-character-viewport data-character-preview={character.id} data-outfit-preview={outfit.id} />
       <section className="character-controls menu-panel-frame">
-        <header className="character-description"><h2>Choose gender</h2><p>You can switch models any time during alpha.</p></header>
+        <header className="character-description"><h2>Choose gender</h2></header>
         {modelPicker}
         <div className="character-equip" data-controller-row>
           <ControllerAction button="A" className="menu-control" disabled={!editingAllowed || !connectedOwner || saved === undefined || status === "saving"}
@@ -668,29 +664,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
             </label>)}
         </fieldset>)}
       </section>}
-      {(tab === "details" || tab === "emotes") && <section className={`character-controls menu-panel-frame ${tab === "details" ? "character-details" : "character-controls--left"}`} aria-label={tab === "details" ? "Character details" : "Emote filters"}>
-        {tab === "details" && <>
-          <header className="character-description"><h2>{characterName ?? "Your character"}</h2></header>
-          {!PLAYER_ONBOARDING && !characterName && modelPicker}
-          <div className="character-outfits" role="group" aria-label="Character identity" data-controller-row>
-            {CHARACTER_IDENTITIES.map(item => <button key={item.id} type="button" className="menu-control"
-              aria-pressed={(choice.identity ?? character.gender) === item.id}
-              onClick={() => update(
-                { ...choice, identity: item.id },
-                activeTrial && { ...activeTrial, identity: item.id },
-              )}>{item.label}</button>)}
-          </div>
-          <label className="character-setting" data-controller-row>Personality<select className="menu-control" aria-label="Character personality" value={choice.appearance?.personality ?? "friendly"}
-            onChange={event => {
-              const personality = event.target.value as CharacterPersonality;
-              update({ ...choice, appearance: { ...characterAppearance(choice), personality } },
-                activeTrial && { ...activeTrial, appearance: { ...appearance, personality } });
-            }}>
-            {CHARACTER_PERSONALITIES.map(item => <option key={item.id} value={item.id}>{item.label}</option>)}
-          </select></label>
-          <p>Click your character to play one of their personality emotes.</p>
-        </>}
-        {tab === "emotes" && emoteBrowser}
+      {tab === "details" && <CharacterDetails name={characterName} gender={choice.identity ?? character.gender}
+        personality={choice.appearance?.personality} bag={bag} selectedId={emote?.id} disabled={brzExiting || reducedMotion}
+        onPreview={playEmote} />}
+      {tab === "emotes" && <section className="character-controls menu-panel-frame character-controls--left" aria-label="Emote filters">
+        {emoteBrowser}
       </section>}
       {tab === "emotes" && emoteResultsPanel}
       {(tab === "profile" || tab === "account") && <AlphaAccountPanel key={JSON.stringify([connectedOwner, tab])} tab={tab} />}
@@ -705,7 +683,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
             <button type="button" className="menu-control" onClick={() => {
               if (!canEditCharacter()) return;
               queued.current.clear();
-              drafts.current.clear();
               clearFittingPreview();
               if (acknowledged.current) setChoice(acknowledged.current);
               setStatus("idle");

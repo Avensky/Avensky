@@ -262,18 +262,28 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const choice = { id: 'jules-okafor', outfit: 'night-run' };
     assert.deepEqual(requests[0].character, choice);
     let serverProgression = view.profile.progression;
-    const acknowledge = async (request, character, publish = true) => {
+    const selectServerCharacter = character => {
       const previous = serverProgression.character;
       const presets = { ...serverProgression.character_presets };
       if (previous && previous.id !== character.id) presets[previous.id] = previous;
       delete presets[character.id];
       serverProgression = { ...serverProgression, character, character_presets: presets, cosmetics_revision: serverProgression.cosmetics_revision + 1 };
+    };
+    const receiveCareer = () => social.getState().receive({ ...view, profile: { ...view.profile, progression: serverProgression } });
+    const switchCareer = async character => {
+      selectServerCharacter(character);
+      await act(async () => receiveCareer());
+    };
+    const acknowledge = async (request, character, publish = true) => {
+      selectServerCharacter(character);
       await act(async () => {
-        if (publish) social.getState().receive({ ...view, profile: { ...view.profile, progression: serverProgression } });
+        if (publish) receiveCareer();
         client.receiveSocialResult({ request_id: request.request_id, ok: true, data: serverProgression });
       });
     };
     await acknowledge(requests[0], choice);
+    const { characterAppearance } = await load('game/characters/characterCatalog.ts');
+    await switchCareer({ ...choice, identity: 'nonbinary', appearance: { ...characterAppearance(choice), personality: 'mechanic' } });
     const characterTabs = '[role=tablist][aria-label="Character sections"]';
     const identityTab = `${characterTabs} #character-editor-tab-body`;
     const identityControl = find(identityTab);
@@ -299,14 +309,20 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await act(async () => document.activeElement.dispatchEvent(new window.KeyboardEvent('keydown', { code: 'KeyE', bubbles: true, cancelable: true })));
     assert.equal(document.activeElement, find('#character-editor-tab-appearance'));
     await click('#character-editor-tab-details');
-    assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
-    assert.deepEqual([...document.querySelectorAll('[aria-label="Character model"] button')].map(node => node.textContent),
-      ['Female body', 'Male body']);
+    const detailTraits = () => [...document.querySelectorAll('.character-details dd')].map(node => node.textContent);
+    assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
+    assert.equal(find('.character-details select, .character-details [data-character-option], [aria-label="Character identity"]'), null);
+    const { findGaragePreviewEmote } = await load('game/characters/garageEmotes.ts');
+    const signatureButtons = [...document.querySelectorAll('[aria-label="Signature emotes"] [role="button"]')];
+    assert.deepEqual(signatureButtons.map(node => node.textContent), ['165', '164', '163', '161'].map(id => findGaragePreviewEmote(id, false).name));
+    await act(async () => signatureButtons[0].click());
+    assert.equal(preview.getState().emote.id, '165');
+    assert.equal(requests.length, 1, 'previewing a signature emote leaves the character untouched');
     await click('#character-editor-tab-emotes');
     assert.equal(find(identityTab), identityControl);
     assert(find('[aria-label="Emote results"]').classList.contains('character-controls--right'));
     assert(find('[aria-label="Emote collection"]').closest('.character-controls--left'));
-    assert.equal(find('[data-character-option]'), null, 'Emotes uses the model chosen in Details');
+    assert.equal(find('[data-character-option]'), null, 'Emotes uses the active character model');
     assert(find('.dressing-toolbar .fitting-camera-toolbar'), 'Emotes uses the Dressing Room camera toolbar');
     assert(find('.dressing-toolbar button[aria-label="Hide interface"]'));
     assert.equal(find('select[aria-label="Preview camera"]'), null);
@@ -393,7 +409,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(preview.getState().emote, null);
     await click(cockpitToggle);
     await click('#character-editor-tab-appearance');
-    assert.equal(find('[data-character-option]'), null, 'the Dressing Room uses the model chosen in Details');
+    assert.equal(find('[data-character-option]'), null, 'the Dressing Room uses the active character model');
     await browseWardrobe('outfits');
     assert.equal(cameraView('Coat').getAttribute('aria-pressed'), 'true');
     for (const category of ['hair', 'face', 'skin']) assert.equal(find(`[data-category=${category}]`), null);
@@ -517,7 +533,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert(find('select[aria-label="Eye color"]'));
     assert(find('select[aria-label="Skin tone"]'));
     await click('#character-editor-tab-details');
-    await select('Character personality', 'tsundere');
+    assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
     await click('#character-editor-tab-emotes');
     await openEmotes();
     await select('Animation clothing fit', 'fitted');
@@ -534,7 +550,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(requests[1].character.appearance.skin, 'deep');
     assert.equal(requests[1].character.appearance.hair_color, 'espresso');
     assert.equal(requests[1].character.appearance.glasses, 'aviator');
-    assert.equal(requests[1].character.appearance.personality, 'tsundere');
+    assert.equal(requests[1].character.appearance.personality, 'mechanic');
+    assert.equal(requests[1].character.identity, 'nonbinary');
     assert.equal(requests[1].character.appearance.animation_fit, 'fitted');
     await browseWardrobe('props');
     await click('[data-wardrobe-item=shop-bag]');
@@ -641,21 +658,20 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('select[aria-label="Eye color"]').value, 'obsidian');
     assert.equal(find('select[aria-label="Skin tone"]').value, 'deep');
     await click('#character-editor-tab-details');
-    assert.equal(find('[aria-label="Character model"] [data-character-option="jules-okafor"]').getAttribute('aria-pressed'), 'true');
-    const identities = '[aria-label="Character identity"] button';
-    assert.deepEqual([...document.querySelectorAll(identities)].map(node => node.textContent), ['Male', 'Female', 'Nonbinary']);
-    assert.equal(find(identities + ':first-child').getAttribute('aria-pressed'), 'true');
-    await click(identities + ':last-child');
-    assert.equal(drafts.at(-1).id, 'jules-okafor', 'identity is independent of the selected model');
+    assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
+    await click('#character-editor-tab-body');
+    await select('Hair color', 'red');
     await act(async () => t.mock.timers.tick(350));
     assert.equal(requests[3].character.identity, 'nonbinary');
     await acknowledge(requests[3], requests[3].character, false);
     await move('back');
     await click('[data-open-character]');
     await click('#character-editor-tab-details');
-    assert.equal(find(identities + ':last-child').getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
 
-    await click('[aria-label="Character model"] [data-character-option="mara-vega"]');
+    // A roster selection replaces the active character while wardrobe remains read-only.
+    await switchCareer({ id: 'mara-vega', outfit: 'dockwear' });
+    assert.deepEqual(detailTraits(), ['Female', 'Friendly', 'Workshop']);
     assert.equal(drafts.at(-1).id, 'mara-vega');
     await click('#character-editor-tab-appearance');
     await browseWardrobe('underwear');
@@ -716,7 +732,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(requests[4].character.appearance.hair, 'hair-01');
     await acknowledge(requests[4], requests[4].character);
     await click('#character-editor-tab-details');
-    await click('[aria-label="Character model"] [data-character-option="jules-okafor"]');
+    await switchCareer(serverProgression.character_presets['jules-okafor']);
     assert.equal(drafts.at(-1).outfit, 'race-crew');
     assert.equal(drafts.at(-1).appearance.eye_color, 'obsidian');
     await act(async () => social.getState().reset());
@@ -976,18 +992,27 @@ test('device character edits stay local when the connected profile has no charac
     await act(async () => button('Use locally').click());
     assert.equal(readLocalCharacter().id, 'jules-okafor');
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    await act(async () => button('Nonbinary').click());
+    assert.deepEqual([...document.querySelectorAll('.character-details dd')].map(node => node.textContent),
+      ['Male', 'Friendly', 'Workshop'], 'legacy local choices use their model gender and the existing personality fallback');
+    assert.equal(document.querySelector('.character-details select, .character-details [data-character-option]'), null);
+    const localBeforePreview = readLocalCharacter();
+    await click('[aria-label="Signature emotes"] [role="button"]');
     await act(async () => t.mock.timers.tick(350));
     assert.equal(requests.length, 0);
-    assert.equal(readLocalCharacter().identity, 'nonbinary');
+    assert.deepEqual(readLocalCharacter(), localBeforePreview);
 
+    await show('body');
     const failedWrite = t.mock.method(dom.window.Storage.prototype, 'setItem', () => { throw new Error('Storage unavailable'); });
-    await act(async () => button('Female').click());
-    assert.equal(readLocalCharacter().identity, 'nonbinary');
+    await act(async () => {
+      const skin = document.querySelector('select[aria-label="Skin tone"]');
+      skin.value = 'deep';
+      skin.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    assert.deepEqual(readLocalCharacter(), localBeforePreview);
     assert(button('Retry'));
     failedWrite.mock.restore();
     await act(async () => button('Retry').click());
-    assert.equal(readLocalCharacter().identity, 'female');
+    assert.equal(readLocalCharacter().appearance.skin, 'deep');
 
     const saved = readLocalCharacter();
     const { characterAppearance } = await load('game/characters/characterCatalog.ts');

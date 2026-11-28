@@ -12,6 +12,7 @@ import { isUITheme } from "../../theme/catalog";
 import { DEFAULT_GARAGE_THEME } from "../../theme/garageEntry";
 import { collectGarageFixtures } from "./garageFixtures";
 import { setFloorFinish } from "./mechanicsFloor";
+import { nearestRestYaw } from "./garageOrbitAngles";
 import { GarageCameraTravel } from "./garageCameraTravel";
 import { installGarageEntryInteraction, type ActorInput, type EntryMotion } from "./garageEntryInteraction";
 import { restoreGaragePreferences } from "../../theme/garagePreferences";
@@ -24,7 +25,7 @@ export type GarageEntryShot = {
   subject?: "loading" | "ready" | "unavailable";
   framingRevision?: number;
   frame(camera: PerspectiveCamera, width: number, height: number): void;
-  orbit(camera: PerspectiveCamera, yaw: number, pitch: number): void;
+  orbit(camera: PerspectiveCamera, yaw: number, pitch: number, bounds?: Box3): void;
   actor?: ActorInput;
 };
 type Preview = { loadBayDetail?: boolean; contents: ReactNode; demand: boolean; dpr?: number; shadows: boolean; shot?: GarageEntryShot };
@@ -94,7 +95,7 @@ function GarageObject({ host, camera, entry, shot, detailedDoors }: { host: HTML
       const materials = Array.isArray(node.material) ? node.material : [node.material];
       wallSurface = materials.find(material => material.userData.garageSurface === "garage-wall");
     });
-    return { ...garage, wallSurface, fixtures: collectGarageFixtures(garage.root), envelope: { bounds } };
+    return { ...garage, wallSurface, fixtures: collectGarageFixtures(garage.root), envelope: { bounds }, cameraBounds: bounds.clone().expandByScalar(-.30) };
   }, [scene]);
   useLayoutEffect(() => {
     const root = document.documentElement;
@@ -141,12 +142,12 @@ function GarageObject({ host, camera, entry, shot, detailedDoors }: { host: HTML
     <primitive object={display.root} dispose={null} />
     <primitive object={display.fixtures.lights} />
     <GarageDoorWall surface={display.wallSurface} detailed={detailedDoors} cullOutsideShot={entry} />
-    <EntryCamera camera={camera} active={entry} shot={shot} />
+    <EntryCamera camera={camera} active={entry} shot={shot} bounds={display.cameraBounds} />
     <object3D name="garage-camera-envelope" userData={display.envelope} />
   </>;
 }
 
-function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; active: boolean; shot?: GarageEntryShot }) {
+function EntryCamera({ camera, active, shot, bounds }: { camera: PerspectiveCamera; active: boolean; shot?: GarageEntryShot; bounds: Box3 }) {
   const { width, height } = useThree(state => state.size);
   const dpr = useThree(state => state.viewport.dpr);
   const invalidate = useThree(state => state.invalidate);
@@ -194,7 +195,7 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
         motion.yaw = motion.pitch = 0;
       }
     }
-    const yaw = motion.targetYaw ?? 0;
+    const yaw = motion.targetYaw ?? nearestRestYaw(motion.yaw);
     const pitch = motion.targetPitch ?? 0;
     const following = motion.targetYaw !== undefined;
     const immediate = reducedMotion?.matches || document.documentElement.dataset.reduceMotion === "true";
@@ -203,10 +204,10 @@ function EntryCamera({ camera, active, shot }: { camera: PerspectiveCamera; acti
     motion.pitch += (pitch - motion.pitch) * blend;
     const moving = (yaw - motion.yaw) ** 2 + (pitch - motion.pitch) ** 2 > travel.settledAngleSquared;
     if (!moving) {
-      motion.yaw = yaw;
+      motion.yaw = following ? yaw : 0;
       motion.pitch = pitch;
     }
-    travel.frame(camera, shot, width, height, dpr, motion.yaw, motion.pitch, now, Boolean(immediate));
+    travel.frame(camera, shot, width, height, dpr, motion.yaw, motion.pitch, now, Boolean(immediate), bounds);
     const page = document.documentElement.dataset;
     if (page.garageShot !== travel.phase) {
       if (travel.phase) {

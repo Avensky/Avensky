@@ -15,8 +15,12 @@ export const CHARACTER_PERSONALITIES = [
 export type CharacterPersonality = typeof CHARACTER_PERSONALITIES[number]["id"];
 export type AnimationFit = "auto" | "full" | "fitted";
 
-export function personalityEmoteIds(personality: CharacterPersonality = "friendly") {
-  return CHARACTER_PERSONALITIES.find(item => item.id === personality)?.emotes ?? CHARACTER_PERSONALITIES[0].emotes;
+export function characterPersonality(personality: CharacterPersonality = "friendly") {
+  return CHARACTER_PERSONALITIES.find(item => item.id === personality) ?? CHARACTER_PERSONALITIES[0];
+}
+
+export function personalityEmoteIds(personality?: CharacterPersonality) {
+  return characterPersonality(personality).emotes;
 }
 
 export function personalityEmote(personality: CharacterPersonality = "friendly", previous?: string, random = Math.random()) {

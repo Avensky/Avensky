@@ -1,4 +1,4 @@
-import { Vector3, type PerspectiveCamera } from "three";
+import { Vector3, type Box3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 import { placeGarageOrbit } from "./garageCameraTravel.ts";
 import type { CreatorStep } from "../welcome/CharacterCreator";
@@ -42,8 +42,8 @@ export function rosterCamera(view: Exclude<CharacterGarageView, "main"> = "roste
     target.y = eye;
     distance = (eye - waist) * torsoSpan / viewSpan;
   }
-  function orbit(camera: PerspectiveCamera, yaw: number, pitch: number) {
-    placeGarageOrbit(camera, target, distance, ROSTER_HEADING - yaw, .055 + pitch);
+  function orbit(camera: PerspectiveCamera, yaw: number, pitch: number, bounds?: Box3) {
+    placeGarageOrbit(camera, target, distance, ROSTER_HEADING - yaw, .055 + pitch, bounds);
   }
   return {
     subject: "loading", framingRevision: 0,

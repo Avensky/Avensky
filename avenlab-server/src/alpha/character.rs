@@ -292,11 +292,25 @@ pub fn validate_driver(driver: &crate::social::authoring::Driver) -> Result<(), 
 }
 
 impl CharacterChoice {
+    fn personality(&self) -> Option<&str> {
+        self.appearance.as_ref().and_then(|look| look.personality.as_deref())
+    }
+
     pub fn has_starter_identity(&self, starter: &Self) -> bool {
         self.id == starter.id && self.identity == starter.identity && self.driver_id == starter.driver_id
-            && self.outfit == starter.outfit
-            && self.appearance.as_ref().and_then(|look| look.personality.as_deref())
-                == starter.appearance.as_ref().and_then(|look| look.personality.as_deref())
+            && self.outfit == starter.outfit && self.personality() == starter.personality()
+    }
+
+    pub fn retain_character_details(&mut self, wearer: &Self) {
+        self.identity = wearer.identity;
+        if self.personality() != wearer.personality() {
+            if let Some(appearance) = &mut self.appearance {
+                appearance.personality = wearer.personality().map(str::to_owned);
+            } else {
+                // A legacy outfit can carry only an outfit ID.
+                self.appearance.clone_from(&wearer.appearance);
+            }
+        }
     }
 
     pub fn known_driver(&self, drivers: &BTreeMap<String, crate::social::authoring::Driver>) -> bool {

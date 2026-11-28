@@ -27,7 +27,10 @@ test('saved outfits preserve a tuned look through a confirmed save, reconnect, a
     const sent = [], previews = [];
     let ended = 0;
     const connect = () => client.setSocialConnection({ readyState: WebSocket.OPEN, send: value => sent.push(JSON.parse(value)) });
-    const equipped = { id: 'mara-vega', outfit: 'dockwear' };
+    const equipped = {
+      id: 'mara-vega', outfit: 'dockwear', identity: 'female', driver_id: 'brz-female',
+      appearance: { hair: 'natural', hair_color: 'original', skin: 'original', headwear: 'hat', color: 'original', personality: 'mechanic' },
+    };
     const tuned = {
       ...equipped,
       wardrobeTrial: { set: 'gothic-04', waist: 'over', shirt: 'none' },
@@ -35,7 +38,7 @@ test('saved outfits preserve a tuned look through a confirmed save, reconnect, a
       garments: { skirt: 'gothic-skirt-04', underskirt: 'village-petticoat', bow: 'bowtie-01', socks: 'socks-01' },
       removedClothing: ['bow', 'outer-skirt'],
       appearance: {
-        hair: 'cropped', hair_color: 'original', skin: 'original', headwear: 'hat', color: 'original',
+        ...equipped.appearance, hair: 'cropped',
         briefs_style: 'boxer-briefs',
         item_colors: { 'gothic-04:corset': { color: '#473652', accent: '#c77baa' } },
       },
@@ -44,7 +47,8 @@ test('saved outfits preserve a tuned look through a confirmed save, reconnect, a
       character: equipped, character_presets: {},
       character_outfits: {
         Night: { id: 'jules-okafor', outfit: 'night-run' },
-        'Layer check': { ...tuned, garments: { ...tuned.garments, top: 'top-01' }, removedClothing: ['skirt', 'bow'] },
+        'Layer check': { ...tuned, identity: 'nonbinary', driver_id: 'ae86-female', appearance: { ...tuned.appearance, personality: 'racer' },
+          garments: { ...tuned.garments, top: 'top-01' }, removedClothing: ['skirt', 'bow'] },
       },
       cosmetics_revision: 2,
     };
@@ -169,6 +173,26 @@ test('saved outfits preserve a tuned look through a confirmed save, reconnect, a
     assert.match(document.querySelector('[role=status]').textContent, /another character's outfit/);
     assert(button('Save outfit').disabled);
     assert.deepEqual(JSON.parse(window.localStorage.getItem(LOCAL_OUTFITS_KEY)), stored);
+
+    await act(async () => button('Profile').click());
+    await act(async () => document.querySelector('[aria-label="Try on Layer check"]').click());
+    const borrowed = previews.at(-1);
+    assert.equal(borrowed.identity, tuned.identity);
+    assert.equal(borrowed.driver_id, tuned.driver_id);
+    assert.equal(borrowed.appearance.personality, 'mechanic');
+    assert.equal(borrowed.garments.top, 'top-01');
+
+    const legacy = { id: equipped.id, outfit: 'shop-crew' };
+    await act(async () => {
+      window.localStorage.setItem(LOCAL_OUTFITS_KEY, JSON.stringify({ Classic: legacy }));
+      window.dispatchEvent(new dom.window.StorageEvent('storage', { key: LOCAL_OUTFITS_KEY }));
+      button('This device').click();
+    });
+    await act(async () => document.querySelector('[aria-label="Try on Classic"]').click());
+    assert.equal(previews.at(-1).outfit, legacy.outfit);
+    assert.deepEqual(previews.at(-1).appearance, equipped.appearance);
+    assert.equal(previews.at(-1).identity, tuned.identity);
+    assert.equal(previews.at(-1).driver_id, tuned.driver_id);
   } finally {
     if (root) await act(async () => root.unmount());
     client?.setSocialConnection(null);

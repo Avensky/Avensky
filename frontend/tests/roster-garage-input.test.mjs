@@ -1,12 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { JSDOM } from "jsdom";
-import { Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from "three";
+import { Box3, Group, Mesh, MeshStandardMaterial, PerspectiveCamera, Vector3 } from "three";
 import { creatorStepFrames, rosterCamera } from "../src/game/preview/rosterCamera.ts";
 import { garageMenuCamera } from "../src/game/preview/garageMenuCamera.ts";
 import { GARAGE_BAY_DOORS } from "../src/game/preview/garageDoorLayout.ts";
 import { GARAGE_MENU_LANDMARKS } from "../src/game/preview/garageMenuLandmarks.ts";
 import { GARAGE_PARKING } from "../src/game/preview/garageServiceLayout.ts";
+import { nearestRestYaw } from "../src/game/preview/garageOrbitAngles.ts";
 import { GarageCameraTravel } from "../src/game/preview/garageCameraTravel.ts";
 import { installGarageEntryInteraction, moveGarageOrbitStick } from "../src/game/preview/garageEntryInteraction.ts";
 import { bindRosterSticks, readRosterSticks, releaseRosterSticks } from "../src/game/preview/rosterStickControls.ts";
@@ -350,6 +351,74 @@ test("failed, interrupted, and reduced-motion handoffs release the camera", () =
   assert.ok(camera.position.distanceTo(room) > 1, "reduced motion goes directly to the selected rig");
 });
 
+test("room, character, and station cameras can turn fully and remain upright inside the garage", () => {
+  const bounds = new Box3(new Vector3(-6.34, .3, -5.88), new Vector3(8.2, 4.68, 8.45));
+  const camera = new PerspectiveCamera(), travel = new GarageCameraTravel();
+  const frame = yaw => travel.frame(camera, undefined, 390, 844, 1, yaw, .2, 0, true, bounds);
+  frame(0);
+  const start = camera.quaternion.clone(), eye = camera.position.clone();
+  frame(Math.PI);
+  assert.ok(Math.abs(start.angleTo(camera.quaternion) - Math.PI) < 1e-7);
+  frame(Math.PI * 6);
+  assert.ok(start.angleTo(camera.quaternion) < 1e-7 && eye.equals(camera.position));
+  assert.ok(Math.abs(new Vector3(1, 0, 0).applyQuaternion(camera.quaternion).y) < 1e-8, "login keeps the horizon level");
+  for (const shot of [rosterCamera(), rosterCamera("create", "eyes"), rosterCamera("profile"),
+    ...Object.keys(GARAGE_MENU_LANDMARKS).map(station => garageMenuCamera(station))]) {
+    shot.frame(camera, 390, 844);
+    shot.orbit(camera, 0, 0, bounds);
+    const origin = camera.position.clone();
+    shot.orbit(camera, Math.PI, 0, bounds);
+    assert.ok(camera.position.distanceTo(origin) > .25);
+    shot.orbit(camera, Math.PI * 4, 0, bounds);
+    assert.ok(camera.position.distanceTo(origin) < 1e-8);
+    for (const yaw of [-Math.PI, 0, 2, Math.PI * 5]) for (const pitch of [-10, -.7, .8, 10]) {
+      shot.orbit(camera, yaw, pitch, bounds);
+      assert.ok(bounds.distanceToPoint(camera.position) < 1e-6, "stay inside the walls, floor and ceiling");
+      assert.ok(new Vector3(0, 1, 0).applyQuaternion(camera.quaternion).y > 0, "remain upright at both poles");
+    }
+  }
+});
+
+test("orbiting past a station or reversing never flips the camera away from the subject", () => {
+  const bounds = new Box3(new Vector3(-6.34, .3, -5.88), new Vector3(8.2, 4.68, 8.45));
+  const camera = new PerspectiveCamera(), previous = camera.quaternion.clone();
+  for (const [w, h] of [[390, 844], [844, 390]]) for (const id of Object.keys(GARAGE_MENU_LANDMARKS)) {
+    const shot = garageMenuCamera(id);
+    shot.frame(camera, w, h);
+    for (const pitch of [-1, -.5, 0, .5, 1]) {
+      for (let i = -360; i <= 360; i++) {
+        shot.orbit(camera, Math.abs(i) * Math.PI / 180, pitch, bounds);
+        if (i > -360) assert.ok(previous.angleTo(camera.quaternion) < .09, id + " at " + i + " degrees");
+        previous.copy(camera.quaternion);
+      }
+    }
+  }
+});
+
+test("a departing chase shot can travel continuously beyond the bay", () => {
+  const bounds = new Box3(new Vector3(-7, .3, -6), new Vector3(8, 4.7, 8.45));
+  const camera = new PerspectiveCamera(), travel = new GarageCameraTravel();
+  const makeShot = z => ({
+    frame(c) { c.clearViewOffset(); },
+    orbit(c) { c.position.set(0, 3, z); c.lookAt(0, 1, z + 1); },
+  });
+  const inside = makeShot(8), outside = makeShot(13);
+  travel.frame(camera, inside, 844, 390, 1, 0, 0, 0, true, bounds);
+  for (let i = 0; i <= 9; i++) travel.frame(camera, outside, 844, 390, 1, 0, 0, 100 * i, false, bounds);
+  assert.ok(camera.position.z > 12.8 && camera.position.z < 13, "transition passes through the open doorway");
+});
+
+test("stick rotation can accumulate revolutions in either direction and rest by the shortest turn", () => {
+  for (const sign of [-1, 1]) {
+    const motion = { yaw: 0, pitch: 0, dragging: false };
+    for (let i = 0; i < 410; i++) moveGarageOrbitStick(motion, sign, 0, 1 / 60);
+    assert.ok(-sign * motion.targetYaw > Math.PI * 4);
+    const rest = nearestRestYaw(motion.targetYaw);
+    assert.ok(Math.abs(motion.targetYaw - rest) < Math.PI);
+    assert.equal(rest, -sign * Math.PI * 4);
+  }
+});
+
 test("only the initial hit chooses the actor and UI presses are ignored", () => {
   const dom = new JSDOM('<div class="garage-orbit-surface"></div><div role="button">Play</div>');
   const { window } = dom;
@@ -385,6 +454,17 @@ test("only the initial hit chooses the actor and UI presses are ignored", () => 
     assert.equal(motion.dragging, false);
     pointer("pointerdown", 50, document.querySelector('[role="button"]'));
     assert.equal(hitCount, 2);
+    for (let i = 0; i < 9; i++) {
+      pointer("pointerdown", 120);
+      pointer("pointermove", 340);
+      pointer("pointerup", 340);
+    }
+    assert.ok(motion.targetYaw > 2 * Math.PI, "successive phone swipes accumulate past a full revolution");
+    const previous = motion.targetYaw;
+    pointer("pointerdown", 340);
+    pointer("pointermove", 120);
+    pointer("pointerup", 120);
+    assert.ok(motion.targetYaw < previous && motion.targetYaw > 2 * Math.PI, "reversing crosses no artificial seam");
   } finally {
     controls.abort();
     dom.window.close();

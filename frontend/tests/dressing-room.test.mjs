@@ -142,6 +142,13 @@ test('the fitting camera orbits a close-up without changing its target or crossi
     orbitFittingCamera(position, target, Math.PI, 0, sphere);
     assert(position.z < target.z, 'a horizontal drag can reach the back view');
     assert(Math.abs(position.distanceTo(target) - distance) < 1e-8);
+    const rear = position.clone();
+    position.set(.2, .92, 3.45);
+    orbitFittingCamera(position, target, -5 * Math.PI, 0, sphere);
+    assert(position.distanceTo(rear) < 1e-8, 'the inspection angle repeats after multiple turns');
+    position.set(.2, .92, 3.45);
+    orbitFittingCamera(position, target, 0, -4, sphere);
+    assert(position.y > target.y + .99 * distance, 'a high angle can look down on the subject');
     position.set(.2, .92, 3.45);
     const applied = orbitFittingCamera(position, target, .7, 10, sphere);
     assert(position.y >= .30 - 1e-8, 'a large vertical drag stops above the floor');

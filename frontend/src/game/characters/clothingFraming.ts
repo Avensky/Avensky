@@ -1,6 +1,7 @@
 import { Box3, MathUtils, Quaternion, Spherical, Vector3 } from "three";
 import { CLOTHING_PIECES, clothingBounds, type ClothingPiece } from "./clothingPieces";
 import type { Object3D } from "three";
+import { GARAGE_POLE_MARGIN } from "../preview/garageOrbitAngles";
 
 /** Measure only on selection. A missing accessory still has a useful regional close-up. */
 export function clothingFrame(root: Object3D, piece: ClothingPiece, fov: number, aspect: number) {
@@ -33,7 +34,8 @@ export function orbitFittingCamera(position: Vector3, target: Vector3, yaw: numb
   const basePolar = sphere.phi;
   const floorPolar = Math.acos(MathUtils.clamp((.30 - target.y) / sphere.radius, -1, 1));
   sphere.theta += yaw;
-  sphere.phi = MathUtils.clamp(basePolar + pitch, .35, Math.max(.35, Math.min(2.15, floorPolar)));
+  const lowestView = MathUtils.clamp(floorPolar, GARAGE_POLE_MARGIN, Math.PI - GARAGE_POLE_MARGIN);
+  sphere.phi = MathUtils.clamp(basePolar + pitch, GARAGE_POLE_MARGIN, lowestView);
   position.setFromSpherical(sphere).add(target);
   return sphere.phi - basePolar;
 }

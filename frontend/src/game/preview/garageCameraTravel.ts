@@ -1,13 +1,30 @@
-import { MathUtils, Quaternion, Vector3, type PerspectiveCamera } from "three";
+import { Euler, MathUtils, Quaternion, Vector3, type Box3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
+import { clampGarageElevation } from "./garageOrbitAngles.ts";
 
 export function garageOrbitDirection(direction: Vector3, heading: number, elevation: number) {
+  elevation = clampGarageElevation(elevation);
   const horizontal = Math.cos(elevation);
   return direction.set(horizontal * Math.sin(heading), Math.sin(elevation), horizontal * Math.cos(heading));
 }
 
-export function placeGarageOrbit(camera: PerspectiveCamera, target: Vector3, distance: number, heading: number, elevation: number) {
-  garageOrbitDirection(camera.position, heading, elevation).multiplyScalar(distance).add(target);
+const roomAxes = ["x", "y", "z"] as const;
+
+/** Shorten the sightline only where the garage shell intersects the orbit. */
+export function garageOrbitDistance(target: Vector3, direction: Vector3, distance: number, bounds?: Box3) {
+  if (!bounds) return distance;
+  for (const axis of roomAxes) {
+    const component = direction[axis];
+    if (Math.abs(component) < 1e-8) continue;
+    const wall = component > 0 ? bounds.max[axis] : bounds.min[axis];
+    distance = Math.min(distance, (wall - target[axis]) / component);
+  }
+  return Math.max(.05, distance);
+}
+
+export function placeGarageOrbit(camera: PerspectiveCamera, target: Vector3, distance: number, heading: number, elevation: number, bounds?: Box3) {
+  const ray = garageOrbitDirection(camera.position, heading, elevation);
+  ray.multiplyScalar(garageOrbitDistance(target, ray, distance, bounds)).add(target);
   camera.lookAt(target);
 }
 
@@ -62,7 +79,8 @@ export class GarageCameraTravel {
   private sourceLens = new Lens();
   private targetLens = new Lens();
   private roomPosition = new Vector3();
-  private roomOrientation = new Quaternion();
+  private roomOrientation = new Euler(0, 0, 0, "YXZ");
+  private roomLook = new Euler(0, 0, 0, "YXZ");
   private time = TRAVEL_MS;
   private lastFrame?: number;
   settledAngleSquared = 1e-10;
@@ -72,7 +90,7 @@ export class GarageCameraTravel {
   resume() { this.lastFrame = undefined; }
 
   frame(camera: PerspectiveCamera, requested: GarageEntryShot | undefined, width: number, height: number, dpr: number,
-        yaw: number, pitch: number, now: number, reducedMotion: boolean) {
+        yaw: number, pitch: number, now: number, reducedMotion: boolean, bounds?: Box3) {
     if (width <= 0 || height <= 0) return; // The persistent canvas may briefly move between DOM parents.
     const firstFrame = this.width === 0;
     if (firstFrame) camera.userData.hasGarageFrame = true;
@@ -106,7 +124,7 @@ export class GarageCameraTravel {
         this.roomPosition.set(portrait ? 4.6 : 5.55, portrait ? 1.72 : 1.57, 4.95);
         camera.position.copy(this.roomPosition);
         camera.lookAt(portrait ? -3.1 : -4.7, portrait ? 2.22 : 1.95, -5.55);
-        this.roomOrientation.copy(camera.quaternion);
+        this.roomOrientation.setFromQuaternion(camera.quaternion);
         applyLens(camera, width, height, portrait ? 70 : 59, 0, 0);
       }
       this.targetLens.read(camera);
@@ -117,12 +135,11 @@ export class GarageCameraTravel {
       this.settledAngleSquared = (.25 / (focalPixels * cornerScale)) ** 2;
     }
 
-    if (shot) shot.orbit(camera, yaw, pitch);
+    if (shot) shot.orbit(camera, yaw, pitch, bounds);
     else {
       camera.position.copy(this.roomPosition);
-      camera.quaternion.copy(this.roomOrientation);
-      camera.rotateY(yaw);
-      camera.rotateX(pitch);
+      this.roomLook.set(clampGarageElevation(this.roomOrientation.x + pitch), this.roomOrientation.y + yaw, 0);
+      camera.quaternion.setFromEuler(this.roomLook);
     }
 
     if ((changed || resized) && this.time < TRAVEL_MS) {
@@ -151,6 +168,8 @@ export class GarageCameraTravel {
     }
     this.lastFrame = now;
     if (this.time < TRAVEL_MS) {
+      // Keep interior arcs in the shell; the chase shot can intentionally follow the car through a bay.
+      const indoorBounds = bounds?.containsPoint(this.sourcePosition) && bounds.containsPoint(camera.position) ? bounds : undefined;
       const t = MathUtils.smootherstep(this.time, 0, TRAVEL_MS);
       if (this.arcDirection && t > 0) {
         const end = camera.position;
@@ -172,6 +191,7 @@ export class GarageCameraTravel {
         camera.position.lerpVectors(this.sourcePosition, camera.position, t);
         camera.quaternion.slerp(this.sourceOrientation, 1 - t);
       }
+      indoorBounds?.clampPoint(camera.position, camera.position);
       applyLens(camera, width, height, MathUtils.lerp(this.sourceLens.fov, lens.fov, t),
         MathUtils.lerp(this.sourceLens.x, lens.x, t), MathUtils.lerp(this.sourceLens.y, lens.y, t));
     } else applyLens(camera, width, height, lens.fov, lens.x, lens.y);
