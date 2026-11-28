@@ -13,6 +13,19 @@ import "./savedOutfits.css";
 const MAX_OUTFITS = 24;
 const MAX_NAME_LENGTH = 48;
 
+function outfitForCharacter(outfit: CharacterChoice, wearer: CharacterChoice): CharacterChoice {
+  const preview = { ...outfit };
+  if (outfit.identity !== wearer.identity) preview.identity = wearer.identity;
+  if (outfit.driver_id !== wearer.driver_id) preview.driver_id = wearer.driver_id;
+  if (outfit.appearance?.personality !== wearer.appearance?.personality) {
+    // Older saves can be just an outfit ID, with no appearance of their own.
+    preview.appearance = outfit.appearance
+      ? { ...outfit.appearance, personality: wearer.appearance?.personality }
+      : wearer.appearance;
+  }
+  return preview;
+}
+
 function outfitDetails(choice: CharacterChoice) {
   const visiblePieces = wornClothing(choice);
   const wardrobe = visiblePieces.includes("corset") ? resolveCharacterWardrobe(choice) : undefined;
@@ -180,7 +193,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
           <button type="button" className="menu-control saved-outfit-preview" aria-label={`Try on ${outfitName}`} disabled={!editingAllowed} onClick={() => {
             if (!canEditCharacter()) return;
             if (source === "device") restoreLocalOutfitHair(outfit);
-            onTryOn(outfit);
+            onTryOn(outfitForCharacter(outfit, choice));
             setName(outfitName);
             setMessage(`Previewing ${outfitName}.`);
           }}>

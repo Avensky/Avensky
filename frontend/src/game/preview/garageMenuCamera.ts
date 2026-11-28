@@ -1,6 +1,6 @@
-import { Vector3, type PerspectiveCamera } from "three";
+import { MathUtils, Vector3, type Box3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
-import { garageOrbitDirection, placeGarageOrbit } from "./garageCameraTravel.ts";
+import { garageOrbitDirection, garageOrbitDistance, placeGarageOrbit } from "./garageCameraTravel.ts";
 import { GARAGE_MENU_LANDMARKS, type GarageMenuStation } from "./garageMenuLandmarks.ts";
 
 // Eye positions in the clear aisle, in floor metres from the character.
@@ -19,17 +19,22 @@ export function garageMenuCamera(station: GarageMenuStation, anchor: readonly [n
   const actorRay = new Vector3(), stationRay = new Vector3();
   let distance = 2.57, heading = 2.94, elevation = .17, stationWeight = .5;
 
-  function orbit(camera: PerspectiveCamera, yaw: number, pitch: number) {
+  function orbit(camera: PerspectiveCamera, yaw: number, pitch: number, bounds?: Box3) {
     if (station === "enter_world") {
-      placeGarageOrbit(camera, target, distance, heading - yaw, elevation + pitch);
+      placeGarageOrbit(camera, target, distance, heading - yaw, elevation + pitch, bounds);
       return;
     }
-    garageOrbitDirection(actorRay, heading - yaw, elevation + pitch).negate();
-    camera.position.copy(actor).addScaledVector(actorRay, -distance);
+    garageOrbitDirection(actorRay, heading - yaw, elevation + pitch);
+    camera.position.copy(actor).addScaledVector(actorRay, garageOrbitDistance(actor, actorRay, distance, bounds));
+    actorRay.negate();
     // The normalized sightlines keep the near character and the distant station
     // in frame independently of depth. The narrow vehicle shot gives its nose more room.
     stationRay.subVectors(landmark, camera.position).normalize();
-    target.copy(camera.position).addScaledVector(actorRay, 1 - stationWeight).addScaledVector(stationRay, stationWeight);
+    // Ease off the station when inspecting from a different side. Trying to look
+    // halfway between opposite sightlines makes the camera flip past the actor.
+    const alignment = Math.cos(yaw) * Math.cos(pitch);
+    const weight = stationWeight * MathUtils.smoothstep(alignment, .55, .94);
+    target.copy(camera.position).addScaledVector(actorRay, 1 - weight).addScaledVector(stationRay, weight);
     camera.lookAt(target);
   }
 

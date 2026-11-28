@@ -249,7 +249,7 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
     );
     const stationControl = id => document.querySelector(`[data-station-anchor="${id}"] [role="button"]`);
     const continueControl = () => document.querySelector('[aria-label="Continue"]');
-    await t.test("keyboard and D-pad follow the garage stations on screen as the camera reframes", async () => {
+    await t.test("keyboard and D-pad cycle every garage station while the camera reframes", async () => {
       await reset();
       const controls = MAIN_MENU_ITEMS.map(({ id }) => stationControl(id));
       const positions = [[450, 118], [365, 463], [706, 236], [166, 291]];
@@ -259,11 +259,18 @@ test("mouse, keyboard and polled gamepad navigate the real menus and preferences
       try {
         await key("KeyD", "d");
         assert.equal(document.activeElement, controls[2], "Vehicle is to the right of Enter World");
-        await key("ArrowRight", "ArrowRight");
-        assert.equal(document.activeElement, controls[2], "no wrap at the right edge");
         positions.splice(0, 4, [135, 463], [571, 213], [214, 298], [762, 287]);
         await button(15);
-        assert.equal(document.activeElement, controls[1], "Wardrobe is now the closest station to the right");
+        assert.equal(document.activeElement, controls[3], "moving station labels keep their input order");
+        await key("ArrowRight", "ArrowRight");
+        assert.equal(document.activeElement, controls[1]);
+        await button(15);
+        assert.equal(document.activeElement, controls[0], "right wraps to the starting station");
+        await key("ArrowLeft", "ArrowLeft");
+        assert.equal(document.activeElement, controls[1], "left retraces the last move");
+        window.dispatchEvent(new dom.window.Event("resize"));
+        await button(15);
+        assert.equal(document.activeElement, controls[2], "resizing uses the new positions");
         assert.equal(ui.getState().screen, "main");
       } finally {
         for (const control of controls) delete control.getBoundingClientRect;

@@ -8,11 +8,7 @@ Its profile tab follows the same desktop, phone and short-landscape sizes as the
 The editor previews changes on the same turntable as the vehicle. New profiles
 confirm a character model before editing. Details, Body, Appearance, and Emotes share
 the Character header tab list, which opens on Appearance on the first visit.
-Use the shoulder buttons or Q and E to switch tabs. Where model selection is available, choose it in Details
-to preview its saved outfit and appearance in the other tabs. Details saves
-Male, Female, or Nonbinary independently of the equipped model. The server saves
-edits automatically, and the editor keeps pending changes through a reconnect to
-the same profile.
+Use the shoulder buttons or Q and E to switch tabs. Details shows the saved gender and personality, the starter style associated with that personality, and its gestures. Choose gender and personality when creating the character. Trying on and equipping outfits preserves those choices. The server saves wardrobe edits automatically, and the editor keeps pending changes through a reconnect to the same profile.
 
 Heroes, the fitting room, and the portrait worker use a losslessly packed
 copy of Vesper's bundled `villager-female.portrait.glb`. The character LOD
@@ -696,7 +692,7 @@ exposed skin in five sampled poses per tier.
 
 ## Body and emotes
 
-**Details** holds the character identity and personality. **Body** holds hair, eye and eyebrow color, skin tone, and an upper-arm band tattoo. The tattoo uses the skin material and follows the existing rig. Connected profiles save it when the server advertises tattoo support.
+**Details** describes the active character’s identity and personality. Resolve the starter style and signature emotes from the same catalogs that supply creation and playback. **Body** holds hair, eye and eyebrow color, skin tone, and an upper-arm band tattoo. The tattoo uses the skin material and follows the existing rig. Connected profiles save it when the server advertises tattoo support.
 
 **Emotes** opens the library with gestures, favorites, poses, and garage interactions. The creator saves named pose sequences on the current browser for the active player. Each keyframe has a body pose and optional hand shape with a hold time, transition speed, and facing. Playing the sequence uses the existing pose solver.
 

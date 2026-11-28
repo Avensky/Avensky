@@ -11,7 +11,7 @@ import { useGarageParking } from "../preview/garageParkingStore";
 import { useGarageParkingVehicle } from "../preview/garageParkingVehicle";
 import { GarageDriveOverlay } from "./GarageDriveOverlay";
 import { GarageOrbitSurface } from "../preview/GarageOrbitSurface";
-import { nextGarageStation } from "./garageStationNavigation";
+import { createGarageStationNavigation } from "./garageStationNavigation";
 import { GarageEntryHeader } from "../welcome/GarageEntryHeader";
 import { MAIN_MENU_ITEMS } from "./menuItems";
 import { useGarageEditor } from "../../worldBuilder/garage/garageEditorState";
@@ -93,6 +93,8 @@ function GarageStations() {
   }, [openStation]);
 
   useEffect(() => {
+    const navigation = createGarageStationNavigation();
+    const menu = root.current;
     function focusStation() {
       stations.current?.querySelector<HTMLElement>('[data-selected="true"]')?.focus({ preventScroll: true });
     }
@@ -115,13 +117,19 @@ function GarageStations() {
         if (!stations.current.contains(active)) focusStation();
         else {
           const buttons = Array.from(stations.current.querySelectorAll<HTMLElement>('[data-station-anchor] [role="button"]:not([aria-disabled="true"])'));
-          const next = nextGarageStation(buttons, active, action);
+          const next = navigation.next(buttons, active, action);
           if (next !== active) next?.focus({ preventScroll: true });
         }
       }
     }
     window.addEventListener("avenlab:main-menu-action", route);
-    return () => window.removeEventListener("avenlab:main-menu-action", route);
+    window.addEventListener("resize", navigation.reset);
+    menu?.addEventListener("pointerdown", navigation.reset, true);
+    return () => {
+      window.removeEventListener("avenlab:main-menu-action", route);
+      window.removeEventListener("resize", navigation.reset);
+      menu?.removeEventListener("pointerdown", navigation.reset, true);
+    };
   }, [continueSelection]);
 
   return <main ref={root} className="game-ui menu-surface menu-home main-menu garage-main-menu relative z-30" aria-label="Garage"

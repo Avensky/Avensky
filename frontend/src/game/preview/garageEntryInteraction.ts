@@ -1,3 +1,4 @@
+import { clampGarageElevation } from "./garageOrbitAngles.ts";
 import { createGarageOrbitIdle } from "./garageOrbitIdle.ts";
 
 export type EntryMotion = {
@@ -9,8 +10,8 @@ export type EntryMotion = {
 
 export type ActorInput = { hit: (clientX: number, clientY: number) => boolean; turn: (radians: number) => void };
 const IDLE_MS = 18000;
-export const MAX_YAW = .24;
-export const MAX_PITCH = .09;
+const DRAG_RADIANS_PER_PIXEL = .004;
+const STICK_RADIANS_PER_SECOND = 2;
 
 /** Input lives with the room, so grabbing during GLB loading cancels the entrance offset too. */
 export function installGarageEntryInteraction(motion: EntryMotion, interactivePreview: () => boolean, getActor?: () => ActorInput | undefined) {
@@ -69,9 +70,10 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
     motion.dragStarted = performance.now();
     motion.lastInput = motion.dragStarted;
     if (root.dataset.garageReady !== "true") {
-      motion.yaw = 0; motion.pitch = 0;
+      motion.yaw = motion.pitch = 0;
+      motion.targetYaw = motion.targetPitch = 0;
     }
-    motion.targetYaw = motion.yaw; motion.targetPitch = motion.pitch;
+    motion.targetYaw ??= motion.yaw; motion.targetPitch ??= motion.pitch;
     motion.invalidate?.();
   }, capture);
   document.addEventListener("pointermove", event => {
@@ -83,8 +85,8 @@ export function installGarageEntryInteraction(motion: EntryMotion, interactivePr
       pointer.x = event.clientX;
       return;
     }
-    const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * .0014));
-    const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, (motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * .0009));
+    const yaw = (motion.targetYaw ?? motion.yaw) + (event.clientX - pointer.x) * DRAG_RADIANS_PER_PIXEL;
+    const pitch = clampGarageElevation((motion.targetPitch ?? motion.pitch) + (event.clientY - pointer.y) * DRAG_RADIANS_PER_PIXEL);
     pointer.x = event.clientX; pointer.y = event.clientY;
     if (yaw === motion.targetYaw && pitch === motion.targetPitch) return;
     motion.targetYaw = yaw; motion.targetPitch = pitch;
@@ -154,8 +156,8 @@ export function moveGarageOrbitStick(motion: EntryMotion, x: number, y: number, 
       motion.lastInput = performance.now();
       motion.idle?.cancel();
     }
-    const yaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, (motion.targetYaw ?? motion.yaw) - x * MAX_YAW * 2 * elapsed));
-    const pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, (motion.targetPitch ?? motion.pitch) + y * MAX_PITCH * 2 * elapsed));
+    const yaw = (motion.targetYaw ?? motion.yaw) - x * STICK_RADIANS_PER_SECOND * elapsed;
+    const pitch = clampGarageElevation((motion.targetPitch ?? motion.pitch) + y * STICK_RADIANS_PER_SECOND * elapsed);
     motion.stickActive = true;
     if (yaw === motion.targetYaw && pitch === motion.targetPitch) return;
     motion.targetYaw = yaw;

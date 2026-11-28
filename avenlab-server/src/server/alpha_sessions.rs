@@ -402,13 +402,15 @@ impl Server {
                         .filter(|current| current.id == choice.id).and_then(|current| current.driver_id.clone());
                 }
                 if !choice.known_driver(&data.authored.drivers) { return Err("Unknown roster character.".into()); }
-                if profile.active_character.is_some() && progression.character.as_ref().is_some_and(|current| {
-                    current.id != choice.id || current.driver_id != choice.driver_id
-                }) {
-                    return Err("Choose this character's outfits in the garage. Switch characters from the welcome screen.".into());
-                }
-                if choice.identity.is_none() {
-                    choice.identity = progression.character.as_ref().and_then(|current| current.identity);
+                if let Some(current) = &progression.character {
+                    if profile.active_character.is_some() {
+                        if current.id != choice.id || current.driver_id != choice.driver_id {
+                            return Err("Choose this character's outfits in the garage. Switch characters from the welcome screen.".into());
+                        }
+                        choice.retain_character_details(current);
+                    } else if choice.identity.is_none() {
+                        choice.identity = current.identity;
+                    }
                 }
                 if progression.character.as_ref() == Some(&choice) {
                     return Ok(progression.cosmetics_view());
