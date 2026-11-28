@@ -190,6 +190,7 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     const { CHARACTERS, DEFAULT_CHARACTER, ROOK_ID, characterLook } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
     const { useCharacterPreviewStore: preview } = await vite.ssrLoadModule('/src/game/characters/characterPreviewStore.ts');
     const { navigateFormRows } = await vite.ssrLoadModule('/src/game/social/formRows.ts');
+    const { wornClothing } = await vite.ssrLoadModule('/src/game/characters/clothingPieces.ts');
     const changes = [], trials = [];
     function Harness({ initial }) {
       const [choice, setChoice] = useState(initial);
@@ -226,7 +227,10 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     await act(async () => groups[0].click());
     const cameraRail = find('.dressing-camera-shortcuts');
     const views = [...cameraRail.querySelectorAll('[data-camera-choice]')];
-    assert.deepEqual(views.slice(0, 3).map(button => button.dataset.cameraChoice), ['Full body', 'Face', 'Hands']);
+    const expectedViews = ['Full body', 'Face', 'Hands', ...wornClothing(DEFAULT_CHARACTER).map(piece => 'piece:' + piece)];
+    const viewIds = views.map(button => button.dataset.cameraChoice);
+    assert.deepEqual([...viewIds].sort(), [...expectedViews].sort(), 'each worn piece and character shot has exactly one shortcut');
+    assert.deepEqual(viewIds.slice(0, 3), ['Full body', 'Face', 'Hands']);
     assert(views.every(button => !button.closest('[hidden]')), 'camera and worn-item views are directly available');
     assert(find('[data-wearable-quick-select="corset"]'));
     assert(!find('[data-wearable-quick-select="bra"]'));

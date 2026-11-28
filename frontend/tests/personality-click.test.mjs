@@ -62,10 +62,24 @@ test('character clicks play varied personality clips, resume held poses, and ign
       finally { Math.random = random; }
     };
     const tick = seconds => { for (let n = 0; n < seconds * 60; n++) for (const frame of frames) frame({}, 1 / 60); };
+    const shoulder = scene.getObjectByName('upperarm_r'), rest = shoulder.quaternion.clone();
+    function checkHoldAndResume(joint, motion) {
+      preview.setState({ playbackPaused: true });
+      const held = joint.quaternion.clone();
+      tick(.5);
+      assert(held.equals(joint.quaternion), `pause freezes the ${motion} skeleton`);
+      preview.setState({ playbackPaused: false });
+      tick(.25);
+      assert(held.angleTo(joint.quaternion) > .001, `resume advances the ${motion} skeleton`);
+    }
+    checkHoldAndResume(scene.getObjectByName('head'), 'idle breathing');
+    preview.setState({ playbackPaused: true });
     await act(async () => click(0)); assert.equal(preview.getState().emote.id, '041'); assert.equal(preview.getState().playbackPaused, false);
     assert.equal(frames.size, 1, 'one animation frame callback is registered');
-    const shoulder = scene.getObjectByName('upperarm_r'), rest = shoulder.quaternion.clone();
     await act(async () => tick(1)); assert(rest.angleTo(shoulder.quaternion) > .01, 'a personality click produces actual skeletal animation');
+    const activeEmote = preview.getState().emote;
+    checkHoldAndResume(shoulder, 'active emote');
+    assert.equal(preview.getState().emote, activeEmote, 'resume keeps the same emote');
     await act(async () => click(0)); assert.equal(preview.getState().emote.id, '042', 'same random input still excludes the last clip');
     const second = preview.getState().emote;
     await act(async () => click(20)); assert.equal(preview.getState().emote, second, 'drag release does not play a clip');

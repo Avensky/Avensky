@@ -2,9 +2,9 @@ import { Box3, Euler, MathUtils, Vector3, type Object3D } from "three";
 import type { GarageStation } from "../preview/garageStations";
 import type { Emote, XYZ } from "./garageEmotes";
 export const MAKEUP_EMOTES = [
-  { id: "makeup-check", mirrorId: "mirror-makeup", name: "Check makeup", icon: "makeupCheck" },
-  { id: "redo-lipstick", mirrorId: "mirror-lipstick", name: "Redo lipstick", icon: "lipstick" },
-  { id: "apply-eyeliner", mirrorId: "mirror-eyeliner", name: "Apply eyeliner", icon: "eyeliner" },
+  { id: "makeup-check", mirrorId: "mirror-makeup", name: "Check makeup" },
+  { id: "redo-lipstick", mirrorId: "mirror-lipstick", name: "Redo lipstick" },
+  { id: "apply-eyeliner", mirrorId: "mirror-eyeliner", name: "Apply eyeliner" },
 ] as const;
 export const MIRROR_MAKEUP_EMOTES = MAKEUP_EMOTES.map(({ mirrorId, name }) => ({
   id: mirrorId, name: `Side mirror · ${name}`,

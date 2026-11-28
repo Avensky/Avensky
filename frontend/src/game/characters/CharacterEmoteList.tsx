@@ -8,7 +8,7 @@ import { EMOTE_GROUPS, findGaragePreviewEmote, garagePreviewCollection, type Emo
 import { availableFinderEmotes, matchesEmote } from "./emoteFinder";
 import { EmoteFinderShortcuts } from "./EmoteFinderShortcuts";
 import { GARAGE_LEAN_ID, GARAGE_LEAN_NAME } from "./garageLean";
-import { MIRROR_MAKEUP_EMOTES } from "./mirrorCheck";
+import { MAKEUP_EMOTES, MIRROR_MAKEUP_EMOTES } from "./mirrorCheck";
 
 export type PreviewEmoteGroup = EmoteGroup | CharacterPersonality | "Best" | "All" | "Personality" | "Favorites" | "Gestures";
 export type PreviewEmote = { id: string; name: string };
@@ -53,10 +53,12 @@ export const CharacterEmoteList = memo(function CharacterEmoteList({
   }, [insideCar, group, bag, road, station, personality, favorites, useCatalog]);
   const terms = query.match(/[\p{L}\p{N}]+/gu) ?? [];
   const favoritable = new Set(picked.map(item => item.id));
+  const showGarageActions = !insideCar && (group === "Garage" || useCatalog);
   const visible = [
-    ...(!insideCar && mirrorAvailable && (group === "Garage" || useCatalog) ? MIRROR_MAKEUP_EMOTES : []),
-    ...(!insideCar && leanAvailable && (group === "Garage" || useCatalog) ? [{ id: GARAGE_LEAN_ID, name: GARAGE_LEAN_NAME }] : []),
+    ...(showGarageActions && mirrorAvailable ? MIRROR_MAKEUP_EMOTES : []),
+    ...(showGarageActions && leanAvailable ? [{ id: GARAGE_LEAN_ID, name: GARAGE_LEAN_NAME }] : []),
     ...picked,
+    ...(showGarageActions ? MAKEUP_EMOTES : []),
   ].filter(item => `${item.id} ${item.name}`.toLowerCase().includes(query) ||
     (finder && terms.length > 0 && matchesEmote(item, terms)));
 

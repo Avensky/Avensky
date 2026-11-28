@@ -1,4 +1,5 @@
 import { GameButton } from "../../components/GameButton";
+import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { turnCharacter, turnGarage } from "./fittingControlsStore";
 import "./fittingRotationControls.css";
 
@@ -13,26 +14,31 @@ function RotateArrow({ right, garage }: { right: boolean; garage: boolean }) {
   </svg>;
 }
 
-const controls = [
-  { subject: "garage", direction: -1 },
-  { subject: "character", direction: -1 },
-  { subject: "character", direction: 1 },
-  { subject: "garage", direction: 1 },
-] as const;
-
-export function FittingRotationControls({ characterDisabled, garageDisabled }: {
-  characterDisabled: boolean; garageDisabled: boolean;
+function RotationButton({ subject, direction, disabled }: {
+  subject: "garage" | "character"; direction: -1 | 1; disabled: boolean;
 }) {
-  return <div className="fitting-rotation-grid" role="group" aria-label="Rotate character and garage" data-controller-row>
-    {controls.map(({ subject, direction }) => {
-      const right = direction > 0;
-      const garage = subject === "garage";
-      const label = `Rotate ${subject} ${right ? "right" : "left"}`;
-      return <GameButton key={label} variant="custom" pressFeedback className="fitting-rotation-button"
-        data-rotation={subject} disabled={garage ? garageDisabled : characterDisabled}
-        aria-label={label} title={label} onPress={() => (garage ? turnGarage : turnCharacter)(direction)}>
-        <RotateArrow garage={garage} right={right} />
-      </GameButton>;
-    })}
+  const right = direction > 0;
+  const garage = subject === "garage";
+  const label = `Rotate ${subject} ${right ? "right" : "left"}`;
+  return <GameButton variant="custom" pressFeedback className="fitting-rotation-button"
+    data-rotation={subject} disabled={disabled} aria-label={label} title={label}
+    onPress={() => (garage ? turnGarage : turnCharacter)(direction)}>
+    <RotateArrow garage={garage} right={right} />
+  </GameButton>;
+}
+
+export function FittingRotationControls({ characterDisabled, garageDisabled, paused, reducedMotion, onTogglePose }: {
+  characterDisabled: boolean; garageDisabled: boolean; paused: boolean; reducedMotion: boolean; onTogglePose: () => void;
+}) {
+  const label = reducedMotion ? "Pose playback paused by Reduced Motion" : paused ? "Resume pose" : "Pause pose";
+  return <div className="fitting-rotation-grid" role="group" aria-label="Rotation and pose playback" data-controller-row>
+    <RotationButton subject="garage" direction={-1} disabled={garageDisabled} />
+    <RotationButton subject="character" direction={-1} disabled={characterDisabled} />
+    <GameButton variant="custom" pressFeedback className="fitting-rotation-button"
+      aria-label={label} title={label} aria-pressed={paused || reducedMotion} disabled={reducedMotion} onPress={onTogglePose}>
+      <PreviewToolIcon icon={paused || reducedMotion ? "resume" : "hold"} />
+    </GameButton>
+    <RotationButton subject="character" direction={1} disabled={characterDisabled} />
+    <RotationButton subject="garage" direction={1} disabled={garageDisabled} />
   </div>;
 }

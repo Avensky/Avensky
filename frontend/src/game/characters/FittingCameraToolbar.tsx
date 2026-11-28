@@ -1,22 +1,14 @@
 import type { ReactNode } from "react";
 import { GameButton } from "../../components/GameButton";
-import { PreviewControlDisclosure } from "../preview/PreviewControlDisclosure";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewVisibilityToggle } from "../preview/PreviewVisibilityToggle";
 import { PreviewZoomSlider } from "../preview/PreviewZoomSlider";
 import { CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX, useCharacterPreviewStore } from "./characterPreviewStore";
 
-export function FittingAngleRail({ children, tools }: { children: ReactNode; tools?: ReactNode }) {
+export function FittingAngleRail({ children }: { children: ReactNode }) {
   return <aside className="dressing-camera-shortcuts fitting-camera-toolbar" aria-label="Fitting room camera shortcuts">
     <div className="wardrobe-camera-presets">{children}</div>
-    {tools}
   </aside>;
-}
-
-export function FittingPoseTools({ children }: { children: ReactNode }) {
-  return <PreviewControlDisclosure label="Pose tools" icon={<PreviewToolIcon icon="adjustments" />}>
-    {children}
-  </PreviewControlDisclosure>;
 }
 
 export function FittingZoomRail({ insideCar }: { insideCar: boolean }) {

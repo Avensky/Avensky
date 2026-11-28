@@ -17,19 +17,17 @@ import { CharacterDetails } from "./CharacterDetails";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { AlphaAccountPanel } from "./AlphaAccountPanel";
 import { CHARACTER_CAMERAS, useCharacterPreviewStore } from "./characterPreviewStore";
-import { EMOTE_GROUPS, LOOK_AWAY_EMOTE } from "./garageEmotes";
+import { EMOTE_GROUPS } from "./garageEmotes";
 import { CharacterPosePack } from "./CharacterPosePack";
 import { CharacterEmoteList, type PreviewEmote, type PreviewEmoteGroup } from "./CharacterEmoteList";
 import { unlockVehicleAudio } from "../../audio/sharedAudio";
 import { GARAGE_STATIONS } from "../preview/garageStations";
 import { CHARACTER_PERSONALITIES, type AnimationFit } from "./characterPersonality";
 import { FittingCameraSelect } from "./FittingCameraSelect";
-import { FittingAngleRail, FittingPoseTools, FittingZoomRail } from "./FittingCameraToolbar";
+import { FittingAngleRail, FittingZoomRail } from "./FittingCameraToolbar";
 import { DressingRoom, type WardrobeNavigation } from "./DressingRoom";
 import { WardrobeBody } from "./WardrobeBody";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
-import { PreviewToolIcon } from "../preview/PreviewToolIcon";
-import { PreviewToolButton } from "../preview/PreviewToolButton";
 import { FittingRotationControls } from "./FittingRotationControls";
 import { characterTurnLocked } from "./characterPreviewStage";
 import { PLAYER_ONBOARDING } from "../welcome/config";
@@ -51,6 +49,7 @@ export type CharacterTab = typeof CHARACTER_TABS[number]["id"];
 
 const PREVIEW_CAST = CHARACTERS.map(item => ({ gender: item.gender, choice: { id: item.id, outfit: item.outfits[0].id } }));
 const BODY_CAMERAS = ["Full body", "Hair", "Face", "Eyes", "Makeup", "Hands"] as const;
+const VEHICLE_EMOTE_CAMERAS = [...CHARACTER_CAMERAS, "Whole car"] as const;
 const COCKPIT_CAMERAS = ["Full body", "Whole car"] as const;
 const EMOTE_PACKS = EMOTE_GROUPS.filter(group => group !== "Garage");
 type EmoteSection = PreviewEmoteGroup | "Pose pack" | "Interactions" | "Creator";
@@ -507,7 +506,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
         <button type="button" className="menu-control" data-controller-row data-cockpit-toggle disabled={!canEnterCar || !cockpitVehicle || brzDoorBusy}
           onClick={toggleCockpit}>Enter {stationName}</button>
       </>}
-      {insideCar && !locked && <button type="button" className="menu-control" data-controller-row data-cockpit-toggle
+      {insideCar && <button type="button" className="menu-control" data-controller-row data-cockpit-toggle
         disabled={exitDisabled} onClick={toggleCockpit}>{exitLabel}</button>}
       {reducedMotion && <p>Emote playback is paused by Reduced Motion.</p>}
       {cockpitError && <p role="status">{cockpitError}</p>}
@@ -591,30 +590,18 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   const fitting = tab === "appearance";
   const rotationDisabled = characterTurnLocked(insideCar, emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
-  const cameraViews = tab === "body" ? BODY_CAMERAS : vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
+  const cameraViews = tab === "body" ? BODY_CAMERAS : vehiclePreview ? VEHICLE_EMOTE_CAMERAS : CHARACTER_CAMERAS;
   const changeCamera = (view: typeof camera) => useCharacterPreviewStore.setState(s => ({ camera: view, zoom: 1, focusRevision: s.focusRevision + 1 }));
   const cameraSelect = insideCar
     ? <FittingCameraSelect views={COCKPIT_CAMERAS} driver view={camera === "Whole car" ? "Whole car" : "Full body"}
       viewLabels={{ "Full body": "Driver", "Whole car": "Whole vehicle" }} onViewChange={changeCamera} />
-    : <FittingCameraSelect choice={previewChoice} views={cameraViews}
+    : <FittingCameraSelect views={cameraViews}
       view={!vehiclePreview && camera === "Whole car" ? "Full body" : camera} onViewChange={changeCamera} />;
   const togglePose = () => useCharacterPreviewStore.setState({ playbackPaused: !playbackPaused });
-  const exitCockpit = insideCar && <PreviewToolButton label={exitLabel} disabled={exitDisabled} data-cockpit-toggle onClick={toggleCockpit}>
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="M11 4H4v16h7m2-12 4 4-4 4m4-4H8" /></svg>
-  </PreviewToolButton>;
-  const poseTools = <FittingPoseTools>
-    <PreviewToolButton label={playbackPaused ? "Resume pose" : "Hold pose"} aria-pressed={playbackPaused}
-      onClick={togglePose}><PreviewToolIcon icon={playbackPaused ? "resume" : "hold"} /></PreviewToolButton>
-    {fitting && <><PreviewToolButton label="Look away" disabled={reducedMotion}
-      onClick={() => playEmote(LOOK_AWAY_EMOTE)}><PreviewToolIcon icon="lookAway" /></PreviewToolButton>
-      {MAKEUP_EMOTES.map(item => <PreviewToolButton key={item.id} label={item.name}
-        disabled={reducedMotion} onClick={() => playEmote(item)}><PreviewToolIcon icon={item.icon} /></PreviewToolButton>)}
-    </>}
-    {exitCockpit}
-  </FittingPoseTools>;
-  const angles = <div className="dressing-camera-block"><FittingAngleRail tools={poseTools}>{cameraSelect}</FittingAngleRail></div>;
+  const angles = <div className="dressing-camera-block"><FittingAngleRail>{cameraSelect}</FittingAngleRail></div>;
   const framing = <FittingZoomRail insideCar={insideCar} />;
-  const rotation = <FittingRotationControls characterDisabled={rotationDisabled} garageDisabled={insideCar} />;
+  const rotation = <FittingRotationControls characterDisabled={rotationDisabled} garageDisabled={insideCar}
+    paused={playbackPaused} reducedMotion={reducedMotion} onTogglePose={togglePose} />;
 
   if (!locked) return (
     <div ref={page} className="character-page character-page--setup" aria-label="Choose character gender" onFocus={revealCharacterControl}>
@@ -652,7 +639,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
         aria-label={`Preview of ${characterName ?? "Your character"}`} />
       {fitting && <DressingRoom navigation={wardrobeNavigation} choice={previewChoice} onChange={editPreviewAppearance} onPreviewOutfit={previewOutfit} onTryOn={tryOn} onLoad={loadOutfit}
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
-        onEndPreview={loadedOutfit ? endOutfitPreview : undefined} poseTools={poseTools}
+        onEndPreview={loadedOutfit ? endOutfitPreview : undefined}
         onColors={saveClothingColors} />}
       {tab === "body" && <WardrobeBody choice={previewChoice} onChange={editBodyAppearance}
         navigation={wardrobeNavigation} disabled={!editingAllowed} tattoosAvailable={!saveToProfile || bodyTattoosAvailable} />}
@@ -665,7 +652,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
       {tab === "emotes" && emoteResultsPanel}
       {(tab === "profile" || tab === "account") && <AlphaAccountPanel key={JSON.stringify([connectedOwner, tab])} tab={tab} />}
       {playback}
-      {!fitting && angles}
+      {(tab === "body" || tab === "details" || tab === "emotes") && angles}
       {framing}{rotation}
       {status === "error" && <section className="character-controls menu-panel-frame character-controls--bottom" aria-label="Recover unsaved changes">
         <div className="character-equip" data-controller-row>

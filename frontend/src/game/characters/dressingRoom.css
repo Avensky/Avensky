@@ -46,20 +46,16 @@
   touch-action: pan-y;
   pointer-events: auto;
 }
-.wardrobe-camera-presets .fitting-camera-choices,
-.wardrobe-camera-presets .dressing-wearable-shortcuts {
-  display: flex;
-  flex-flow: column nowrap;
+.wardrobe-camera-presets .fitting-camera-choices {
+  display: grid;
+  grid-template-columns: var(--fitting-tool-size);
   gap: 2px;
 }
 .wardrobe-camera-presets .fitting-tool-icon { touch-action: pan-y; }
-.dressing-camera-shortcuts > .preview-control-disclosure { flex: none; pointer-events: auto; }
-.dressing-camera-shortcuts .fitting-camera-panel {
-  left: calc(100% + 4px);
-  bottom: 0;
-  transform: none;
-  grid-template-columns: repeat(2, var(--fitting-tool-size));
-  max-height: min(40dvh, 225px);
+@media (pointer: coarse) and (orientation: landscape) {
+  .wardrobe-camera-presets .fitting-camera-choices {
+    grid-template-columns: repeat(2, var(--fitting-tool-size));
+  }
 }
 .dressing-camera-shortcuts .fitting-tool-icon, .dressing-preview-zoom .fitting-tool-icon {
   -webkit-tap-highlight-color: transparent;
@@ -68,7 +64,7 @@
 .dressing-preview-zoom.fitting-camera-toolbar .menu-control.fitting-tool-icon {
   background: color-mix(in srgb, var(--app-panel) 65%, transparent);
 }
-.dressing-camera-shortcuts.fitting-camera-toolbar .menu-control:is([aria-pressed=true], [aria-expanded=true], :focus-visible),
+.dressing-camera-shortcuts.fitting-camera-toolbar .menu-control:is([aria-pressed=true], :focus-visible),
 .dressing-preview-zoom.fitting-camera-toolbar .menu-control:focus-visible {
   border-color: var(--app-accent); color: var(--app-accent);
   box-shadow: inset 0 -2px var(--app-accent);

@@ -95,8 +95,8 @@ lipstick, and Apply eyeliner. All three use the exterior mirror on the staged
 door side. Separately named mirror meshes give the target point. Fused mirrors
 use an estimate near the window corner.
 
-In Appearance, Camera tools has stationary versions of all three actions
-with a face close-up. Look away is also available for outfit inspection.
+In Emotes, the Garage list and motion search offer stationary versions of
+all three actions with a face close-up. Look away is available there as well.
 The lipstick and eyeliner emotes follow rig-specific face landmarks and
 use temporary handheld props. These previews leave saved appearance colors
 as equipped.
@@ -548,7 +548,7 @@ Choose an equipped piece from the camera rail or click its catalog card to
 inspect it. Selected item measures the visible garment or accessory, including
 glasses and the bag. Camera presets ease between angles. Manual editor
 orbit/pan cancels the transition.
-Hold pose freezes animation. Clicking the character resumes a personality gesture.
+The center playback button pauses or resumes the pose. Clicking the character can start a personality gesture.
 
 Fabric and trim overrides are stored under `appearance.item_colors` by outfit
 or wardrobe set plus piece, such as `gothic-01:skirt` or `aviator:glasses`.
@@ -568,7 +568,9 @@ orbit the fitting-room camera around the current framing target. Mouse and touch
 use the initial press to distinguish the dressed character from the room.
 Captured movement turns the character without testing each skinned garment again.
 
-Choose a shot or garment close-up on the camera rail. Reset view above the zoom
+Choose a shot for the active tab on the camera rail. Appearance includes worn
+garments in head-to-toe order. On a landscape phone the rail uses two columns.
+Reset view above the zoom
 slider restores the current framing. Hide interface below the slider leaves the
 live character in view. The next deliberate input restores the controls.
 The Heroes Fitting Room uses the garage with an angled
