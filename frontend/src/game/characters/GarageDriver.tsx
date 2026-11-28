@@ -135,7 +135,8 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
-    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID} />
+    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID}
+      stockFit={look.outfit.id === "dockwear" && !look.garments && !look.corset && !look.wardrobe && !removedClothing.length} />
     <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
       leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creatorEmotes={creatorEmotes} />
   </> : null;

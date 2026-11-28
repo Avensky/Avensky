@@ -94,5 +94,14 @@
     "url": "/models/characters/female/hair/Hair_12_espresso.glb",
     "sha256": "923194cf9a12649b37a9523731d8d10616aae7fc0e1ec97be71739c4ee0a78d4",
     "size": 1418972
+  },
+  {
+    "id": "Mia_01",
+    "label": "Braided Ponytail",
+    "mesh": "Mia_01",
+    "url": "/models/characters/female/wardrobe/alpha/mia-braided-ponytail.glb",
+    "sha256": "7e71285a8d25fc9ce3b5f5aea6351997519aeef035087effd3670fa5e1423f3a",
+    "size": 16662792,
+    "editableGroom": true
   }
 ]

@@ -63,12 +63,14 @@ function assetDefines(release: StagingRelease | null) {
     ? (packedPath && Object.hasOwn(release.assets, packedPath) ? packedPath : null)
     : installedPackedVesperPortrait(vesper);
 
-  const fittedHair: {id: string; label: string; url: string; mesh: string; sha256: string}[] = JSON.parse(readFileSync(
+  const fittedHair: {id: string; label: string; url: string; mesh: string; sha256: string; editableGroom?: boolean}[] = JSON.parse(readFileSync(
     new URL("../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
+  const activeHair = fittedHair.filter(style => release
+    ? release.assets[style.url]?.sha256 === style.sha256
+    : style.editableGroom && hasModel(garmentFile(style.url)));
   return {
-    __FITTED_HAIR_IDS__: JSON.stringify(fittedHair.filter(style => release?.assets[style.url]?.sha256 === style.sha256).map(style => style.id)),
-    __FITTED_HAIR_STYLES__: JSON.stringify(fittedHair.filter(style => release?.assets[style.url]?.sha256 === style.sha256)
-      .map(({ id, label, url, mesh }) => ({ id, label, url, mesh }))),
+    __FITTED_HAIR_IDS__: JSON.stringify(activeHair.map(style => style.id)),
+    __FITTED_HAIR_STYLES__: JSON.stringify(activeHair.map(({ id, label, url, mesh, editableGroom }) => ({ id, label, url, mesh, editableGroom }))),
     __STAGING_ASSET_RELEASE__: JSON.stringify(release && {
       id: release.id, paths: Object.fromEntries(Object.keys(release.assets).map(path => [path, true])),
     }),

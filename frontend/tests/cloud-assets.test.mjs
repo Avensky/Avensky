@@ -19,8 +19,12 @@ test("staging automatically includes all approved private hair and fitted wardro
   const hair = JSON.parse(readFileSync(new URL("../../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
   const fitted = JSON.parse(readFileSync(new URL("../scripts/staging-fitted-assets.json", import.meta.url), "utf8"));
   const paths = Object.keys(release.assets).filter(url => url.startsWith("/models/characters/female/hair/"));
-  assert.equal(hair.length, 12);
-  assert.deepEqual(paths.sort(), hair.map(style => style.url).sort());
+  const pack = hair.filter(style => /^hair-\d{2}$/.test(style.id));
+  assert.equal(pack.length, 12);
+  assert.deepEqual(paths.sort(), pack.map(style => style.url).sort());
+  const braided = hair.find(style => style.id === "Mia_01");
+  assert.equal(braided?.label, "Braided Ponytail");
+  assert.equal(braided?.editableGroom, true);
   for (const { url, sha256, size } of hair) {
     assert.deepEqual(release.assets[url], { sha256, size });
   }
