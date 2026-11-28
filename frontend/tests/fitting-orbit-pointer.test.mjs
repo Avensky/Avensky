@@ -150,6 +150,20 @@ test('background mouse and touch drags orbit, while a direct mouse hit turns the
     pointer('pointermove', 9, 22, 17, 'touch');
     pointer('pointerup', 9, 22, 17, 'touch');
     assert.deepEqual(deltas.at(-1), [12, 2], 'the open garage beside the vehicle orbits the camera');
+    for (const [width, height] of [[390, 844], [844, 390]]) {
+      await act(async () => store.getState().setSize(width, height, 0, 0));
+      for (const heading of [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2, 2 * Math.PI]) {
+        camera.position.set(4 * Math.sin(heading), .5, 4 * Math.cos(heading));
+        camera.lookAt(0, 0, 0);
+        store.getState().scene.updateMatrixWorld(true);
+        const previous = deltas.length;
+        pointer('pointerdown', 10, 52, 25, 'touch');
+        pointer('pointermove', 10, 22, 25, 'touch');
+        pointer('pointerup', 10, 22, 25, 'touch');
+        assert.equal(deltas.length, previous + 1, 'can re-grab the room after passing the rear of the model');
+        assert.deepEqual(deltas.at(-1), [-30, 0], 'the reverse swipe is preserved at every heading');
+      }
+    }
   } finally {
     if (root) await act(async () => root.unmount());
     await vite?.close();
