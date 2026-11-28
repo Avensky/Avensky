@@ -45,7 +45,9 @@ function garageTestServer() {
         }
         export const stepCamera = () => renderFrame({ frameloop: 'always', invalidate, scene }, 1 / 60);
         export const useFrame = callback => useLayoutEffect(() => { renderFrame = callback; }, [callback]);
-        export const useThree = selector => selector({ size: { width: 1000, height: 500 }, get: () => ({camera:entryCamera}), invalidate });
+        let size = { width: 1000, height: 500 };
+        export const resizeSurface = (width,height) => { size = {width,height}; };
+        export const useThree = selector => selector({ size, get: () => ({camera:entryCamera}), invalidate });
         export const Html = () => null, PreviewContactShadow = () => null;
         export const FittingCameraOrbit = () => null, FittingMirrorDisplay = () => null;
         export function PerspectiveCamera({ref, children}) {
@@ -140,7 +142,7 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     const {useGarageDrive} = await load('game/preview/garageDriveStore.ts');
     const {useCharacterPreviewStore} = await load('game/characters/characterPreviewStore.ts');
     const {useVehicleStudioStore} = await load('game/heroes/vehicleStudioStore.ts');
-    const {camera,entryCamera,stepCamera,waitForModel,getActorPosition,setGarageMotion} = await vite.ssrLoadModule('virtual:garage-surface');
+    const {camera,entryCamera,stepCamera,resizeSurface,waitForModel,getActorPosition,setGarageMotion} = await vite.ssrLoadModule('virtual:garage-surface');
     useUIStore.setState({screen:'heroes'});
     useAlphaStore.setState({previewHero:'brz'});
     useVehicleStudioStore.getState().setActiveTab('performance');
@@ -231,6 +233,12 @@ test('a delayed vehicle swap retains the camera and mounted driver until a new s
     assert.deepEqual(camera.view, entryCamera.view);
     for (let frame=0;frame<15;frame++) stepCamera();
     assert(camera.position.distanceTo(entryCamera.position)>.1);
+    resizeSurface(390,844);
+    useCharacterPreviewStore.setState({viewport:{left:6,top:93,width:378,height:429}});
+    await act(async()=>root.render(createElement(VehiclePreview,{wardrobeOpen:true,characterOnly:true,fittingRoom:true,stationary:true})));
+    stepCamera();
+    assert.equal(camera.view.offsetX, 0, "orientation changes immediately center the lens on the new stage");
+    assert.equal(camera.view.offsetY, 844/2 - (93+429/2));
     await act(async()=>root.render(null));
     assert(entryCamera.position.distanceTo(camera.position)<1e-8,'return starts at the current workshop eye');
     assert(entryCamera.quaternion.angleTo(camera.quaternion)<1e-6);

@@ -425,8 +425,11 @@ export function VehiclePreview({
     const reframing = Math.abs(currentX - offsetX) > .01 || Math.abs(currentY - offsetY) > .01
       || Math.abs(camera.zoom - lensZoom) > .0001 || Math.abs(camera.fov - cameraFov) > .01;
     const resize = camera.view?.fullWidth !== width || camera.view?.fullHeight !== height;
+    const rotated = camera.view?.enabled && (camera.view.fullWidth < camera.view.fullHeight) !== (width < height);
     const lensChanged = reframing || camera.fov !== cameraFov || camera.near !== cameraNear || camera.zoom !== lensZoom;
-    const lensBlend = reframing ? blend : 1;
+    // Rotation redefines the screen coordinates immediately. An old portrait
+    // shift applied to a landscape lens can put the actor behind the header.
+    const lensBlend = reframing && !rotated ? blend : 1;
     camera.fov = MathUtils.lerp(camera.fov, cameraFov, lensBlend);
     camera.near = cameraNear;
     camera.zoom = MathUtils.lerp(camera.zoom, lensZoom, lensBlend);
