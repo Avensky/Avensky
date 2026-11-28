@@ -33,11 +33,31 @@ function characterTestDom() {
   };
 }
 
+function bodyEditor(click) {
+  const open = async section => {
+    const target = '[data-body-section="' + section + '"]';
+    if (!document.querySelector(target)) await click('[data-body-back]');
+    await click(target);
+  };
+  const active = async section => {
+    await open(section);
+    const value = document.querySelector('[data-creator-option][aria-pressed=true]').dataset.creatorOption;
+    await click('[data-body-back]');
+    return value;
+  };
+  const pick = async (section, id, keepOpen = false) => {
+    await open(section);
+    await click('[data-creator-option="' + id + '"]');
+    if (!keepOpen) await click('[data-body-back]');
+  };
+  return { open, active, pick };
+}
+
 test('Heroes opens the character picker, saves one profile choice, and opens Garage from a vehicle', async t => {
   const { close } = characterTestDom();
   let vite, root;
   try {
-    vite = await createServer({ define: { __FITTED_HAIR_IDS__: JSON.stringify(['hair-01']), __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01', 'medieval-05']) },
+    vite = await createServer({ define: { __FITTED_HAIR_IDS__: JSON.stringify(['hair-01', 'Mia_01']), __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['gothic-skirt-04', 'top-01', 'medieval-05']) },
       server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error',
       plugins: [{
         name: 'count-fit-review-keys',
@@ -86,6 +106,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     const find = selector => document.querySelector(selector);
     const click = selector => act(async () => find(selector).click());
     const openEmotes = () => find('.character-emote-toggle[aria-expanded="false"]') ? click('.character-emote-toggle') : Promise.resolve();
+    const body = bodyEditor(click);
     const chooseEmoteGroup = group => click(`[data-emote-group="${group}"]`);
     const openCollections = () => act(async () => [...document.querySelectorAll(".character-emote-browser button")].find(button => button.textContent === "Collections").click());
     const playEmote = async selector => {
@@ -417,13 +438,13 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(preview.getState().insideCar, false);
     assert.equal(preview.getState().emote, null);
     await click('#character-editor-tab-body');
-    assert.equal(find('select[aria-label="Eye color"]').value, 'original');
+    assert.equal(await body.active('eyes'), 'original');
     t.mock.timers.enable({ apis: ['setTimeout'] });
-    await select('Eye color', 'obsidian');
-    await select('Eyebrow tint', 'copper');
-    await select('Skin tone', 'deep');
-    await select('Hair color', 'espresso');
-    assert.equal(preview.getState().camera, 'Face');
+    await body.pick('eyes', 'obsidian');
+    await body.pick('brows', 'copper');
+    await body.pick('skin', 'deep');
+    await body.pick('hair', 'espresso', true);
+    assert.equal(preview.getState().camera, 'Hair');
     await click('#character-editor-tab-appearance');
     await browseWardrobe('accessories');
     await click('[data-wardrobe-item="glasses:aviator"]');
@@ -530,8 +551,8 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('.dressing-color-panel').childElementCount, 0);
     assert.equal(document.activeElement, find('[aria-label="Open clothing colors"]'));
     await click('#character-editor-tab-body');
-    assert(find('select[aria-label="Eye color"]'));
-    assert(find('select[aria-label="Skin tone"]'));
+    assert(find('[data-body-section=eyes]'));
+    assert(find('[data-body-section=skin]'));
     await click('#character-editor-tab-details');
     assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
     await click('#character-editor-tab-emotes');
@@ -655,12 +676,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(find('[data-outfit-preview]').dataset.outfitPreview, 'race-crew');
     assert.equal(find('[data-character-option]'), null);
     await click('#character-editor-tab-body');
-    assert.equal(find('select[aria-label="Eye color"]').value, 'obsidian');
-    assert.equal(find('select[aria-label="Skin tone"]').value, 'deep');
+    assert.equal(await body.active('eyes'), 'obsidian');
+    assert.equal(await body.active('skin'), 'deep');
     await click('#character-editor-tab-details');
     assert.deepEqual(detailTraits(), ['Nonbinary', 'Mechanic', 'Service bay']);
     await click('#character-editor-tab-body');
-    await select('Hair color', 'red');
+    await body.pick('hair', 'red');
     await act(async () => t.mock.timers.tick(350));
     assert.equal(requests[3].character.identity, 'nonbinary');
     await acknowledge(requests[3], requests[3].character, false);
@@ -693,14 +714,42 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await browseWardrobe('tops');
     await click('[data-wardrobe-item=top-01]');
     assert.deepEqual(drafts.at(-1).garments, { skirt: 'gothic-skirt-04', top: 'top-01' });
-    assert.equal(find('[data-equip-outfit]'), null, 'individual trial pieces stay in the fitting room');
+    assert.ok(find('[data-equip-outfit]'), 'a preview of individual garments can be equipped');
     await click('[aria-label="Open clothing colors"]');
     await click('button[aria-label="Gothic Pink"]');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95');
     await click('#character-editor-tab-body');
-    assert.equal(find('select[aria-label="Hairstyle"] option[value="cropped"]'), null);
-    await select('Hairstyle', 'hair-01');
+    await body.open('hairstyle');
+    assert.equal(find('[data-creator-option=cropped]'), null);
+    await click('[data-body-back]');
+    await body.pick('hairstyle', 'Mia_01');
+    await body.open('hair');
+    await click('[data-body-groom]');
+    await click('[aria-label="Increase crown volume"]');
+    await click('[data-hair-piece="left-braid"]');
+    await move('next_option');
+    assert.equal(find('[data-creator-channel=roots]').getAttribute('aria-selected'), 'true');
+    await click('[data-creator-option=copper]');
+    assert.equal(drafts.at(-1).appearance.hair_groom.pieces['left-braid'].roots, '#ae5837');
+    assert.equal(drafts.at(-1).appearance.hair_groom.volume, .05);
+    await move('back');
+    assert.equal(document.activeElement.dataset.hairPiece, 'left-braid');
+    await move('back');
+    assert(document.activeElement.hasAttribute('data-body-groom'));
+    await move('back');
+    assert.equal(document.activeElement.dataset.bodySection, 'hair');
+    await body.open('makeup');
+    const beforeBrowsing = drafts.at(-1);
+    await move('previous_option');
+    assert.equal(find('[data-creator-channel=eyeliner]').getAttribute('aria-selected'), 'true');
+    assert.equal(drafts.at(-1), beforeBrowsing, 'changing channels or focusing a swatch does not save it');
+    await click('[data-creator-option=cat-eye]');
+    assert.equal(drafts.at(-1).appearance.eyeliner, 'cat-eye');
+    assert.equal(preview.getState().camera, 'Makeup');
+    await move('back');
+    await body.pick('hairstyle', 'hair-01');
     assert.equal(drafts.at(-1).appearance.hair, 'hair-01');
+    assert.equal(drafts.at(-1).appearance.hair_groom, undefined, 'another hairstyle cannot carry a Mia groom to the server');
     assert.equal(drafts.at(-1).appearance.item_colors['top-01:shirt'].accent, '#ff2d95', 'identity edits preserve trial garment colors');
     await click('#character-editor-tab-emotes');
     assert.deepEqual(drafts.at(-1).garments, { skirt: 'gothic-skirt-04', top: 'top-01' });
@@ -728,7 +777,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
       'medieval-05:skirt': { color: '#ad444d' },
       'medieval-05:hat': { color: '#4b79a4' },
     });
-    assert.equal(requests[4].character.garments, undefined, 'trial pieces stay out of character equip messages');
+    assert.equal(requests[4].character.garments, undefined, 'equipping another complete outfit discards the previous trial');
     assert.equal(requests[4].character.appearance.hair, 'hair-01');
     await acknowledge(requests[4], requests[4].character);
     await click('#character-editor-tab-details');
@@ -737,7 +786,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(drafts.at(-1).appearance.eye_color, 'obsidian');
     await act(async () => social.getState().reset());
     await click('#character-editor-tab-body');
-    await select('Hair color', 'copper');
+    await body.pick('hair', 'copper');
     await act(async () => t.mock.timers.tick(350));
     assert.equal(requests.length, 5);
     assert.equal(readLocalCharacter(), undefined, 'a known profile continues queuing edits while disconnected');
@@ -757,15 +806,15 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
 
     await click('[data-open-character]');
     await click('#character-editor-tab-body');
-    await select('Eye color', 'original');
+    await body.pick('eyes', 'original');
     assert.equal(drafts.at(-1).appearance.eye_color, 'original');
     const requestCount = requests.length;
     const draftCount = drafts.length;
-    const staleEyes = find('select[aria-label="Eye color"]');
+    await body.open('eyes');
+    const staleEyes = find('[data-creator-option=obsidian]');
     await act(async () => {
       ui.getState().setScreen('mode_select');
-      staleEyes.value = 'obsidian';
-      staleEyes.dispatchEvent(new Event('change', { bubbles: true }));
+      staleEyes.click();
       t.mock.timers.tick(350);
     });
     assert.equal(requests.length, requestCount, 'a queued equip cannot dispatch after leaving Heroes');
@@ -780,12 +829,12 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     });
     await click('[data-open-character]');
     await click('#character-editor-tab-body');
-    await select('Eye color', 'original');
+    await body.pick('eyes', 'original');
     await act(async () => t.mock.timers.tick(350));
     const inFlight = requests.at(-1);
     assert.equal(requests.length, requestCount + 1);
     assert.equal(inFlight.character.appearance.eye_color, 'original');
-    await select('Skin tone', 'original');
+    await body.pick('skin', 'original');
     await act(async () => ui.getState().setOverlay('settings'));
     await acknowledge(inFlight, inFlight.character, false);
     assert.equal(requests.length, requestCount + 1, 'an in-flight save cannot dispatch later queued edits under an overlay');
@@ -798,9 +847,9 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(resumed.character.appearance.skin, 'original');
     await acknowledge(resumed, resumed.character, false);
 
-    assert.equal(find('select[aria-label="Tattoo"]').disabled, true, 'legacy servers lack the tattoo capability');
+    assert.equal(find('[data-body-section=tattoo]').getAttribute('aria-disabled'), 'true', 'legacy servers lack the tattoo capability');
     await act(async () => social.setState({ bodyTattoosAvailable: true }));
-    await select('Tattoo', 'twin-band');
+    await body.pick('tattoo', 'twin-band');
     await act(async () => t.mock.timers.tick(350));
     const tattoo = requests.at(-1);
     assert.equal(tattoo.character.appearance.tattoo, 'twin-band');
@@ -986,6 +1035,7 @@ test('device character edits stay local when the connected profile has no charac
     const show = tab => act(async () => root.render(h(CharacterPage, { ...props, tab })));
     const click = selector => act(async () => document.querySelector(selector).click());
     const button = label => [...document.querySelectorAll('button')].find(node => node.textContent === label);
+    const body = bodyEditor(click);
 
     await show('details');
     await click('[data-character-option="jules-okafor"]');
@@ -1003,13 +1053,10 @@ test('device character edits stay local when the connected profile has no charac
 
     await show('body');
     const failedWrite = t.mock.method(dom.window.Storage.prototype, 'setItem', () => { throw new Error('Storage unavailable'); });
-    await act(async () => {
-      const skin = document.querySelector('select[aria-label="Skin tone"]');
-      skin.value = 'deep';
-      skin.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await body.pick('skin', 'deep');
     assert.deepEqual(readLocalCharacter(), localBeforePreview);
     assert(button('Retry'));
+    assert.equal(await props.beforeClose.current(), false, 'a failed device write keeps Wardrobe open for retry or revert');
     failedWrite.mock.restore();
     await act(async () => button('Retry').click());
     assert.equal(readLocalCharacter().appearance.skin, 'deep');
@@ -1024,24 +1071,18 @@ test('device character edits stay local when the connected profile has no charac
     await click('[aria-label="Try on Race fit"]');
     assert(!document.querySelector('[aria-label="Clear saved outfit preview"]').disabled);
     await show('body');
-    const hairColor = document.querySelector('select[aria-label="Hair color"]');
-    assert.equal(hairColor.selectedOptions[0].textContent, 'Custom palette');
+    await body.open('hair');
+    assert.equal(document.querySelector('[aria-label="Base custom color"]').value, HAIR_COLOR_THEMES['Icy Blue'].base);
+    await click('[data-creator-option=original]');
     for (const id of ['red', 'dirty-blonde']) {
-      await act(async () => {
-        hairColor.value = id;
-        hairColor.dispatchEvent(new Event('change', { bubbles: true }));
-      });
-      assert.equal(hairColor.value, id);
+      await click('[data-creator-option="' + id + '"]');
+      assert.equal(document.querySelector('[data-creator-option][aria-pressed=true]').dataset.creatorOption, id);
       await act(async () => t.mock.timers.tick(350));
       assert.equal(readLocalCharacter().appearance.hair_color, id);
       assert.equal(readLocalCharacter().appearance.hair_palette, undefined);
     }
     t.mock.method(dom.window.Storage.prototype, 'setItem', () => { throw new Error('Storage unavailable'); });
-    const eyeColor = document.querySelector('select[aria-label="Eye color"]');
-    await act(async () => {
-      eyeColor.value = 'obsidian';
-      eyeColor.dispatchEvent(new Event('change', { bubbles: true }));
-    });
+    await body.pick('eyes', 'obsidian');
     await act(async () => button('Revert unsaved').click());
     await show('appearance');
     await click('[data-category=saved]');
@@ -1282,5 +1323,70 @@ test('all emote batches return to rest and keep planted and lifted feet distinct
     model.dispose();
   } finally {
     await vite.close();
+  }
+});
+
+test('equipping a device outfit on the active roster character survives returning to the garage', async () => {
+  const { close } = characterTestDom();
+  let root, vite, client;
+  try {
+    vite = await createServer({ define: { __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['top-01']) },
+      server: { middlewareMode: true, hmr: false, ws: false }, appType: 'custom', logLevel: 'error' });
+    const load = path => vite.ssrLoadModule('/src/' + path);
+    const { CharacterPage } = await load('game/characters/CharacterPage.tsx');
+    const { writeLocalCharacter, writeLocalOutfit } = await load('game/characters/localOutfits.ts');
+    const { useSocialStore: social, selectMainGarageCharacter } = await load('store/social/socialStore.ts');
+    const { useUIStore: ui } = await load('store/menus/uiStore.ts');
+    client = await load('net/socialClient.ts');
+    const requests = [];
+    client.setSocialConnection({ readyState: WebSocket.OPEN, send: value => requests.push(JSON.parse(value)) });
+    const active = { id: 'mara-vega', outfit: 'dockwear', identity: 'female', appearance: {
+      hair: 'Mia_01', hair_color: 'dirty-blonde', skin: 'warm', headwear: 'hat', color: 'original', personality: 'mechanic',
+    }};
+    const other = { id: 'mara-vega', outfit: 'shop-crew' };
+    const palette = { base: '#765432', highlights: '#aa8754', tips: '#aa8855', roots: '#473623', tipBlend: 0.6, highlightStrength: 0.3 };
+    const groom = { volume: 0.3, thickness: -0.2, pieces: { ponytail: palette } };
+    writeLocalCharacter(other);
+    writeLocalOutfit('Custom shirt', { ...active, garments: { top: 'top-01' }, localHair: { id: 'Mia_01', palette, original: false, groom } });
+    const progression = { character: null, character_presets: {}, cosmetics_revision: 1 };
+    const profile = { id: 'account', name: 'Driver', active_character_id: 'A', characters: [
+      { id: 'B', name: 'Other', appearance: other }, { id: 'A', name: 'Selected', appearance: active },
+    ], progression };
+    const view = { profile, players: [], teammates: [], requests: [], groups: [], worlds: [], world_invites: [], maps: [], limits: {max_active_worlds: 4} };
+    social.getState().receive(view);
+    ui.setState({ screen: 'heroes', overlay: null, isModeLoading: false });
+    const { createRoot } = await import('react-dom/client');
+    root = createRoot(document.querySelector('#root'));
+    const previews = [], beforeClose = { current: null };
+    const props = { beforeClose, tab: 'appearance', onReady() {}, onPreview(choice) { previews.push(choice); } };
+    const open = () => act(async () => root.render(h(CharacterPage, props)));
+    const click = selector => act(async () => document.querySelector(selector).click());
+    await open();
+    assert.deepEqual(previews.at(-1), active, 'Wardrobe uses the same active slot fallback as the main garage');
+    await click('[data-category=saved]');
+    await click('[aria-label="Try on Custom shirt"]');
+    assert.equal(selectMainGarageCharacter(social.getState()), active, 'trying on leaves the equipped appearance alone');
+    await click('[data-equip-outfit]');
+    const [request] = requests;
+    assert.equal(request.action, 'character_equip');
+    assert.equal(request.character_slot_id, 'A');
+    assert.equal(request.character.localHair, undefined);
+    assert.deepEqual(request.character.garments, { top: 'top-01' });
+    assert.deepEqual(request.character.appearance.hair_groom, groom);
+    assert.deepEqual(request.character.appearance.hair_palette, palette);
+    const confirmed = { ...progression, cosmetics_revision: 2, character: request.character };
+    await act(async () => client.receiveSocialResult({ request_id: request.request_id, ok: true, data: confirmed }));
+    assert.equal(await beforeClose.current(), true);
+    await act(async () => root.render(null));
+    social.getState().receive(view); // an older snapshot can arrive just after closing
+    assert.deepEqual(selectMainGarageCharacter(social.getState()), request.character);
+    await open();
+    assert.deepEqual(previews.at(-1), request.character);
+    assert.equal(social.getState().view.profile.characters[0].appearance, other);
+  } finally {
+    if (root) await act(async () => root.unmount());
+    client?.setSocialConnection(null);
+    await vite?.close();
+    close();
   }
 });

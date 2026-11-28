@@ -406,7 +406,7 @@ function pauseEntry(issue: EntryIssue) {
   disconnectRustServer();
   resetHub();
   resetHubControls();
-  useSocialStore.setState({ entryIssue: issue, profileOwner: null, cachedCosmetics: null });
+  useSocialStore.setState({ entryIssue: issue, profileOwner: null, cachedCharacterSlot: null, cachedCosmetics: null });
   useUIStore.getState().setScreen("welcome");
   if (issue.kind === "session-replaced" || issue.kind === "session-expired") {
     // If the public form can't load, the same notice and a retry stay in the garage.

@@ -10,7 +10,7 @@ import {MenuIcon} from "../../components/menus/MenuIcon";
 import {SceneTabHeader} from "../../components/menus/SceneTabHeader";
 import {HEROES,useAlphaStore,type HeroFilter} from "../../store/alpha/alphaStore";
 import {useUIStore} from "../../store/menus/uiStore";
-import {useSocialStore} from "../../store/social/socialStore";
+import {selectCharacterSlot,useSocialStore} from "../../store/social/socialStore";
 import {requestSocial} from "../../net/socialClient";
 import {FACTORY_APPEARANCE,useHeroLoadouts,type HeroAppearance} from "../../vehicles/cosmetics/heroLoadouts";
 import {useSelectionNavigation} from "../alpha/useSelectionNavigation";
@@ -96,6 +96,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
  const pressOwner=useMenuPressOwner();
  const overlay=useUIStore(s=>s.overlay);
  const entry=useUIStore(s=>s.workshopEntry);
+ const characterSlot=useSocialStore(selectCharacterSlot);
  const owner=useSocialStore(s=>s.view?.profile.id??s.profileOwner);
  const connected=useSocialStore(s=>Boolean(s.view));
  const stagingSignedIn=useSocialStore(s=>s.stagingSignIn && s.profileStatus==="ready" && Boolean(s.view?.profile));
@@ -352,7 +353,7 @@ export function HeroWorkshop({onCharacterViewChange,onCharacterPreviewChange}:{
         tablistClassName="hero-pick-tabs" onTabChange={next=>setRole(next as WorkshopFilter)}
         idPrefix="hero-workshop-role" panelId="hero-workshop-role-panel"/>}
   <div className="hero-selection-stage hero-workshop-body">
-   {characterOpen&&<CharacterPage onPreview={onCharacterPreviewChange} onReady={setCharacterReady} tab={characterTab}
+   {characterOpen&&<CharacterPage key={JSON.stringify([owner,characterSlot])} onPreview={onCharacterPreviewChange} onReady={setCharacterReady} tab={characterTab}
     beforeClose={beforeCharacterClose} wardrobeNavigation={wardrobeNavigation}/>}
    {viewingConcepts&&<div className="hero-guide-scroll" id="hero-workshop-role-panel" role="tabpanel" aria-labelledby="hero-workshop-role-tab-concepts" tabIndex={0}><HeroConceptGallery/></div>}
    {page==="heroes"&&role!=="concepts"&&<div className="hero-picker-stage hero-workshop-picker" data-vehicle-picker={stationEntry||undefined} data-hero-filter={role} id="hero-workshop-role-panel" role="tabpanel" aria-labelledby={"hero-workshop-role-tab-"+role}>

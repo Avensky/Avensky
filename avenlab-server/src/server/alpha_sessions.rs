@@ -396,6 +396,11 @@ impl Server {
                 if !choice.is_equippable() { return Err("Choose an available character outfit.".into()); }
                 let mut data = self.data.lock().await;
                 let profile = data.profile(&actor)?;
+                if let Some(slot) = value["character_slot_id"].as_str() {
+                    if profile.active_character.as_deref() != Some(slot) {
+                        return Err("Return to this character's wardrobe to equip the outfit.".into());
+                    }
+                }
                 let progression = &profile.progression;
                 if choice.driver_id.is_none() {
                     choice.driver_id = progression.character.as_ref()

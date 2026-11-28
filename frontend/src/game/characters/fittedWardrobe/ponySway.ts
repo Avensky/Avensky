@@ -13,11 +13,12 @@ export function createPonySway(root: Object3D, head: Object3D) {
     offset,
     step(delta: number, enabled: boolean) {
       if (!enabled) {
+        const reset = offset.lengthSq() > 0;
         initialized = false;
         velocity.set(0, 0);
         displacement.set(0, 0);
         offset.set(0, 0, 0);
-        return false;
+        return reset;
       }
       head.getWorldQuaternion(rotation).premultiply(root.getWorldQuaternion(rootRotation).invert());
       axis.set(0, 0, 1).applyQuaternion(rotation);
@@ -40,7 +41,7 @@ export function createPonySway(root: Object3D, head: Object3D) {
       }
       const moving = Math.abs(driveX) + driveY + displacement.length() + velocity.length() > .00012;
       if (!moving) displacement.set(0, 0);
-      // These are the bounds of the verified stock-dress clearance sweep.
+      // The loose ends sway laterally and away from their resting surface.
       offset.set(Math.max(-.009, Math.min(.009, displacement.x)), 0,
         -Math.min(.007, Math.abs(displacement.x) * .40 + Math.max(0, displacement.y)));
       return moving;

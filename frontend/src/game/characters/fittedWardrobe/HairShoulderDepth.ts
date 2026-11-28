@@ -38,6 +38,7 @@ export function prepareHairShoulderDepth(root: Object3D) {
   });
   const clearColor = new Color();
   const projection = new Matrix4();
+  let initialized = false;
   return {
     projection,
     texture: target.texture,
@@ -46,6 +47,7 @@ export function prepareHairShoulderDepth(root: Object3D) {
       camera.matrix.multiplyMatrices(root.matrixWorld, cameraLocal);
       camera.updateMatrixWorld(true);
       projection.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      if (initialized && !surfaces.length) return;
       for (const { source, proxy } of surfaces) {
         proxy.geometry = source.geometry;
         proxy.matrix.copy(source.matrixWorld);
@@ -58,7 +60,8 @@ export function prepareHairShoulderDepth(root: Object3D) {
         renderer.setRenderTarget(target);
         renderer.setClearColor(0xffffff, 1);
         renderer.clear(true, true, false);
-        renderer.render(scene, camera);
+        if (surfaces.length) renderer.render(scene, camera);
+        initialized = true;
       } finally {
         renderer.setRenderTarget(previous);
         renderer.setClearColor(clearColor, alpha);

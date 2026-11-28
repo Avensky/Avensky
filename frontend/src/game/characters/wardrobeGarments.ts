@@ -4,7 +4,7 @@ import type { Object3D, SkinnedMesh } from "three";
 import villageItems from "../../../../packages/wardrobe-catalog/character-village-pieces.json";
 import importedItems from "../../../../packages/wardrobe-catalog/character-garments.json";
 import discoveredManifest from "../../../../packages/wardrobe-catalog/discovered-wardrobe-garments.json";
-import { fittedTennisGarments } from "./fittedWardrobe/alphaAssets";
+import fittedItems from "../../../../packages/wardrobe-catalog/fitted-garments.json";
 
 export const wardrobeGarmentReplacements = {
   top: ["corset", "shirt", "sleeves", "bow"],
@@ -81,7 +81,7 @@ export type WardrobeGarment = {
 
 const discoveredItems = discoveredManifest as WardrobeGarment[];
 export const importedWardrobeItems: WardrobeGarment[] = [
-  ...(importedItems as WardrobeGarment[]).filter(item => !item.retired), ...discoveredItems, ...fittedTennisGarments,
+  ...(importedItems as WardrobeGarment[]).filter(item => !item.retired), ...discoveredItems, ...(fittedItems as WardrobeGarment[]),
 ];
 
 export const villageWardrobeItems = villageItems as WardrobeGarment[];

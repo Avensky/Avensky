@@ -1,39 +1,44 @@
 import { useMemo, useRef } from "react";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
 import {
-  CHARACTER_APPEARANCE_OPTIONS, availableHairStyles, characterAppearance, type CharacterChoice,
+  CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, availableHairStyles, characterAppearance, type CharacterAppearance, type CharacterChoice,
 } from "../characters/characterCatalog";
 import { CreatorOption } from "./CreatorOption";
 import "./creatorHairstyles.css";
 
-export function CreatorHairstyles({ choice, facePreview = choice, onChoice, busy, onContinue }: {
-  choice: CharacterChoice; facePreview?: CharacterChoice;
-  onChoice: (next: CharacterChoice) => void; busy: boolean; onContinue: () => void;
+export function CreatorHairstyles({ choice, onChoice, busy, onContinue, scope = "roster" }: {
+  choice: CharacterChoice;
+  onChoice: (next: CharacterChoice, change: Partial<CharacterAppearance>) => void; busy: boolean; onContinue?: () => void; scope?: "roster" | "catalog";
 }) {
   const appearance = choice.appearance ?? characterAppearance(choice);
   const styles = useMemo(() => availableHairStyles(choice.id), [choice.id]);
-  const portraits = useMemo(() => styles.map(style => ({
-    ...facePreview, appearance: { ...(facePreview.appearance ?? characterAppearance(facePreview)), hair: style.id },
-  })), [facePreview, styles]);
+  const portraits = useMemo(() => {
+    const outfit = CHARACTERS.find(character => character.id === choice.id)?.outfits[0].id;
+    return styles.map(style => outfit ? {
+      id: choice.id, outfit, appearance: { ...characterAppearance(null), hair: style.id },
+    } : undefined);
+  }, [choice.id, styles]);
 
   const selectedStyle = styles.find(style => style.id === appearance.hair);
   const previewLabel = selectedStyle?.label ?? CHARACTER_APPEARANCE_OPTIONS.hair.find(style => style.id === appearance.hair)?.label ?? "Saved hairstyle";
   const firstFocus = useRef(true);
   return <div className="creator-preview-field">
-    <div className="creator-options creator-hairstyles" role="group" aria-label="Hairstyles">
+    <div className="creator-options creator-hairstyles" role="group" aria-label="Hairstyles" data-controller-row data-controller-columns="auto">
       {styles.map((style, index) => {
         const selected = appearance.hair === style.id;
         const pick = () => {
-          if (!selected) onChoice({ ...choice, appearance: { ...appearance, hair: style.id } });
+          if (selected) return;
+          const change = { hair: style.id, hair_groom: undefined };
+          onChoice({ ...choice, appearance: { ...appearance, ...change } }, change);
         };
         return <CreatorOption key={style.id} id={style.id} label={style.label} selected={selected}
           hideTooltip busy={busy} onPick={pick} onFocusOption={() => {
             // If the saved cut is retired or unavailable, entering the tab
             // focuses its first replacement without changing the character.
-            if (!firstFocus.current || selectedStyle) pick();
+            if (scope === "roster" && (!firstFocus.current || selectedStyle)) pick();
             firstFocus.current = false;
           }} onConfirm={onContinue}>
-          <ProfilePortrait choice={portraits[index]} welcomePreview="roster" hairstylePreview />
+          <ProfilePortrait choice={portraits[index]} welcomePreview={scope} hairstylePreview />
         </CreatorOption>;
       })}
     </div>

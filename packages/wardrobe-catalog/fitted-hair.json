@@ -103,5 +103,13 @@
     "sha256": "7e71285a8d25fc9ce3b5f5aea6351997519aeef035087effd3670fa5e1423f3a",
     "size": 16662792,
     "editableGroom": true
+  },
+  {
+    "id": "Space_Buns",
+    "label": "Space Buns & Loose Waves",
+    "mesh": "Space_Buns",
+    "url": "/models/characters/female/wardrobe/alpha/space-buns.glb",
+    "sha256": "1765971a2add6f9221ac2aa11f2154cb2f11272aa374d86f34af5c350074ecf6",
+    "size": 24199444
   }
 ]

@@ -199,7 +199,7 @@ export function CharacterCreator({ step, onStep, choice, facePreview, onChoice, 
           </CreatorOption>;
         })}
       </div>}
-      {step === "hairstyle" && <CreatorHairstyles choice={choice} facePreview={facePreview} onChoice={onChoice} busy={busy} onContinue={advance} />}
+      {step === "hairstyle" && <CreatorHairstyles choice={choice} onChoice={onChoice} busy={busy} onContinue={advance} />}
       {(step === "skin" || step === "hair" || step === "eyes" || step === "makeup") &&
         <CreatorColors key={step} step={step} choice={choice} onChoice={onChoice} busy={busy} onContinue={advance} />}
       {final && <>

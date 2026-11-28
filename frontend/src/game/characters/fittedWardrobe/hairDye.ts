@@ -13,6 +13,9 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
   };
   const groomColor = validVector("_avensky_groom");
   const groomShape = groomColor && validVector("_avensky_groom_lift") && validVector("_avensky_groom_width");
+  const tailMask = geometry.getAttribute("_avensky_tail");
+  const maskedTail = tailMask?.itemSize === 1 && tailMask.count === geometry.attributes.position.count;
+  const sway = tailOffset && (groomColor || maskedTail);
   const pieces = HAIR_PIECES.length;
   const pieceUniforms = groomColor ? {
     avenskyPieceBase: { value: HAIR_PIECES.map(() => new Color()) },
@@ -56,17 +59,23 @@ export function prepareHairDye(material: MeshStandardMaterial, geometry: BufferG
   setPalette(DEFAULT_HAIR_PALETTE, true);
   material.color.set(0xffffff);
   material.customProgramCacheKey = () =>
-    `avensky-hair-dye-v3${tailOffset ? "-tail" : ""}${groomColor ? "-groom" : ""}${groomShape ? "-shape" : ""}`;
+    `avensky-hair-dye-v4${sway ? "-sway" : ""}${maskedTail ? "-tail-mask" : ""}${groomColor ? "-groom" : ""}${groomShape ? "-shape" : ""}`;
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = "uniform vec2 avenskyHairRigOffset; varying vec3 vAvenskyHairRest;\n" + shader.vertexShader.replace(
       "#include <begin_vertex>", "#include <begin_vertex>\nvAvenskyHairRest = position - vec3(0.0, avenskyHairRigOffset);",
     );
-    if (tailOffset) {
+    if (sway) {
       shader.uniforms.avenskyTailOffset = { value: tailOffset };
-      shader.vertexShader = "attribute float _avensky_tail; uniform vec3 avenskyTailOffset;\n" +
-        shader.vertexShader.replace("vAvenskyHairRest = position - vec3(0.0, avenskyHairRigOffset);",
-          "vAvenskyHairRest = position - vec3(0.0, avenskyHairRigOffset);\ntransformed += avenskyTailOffset * _avensky_tail;");
+      const mask = maskedTail ? "_avensky_tail" : "float(abs(_avensky_groom.z - 8.0) < 0.5) * smoothstep(0.1, 1.0, _avensky_groom.x)";
+      shader.vertexShader = (maskedTail ? "attribute float _avensky_tail;\n" : "") + "uniform vec3 avenskyTailOffset;\n" +
+        shader.vertexShader.replace("#include <begin_vertex>", `#include <begin_vertex>
+          transformed += avenskyTailOffset * ${mask};
+          ${groomColor ? `if (abs(_avensky_groom.z - 4.5) < 0.9) {
+            float looseBraid = smoothstep(0.22, 0.96, _avensky_groom.x);
+            transformed += vec3(avenskyTailOffset.x * 0.40, 0.0, -avenskyTailOffset.z * 0.27) * looseBraid;
+          }` : ""}
+        `);
     }
     if (pieceUniforms) {
       Object.assign(shader.uniforms, pieceUniforms);

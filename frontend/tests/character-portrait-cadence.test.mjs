@@ -5,19 +5,22 @@ import { JSDOM } from 'jsdom';
 import { createServer } from 'vite';
 import { act, createElement as h } from 'react';
 import { createRoot } from 'react-dom/client';
-import { DefaultLoadingManager } from 'three';
+import { BoxGeometry, DefaultLoadingManager, Group, Mesh, Vector3 } from 'three';
 
 const serverOptions = {
   configFile: false,
   define: {
     __STAGING_ASSET_RELEASE__: "null",
+    __VILLAGER_MODEL_URL__: JSON.stringify("/character-portrait-test/vega-full.glb"),
     __VILLAGER_PORTRAIT_URL__: JSON.stringify('/character-portrait-test/vega.glb'),
     __CHARACTER_MODEL_FALLBACKS__: JSON.stringify({ 'http://localhost/packed.gltf': 'http://localhost/cut-driver.gltf' }),
     __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(['linen-nightgown']),
     __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(['linen-nightgown']),
     __DRESSING_ROOM_REVISION_IDS__: '[]',
     __FITTED_HAIR_IDS__: JSON.stringify(['hair-01']),
-    __WARDROBE_SET_IDS__: '[]',
+    __WARDROBE_SET_IDS__: JSON.stringify(['gothic-03']),
+    __BUNDLED_WARDROBE_LODS__: JSON.stringify({ 'gothic-03': { mobile: true } }),
+    __STANDALONE_CORSET_LODS__: '{}',
   },
   optimizeDeps: { noDiscovery: true, include: [] },
   server: { middlewareMode: true, hmr: false, ws: false, watch: null },
@@ -267,6 +270,29 @@ test('portraits create one background job for each quiet, visible main-menu requ
     await renderRoster();
     await step(900);
     assert.equal(workers.length, 8, 'revisiting the roster reuses all three pictures');
+    await screen('heroes');
+    const renderCut = (color) => act(async () => root.render(h(ProfilePortrait, {
+      choice: { ...choice, appearance: { ...choice.appearance, hair: 'hair-01', hair_color: color } },
+      welcomePreview: 'catalog', hairstylePreview: true,
+    })));
+    await renderCut('original');
+    const jobsBeforeStyles = workers.length;
+    await step(900);
+    assert.equal(workers.length, jobsBeforeStyles, 'offscreen Wardrobe styles do no work');
+    await act(async () => visibleTiles());
+    await step(900);
+    assert.equal(workers.length, jobsBeforeStyles + 1, 'a visible Wardrobe style gets one job');
+    await finish(workers.at(-1));
+    const hairImage = image();
+    assert.ok(hairImage);
+    await screen('welcome');
+    await act(async () => root.render(h(ProfilePortrait, {
+      choice: { ...choice, appearance: { ...choice.appearance, hair: 'hair-01', hair_color: 'copper' } },
+      welcomePreview: 'roster', hairstylePreview: true,
+    })));
+    await step(900);
+    assert.equal(image(), hairImage, 'both editors reuse the cut thumbnail across dye changes');
+    assert.equal(workers.length, jobsBeforeStyles + 1);
     assert.deepEqual(mainRequests, [], 'GLTF requests never run on the main thread');
   } finally {
     if (root) await act(async () => root.unmount());
@@ -289,6 +315,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
         min: [-.2, 1, 0], max: [.2, 1.4, 0] },
       { data: new Uint8Array(12), componentType: 5121, type: 'VEC4' },
       { data: new Float32Array([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0]), componentType: 5126, type: 'VEC4' },
+      { data: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]), componentType: 5126, type: 'VEC3' },
       { data: new Uint16Array([0, 1, 2]), componentType: 5123, type: 'SCALAR' },
     ];
     const bytes = Buffer.concat(attributes.map(({ data }) => Buffer.from(data.buffer)));
@@ -302,7 +329,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       ...rig,
       scenes: [{ nodes: [...rig.scenes[0].nodes, rig.nodes.length] }],
       nodes: [...rig.nodes, { name, mesh: 0, skin: 0 }],
-      meshes: [{ primitives: [{ attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2 }, indices: 3 }] }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0, JOINTS_0: 1, WEIGHTS_0: 2, NORMAL: 3 }, indices: 4 }] }],
       buffers: [{ uri: 'data:application/octet-stream;base64,' + bytes.toString('base64'), byteLength: bytes.length }],
       bufferViews,
       accessors: attributes.map(({ data, ...accessor }, bufferView) => ({ ...accessor, bufferView, count: 3 })),
@@ -347,7 +374,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       postMessage(value) { response = value; },
     },
     OffscreenCanvas: class {
-      constructor(width, height) { assert.equal(width, height); assert.ok([192, 320].includes(width)); }
+      constructor(width, height) { assert.equal(width, height); assert.ok([192, 256, 320].includes(width)); }
       async convertToBlob(options) {
         assert.deepEqual(options, { type: 'image/webp', quality: .90 });
         return new Blob(['test portrait'], { type: options.type });
@@ -365,13 +392,13 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       plugins: [{
         name: 'character-portrait-worker-probe', enforce: 'pre',
         transform(source, id) {
-          if (id.endsWith('/characterPortrait.worker.ts')) return source.replace('"three"', JSON.stringify(rendererMock));
+          if (id.endsWith('/portraitRendering.ts')) return source.replace('"three"', JSON.stringify(rendererMock));
         },
         resolveId(id) { if (id === rendererMock) return '\0' + id; },
         load(id) {
           if (id === '\0' + rendererMock) return `
             export * from 'three';
-            export const renderedModels = [], renderedDresses = [], renderedMeshes = [];
+            export const renderedModels = [], renderedDresses = [], renderedMeshes = [], dressDyes = [];
             export class WebGLRenderer {
               constructor({ canvas }) { if (!(canvas instanceof OffscreenCanvas)) throw Error('Missing offscreen canvas'); }
               setSize(width, height, updateStyle) { if (updateStyle) throw Error('An offscreen canvas has no style'); }
@@ -383,6 +410,8 @@ test('portrait worker renders authored GLTF assets and skips missing character m
                   if (object.isMesh && object.layers.test(camera.layers)) meshes.push(object.name);
                 });
                 renderedMeshes.push(meshes);
+                const dress = model.getObjectByName('wardrobe-linen-nightgown')?.getObjectByProperty('isMesh', true);
+                dressDyes.push(dress?.material.color.getHexString());
                 renderedModels.push(model.name);
                 renderedDresses.push(model.getObjectByName('wardrobe-linen-nightgown')?.visible === true);
               }
@@ -396,7 +425,7 @@ test('portrait worker renders authored GLTF assets and skips missing character m
     const { characterLook } = await vite.ssrLoadModule('/src/game/characters/characterCatalog.ts');
     const { getWardrobeGarment } = await vite.ssrLoadModule('/src/game/characters/wardrobeGarments.ts');
     await vite.ssrLoadModule('/src/game/characters/characterPortrait.worker.ts');
-    const { renderedModels, renderedDresses, renderedMeshes } = await vite.ssrLoadModule(rendererMock);
+    const { renderedModels, renderedDresses, renderedMeshes, dressDyes } = await vite.ssrLoadModule(rendererMock);
     const rook = characterLook({ id: 'jules-okafor', outfit: 'night-run' });
     const vega = characterLook({ id: 'mara-vega', outfit: 'linen-nightgown' });
 
@@ -429,8 +458,10 @@ test('portrait worker renders authored GLTF assets and skips missing character m
     await handler({ data: styleJob });
     assert.equal(response.image?.type, 'image/webp', 'a roster portrait retains the stock fallback');
     files.set(hairUrl, skinnedModel('Hair_01'));
+    requests.length = 0;
     await handler({ data: { ...styleJob, hairstylePreview: true } });
     assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.deepEqual(requests, [hairUrl], 'a fitted style tile loads its own cut without the actor or clothes');
 
     assert.deepEqual(renderedMeshes.at(-1), ['Hair_01'], 'fitted hair renders in isolation from the outfit, body and stock hair');
 
@@ -474,11 +505,92 @@ test('portrait worker renders authored GLTF assets and skips missing character m
       clearTimeout(deadline);
       deferredDonor.resolve(new Response(null, { status: 404 }));
     }
+    const village = JSON.parse(dressModel);
+    village.scenes[0].nodes.push(village.nodes.length);
+    village.nodes.push({ ...village.nodes.at(-1), name: 'BODY_WARDROBE' });
+    files.set('/catalog.gltf', JSON.stringify(village));
+    const garment = { kind: 'garment', modelUrl: 'http://localhost/catalog.gltf', nodes: ['CLOTH_DRESS'] };
+    await handler({ data: garment });
+    assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.deepEqual(renderedMeshes.at(-1), ['CLOTH_DRESS'], 'a standalone item excludes the donor body');
+    await handler({ data: { ...garment, nodes: ['CLOTH_MISSING'] } });
+    assert.match(response.error, /Garment geometry unavailable/);
+    files.set(getWardrobeGarment('linen-nightgown').mobileUrl, dressModel);
+    const dyedDress = { ...vega, appearance: { ...vega.appearance, item_colors: { 'linen-nightgown:dress': {color: '#93b247'} } } };
+    await handler({ data: { kind: 'outfit', look: dyedDress, modelUrl: 'http://localhost/full-driver.gltf', bag: false } });
+    assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.ok(renderedDresses.at(-1), 'outfit thumbnails include the selected dress');
+    assert.equal(dressDyes.at(-1), '93b247', 'saved per-piece dye reaches the thumbnail');
+
+    const bundle = JSON.parse(fullBody);
+    for (const name of ['HEAD_FACE4', 'CLOTH_BOTTOM_SKIRT', 'CLOTH_CORSET_OVER', 'CLOTH_CORSET_TUCKED', 'CLOTH_FEET_SHOES']) {
+      bundle.scenes[0].nodes.push(bundle.nodes.length);
+      bundle.nodes.push({ ...bundle.nodes.at(-1), name });
+    }
+    const bundleUrl = '/models/characters/wardrobe/gothic-03.mobile.glb';
+    files.set(bundleUrl, JSON.stringify(bundle));
+    const savedSet = characterLook({ id: 'mara-vega', outfit: 'dockwear', removedClothing: ['shoes'],
+      wardrobe: { set: 'gothic-03', shirt: 'none', waist: 'over' } });
+    requests.length = 0;
+    await handler({ data: { kind: 'outfit', look: savedSet, modelUrl: bundleUrl, bag: false } });
+    assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.deepEqual(requests, [bundleUrl], 'a cold bundle supplies its own dressed actor');
+    assert.ok(renderedMeshes.at(-1).includes('CLOTH_CORSET_OVER'));
+    assert.ok(!renderedMeshes.at(-1).includes('CLOTH_FEET_SHOES'), 'the saved shoe removal reaches the preview');
+    const glasses = { ...savedSet, appearance: { ...savedSet.appearance, glasses: 'aviator' } };
+    await handler({ data: { kind: 'outfit', piece: 'glasses', look: glasses, modelUrl: bundleUrl, bag: false } });
+    assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.equal(renderedMeshes.at(-1).length, 2, 'the generated glasses show only their rims and lenses');
+    assert.ok(!renderedMeshes.at(-1).includes('HEAD_FACE4'));
+    const bra = characterLook({ id: 'mara-vega', outfit: 'dockwear', bra: true, removedClothing: ['top', 'corset'] });
+    await handler({ data: { kind: 'outfit', piece: 'bra', look: bra, modelUrl: bundleUrl, bag: false } });
+    assert.equal(response.image?.type, 'image/webp', response.error);
+    assert.ok(renderedMeshes.at(-1).every(name => name.startsWith('wardrobe-underwear-bra')));
     assert.equal(modeLoadStarts, 0, 'portrait assets never set the shared mode loading state');
   } finally {
     await vite?.close();
     DefaultLoadingManager.onStart = previousStart;
     dom.window.close();
     restore();
+  }
+});
+
+test('hairstyle framing includes the crown, side strands and longest ends of a multipart cut', async () => {
+  const vite = await createServer(serverOptions);
+  try {
+    const { frameHairThumbnail } = await vite.ssrLoadModule('/src/game/characters/hairThumbnail.ts');
+    for (const view of ['front', 'side', 'back']) {
+      const actor = new Group(), cut = new Group(), strands = new Group();
+      actor.position.set(3, 2, -4);
+      actor.rotation.y = .45;
+      actor.add(cut);
+      cut.add(strands);
+      const crown = new Mesh(new BoxGeometry(.22, .08, .21));
+      const braid = new Mesh(new BoxGeometry(.03, .28, .025));
+      const ponytail = new Mesh(new BoxGeometry(.11, .38, .09));
+      crown.position.y = 1.7;
+      braid.position.set(.11, 1.54, .125);
+      ponytail.position.set(-.06, 1.44, -.22);
+      cut.add(crown);
+      strands.add(braid, ponytail);
+      const coat = new Mesh(new BoxGeometry(.8, 1.2, .4));
+      actor.add(coat);
+      const camera = frameHairThumbnail(actor, [cut], view);
+      assert.equal(coat.layers.test(camera.layers), false);
+      const point = new Vector3();
+      let bottom = Infinity, top = -Infinity;
+      for (const mesh of [crown, braid, ponytail]) {
+        assert.ok(mesh.layers.test(camera.layers));
+        for (let i = 0; i < mesh.geometry.attributes.position.count; i++) {
+          mesh.getVertexPosition(i, point).applyMatrix4(mesh.matrixWorld).project(camera);
+          assert.ok(Math.abs(point.x) < .93 && Math.abs(point.y) < .93 && Math.abs(point.z) <= 1);
+          bottom = Math.min(bottom, point.y);
+          top = Math.max(top, point.y);
+        }
+      }
+      assert.ok(top - bottom > 1.7, 'the complete cut fills at least 85% of the square');
+    }
+  } finally {
+    await vite.close();
   }
 });

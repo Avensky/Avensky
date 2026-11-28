@@ -225,7 +225,7 @@ export async function signOutPlayerProfile() {
     }
   } catch { /* Private browsing may disallow storage access. */ }
   pageIdentity = null;
-  useSocialStore.setState({profileOwner:null,cachedCosmetics:null,view:null,profileScope:null,registeredProfile:false});
+  useSocialStore.setState({profileOwner:null,cachedCharacterSlot:null,cachedCosmetics:null,view:null,profileScope:null,registeredProfile:false});
 }
 /** Explicitly create another authenticated player without changing the saved
  * main profile. Duplicated tabs may inherit sessionStorage and can use this

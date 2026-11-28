@@ -1,3 +1,4 @@
+import { PORTRAIT_FOV, wardrobeEyeLine, wardrobePortraitDistance } from "./portraitFraming";
 import { copyGarageView, showroomZoom, type ShowroomBounds } from "./workshopFraming";
 import { useUIStore, type MenuScreen } from "../../store/menus/uiStore";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -17,7 +18,7 @@ import { PreviewTurntable } from "./PreviewTurntable";
 import { DEFAULT_PREVIEW_PLATFORM } from "./previewPlacement";
 import { useSocialStore } from "../../store/social/socialStore";
 import { usePlayerCharacter } from "../characters/localOutfits";
-import { clothingFrame, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
+import { blendCharacterCamera, clothingFrame, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
 import { createGarageOrbitIdle } from "./garageOrbitIdle";
 import { FITTING_BODY_DIRECTION, fullBodyZoom, type FittingBodyFrame } from "../characters/fullBodyFraming";
 import { FittingCameraOrbit } from "../characters/FittingCameraOrbit";
@@ -74,6 +75,7 @@ function createPreviewAim() {
     position: new Vector3(), target: new Vector3(), offset: new Vector3(), scale: new Vector3(),
     pivot: new Vector3(), eye: new Vector3(), nextEye: new Vector3(),
     anchorRotation: new Quaternion(), orbit: new Quaternion(), swing: new Quaternion(), lookAt: new Matrix4(),
+    portraitAnchor: undefined as Object3D | undefined, eyeToWaist: .49,
     itemKey: "", itemCenter: new Vector3(), itemDistance: 1,
     anchors: new Map<string, Object3D>(), cameraMin: new Vector3(), cameraMax: new Vector3(),
     renderedVehicle: undefined as string | undefined, renderedView: "", drivingSetShot: undefined as string | undefined, inStation: false, held: false,
@@ -239,7 +241,7 @@ export function VehiclePreview({
     if (!camera || !width || !height) return;
     const aim = cameraAim.current!;
     const rotation = fittingOrbit.current!;
-    const { position, target, offset, anchorRotation, pivot, eye, nextEye, orbit, swing, lookAt } = aim;
+    const { position, target, offset, anchorRotation, pivot, lookAt } = aim;
     const wardrobe = wardrobeOpen ? useCharacterPreviewStore.getState() : null;
     const emotesInGarage = Boolean(wardrobe && !characterOnly &&
       (import.meta.env.DEV || import.meta.env.MODE === "staging"));
@@ -270,6 +272,9 @@ export function VehiclePreview({
     position.set(...cameraPosition);
     target.set(0, driverStage ? 1.17 : 1.35, 0);
     let lensZoom = zoom;
+    let lensFov = fov;
+    let lensNear = near;
+    let portraitShift = 0;
     let drivingSetShot: string | undefined;
     let missingActorShot = false;
     if (!aim.held && garageView !== "Showroom") {
@@ -333,6 +338,29 @@ export function VehiclePreview({
           radius = aim.itemDistance / MathUtils.clamp(view.zoom, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX);
           anchor.parent!.parent!.getWorldQuaternion(anchorRotation);
           orientFittingCameraOffset(offset.set(0, radius * .06, radius), anchorRotation, characterOnly);
+        } else if (view.camera === "Hair" || view.camera === "Eyes" || view.camera === "Makeup") {
+          const eyeFocus = findPreviewAnchor(aim.anchors, anchor, "villager-eye-focus");
+          const head = eyeFocus ?? findPreviewAnchor(aim.anchors, anchor, "head");
+          if (head) {
+            head.getWorldPosition(target);
+            if (!eyeFocus) target.y += .065 * scale;
+            if (aim.portraitAnchor !== head) {
+              const waist = findPreviewAnchor(aim.anchors, anchor, "spine_03");
+              const length = waist && (target.y - waist.getWorldPosition(offset).y - .03 * scale);
+              aim.eyeToWaist = length && length > 0 ? length : .49 * scale;
+              aim.portraitAnchor = head;
+            }
+          } else {
+            anchor.getWorldPosition(target).y += 1.57 * scale;
+          }
+          const visibleHeight = area?.height || height;
+          lensFov = PORTRAIT_FOV;
+          lensNear = .025;
+          radius = wardrobePortraitDistance(view.camera, head ? aim.eyeToWaist : .49 * scale,
+            height, area?.width || width, visibleHeight, width < height) / MathUtils.clamp(view.zoom, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX);
+          portraitShift = (.5 - wardrobeEyeLine(view.camera)) * visibleHeight;
+          (characterActor.current ?? anchor).getWorldQuaternion(anchorRotation);
+          orientFittingCameraOffset(offset.set(0, radius * .055, radius), anchorRotation, characterOnly);
         } else if (view.camera === "Face") {
           const focus = findPreviewAnchor(aim.anchors, anchor, "villager-face-focus");
           const head = focus ?? findPreviewAnchor(aim.anchors, anchor, "head");
@@ -396,8 +424,8 @@ export function VehiclePreview({
     const garageOffset = workshop && !wardrobeOpen && !closeShot && garageTab !== "abilities" ? .07 : 0;
     const offsetX = panelsHidden ? 0 : area?.width ? width / 2 - (area.left + area.width / 2)
       : aim.held ? aim.heldOffset.x * width : width * (sandboxPicker ? .15 : garageOffset);
-    const offsetY = panelsHidden ? 0 : area?.height ? height / 2 - (area.top + area.height / 2)
-      : aim.held ? aim.heldOffset.y * height : wardrobeOpen ? height * .055 : heroLayout && aspect < 1 ? -height * .04 : 0;
+    const offsetY = portraitShift + (panelsHidden ? 0 : area?.height ? height / 2 - (area.top + area.height / 2)
+      : aim.held ? aim.heldOffset.y * height : wardrobeOpen ? height * .055 : heroLayout && aspect < 1 ? -height * .04 : 0);
     aim.initializedCamera = camera;
     const drivingSetCut = drivingSetShot && drivingSetShot !== aim.drivingSetShot;
     aim.drivingSetShot = drivingSetShot;
@@ -408,19 +436,14 @@ export function VehiclePreview({
       camera.position.copy(position);
     } else {
       // Arc around the subject when angles differ, even after a large turntable drag.
-      eye.subVectors(camera.position, pivot);
-      nextEye.subVectors(position, target);
-      const radius = MathUtils.lerp(eye.length(), nextEye.length(), blend);
-      swing.setFromUnitVectors(eye.normalize(), nextEye.normalize());
-      eye.applyQuaternion(orbit.identity().slerp(swing, blend)).multiplyScalar(radius);
-      camera.position.copy(pivot.lerp(target, blend)).add(eye);
+      blendCharacterCamera(camera.position, pivot, position, target, blend, aim);
     }
     if (boundedCamera) camera.position.clamp(aim.cameraMin, aim.cameraMax);
     camera.quaternion.setFromRotationMatrix(lookAt.lookAt(camera.position, pivot, camera.up));
     const currentX = camera.view?.offsetX ?? (roomCamera ? 0 : offsetX);
     const currentY = camera.view?.offsetY ?? (roomCamera ? 0 : offsetY);
-    const cameraFov = aim.held ? aim.heldFov : fov;
-    const cameraNear = aim.held ? aim.heldNear : near;
+    const cameraFov = aim.held ? aim.heldFov : lensFov;
+    const cameraNear = aim.held ? aim.heldNear : lensNear;
     const reframing = Math.abs(currentX - offsetX) > .01 || Math.abs(currentY - offsetY) > .01
       || Math.abs(camera.zoom - lensZoom) > .0001 || Math.abs(camera.fov - cameraFov) > .01;
     const resize = camera.view?.fullWidth !== width || camera.view?.fullHeight !== height;

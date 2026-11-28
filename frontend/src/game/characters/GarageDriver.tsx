@@ -17,8 +17,8 @@ import { AssetBoundary } from "../../components/debugger/AssetBoundary";
 import { ROOK_ID, VILLAGER_ID, characterLook, type CharacterChoice, type CharacterLook } from "./characterCatalog";
 import { GarageEmotePlayer, type VictoryPlayback } from "./GarageEmotePlayer";
 import { CharacterLoadingEffect } from "./CharacterLoadingEffect";
-import { SpaceBunsPreview } from "./fittedWardrobe/SpaceBunsPreview";
-import { previewStockBonnet, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
+import { SpaceBunsMotion } from "./fittedWardrobe/SpaceBunsMotion";
+import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { DressContactMotion } from "./fittedWardrobe/DressContactMotion";
 import { WedgeSandalMotion } from "./fittedWardrobe/WedgeSandalMotion";
 import { applyVillagerLook, prepareVillager, villagerModelUrl } from "./villagerModel";
@@ -136,8 +136,8 @@ function ReadyVillager({ preview, bag, previewPacks, leanFit, mirrorFit, victory
   return model ? <>
     <DressContactMotion root={model.root} source={garmentBody} active={Boolean(previewPacks)} />
     <WedgeSandalMotion root={model.root} active={Boolean(previewPacks)} />
-    <SpaceBunsPreview root={model.root} active={Boolean(previewPacks) && look.character.id === VILLAGER_ID}
-      stockFit={look.outfit.id === "dockwear" && !look.garments && !look.corset && !look.wardrobe && !removedClothing.length} />
+    {model.fittedHair && look.appearance.hair === "Space_Buns" && <SpaceBunsMotion root={model.root} hair={model.fittedHair} />}
+    {model.ponySway && <PonyMotion sway={model.ponySway} paused={paused} />}
     <PreparedVillager model={model} look={look} bag={bag} previewPacks={previewPacks}
       leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} upright={upright} rosterPreview={rosterPreview} creatorEmotes={creatorEmotes} />
   </> : null;
@@ -168,28 +168,26 @@ function RosterEmotePlayer({ root, look, bag, paused, creatorEmotes }: { root: O
   return <GarageEmotePlayer root={root} bag={bag} bagColors={colors} rosterEmote={cycle.emote} onSelectionEnd={cycle.onSelectionEnd} />;
 }
 
+function PonyMotion({ sway, paused }: { sway: NonNullable<ReturnType<typeof prepareVillager>["ponySway"]>; paused: boolean }) {
+  const reducedMotion = usePreferencesStore(state => state.reducedMotion);
+  const systemMotion = useMemo(() => window.matchMedia("(prefers-reduced-motion: reduce)"), []);
+  useFrame(({ invalidate }, delta) => {
+    const enabled = !paused && !reducedMotion && !systemMotion.matches && !document.hidden && !useCharacterPreviewStore.getState().insideCar;
+    if (sway.step(delta, enabled)) invalidate();
+  });
+  return null;
+}
+
 function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, victory, cockpit, paused, upright, rosterPreview, creatorEmotes }:
   VillagerPlayback & { model: ReturnType<typeof prepareVillager>; look: CharacterLook }) {
   const invalidate = useThree(s => s.invalidate);
   const departing = useGarageParking(s => Boolean(rosterPreview && s.departurePhase));
-  const previewHair = useLocalHairstyle(s => s.id);
   const stage = useRef<Group>(null);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
-    if (previewPacks && look.character.id === VILLAGER_ID) {
-      // Stock is the authored long braid with bonnet, even if a saved appearance
-      // previously chose cropped/fitted hair. Imported previews take its place.
-      // Change only visibility, never the outfit's removal array or actor rig.
-      const stock = previewStockBonnet(true, true, previewHair);
-      if (model.hat) model.hat.visible = stock;
-      if (model.longHair) model.longHair.visible = stock;
-      if (model.fittedHair) model.fittedHair.visible = false;
-      if (model.crop) model.crop.visible = false;
-      if (stock) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
-    }
     if (previewPacks && stage.current) stage.current.userData.fittingBody = measureFittingBody(model.root, stage.current);
     invalidate();
-  }, [model, look, previewHair, previewPacks, invalidate]);
+  }, [model, look, previewPacks, invalidate]);
   useLayoutEffect(() => {
     if (model.trialGarments && useCharacterPreviewStore.getState().camera === "Selected item") {
       useCharacterPreviewStore.setState(state => ({ focusRevision: state.focusRevision + 1 }));

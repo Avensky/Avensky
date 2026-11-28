@@ -350,6 +350,8 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
 
     await open('underwear');
     assert(find('[aria-label="Clear Underwear"]').disabled);
+    assert(find('[data-wardrobe-item=underwear-bra] .wardrobe-thumbnail'));
+    assert(find('[data-wardrobe-item=underwear-briefs] .wardrobe-thumbnail'));
     await click('[data-wardrobe-item=underwear-bra]');
     assertPiece('bra');
     assert.equal(trials.length, 0, 'inspecting a covered base layer preserves the outfit');
@@ -488,6 +490,8 @@ test('dressing room lists whole outfits and keeps corsets in their own category'
     await click(`[data-wardrobe-item=${missingOutfit}]`);
     assert.equal(changes.at(-1).outfit, DEFAULT_CHARACTER.outfit, 'missing outfits leave the current selection in place.');
     const nightgown = '[aria-label="Sleepwear"] [data-wardrobe-item=linen-nightgown]';
+    assert(find(nightgown).querySelector('.wardrobe-thumbnail'), 'the outfit has a static character preview');
+    assert.equal(find(nightgown).querySelector('canvas'), null, 'outfit tiles never mount a live 3D renderer');
     assert.equal(find(nightgown).dataset.alphaStatus, 'provisional');
     assert.match(find(nightgown).textContent, /Provisional pass/);
     await click(nightgown);

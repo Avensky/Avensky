@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { BoxGeometry, Group, Mesh, PerspectiveCamera, Vector3 } from "three";
+import { wardrobePortraitDistance, wardrobeEyeLine, PORTRAIT_FOV } from "../src/game/preview/portraitFraming.ts";
 import { FITTING_BODY_DIRECTION, fullBodyZoom, measureFittingBody } from "../src/game/characters/fullBodyFraming.ts";
 
 test("the dressed rig fills the open stage from headwear to shoes in both phone orientations", () => {
@@ -46,6 +47,39 @@ test("the dressed rig fills the open stage from headwear to shoes in both phone 
         }
       });
       if (freeW>300) assert.ok(bottom-top>=.77*freeH, `character uses the portrait/landscape stage at ${w}×${h}`);
+    }
+  }
+});
+
+test("wardrobe focuses the hairstyle, whole makeup area, then both irises in the open phone stage", () => {
+  // Eye, waist, and lip positions for each starter rig in the garage.
+  for (const [eyeY, waist, lips] of [[1.5583, 1.095, 1.501], [1.711, 1.164, 1.643]]) {
+    for (const [w, h, left, top, width, height] of [[390, 844, 8, 86, 374, 430], [844, 390, 4, 42, 440, 315]]) {
+      const eye = new Vector3(0, eyeY, .09);
+      const camera = new PerspectiveCamera(PORTRAIT_FOV, w / h, .025);
+      const pixel = point => {
+        const p = point.clone().project(camera);
+        return [(1 + p.x) * w / 2, (1 - p.y) * h / 2];
+      };
+      let previous = Infinity;
+      for (const name of ["Hair", "Makeup", "Eyes"]) {
+        const distance = wardrobePortraitDistance(name, eyeY - waist, h, width, height, w < h);
+        assert(distance < previous, name + " moves closer");
+        previous = distance;
+        camera.position.copy(eye).add(new Vector3(0, .055 * distance, distance));
+        camera.lookAt(eye);
+        camera.setViewOffset(w, h, w / 2 - left - width / 2, h / 2 - top - wardrobeEyeLine(name) * height, w, h);
+        camera.updateMatrixWorld();
+        const points = [new Vector3(.035, eyeY, .09), new Vector3(-.035, eyeY, .09)];
+        if (name !== "Eyes") points.push(new Vector3(0, lips, .10));
+        if (name === "Hair") points.push(new Vector3(0, eyeY + .15, .01), new Vector3(0, eyeY - .33, -.09));
+        for (const point of points) {
+          const [x, y] = pixel(point);
+          assert(x > left && x < left + width && y > top && y < top + height, name + " landmarks visible at " + w + "×" + h);
+        }
+        const [right] = pixel(points[0]), [leftEye] = pixel(points[1]);
+        if (name === "Eyes") assert(right - leftEye > width * .20, "both eyes are large enough to inspect");
+      }
     }
   }
 });

@@ -11,9 +11,18 @@ material. Mia's Blender color ramps are available as reusable themes.
 
 On this fit, crown volume adds up to 3.5 mm of lift and crown strand width
 varies by up to 22% on supported sections. The roots and contact areas carry
-zero shape displacement. The stock-dress ponytail uses the export's separate
-sway mask and the previously checked motion bounds. This staging candidate
-still needs performance checks on physical devices.
+zero shape displacement. The character renderer fits the rear lengths and both
+front braids once against the selected body and visible torso garments. At the
+nape, the body guides the fall past raised collars. The loosened rear lengths
+are 28% shorter below the tie and the face braids are 9% shorter below their
+roots. Keep the crown, tie, individual tips and source GLB intact. The ends
+follow the upper torso through head turns. Motion from the head adds a small
+spring displacement, with reduced motion and a parked viewport supported.
+
+For a fit review, check the back and both profiles in a stock dress and a
+different top. Turn the head during an emote and check both braids against
+the chest, including the transition back to neutral. Compare crown, tie and
+the relative lengths of the separate locks with the original Blender groom.
 
 Compatible fitted exports can supply `_AVENSKY_GROOM` as a vertex vector
 `[rootToTip, variation, sectionIndex]`. See `hairGroom.ts` for the section order.
@@ -22,10 +31,33 @@ displacement in glTF rest space. Meshes without those channels retain the
 shared palette behavior. The GLB travels through the authenticated staging
 asset catalog.
 
-The catalog contains 12 fitted styles `hair-01`…`hair-12`, but the wardrobe's old `alphaAssets.ts` list only included Space Buns and Mia. The build now injects all available catalog styles (`id`, display label, logical URL and actual GLB mesh name), and `SpaceBunsPreview` uses each model's mesh name (e.g. `Hair_01`) instead of trying to find a mesh named `hair-01`. Missing/broken test assets still fail within their preview boundary; other outfits continue to work.
+Keep the fitted hair registry in `packages/wardrobe-catalog/fitted-hair.json`.
+The build exposes installed styles by saved ID and GLB node name. Wardrobe,
+roster, garage and portraits bind the selected character's saved style,
+palette and groom through the same renderer. Fitted exports may contain
+several skinned primitives beneath their named node.
 
-## Temporary bridge for the already-running private asset gateway
+## Fit review, 2026-11-28
 
-Existing Vultr receiver `/usr/local/lib/avensky/publish.py` still expects the legacy **534-asset** release ID, even though the gateway already serves the **546-asset** hair release. Until the one-time root-owned receiver upgrade, the **staging-only** CI bundle keeps `bundle.json.assetRelease` at the previously accepted legacy ID but records the actual Vite client ID as `clientAssetRelease`. The Vite-built frontend continues to request the full 546-asset release, including all hairstyles, from the already-activated gateway. This bridge is limited to the password-protected staging environment; production is not changed.
+We rebuilt a private test mesh from the original Mia Blender groom and
+bound its approximately 90,000 vertices to the stock Vesper portrait rig.
+We checked 3,311 lower front-braid vertices and 792 lower rear vertices
+against the posed body and corset in each of three stances. The stances
+were rest and opposing head turns of about 25° with a 5° spine bend.
+All sampled points cleared the garment. Side and three-quarter WebGL views
+also showed the braids hanging through the space below the chin and meeting
+the bodice smoothly.
 
-After the server's fast staging receiver is installed, remove the compatibility ID and use the built catalog directly. This bridge does not activate future new asset release IDs automatically. The permanent host upgrade is described in `docs/STAGING_AUTODEPLOY.md`.
+The initial fit took roughly 0.2–0.4 seconds on the shared QA host.
+An 8 mm grid supplies the body and clothing samples once per fitted rig.
+Dye changes reuse that fit. Animated frames update a spring and shader offset.
+This review used a source-derived test export. Checking the exact private
+staging GLB and measuring frame timing on a physical phone remain open.
+
+## Staging release
+
+The staging workflow packages the verified asset manifest with the frontend and
+records its release ID in the bundle. Keep the Blender source and fitted GLBs
+in the private asset pipeline. A change to thumbnail framing or runtime fitting
+can reuse the released models. For a replacement GLB, follow the asset release
+and staging procedures. [Private assets](CLOUD_ASSETS.md) · [Staging deployment](STAGING_AUTODEPLOY.md)

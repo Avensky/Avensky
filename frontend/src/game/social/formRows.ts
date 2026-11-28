@@ -56,10 +56,12 @@ export function navigateFormRows(
       ?.click();
     return true;
   }
-  const columns = Math.max(
-    1,
-    Number(group.row.dataset.controllerColumns) || group.items.length,
-  );
+  let columns = Math.max(1, Number(group.row.dataset.controllerColumns) || group.items.length);
+  if (group.row.dataset.controllerColumns === "auto") {
+    const first = group.items[0].getBoundingClientRect();
+    const nextRow = group.items.findIndex(item => item.getBoundingClientRect().top > first.top + first.height / 2);
+    if (nextRow > 0) columns = nextRow;
+  }
   const line = Math.floor(current / columns),
     column = current % columns;
   if (action === "left" || action === "right") {
