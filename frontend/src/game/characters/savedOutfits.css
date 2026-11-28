@@ -35,7 +35,7 @@
 .saved-outfit-list li { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 4px; }
 .saved-outfit-preview.menu-control {
   display: grid;
-  grid-template-columns: clamp(64px, 10vw, 98px) minmax(0, 1fr);
+  grid-template-columns: min(65%, 11.25rem) minmax(0, 1fr);
   gap: 2px 7px;
   align-content: center;
   justify-content: stretch;
@@ -48,12 +48,13 @@
   grid-area: 1 / 1 / span 2;
   width: 100%;
   aspect-ratio: 1;
+  min-height: 0;
   align-self: center;
   background: var(--app-panel);
 }
-.saved-outfit-preview strong { align-self: end; }
-.saved-outfit-preview small { align-self: start; color: var(--app-muted); font-size: 9px; }
-.saved-outfit-delete.menu-control { display: grid; place-items: center; padding: 3px; }
+.saved-outfit-preview strong { align-self: end; font-size: max(1em, 13px); }
+.saved-outfit-preview small { align-self: start; color: var(--app-muted); font-size: max(.9em, 11px); }
+.saved-outfit-delete.menu-control { display: grid; place-items: center; align-self: center; min-height: 44px; padding: 3px; }
 .saved-outfit-delete svg { width: 15px; height: 15px; }
 
 .saved-outfit-sources { display: flex; gap: 4px; }
