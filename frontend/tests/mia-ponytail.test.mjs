@@ -3,7 +3,7 @@ import test from "node:test";
 import { createServer } from "vite";
 import { Bone, BoxGeometry, BufferGeometry, Float32BufferAttribute, Group, MeshStandardMaterial, Skeleton, SkinnedMesh, Uint16BufferAttribute, Vector3 } from "three";
 
-test("Mia's fitted ends shorten and rest against the worn torso while roots follow the head", async () => {
+test("Mia's ponytail shortens and her face braids hang onto the worn torso through head turns", async () => {
   const vite = await createServer({ configFile: false, optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true, hmr: false, ws: false }, logLevel: "error" });
   try {
     const { fitMiaPonytail } = await vite.ssrLoadModule("/src/game/characters/fittedWardrobe/miaFit.ts");
@@ -30,7 +30,9 @@ test("Mia's fitted ends shorten and rest against the worn torso while roots foll
     source.name = "Mia_01";
     for (const [section, x, z] of [[8, 0, -.22], [4, -.075, .022], [5, .075, .022], [0, 0, 0]]) {
       const geo = new BufferGeometry();
-      geo.setAttribute("position", new Float32BufferAttribute([x, 1.54, z, x, 1.29, z, x, 1.16, z], 3));
+      // One braid floats in front of the coat and the other starts inside it.
+      const depths = section === 4 ? [.13, .19, .22] : [z, z, z];
+      geo.setAttribute("position", new Float32BufferAttribute([x, 1.54, depths[0], x, 1.29, depths[1], x, 1.16, depths[2]], 3));
       geo.setAttribute("_avensky_groom", new Float32BufferAttribute([0, .5, section, .55, .5, section, 1, .5, section], 3));
       geo.setAttribute("skinIndex", new Uint16BufferAttribute(Array(12).fill(0), 4));
       geo.setAttribute("skinWeight", new Float32BufferAttribute([1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0], 4));
@@ -50,9 +52,16 @@ test("Mia's fitted ends shorten and rest against the worn torso while roots foll
     const close = (actual, expected) => assert.ok(Math.abs(actual - expected) < .0001, `${actual} ≈ ${expected}`);
     const vertex = (mesh, i) => new Vector3().fromBufferAttribute(mesh.geometry.attributes.position, i);
     close(vertex(tail, 2).y, 1.54 - .38 * .72);
-    close(vertex(left, 2).y, 1.54 - .38 * .91);
+    assert.ok(vertex(left, 2).y >= vertex(source.children[1], 2).y - .0001 && vertex(left, 2).y < vertex(left, 1).y,
+      "the tip hangs below the middle of the braid without stretching the authored length");
     close(vertex(tail, 2).z, -.120);
-    for (const braid of [left, right]) close(vertex(braid, 2).z, .122);
+    const touches = (point, depth) => assert.ok(point.z >= depth - .0001 && point.z <= depth + .008,
+      `braid should rest against the surface at ${depth} m, got ${point.z} m`);
+    for (const braid of [left, right]) {
+      touches(vertex(braid, 1), .115);
+      touches(vertex(braid, 2), .115);
+    }
+    assert.deepEqual(vertex(left, 0), vertex(source.children[1], 0), "the temple attachment stays in place");
     assert.deepEqual(vertex(tail, 0), vertex(source.children[0], 0));
     assert.equal(crown.geometry, source.children[3].geometry);
     close(vertex(source.children[0], 2).z, -.22);
@@ -64,12 +73,28 @@ test("Mia's fitted ends shorten and rest against the worn torso while roots foll
     }
     chest.position.z = .025;
     actor.updateMatrixWorld(true);
-    for (const braid of [left, right]) close(braid.getVertexPosition(2, new Vector3()).z, .147);
+    for (const braid of [left, right]) touches(braid.getVertexPosition(2, new Vector3()), .115 + .025);
     close(tail.getVertexPosition(2, new Vector3()).z, -.120);
     dispose();
 
+    jacket.visible = false;
+    const bareHair = bindFittedHair(source, skeleton);
+    const releaseBare = fitMiaPonytail(bareHair, actor, body);
+    for (const braid of bareHair.children.slice(1, 3)) touches(vertex(braid, 2), .095);
+    releaseBare();
+    jacket.visible = true;
+
+    jacket.userData.clothingPiece = "dress";
+    const dressHair = bindFittedHair(source, skeleton);
+    const releaseDress = fitMiaPonytail(dressHair, actor, body);
+    for (const braid of dressHair.children.slice(1, 3)) touches(vertex(braid, 2), .115);
+    releaseDress();
+    delete jacket.userData.clothingPiece;
+
     // A raised bodice edge sits in front of the bare neck. The unsupported
     // portion must hang forward and approach that edge over several rows.
+    jacket.visible = false;
+    const neck = new SkinnedMesh(new BoxGeometry(.26, .50, .07).translate(0, 1.27, 0));
     const bodice = new SkinnedMesh(new BoxGeometry(.3, .30, .30).translate(0, 1.20, 0));
     bodice.name = "CLOTH_TOP_CORSET";
     bodice.bind(skeleton);
@@ -80,10 +105,10 @@ test("Mia's fitted ends shorten and rest against the worn torso while roots foll
       .setAttribute("_avensky_groom", new Float32BufferAttribute(samples.flatMap((_, i) => [i / (samples.length - 1), .5, 4]), 3));
     const projected = new SkinnedMesh(strand);
     projected.bind(skeleton);
-    const release = fitMiaPonytail(projected, actor, body);
+    const release = fitMiaPonytail(projected, actor, neck);
     const points = samples.map((_, i) => vertex(projected, i));
     for (const [i, point] of points.entries()) {
-      assert.ok(point.z >= .07999, "a hanging braid stays in front of the hollow under the chin");
+      assert.ok(point.z >= .077, "the unsupported braid falls from the jaw without bending back into the hollow of the neck");
       if (i && point.y < 1.43) assert.ok(Math.abs(point.z - points[i - 1].z) < .008,
         "the front braid bridges the bodice edge without a horizontal step");
     }
