@@ -19,6 +19,7 @@ import { useSocialStore } from "../../store/social/socialStore";
 import { usePlayerCharacter } from "../characters/localOutfits";
 import { clothingFrame, orbitFittingCamera, orientFittingCameraOffset } from "../characters/clothingFraming";
 import { createGarageOrbitIdle } from "./garageOrbitIdle";
+import { FITTING_BODY_DIRECTION, fullBodyZoom, type FittingBodyFrame } from "../characters/fullBodyFraming";
 import { FittingCameraOrbit } from "../characters/FittingCameraOrbit";
 import { FittingMirrorDisplay } from "../characters/FittingMirrorDisplay";
 import { GARAGE_LEAN_ID } from "../characters/garageLean";
@@ -311,7 +312,15 @@ export function VehiclePreview({
         if (view.camera !== "Selected item") radius *= Math.max(1, height / Math.max(1, area?.height || height) * .72);
         anchor.getWorldPosition(target);
         target.setY(target.y + eyeHeight * scale);
-        if (view.camera === "Selected item") {
+        const body = characterOnly && (view.camera === "Full body" || view.camera === "Whole car")
+          ? anchor.userData.fittingBody as FittingBodyFrame | undefined : undefined;
+        if (body) {
+          anchor.getWorldPosition(target).y += body.centerY * scale;
+          lensZoom = fullBodyZoom(body, fov, height, area?.width || width, area?.height || height)
+            * MathUtils.clamp(view.zoom, CHARACTER_ZOOM_MIN, CHARACTER_ZOOM_MAX);
+          offset.copy(FITTING_BODY_DIRECTION).multiplyScalar(body.distance * scale);
+          orientFittingCameraOffset(offset, anchorRotation, true);
+        } else if (view.camera === "Selected item") {
           const key = [anchor.uuid, anchor.children[0]?.uuid, view.focusRevision, view.selectedPiece, driver?.wardrobe?.set, driver?.wardrobe?.shirt, driver?.wardrobe?.waist, driver?.appearance?.glasses, width, height, area?.width, area?.height].join(":");
           if (aim.itemKey !== key) {
             const shot = clothingFrame(anchor, view.selectedPiece, fov, area?.width && area.height ? area.width / area.height : aspect);
@@ -416,8 +425,11 @@ export function VehiclePreview({
     const reframing = Math.abs(currentX - offsetX) > .01 || Math.abs(currentY - offsetY) > .01
       || Math.abs(camera.zoom - lensZoom) > .0001 || Math.abs(camera.fov - cameraFov) > .01;
     const resize = camera.view?.fullWidth !== width || camera.view?.fullHeight !== height;
+    const rotated = camera.view?.enabled && (camera.view.fullWidth < camera.view.fullHeight) !== (width < height);
     const lensChanged = reframing || camera.fov !== cameraFov || camera.near !== cameraNear || camera.zoom !== lensZoom;
-    const lensBlend = reframing ? blend : 1;
+    // Rotation redefines the screen coordinates immediately. An old portrait
+    // shift applied to a landscape lens can put the actor behind the header.
+    const lensBlend = reframing && !rotated ? blend : 1;
     camera.fov = MathUtils.lerp(camera.fov, cameraFov, lensBlend);
     camera.near = cameraNear;
     camera.zoom = MathUtils.lerp(camera.zoom, lensZoom, lensBlend);

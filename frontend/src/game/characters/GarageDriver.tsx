@@ -1,13 +1,14 @@
 import type { MirrorCheckFit } from "./mirrorCheck";
 import { useGarageParking } from "../preview/garageParkingStore";
 import { RosterRigHandoff } from "./RosterRigHandoff";
+import { measureFittingBody } from "./fullBodyFraming";
 import { CharacterTurntable } from "./CharacterTurntable";
 import { usesFittedAnimation } from "./animationFit";
 import { clothingColors } from "./clothingPieces";
-import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAssetGLTF } from "../../assets/useAssetGLTF";
 import { useFrame, useThree } from "@react-three/fiber";
-import { AnimationMixer, type Object3D } from "three";
+import { AnimationMixer, type Group, type Object3D } from "three";
 import { buildEmoteClips, type CreatorEmoteMode } from "./garageEmotes";
 import { useRosterEmoteCycle } from "../preview/useRosterEmoteCycle";
 import { DriverBag } from "./DriverBag";
@@ -172,6 +173,7 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
   const invalidate = useThree(s => s.invalidate);
   const departing = useGarageParking(s => Boolean(rosterPreview && s.departurePhase));
   const previewHair = useLocalHairstyle(s => s.id);
+  const stage = useRef<Group>(null);
   useLayoutEffect(() => {
     applyVillagerLook(model, look);
     if (previewPacks && look.character.id === VILLAGER_ID) {
@@ -185,6 +187,7 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
       if (model.crop) model.crop.visible = false;
       if (stock) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
     }
+    if (previewPacks && stage.current) stage.current.userData.fittingBody = measureFittingBody(model.root, stage.current);
     invalidate();
   }, [model, look, previewHair, previewPacks, invalidate]);
   useLayoutEffect(() => {
@@ -193,7 +196,7 @@ function PreparedVillager({ model, look, bag, previewPacks, leanFit, mirrorFit, 
     }
   }, [model]);
 
-  return <group name="garage-driver" rotation={upright ? [0, 0, 0] : DRIVER_TILT}>
+  return <group name="garage-driver" ref={stage} rotation={upright ? [0, 0, 0] : DRIVER_TILT}>
     {model.detachedCorset?.updateShoulders && <HighCollarMotion update={model.detachedCorset.updateShoulders} />}
     {departing ? <primitive object={model.root} dispose={null} /> : rosterPreview ? <RosterEmotePlayer root={model.root} look={look} bag={bag} paused={paused} creatorEmotes={creatorEmotes} />
       : <GarageEmotePlayer root={model.root} bag={bag} personality={look.appearance.personality} bagColors={clothingColors(look, "bag")} previewPacks={previewPacks} leanFit={leanFit} mirrorFit={mirrorFit} victory={victory} cockpit={cockpit} paused={paused} />}

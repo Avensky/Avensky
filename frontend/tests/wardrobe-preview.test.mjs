@@ -96,15 +96,21 @@ function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
         }
         if (id.endsWith("/GarageDriver.tsx")) return source
           .replace(/from "(?:@react-three\/fiber|\.\/(?:CharacterTurntable|CharacterLoadingEffect|GarageEmotePlayer|villagerModel)|\.\.\/preview\/PreviewLoadingSeal|\.\.\/\.\.\/assets\/useAssetGLTF)"/g, 'from "virtual:wardrobe-preview"')
-          .replaceAll("<group ", "<div ").replaceAll("</group>", "</div>");
+          .replace('import { useFrame, useThree }', 'import { useFrame, useThree, SceneGroup }')
+          .replaceAll("<group ", "<SceneGroup ").replaceAll("</group>", "</SceneGroup>");
       },
       resolveId(id) { if (id === "virtual:wardrobe-preview") return "\0wardrobe-preview-test"; },
       load(id) {
         if (id !== "\0wardrobe-preview-test") return;
         return `
-          import { createElement, useLayoutEffect } from "react";
+          import { createElement, useImperativeHandle, useLayoutEffect, useState } from "react";
           import { Bone, BufferGeometry, Float32BufferAttribute, Group, Skeleton, SkinnedMesh, Uint16BufferAttribute } from "three";
 
+          export function SceneGroup({ref, children}) {
+            const [group] = useState(() => new Group());
+            useImperativeHandle(ref, () => group, [group]);
+            return createElement("div", null, children);
+          }
           const assets = new Map(), invalidate = () => {};
           export const prepared = [], committed = [], appliedLooks = [], loadedGarments = [], loadedBodies = [];
           export const assetReads = [];
