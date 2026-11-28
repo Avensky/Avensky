@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { GameButton } from "../../components/GameButton";
 import { ColorSwatch } from "../../components/menus/ColorSwatch";
 import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
@@ -11,31 +11,24 @@ import { BRAIDED_PONYTAIL_THEMES } from "../characters/fittedWardrobe/hairGroom"
 import { CreatorOption } from "./CreatorOption";
 import "./creatorColors.css";
 
-type Step = "skin" | "hair" | "eyes" | "makeup" | "brows";
-type Channel = HairColorZone | "brow_color" | "skin" | "eye_color" | "presets" | "makeup" | "eyeshadow" | "eyeliner";
+import { creatorColorChannels, colorChannelLabels as labels, type ColorChannel, type ColorStep } from "./creatorColorChannels";
+
 type Swatch = { id: string; label: string; color?: string };
 const ponytailThemes = { ...BRAIDED_PONYTAIL_THEMES, ...HAIR_COLOR_THEMES };
-const labels: Record<Channel, string> = {
-  brow_color: "Eyebrow tint", skin: "Skin tone", base: "Base", roots: "Roots", highlights: "Highlights", tips: "Tips", eye_color: "Eye color",
-  presets: "Presets", makeup: "Lipstick", eyeshadow: "Eyeshadow", eyeliner: "Eyeliner",
-};
 const hairColors = [...options.hair_color,
   ...(["Honey Blonde", "Platinum Smoke", "Bright Copper", "Black Cherry", "Midnight Teal", "Icy Blue", "Violet Dusk", "Rose Quartz"] as const)
     .map(label => ({ id: label, label, color: HAIR_COLOR_THEMES[label].base }))];
-const makeupChannels = ["makeup", "eyeshadow", "eyeliner"] as const;
-const hairChannels = [...HAIR_COLOR_ZONES, "presets"] as const;
-const singleChannels = { brows: ["brow_color"], skin: ["skin"], eyes: ["eye_color"], cropped: ["base"] } as const;
 const linerStrokes: Record<string, string> = {
   classic: "M4 18 Q12 9 24 16",
   "cat-eye": "M4 18 Q12 9 23 15 L29 11 Q26 16 23 17",
   graphic: "M4 18 Q12 9 23 15 L29 10 M21 18 Q25 18 28 15",
 };
 
-export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardrobe = false }: {
-  step: Step; choice: CharacterChoice; onChoice: (next: CharacterChoice, change: Partial<CharacterAppearance>) => void; busy: boolean; onContinue?: () => void;
-  wardrobe?: boolean;
+export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardrobeField }: {
+  step: ColorStep; choice: CharacterChoice; onChoice: (next: CharacterChoice, change: Partial<CharacterAppearance>) => void; busy: boolean; onContinue?: () => void;
+  wardrobeField?: { channel: ColorChannel; renderSample: (option: Swatch, preset?: HairPalette) => ReactNode };
 }) {
-  const [requested, setChannel] = useState<Channel>("base");
+  const [requested, setChannel] = useState<ColorChannel>("base");
   const id = useId();
   const group = useRef<HTMLDivElement>(null);
   const movingToChannel = useRef(false);
@@ -43,9 +36,9 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardro
   const themes: Record<string, HairPalette> = appearance.hair === "Mia_01" ? ponytailThemes : HAIR_COLOR_THEMES;
   const look = characterLook(choice);
   const natural = characterLook({ id: choice.id, outfit: choice.outfit });
-  const channels: readonly Channel[] = step === "hair" ? (appearance.hair === "cropped" ? singleChannels.cropped : hairChannels)
-    : step === "makeup" ? makeupChannels : singleChannels[step];
-  const channel = channels.includes(requested) ? requested : channels[0];
+  const channels = creatorColorChannels(step, appearance.hair);
+  const requestedChannel = wardrobeField?.channel ?? requested;
+  const channel = channels.includes(requestedChannel) ? requestedChannel : channels[0];
   const palette = appearanceHairPalette(appearance);
   const base = look?.hair ?? DEFAULT_HAIR_PALETTE.base;
   const currentPalette = palette ?? { ...DEFAULT_HAIR_PALETTE, base, roots: base, highlights: base, tips: base };
@@ -90,22 +83,11 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardro
     value?.focus({ preventScroll: true });
     movingToChannel.current = false;
   }
-  function openChannel(next: Channel) {
+  function openChannel(next: ColorChannel) {
     if (channel === next) { focusSwatch(); return; }
     setChannel(next);
   }
-  useLayoutEffect(() => {
-    focusSwatch();
-    if (!wardrobe) return;
-    const tab = document.getElementById(id + channel);
-    const row = tab?.parentElement;
-    if (tab && row && row.scrollWidth > row.clientWidth) {
-      const panelBounds = row.getBoundingClientRect();
-      const tabBounds = tab.getBoundingClientRect();
-      if (tabBounds.left < panelBounds.left) row.scrollLeft += tabBounds.left - panelBounds.left;
-      else if (tabBounds.right > panelBounds.right) row.scrollLeft += tabBounds.right - panelBounds.right;
-    }
-  }, [channel, wardrobe, id]);
+  useLayoutEffect(focusSwatch, [channel]);
   function moveChannel(direction: number) {
     if (busy || channels.length < 2 || group.current?.closest("[inert]") || useTextKeyboardStore.getState().session) return;
     openChannel(channels[(channels.indexOf(channel) + direction + channels.length) % channels.length]);
@@ -114,21 +96,22 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardro
     const action = (event as CustomEvent<MenuAction>).detail;
     if (action === "previous_option" || action === "next_option") moveChannel(action === "previous_option" ? -1 : 1);
   });
+  const inWardrobe = Boolean(wardrobeField);
   useEffect(() => {
-    if (wardrobe) return;
+    if (inWardrobe) return;
     window.addEventListener("avenlab:panel-action", cycle);
     return () => window.removeEventListener("avenlab:panel-action", cycle);
-  }, [wardrobe]);
+  }, [inWardrobe]);
   const activeLabel = values.find(option => option.id === active)?.label ??
     (channel === "presets" ? "Custom" : palette && HAIR_COLOR_ZONES.includes(channel as HairColorZone) ? palette[channel as HairColorZone] : "Original");
   return <>
-    {channels.length > 1 && <SecondaryTabRow navigation={wardrobe ? "arrows" : "triggers"} className="creator-color-channels" aria-label={step === "hair" ? "Hair color channels" : "Makeup channels"}>
+    {!inWardrobe && channels.length > 1 && <SecondaryTabRow className="creator-color-channels" aria-label={step === "hair" ? "Hair color channels" : "Makeup channels"}>
       {channels.map(key => <GameButton key={key} variant="custom" role="tab" data-creator-channel={key}
         id={id + key} aria-selected={key === channel} aria-controls={id + "-colors"} disabled={busy}
         onPress={() => openChannel(key)}>{labels[key]}</GameButton>)}
     </SecondaryTabRow>}
-    <div id={id + "-colors"} role={channels.length > 1 ? "tabpanel" : "group"}
-      aria-labelledby={channels.length > 1 ? id + channel : undefined} aria-label={channels.length === 1 ? labels[channel] : undefined}
+    <div id={id + "-colors"} role={!inWardrobe && channels.length > 1 ? "tabpanel" : "group"}
+      aria-labelledby={!inWardrobe && channels.length > 1 ? id + channel : undefined} aria-label={inWardrobe || channels.length === 1 ? labels[channel] : undefined}
       className="creator-preview-field" data-color-field={channel}>
       <div ref={group} key={channel} className={"creator-options creator-color-options " + (channel === "eyeliner" ? "creator-style-options" : "creator-swatches")}
         data-controller-row data-controller-columns="auto" role="group" aria-label={labels[channel] + " options"}>
@@ -137,7 +120,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardro
           const preset = channel === "presets" ? themes[option.id] : undefined;
           return <CreatorOption key={option.id} id={option.id} label={option.label} selected={active === option.id}
             hideTooltip={channel === "eyeliner"} busy={busy} onFocusOption={() => { if (onContinue && !movingToChannel.current) pick(option); }} onPick={() => pick(option)} onConfirm={onContinue}>
-            {preset ? <span className="creator-preset-sample" aria-hidden="true" style={{
+            {wardrobeField ? wardrobeField.renderSample({ ...option, color }, preset) : preset ? <span className="creator-preset-sample" aria-hidden="true" style={{
               "--roots": preset.roots, "--base": preset.base, "--highlights": preset.highlights, "--tips": preset.tips,
             } as CSSProperties} /> : channel === "eyeliner" ? (
               <svg viewBox="0 0 32 24" aria-hidden="true">
@@ -147,7 +130,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue, wardro
             ) : color ? <ColorSwatch color={color} /> : <span aria-hidden="true">∅</span>}
           </CreatorOption>;
         })}
-        {wardrobe && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
+        {inWardrobe && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
           <label className="creator-option wardrobe-custom-dye chamfered-frame" title="Custom color">
             <span aria-hidden="true">+</span><input type="color" disabled={busy} value={currentPalette[channel as HairColorZone]}
               aria-label={labels[channel] + " custom color"}

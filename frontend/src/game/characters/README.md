@@ -575,6 +575,20 @@ angles, rotation and playback, zoom, and the current inspector. The group cycle
 wraps in both directions. Use directional input to browse controls within a group.
 Reset view above the zoom slider restores the current framing. Keep the toolbar
 hints visible while the fitting-room interface is open, including after touch input.
+
+The six Body category images share one WebP atlas. Hair, makeup and complexion
+use separate detail atlases, requested when their images appear. Color options
+put their dye behind the material mask to keep the lighting and texture of the
+original sample. Rebuild the atlases with
+`frontend/scripts/bake-body-feature-art.mjs` using the approved concept renders.
+
+For stock hairstyle tiles, bake a 320px WebP of each rig with its first catalog
+outfit, neutral appearance and natural hair. Use the same `hairstylePreview`
+worker framing as the fitted cuts. Check the crown, longest end and contrast
+against the actual tile, then replace the matching image in `previews/`.
+Published fitted cuts can reuse their catalog image across browser visits.
+Bump `FRAMING` in `catalogHairImage.ts` when the rendering recipe changes.
+
 The Heroes Fitting Room uses the garage with an angled
 mirror that reflects the live character. Ruffled Corset first equips in
 Over skirt.

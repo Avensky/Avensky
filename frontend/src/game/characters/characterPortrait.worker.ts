@@ -1,6 +1,6 @@
 import { preparePortraitOutfit, renderWardrobeThumbnail } from "./wardrobeThumbnail.worker";
 import { Box3, LoadingManager, Mesh, OrthographicCamera, Vector3, type Object3D } from "three";
-import { frameHairThumbnail, type HairThumbnailView } from "./hairThumbnail";
+import { frameHairThumbnail } from "./hairThumbnail";
 import { loadPortraitAsset, renderPortraitImage } from "./portraitRendering";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
@@ -70,38 +70,22 @@ async function renderPortrait({ look, modelUrl, dress, hairstylePreview }: Chara
     const loadScene = (url: string) => loadPortraitAsset(loader, url);
     const selectedHair = installedHairStyles(look.character.id).find(style => style.id === look.appearance.hair);
     if (hairstylePreview) {
-      // Most fitted exports contain the complete cut and its rest skeleton.
-      // Only styles fitted against the wearer's body need a character model.
-      const hairScene = selectedHair ? await loadScene(selectedHair.url).catch(() => undefined) : undefined;
-      const fitted = hairScene && selectedHair ? hairScene.getObjectByName(selectedHair.mesh) : undefined;
-      if (selectedHair && !fitted) throw Error("The hairstyle preview is unavailable.");
-      let root: Object3D;
-      let cut: Object3D | undefined;
-      let view: HairThumbnailView = "side";
-      const parts: Object3D[] = [];
-      if (selectedHair?.editableGroom && fitted) {
-        view = "back";
-        model = prepareVillager(await loadScene(modelUrl), { female: look.female, hairSource: fitted });
-        applyVillagerLook(model, look);
-        root = model.root;
-        cut = model.fittedHair;
-      } else if (fitted && hairScene) {
-        root = hairScene;
-        cut = fitted;
-      } else {
-        if (look.appearance.hair !== "natural") throw Error("The hairstyle preview is unavailable.");
-        root = await loadScene(modelUrl);
-        cut = root.getObjectByName(look.female ? "HAIR_HAIR20" : "HAIR_SHORT");
-        const bonnet = look.female && root.getObjectByName("ACC_HAT");
-        if (bonnet) {
-          // The front three-quarter angle shows the fringe and braid together.
-          view = "front";
-          parts.push(bonnet);
-        }
-      }
+      // Every cut uses the same dressed portrait rig. Garment previews and the live garage keep their own assets.
+      const [actor, hair] = await Promise.all([
+        loadScene(modelUrl), selectedHair && loadScene(selectedHair.url).catch(() => undefined),
+      ]);
+      const source = selectedHair && hair?.getObjectByName(selectedHair.mesh);
+      if (!source && look.appearance.hair !== "natural") throw Error("The hairstyle preview is unavailable.");
+      model = prepareVillager(actor, { female: look.female, hairSource: source });
+      applyVillagerLook(model, look);
+      const root = model.root;
+      const cut = source ? model.fittedHair : root.getObjectByName(look.female ? "HAIR_HAIR20" : "HAIR_SHORT");
       if (!cut) throw Error("The hairstyle preview is unavailable.");
-      parts.push(cut);
-      return await renderPortraitImage(root, frameHairThumbnail(root, parts, view), HAIRSTYLE_SIZE);
+      const parts = [cut];
+      if (model.hat?.visible) parts.push(model.hat);
+      // The stock cut is open beneath its bonnet. Profile shows its fringe and braid together.
+      const view = selectedHair?.editableGroom ? "back" : model.hat?.visible ? "profile" : "front";
+      return await renderPortraitImage(root, frameHairThumbnail(root, parts, view), HAIRSTYLE_SIZE, "hair");
     }
     const layeredOutfit = look.corset || look.wardrobe || look.bra !== undefined ||
       Object.keys(look.garments ?? {}).some(slot => slot !== "dress") ||

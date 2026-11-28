@@ -1,11 +1,12 @@
-import { useImperativeHandle, useLayoutEffect, useRef, useState, type Ref } from "react";
+import { useImperativeHandle, useLayoutEffect, useRef, useState, type ComponentProps, type Ref } from "react";
 import { GameButton } from "../../components/GameButton";
 import { MenuIcon } from "../../components/menus/MenuIcon";
-import { ColorSwatch } from "../../components/menus/ColorSwatch";
 import "../welcome/characterCreator.css";
 import { CreatorColors } from "../welcome/CreatorColors";
+import { creatorColorChannels, colorChannelLabels, type ColorChannel } from "../welcome/creatorColorChannels";
 import { CreatorHairstyles } from "../welcome/CreatorHairstyles";
 import { CreatorOption } from "../welcome/CreatorOption";
+import { BodyFeaturePreview } from "./BodyFeaturePreview";
 import { CHARACTER_APPEARANCE_OPTIONS as options, characterAppearance, characterLook, installedHairStyles,
   type CharacterAppearance, type CharacterChoice } from "./characterCatalog";
 import { focusWardrobeFeature } from "./characterPreviewStore";
@@ -16,15 +17,29 @@ import "./wardrobeBody.css";
 
 const sections = {
   hairstyle: "Hairstyle", hair: "Hair color", eyes: "Eyes", makeup: "Makeup",
-  skin: "Skin tone", brows: "Eyebrow tint", tattoo: "Tattoo",
+  skin: "Skin tone", brows: "Eyebrow tint",
 };
-type BodySection = keyof typeof sections;
+type Feature = keyof typeof sections;
+type BodySection = Feature | "tattoo";
+const selectedOption = '[data-creator-option][aria-pressed="true"]';
+
+type AppliedValue = { label?: string; color?: string };
+function BodyTile({ feature, channel, title, tint, option, applied, ...button }: {
+  feature: Feature; channel?: string; title: string; tint?: string; option?: string;
+  applied?: AppliedValue;
+} & Omit<ComponentProps<typeof GameButton>, "children">) {
+  return <GameButton {...button} variant="custom" className="wardrobe-body-category chamfered-frame" aria-label={title} aria-description={applied?.label}>
+    <span className="wardrobe-body-picture"><BodyFeaturePreview feature={feature} channel={channel} tint={tint} option={option} /></span>
+    <span className="wardrobe-body-tile-label">{title}{applied?.color && <i aria-hidden="true" style={{ backgroundColor: applied.color }} />}</span>
+  </GameButton>;
+}
 
 export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, navigation }: {
   choice: CharacterChoice; onChange: (change: Partial<CharacterAppearance>) => void;
   disabled: boolean; tattoosAvailable: boolean; navigation?: Ref<WardrobeNavigation>;
 }) {
   const [section, setSection] = useState<BodySection | null>(null);
+  const [channel, setChannel] = useState<ColorChannel | null>(null);
   const [groomLayer, setGroomLayer] = useState<"sections" | HairPiece | null>(null);
   const piece = groomLayer && groomLayer !== "sections" ? groomLayer : null;
   const panel = useRef<HTMLElement>(null);
@@ -33,13 +48,24 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
   const groom = appearance.hair_groom ?? DEFAULT_HAIR_GROOM;
   const look = characterLook(choice);
   const style = installedHairStyles(choice.id).find(item => item.id === appearance.hair);
-  const makeup = [
-    options.makeup.find(item => item.id === appearance.makeup && item.id !== "none")?.label,
-    options.eyeshadow.find(item => item.id === appearance.eyeshadow && item.id !== "none")?.label,
-    options.eyeliner.find(item => item.id === appearance.eyeliner && item.id !== "none")?.label,
-  ].filter(Boolean).join(" · ");
+  const colorStep = section && section !== "hairstyle" && section !== "tattoo" ? section : null;
+  const channels = colorStep ? creatorColorChannels(colorStep, appearance.hair) : [];
+  const field = channels.length === 1 ? channels[0] : channel;
+  const chooseChannel = channels.length > 1 && !field;
+  const sectionTitle = section === "tattoo" ? "Tattoo" : section ? sections[section] : "Body";
+  const pieceTitle = piece && HAIR_PIECES.find(([id]) => id === piece)![1];
+  const title = channel ? colorChannelLabels[channel] : pieceTitle || (groomLayer ? "Hair sections" : sectionTitle);
+  const parentTitle = channel ? pieceTitle || sectionTitle : piece ? "Hair sections" : groomLayer ? "Hair color" : "Body";
+
+  function openSection(id: BodySection) {
+    focusTarget.current = id === "hair" || id === "makeup" ? "[data-creator-channel]" : selectedOption;
+    setSection(id);
+  }
   function back() {
-    if (piece) {
+    if (channel) {
+      focusTarget.current = '[data-creator-channel="' + channel + '"]';
+      setChannel(null);
+    } else if (piece) {
       focusTarget.current = '[data-hair-piece="' + piece + '"]';
       setGroomLayer("sections");
     } else if (groomLayer) {
@@ -51,6 +77,7 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
     } else return false;
     return true;
   }
+
   useImperativeHandle(navigation, () => ({ back }));
   useLayoutEffect(() => { focusWardrobeFeature(section); }, [section]);
   useLayoutEffect(() => () => focusWardrobeFeature(null), []);
@@ -60,20 +87,8 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
     focusTarget.current = null;
     const element = panel.current?.querySelector<HTMLElement>(target) ?? panel.current?.querySelector<HTMLElement>("[data-creator-option]");
     element?.focus({ preventScroll: true });
-  }, [section, groomLayer]);
+  }, [section, groomLayer, channel]);
 
-  const selected = {
-    hairstyle: style?.label ?? options.hair.find(style => style.id === appearance.hair)?.label ?? "Saved hairstyle",
-    hair: appearance.hair_palette ? "Custom" : options.hair_color.find(color => color.id === appearance.hair_color)?.label,
-    eyes: options.eye_color.find(color => color.id === (appearance.eye_color ?? "original"))?.label,
-    brows: options.brow_color.find(color => color.id === (appearance.brow_color ?? "original"))?.label,
-    skin: options.skin.find(color => color.id === appearance.skin)?.label,
-    tattoo: options.tattoo.find(item => item.id === (appearance.tattoo ?? "none"))?.label,
-    makeup: makeup || options.makeup.find(item => item.id === "none")?.label,
-  };
-  const colors = { hairstyle: undefined, hair: appearanceHairPalette(appearance)?.base ?? look?.hair,
-    eyes: look?.iris, skin: look?.skin, brows: options.brow_color.find(item => item.id === appearance.brow_color)?.color ?? look?.hair,
-    makeup: options.makeup.find(item => item.id === appearance.makeup)?.color, tattoo: undefined };
   function clearPiece() {
     if (!piece) return;
     const pieces = { ...groom.pieces };
@@ -87,42 +102,51 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
     if (!dye) return;
     onChange({ hair_groom: { ...groom, pieces: { ...groom.pieces, [piece]: dye } } });
   }
-  const title = piece ? HAIR_PIECES.find(([id]) => id === piece)![1] : groomLayer ? "Hair sections" : section ? sections[section] : "Body";
+  const hairBase = look?.hair ?? DEFAULT_HAIR_PALETTE.base;
+  const shownDye = (piece ? groom.pieces[piece] : undefined) ?? appearanceHairPalette(appearance);
+  const applied: Record<Feature, AppliedValue> = {
+    hairstyle: { label: style?.label ?? options.hair.find(item => item.id === appearance.hair)?.label },
+    hair: { color: hairBase, label: appearance.hair_palette ? "Custom" : options.hair_color.find(item => item.id === appearance.hair_color)?.label },
+    eyes: { color: look?.iris, label: options.eye_color.find(item => item.id === (appearance.eye_color ?? "original"))?.label },
+    skin: { color: look?.skin, label: options.skin.find(item => item.id === appearance.skin)?.label },
+    brows: { color: look?.brow ?? hairBase, label: options.brow_color.find(item => item.id === (appearance.brow_color ?? "original"))?.label },
+    makeup: { label: (["makeup", "eyeshadow", "eyeliner"] as const).flatMap(key =>
+      options[key].filter(item => item.id !== "none" && item.id === appearance[key]).map(item => item.label)).join(", ") || "No makeup" },
+  };
+  const channelTint: Partial<Record<ColorChannel, string>> = {
+    base: shownDye?.base ?? hairBase, roots: shownDye?.roots ?? hairBase, highlights: shownDye?.highlights ?? hairBase,
+    tips: shownDye?.tips ?? hairBase, makeup: look?.lipstick, eyeshadow: look?.eyeshadow,
+  };
   const colorChoice = piece ? { ...choice, appearance: { ...appearance,
-    hair_palette: groom.pieces[piece] ?? appearanceHairPalette(appearance) ?? { ...DEFAULT_HAIR_PALETTE,
-      base: look!.hair, roots: look!.hair, highlights: look!.hair, tips: look!.hair },
+    hair_palette: shownDye ?? { ...DEFAULT_HAIR_PALETTE,
+      base: hairBase, roots: hairBase, highlights: hairBase, tips: hairBase },
   } } : choice;
   return <section data-wardrobe-focus-group="content" ref={panel} className="character-controls menu-panel-frame character-body-style" aria-label="Body customization">
     <header className="wardrobe-body-heading">
       {section && <GameButton variant="custom" className="wardrobe-body-back" data-body-back data-controller-row
-        aria-label={"Back to " + (piece ? "hair sections" : groomLayer ? "hair color" : "Body")} onPress={back}><MenuIcon name="back" /></GameButton>}
+        aria-label={"Back to " + parentTitle} onPress={back}><MenuIcon name="back" /></GameButton>}
       <h2>{title}</h2>
-      {section === "hair" && style?.editableGroom && groomLayer !== "sections" && (piece
-        ? <GameButton variant="menu" data-controller-row disabled={disabled || !groom.pieces[piece]} onPress={clearPiece}>Use overall hair color</GameButton>
-        : <GameButton variant="menu" data-controller-row data-body-groom onPress={() => {
-          focusTarget.current = "[data-hair-piece]"; setGroomLayer("sections");
-        }}>Hair sections</GameButton>)}
     </header>
-    {!section ? <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto">
-      {(Object.keys(sections) as BodySection[]).map(id => <GameButton key={id} variant="menu" className="wardrobe-body-category"
-        data-body-section={id} disabled={disabled || (id === "tattoo" && !tattoosAvailable)}
-        aria-label={sections[id]} onPress={() => {
-          focusTarget.current = '[data-creator-option][aria-pressed="true"]';
-          setSection(id);
-        }}>
-        <span>{sections[id]}</span>
-        {colors[id] && <ColorSwatch color={colors[id]} />}
-        <small>{id === "tattoo" && !tattoosAvailable ? "Server update required" : selected[id]}</small>
-      </GameButton>)}
-    </div> : groomLayer === "sections" ? <>
-      <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto">
-        {HAIR_PIECES.map(([id, label]) => <GameButton key={id} variant="menu" data-hair-piece={id} disabled={disabled}
-          onPress={() => { focusTarget.current = '[data-creator-option][aria-pressed="true"]'; setGroomLayer(id); }}>{label}</GameButton>)}
-        <GameButton variant="menu"
-          disabled={disabled || (!appearance.hair_palette && appearance.hair_color === "original" && !Object.keys(groom.pieces).length)}
-          onPress={() => onChange({ hair_color: "original", hair_palette: undefined,
-            hair_groom: appearance.hair_groom && { ...groom, pieces: {} } })}>Reset hair colors</GameButton>
+    {!section ? <div className="wardrobe-body-list">
+      <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto" role="group" aria-label="Body features">
+        {(Object.keys(sections) as Feature[]).map(id => <BodyTile key={id} feature={id} title={sections[id]} applied={applied[id]}
+          data-body-section={id} disabled={disabled} onPress={() => openSection(id)} />)}
       </div>
+      <GameButton variant="menu" className="wardrobe-body-extra" data-body-section="tattoo" data-controller-row
+        disabled={disabled || !tattoosAvailable} onPress={() => openSection("tattoo")}>
+        Tattoo{!tattoosAvailable && <small>Server update required</small>}
+      </GameButton>
+    </div> : groomLayer === "sections" ? <div className="wardrobe-body-list">
+      <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto" role="group" aria-label="Hair sections">
+        {HAIR_PIECES.map(([id, label]) => <GameButton key={id} variant="menu" data-hair-piece={id}
+          disabled={disabled} onPress={() => {
+            focusTarget.current = "[data-creator-channel]"; setGroomLayer(id);
+          }}>{label}</GameButton>)}
+      </div>
+      <GameButton variant="menu" data-controller-row
+        disabled={disabled || (!appearance.hair_palette && appearance.hair_color === "original" && !Object.keys(groom.pieces).length)}
+        onPress={() => onChange({ hair_color: "original", hair_palette: undefined,
+          hair_groom: appearance.hair_groom && { ...groom, pieces: {} } })}>Reset hair colors</GameButton>
       {(["volume", "thickness"] as const).map(key => <div key={key} className="wardrobe-groom-amount" data-controller-row>
         <span>{key === "volume" ? "Crown volume" : "Crown strand width"}</span>
         {([-1, 1] as const).map(direction => {
@@ -134,13 +158,33 @@ export function WardrobeBody({ choice, onChange, disabled, tattoosAvailable, nav
             </GameButton></div>;
         })}
       </div>)}
-    </> : <div className="creator-panel wardrobe-body-options" key={piece ?? section}>
-      {section === "hairstyle" ? <CreatorHairstyles scope="catalog" choice={choice} onChoice={(_, change) => onChange(change)} busy={disabled} /> :
-        section === "tattoo" ? <div className="creator-options wardrobe-body-grid" data-controller-row data-controller-columns="auto">
-          {options.tattoo.map(option => <CreatorOption key={option.id} id={option.id} label={option.label}
-            selected={option.id === (appearance.tattoo ?? "none")} busy={disabled || !tattoosAvailable}
-            onPick={() => onChange({ tattoo: option.id })}>{option.label}</CreatorOption>)}
-        </div> : <CreatorColors step={section} choice={colorChoice} onChoice={pickColor} busy={disabled} wardrobe />}
+    </div> : chooseChannel && colorStep ? <div className="wardrobe-body-list">
+      <div className="wardrobe-body-grid" data-controller-row data-controller-columns="auto" role="group" aria-label={title + " channels"}>
+        {channels.map(key => <BodyTile key={key} feature={colorStep} channel={key} title={colorChannelLabels[key]}
+          tint={channelTint[key]} option={key === "eyeliner" ? appearance.eyeliner : undefined}
+          data-creator-channel={key} disabled={disabled} onPress={() => {
+            focusTarget.current = selectedOption; setChannel(key);
+          }} />)}
+      </div>
+      {section === "hair" && style?.editableGroom && (piece
+        ? <GameButton variant="menu" data-controller-row disabled={disabled || !groom.pieces[piece]} onPress={clearPiece}>Use overall hair color</GameButton>
+        : <GameButton variant="menu" data-controller-row data-body-groom disabled={disabled} onPress={() => {
+          focusTarget.current = "[data-hair-piece]"; setGroomLayer("sections");
+        }}>Hair sections</GameButton>)}
+    </div> : <div className="creator-panel wardrobe-body-options" key={piece ?? section}>
+      {section === "hairstyle" && <CreatorHairstyles scope="catalog" choice={choice} onChoice={(_, change) => onChange(change)} busy={disabled} />}
+      {section === "tattoo" && <div className="creator-options wardrobe-body-grid" data-controller-row data-controller-columns="auto">
+        {options.tattoo.map(option => <CreatorOption key={option.id} id={option.id} label={option.label}
+          selected={option.id === (appearance.tattoo ?? "none")} busy={disabled || !tattoosAvailable}
+          onPick={() => onChange({ tattoo: option.id })}>{option.label}</CreatorOption>)}
+      </div>}
+      {colorStep && field && <CreatorColors step={colorStep} choice={colorChoice} onChoice={pickColor} busy={disabled}
+        wardrobeField={{ channel: field, renderSample: (option, preset) => <>
+          <BodyFeaturePreview feature={colorStep} channel={field} option={option.id} tint={option.color} palette={preset} />
+          {option.color && <span className="wardrobe-color-chip" aria-hidden="true" style={{
+            background: preset ? `linear-gradient(90deg,${preset.roots} 25%,${preset.base} 25% 50%,${preset.highlights} 50% 75%,${preset.tips} 75%)` : option.color,
+          }} />}
+        </> }} />}
     </div>}
   </section>;
 }

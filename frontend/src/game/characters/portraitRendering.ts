@@ -12,8 +12,8 @@ export async function loadPortraitAsset(loader: GLTFLoader, url: string): Promis
   }
 }
 
-/** Fit the orthographic image to the displayed meshes in their skinned pose. */
-export function framePortraitMeshes(root: Object3D, direction: Vector3, include: (part: Mesh) => boolean) {
+/** Frame the chosen skinned meshes. A portrait can retain surrounding clothing in the image. */
+export function framePortraitMeshes(root: Object3D, direction: Vector3, include: (part: Mesh) => boolean, { isolate = true } = {}) {
   const camera = new OrthographicCamera();
   direction.normalize();
   camera.position.copy(direction);
@@ -24,7 +24,7 @@ export function framePortraitMeshes(root: Object3D, direction: Vector3, include:
   root.traverseVisible(part => {
     if (!(part instanceof Mesh)) return;
     if (!include(part) || !part.layers.test(camera.layers)) {
-      part.layers.disableAll();
+      if (isolate) part.layers.disableAll();
       return;
     }
     toCamera.multiplyMatrices(camera.matrixWorldInverse, part.matrixWorld);
@@ -48,16 +48,25 @@ export function framePortraitMeshes(root: Object3D, direction: Vector3, include:
   return camera;
 }
 
-export async function renderPortraitImage(root: Object3D, camera: OrthographicCamera, size: number, lightX = 3) {
+export async function renderPortraitImage(root: Object3D, camera: OrthographicCamera, size: number, lighting: "standard" | "hair" = "standard") {
   const scene = new Scene();
+  scene.add(root);
   const key = new DirectionalLight(0xffefe1, 2);
-  key.position.set(lightX, 4, 5);
-  scene.add(root, key, new HemisphereLight(0xe5eeff, 0x73685e, 1.25));
+  key.position.set(3, 4, 5);
+  if (lighting === "hair") {
+    // Keep the fringe and braid lit in profile and rear views as well as frontal cuts.
+    key.position.applyQuaternion(camera.quaternion);
+    const rim = new DirectionalLight(0xffe4cd, 1.35);
+    rim.position.set(-3, 3, -2).applyQuaternion(camera.quaternion);
+    scene.add(rim);
+  }
+  scene.add(key, new HemisphereLight(0xe5eeff, 0x73685e, 1.25));
   const canvas = new OffscreenCanvas(size, size);
   const renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
   try {
     renderer.setSize(size, size, false);
     renderer.toneMapping = ACESFilmicToneMapping;
+    if (lighting === "hair") renderer.toneMappingExposure = 1.2;
     renderer.setClearColor(0, 0);
     renderer.render(scene, camera);
     return await canvas.convertToBlob({ type: "image/webp", quality: .90 });

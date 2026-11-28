@@ -6,7 +6,10 @@
   z-index: 2;
   pointer-events: none;
 }
-.character-page:is(.character-page--profile, .character-page--account) { position: relative; }
+.character-page:is(.character-page--profile, .character-page--account) {
+  position: relative;
+  grid-template-rows: minmax(0, 1fr) auto;
+}
 :is(.character-page--profile, .character-page--account) > .fitting-rotation-grid { grid-column: 1 / -1; }
 /* Keep the account sheet in the stage row, clear of its playback controls. */
 :is(.character-page--profile, .character-page--account) > .alpha-account-panel { grid-row: 1 / 2; bottom: 0; }

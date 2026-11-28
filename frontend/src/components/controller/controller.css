@@ -63,6 +63,7 @@
   align-items: center;
   gap: 4px;
 }
+.controller-shortcut-keys { display: inline-flex; align-items: center; gap: inherit; }
 .keyboard-key {
   display: inline-grid;
   place-items: center;

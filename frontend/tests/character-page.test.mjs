@@ -34,21 +34,27 @@ function characterTestDom() {
 }
 
 function bodyEditor(click) {
+  const overview = async () => {
+    for (let depth = 0; document.querySelector('[data-body-back]'); depth++) {
+      assert.ok(depth < 5, 'Back retraces the open Body editor layers');
+      await click('[data-body-back]');
+    }
+  };
   const open = async section => {
-    const target = '[data-body-section="' + section + '"]';
-    if (!document.querySelector(target)) await click('[data-body-back]');
-    await click(target);
+    await overview();
+    await click('[data-body-section="' + section + '"]');
   };
   const active = async section => {
     await open(section);
     const value = document.querySelector('[data-creator-option][aria-pressed=true]').dataset.creatorOption;
-    await click('[data-body-back]');
+    await overview();
     return value;
   };
   const pick = async (section, id, keepOpen = false) => {
     await open(section);
+    if (section === 'hair') await click('[data-creator-channel=base]');
     await click('[data-creator-option="' + id + '"]');
-    if (!keepOpen) await click('[data-body-back]');
+    if (!keepOpen) await overview();
   };
   return { open, active, pick };
 }
@@ -462,6 +468,18 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     assert.equal(preview.getState().insideCar, false);
     assert.equal(preview.getState().emote, null);
     await click('#character-editor-tab-body');
+    const bodyCards = [...document.querySelectorAll('.wardrobe-body-category[data-body-section]')];
+    assert.deepEqual(bodyCards.map(card => card.getAttribute('aria-label')),
+      ['Hairstyle', 'Hair color', 'Eyes', 'Makeup', 'Skin tone', 'Eyebrow tint']);
+    const previews = bodyCards.map(card => card.querySelector('[data-body-preview="' + card.dataset.bodySection + '"]'));
+    assert.ok(previews.every(picture => picture?.querySelector('image')?.getAttribute('href')));
+    assert.equal(new Set(previews.map(picture => picture.querySelector('image').getAttribute('href'))).size, 1,
+      'all six categories share one cached image resource');
+    assert.equal(new Set(previews.map(picture => picture.getAttribute('viewBox'))).size, 6,
+      'each category shows its own feature crop');
+    assert.equal(find('[data-creator-option], [data-creator-channel]'), null, 'the overview mounts only the category choices');
+    const wardrobeStage = find('[data-character-viewport]');
+    assert.ok(wardrobeStage);
     assert.equal(await body.active('eyes'), 'original');
     t.mock.timers.enable({ apis: ['setTimeout'] });
     await body.pick('eyes', 'obsidian');
@@ -469,6 +487,7 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await body.pick('skin', 'deep');
     await body.pick('hair', 'espresso', true);
     assert.equal(preview.getState().camera, 'Hair');
+    assert.equal(find('[data-character-viewport]'), wardrobeStage, 'drilling through Body keeps the same live preview stage');
     await click('#character-editor-tab-appearance');
     await browseWardrobe('accessories');
     await click('[data-wardrobe-item="glasses:aviator"]');
@@ -757,14 +776,19 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await click('[data-body-back]');
     await body.pick('hairstyle', 'Mia_01');
     await body.open('hair');
+    assert.deepEqual([...document.querySelectorAll('[data-creator-channel]')].map(node => node.dataset.creatorChannel),
+      ['base', 'roots', 'highlights', 'tips', 'presets']);
+    assert.equal(find('[data-creator-option]'), null, 'opening Hair color does not hydrate every channel');
     await click('[data-body-groom]');
     await click('[aria-label="Increase crown volume"]');
     await click('[data-hair-piece="left-braid"]');
     await click('[data-creator-channel=roots]');
-    assert.equal(find('[data-creator-channel=roots]').getAttribute('aria-selected'), 'true');
+    assert(find('[data-color-field=roots]'));
     await click('[data-creator-option=copper]');
     assert.equal(drafts.at(-1).appearance.hair_groom.pieces['left-braid'].roots, '#ae5837');
     assert.equal(drafts.at(-1).appearance.hair_groom.volume, .05);
+    await move('back');
+    assert.equal(document.activeElement.dataset.creatorChannel, 'roots');
     await move('back');
     assert.equal(document.activeElement.dataset.hairPiece, 'left-braid');
     await move('back');
@@ -772,14 +796,23 @@ test('Heroes opens the character picker, saves one profile choice, and opens Gar
     await move('back');
     assert.equal(document.activeElement.dataset.bodySection, 'hair');
     await body.open('makeup');
+    assert.deepEqual([...document.querySelectorAll('[data-creator-channel]')].map(node => node.getAttribute('aria-label')),
+      ['Lipstick', 'Eyeshadow', 'Eyeliner']);
     const beforeBrowsing = drafts.at(-1);
     await click('[data-creator-channel=eyeliner]');
-    assert.equal(find('[data-creator-channel=eyeliner]').getAttribute('aria-selected'), 'true');
+    assert(find('[data-color-field=eyeliner]'));
+    const linerPicture = id => find('[data-creator-option="' + id + '"] [data-body-preview=makeup]');
+    assert.equal(linerPicture('none').querySelector('path'), null);
+    assert.notEqual(linerPicture('classic').querySelector('path').getAttribute('d'),
+      linerPicture('cat-eye').querySelector('path').getAttribute('d'), 'eyeliner choices show the different shapes');
     assert.equal(drafts.at(-1), beforeBrowsing, 'changing channels or focusing a swatch does not save it');
     await click('[data-creator-option=cat-eye]');
     assert.equal(drafts.at(-1).appearance.eyeliner, 'cat-eye');
     assert.equal(preview.getState().camera, 'Makeup');
     await move('back');
+    assert.equal(document.activeElement.dataset.creatorChannel, 'eyeliner');
+    await move('back');
+    assert.equal(document.activeElement.dataset.bodySection, 'makeup');
     await body.pick('hairstyle', 'hair-01');
     assert.equal(drafts.at(-1).appearance.hair, 'hair-01');
     assert.equal(drafts.at(-1).appearance.hair_groom, undefined, 'another hairstyle cannot carry a Mia groom to the server');
@@ -981,7 +1014,7 @@ test('Wardrobe cycles toolbars with number keys and controller triggers while pr
     });
     const activeGroup = () => document.activeElement.closest('[data-wardrobe-focus-group]')?.dataset.wardrobeFocusGroup;
     const selectedGroup = () => find('[data-wardrobe-group][aria-selected=true]').dataset.wardrobeGroup;
-    const selectedChannel = () => find('[data-creator-channel][aria-selected=true]').dataset.creatorChannel;
+    const openColorChannel = () => find('[data-color-field]')?.dataset.colorField;
     await poll(); // Let the neutral device connect before its first press.
     assert.equal(document.activeElement.id, 'character-editor-tab-appearance');
     await key('Digit3', '3');
@@ -1036,12 +1069,12 @@ test('Wardrobe cycles toolbars with number keys and controller triggers while pr
     await focus(lipstick);
     await press(15); // D-pad right
     assert.equal(document.activeElement.dataset.creatorChannel, 'eyeshadow');
-    assert.equal(selectedChannel(), 'makeup');
+    assert.equal(openColorChannel(), undefined, 'browsing the channel grid leaves its choices unmounted');
     await key('Enter', 'Enter');
-    assert.equal(selectedChannel(), 'eyeshadow', 'Enter opens the focused channel');
+    assert.equal(openColorChannel(), 'eyeshadow', 'Enter opens the focused channel');
     await press(7);
     assert.equal(activeGroup(), 'angles');
-    assert.equal(selectedChannel(), 'eyeshadow');
+    assert.equal(openColorChannel(), 'eyeshadow');
     await press(5); // RB
     assert.equal(document.activeElement.id, 'character-editor-tab-appearance');
     await act(async () => find('[data-category=outfits]').click());
@@ -1375,6 +1408,7 @@ test('device character edits stay local when the connected profile has no charac
     assert(!document.querySelector('[aria-label="Clear saved outfit preview"]').disabled);
     await show('body');
     await body.open('hair');
+    await click('[data-creator-channel=base]');
     assert.equal(document.querySelector('[aria-label="Base custom color"]').value, HAIR_COLOR_THEMES['Icy Blue'].base);
     await click('[data-creator-option=original]');
     for (const id of ['red', 'dirty-blonde']) {
