@@ -1,4 +1,6 @@
 import type { PortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
+import { assetReleaseId } from "../../assets/runtimeAssets";
+import { catalogHairImage } from "./catalogHairImage";
 
 type PendingPortrait = { result: Promise<string>; abort: AbortController; viewers: number };
 const portraits = new Map<string, string>();
@@ -18,7 +20,7 @@ export function subscribeCharacterPortrait(listener: () => void) {
 function startPortrait(key: string, input: PortraitJob): PendingPortrait {
   const abort = new AbortController();
   let worker: Worker | undefined;
-  const image = workerAvailable.then(() => {
+  const render = () => {
     abort.signal.throwIfAborted();
     return new Promise<Blob>((resolve, reject) => {
       worker = new Worker(new URL("./characterPortrait.worker.ts", import.meta.url), { type: "module" });
@@ -31,6 +33,10 @@ function startPortrait(key: string, input: PortraitJob): PendingPortrait {
       abort.signal.addEventListener("abort", () => reject(abort.signal.reason), { once: true });
       worker.postMessage(input);
     });
+  };
+  const image = workerAvailable.then(() => {
+    abort.signal.throwIfAborted();
+    return catalogHairImage(input, key, assetReleaseId, render);
   }).finally(() => worker?.terminate());
   workerAvailable = image.then(() => {}, () => {});
   const result = image.then(blob => {

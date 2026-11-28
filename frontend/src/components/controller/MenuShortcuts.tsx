@@ -40,7 +40,7 @@ export function MenuShortcuts({
           <ControlGlyph controller="D-PAD" keyboard={directions === "both" ? "↑↓ ←→" : "↑↓"} /> Navigate
         </span>}
         {selectAction && <span><ControlGlyph controller="A" /> {selectLabel ?? (hold ? "Select / hold" : "Select")}</span>}
-        {tabs && <span><ControlGlyph controller={["LB", "RB"]} keyboard="Q / E" /> Tabs</span>}
+        {tabs && <span><span className="controller-shortcut-keys"><ControlGlyph controller={["LB", "RB"]} keyboard="Q / E" /></span> Tabs</span>}
         {secondaryTabs && <span><ControlGlyph controller={["LT", "RT"]} keyboard="1 / 3" /> Field</span>}
         {chat && <span><ControlGlyph controller="X" keyboard="T" /> Chat</span>}
       </>}

@@ -461,9 +461,10 @@ test('portrait worker renders authored GLTF assets and skips missing character m
     requests.length = 0;
     await handler({ data: { ...styleJob, hairstylePreview: true } });
     assert.equal(response.image?.type, 'image/webp', response.error);
-    assert.deepEqual(requests, [hairUrl], 'a fitted style tile loads its own cut without the actor or clothes');
+    assert.deepEqual(requests.sort(), ['/full-driver.gltf', hairUrl], 'a fitted style uses its cut and the dressed portrait rig without loading a wardrobe catalog');
 
-    assert.deepEqual(renderedMeshes.at(-1), ['Hair_01'], 'fitted hair renders in isolation from the outfit, body and stock hair');
+    assert.ok(renderedMeshes.at(-1).includes('Hair_01'), 'the fitted hairstyle is visible');
+    assert.ok(renderedMeshes.at(-1).includes('BODY_WARDROBE'), 'the wearer is visible behind the fitted style');
 
     const dress = { url: 'http://localhost/dress.gltf', item: getWardrobeGarment('linen-nightgown') };
     for (const { label, actor, primary, fallback, donorRequests, fitted } of [
@@ -559,7 +560,7 @@ test('hairstyle framing includes the crown, side strands and longest ends of a m
   const vite = await createServer(serverOptions);
   try {
     const { frameHairThumbnail } = await vite.ssrLoadModule('/src/game/characters/hairThumbnail.ts');
-    for (const view of ['front', 'side', 'back']) {
+    for (const view of ['front', 'side', 'profile', 'back']) {
       const actor = new Group(), cut = new Group(), strands = new Group();
       actor.position.set(3, 2, -4);
       actor.rotation.y = .45;
@@ -576,7 +577,7 @@ test('hairstyle framing includes the crown, side strands and longest ends of a m
       const coat = new Mesh(new BoxGeometry(.8, 1.2, .4));
       actor.add(coat);
       const camera = frameHairThumbnail(actor, [cut], view);
-      assert.equal(coat.layers.test(camera.layers), false);
+      assert.equal(coat.layers.test(camera.layers), true, 'the surrounding wearer stays visible without enlarging the crop');
       const point = new Vector3();
       let bottom = Infinity, top = -Infinity;
       for (const mesh of [crown, braid, ponytail]) {

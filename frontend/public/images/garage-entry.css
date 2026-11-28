@@ -193,27 +193,31 @@ html[data-ui-theme]:not([data-high-contrast=true]) .garage-menu-backdrop:not([hi
 /* One hollow frame for public credentials and in-game tiles. On a 45-degree
    cut a perpendicular stroke moves the inner vertex by (sqrt(2) - 1) widths. */
 :is(.chamfered-frame, .garage-credentials :is(.garage-field,.garage-sign-in)) {
-  --cut-top: var(--frame-top-cut, 8px);
-  --cut-bottom: var(--frame-bottom-cut, 8px);
+  --cut-tl: var(--frame-cut-tl, var(--frame-top-cut, 8px));
+  --cut-tr: var(--frame-cut-tr, var(--frame-top-cut, 8px));
+  --cut-bl: var(--frame-cut-bl, var(--frame-bottom-cut, 8px));
+  --cut-br: var(--frame-cut-br, var(--frame-bottom-cut, 8px));
   --stroke: var(--frame-line-width, 1px);
   position: relative;
-  clip-path: polygon(var(--cut-top) 0, calc(100% - var(--cut-top)) 0, 100% var(--cut-top),
-    100% calc(100% - var(--cut-bottom)), calc(100% - var(--cut-bottom)) 100%, var(--cut-bottom) 100%,
-    0 calc(100% - var(--cut-bottom)), 0 var(--cut-top));
+  clip-path: polygon(var(--cut-tl) 0, calc(100% - var(--cut-tr)) 0, 100% var(--cut-tr),
+    100% calc(100% - var(--cut-br)), calc(100% - var(--cut-br)) 100%, var(--cut-bl) 100%,
+    0 calc(100% - var(--cut-bl)), 0 var(--cut-tl));
 }
 :is(.chamfered-frame, .garage-credentials :is(.garage-field,.garage-sign-in))::before {
   --corner-offset: calc(var(--stroke) * .41421356);
-  --inner-top: max(var(--stroke), calc(var(--cut-top) + var(--corner-offset)));
-  --inner-bottom: max(var(--stroke), calc(var(--cut-bottom) + var(--corner-offset)));
+  --inner-tl: max(var(--stroke), calc(var(--cut-tl) + var(--corner-offset)));
+  --inner-tr: max(var(--stroke), calc(var(--cut-tr) + var(--corner-offset)));
+  --inner-bl: max(var(--stroke), calc(var(--cut-bl) + var(--corner-offset)));
+  --inner-br: max(var(--stroke), calc(var(--cut-br) + var(--corner-offset)));
   --far-edge: calc(100% - var(--stroke));
   content: ""; position: absolute; inset: 0; z-index: 1; pointer-events: none;
   background: var(--frame-line-color);
   clip-path: polygon(evenodd, 0 0, 100% 0, 100% 100%, 0 100%, 0 0,
-    var(--inner-top) var(--stroke), calc(100% - var(--inner-top)) var(--stroke),
-    var(--far-edge) var(--inner-top), var(--far-edge) calc(100% - var(--inner-bottom)),
-    calc(100% - var(--inner-bottom)) var(--far-edge), var(--inner-bottom) var(--far-edge),
-    var(--stroke) calc(100% - var(--inner-bottom)), var(--stroke) var(--inner-top),
-    var(--inner-top) var(--stroke));
+    var(--inner-tl) var(--stroke), calc(100% - var(--inner-tr)) var(--stroke),
+    var(--far-edge) var(--inner-tr), var(--far-edge) calc(100% - var(--inner-br)),
+    calc(100% - var(--inner-br)) var(--far-edge), var(--inner-bl) var(--far-edge),
+    var(--stroke) calc(100% - var(--inner-bl)), var(--stroke) var(--inner-tl),
+    var(--inner-tl) var(--stroke));
 }
 .garage-credentials :is(.garage-field,.garage-sign-in) {
   --frame-top-cut: 0px;

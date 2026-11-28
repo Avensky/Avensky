@@ -5,3 +5,4 @@ declare const __STAGING_ASSET_RELEASE__: { id: string; paths: Record<string, tru
 export const assetUrl = (url: string) => resolveAssetUrl(url, __STAGING_ASSET_RELEASE__);
 export const assetAvailable = (url: string) => hasAssetUrl(url, __STAGING_ASSET_RELEASE__);
 export const stagingAssetsEnabled = __STAGING_ASSET_RELEASE__ !== null;
+export const assetReleaseId = __STAGING_ASSET_RELEASE__?.id;

@@ -1,8 +1,10 @@
 import { useMemo, useRef } from "react";
 import { ProfilePortrait } from "../characters/CharacterPortrait";
 import {
-  CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, availableHairStyles, characterAppearance, type CharacterAppearance, type CharacterChoice,
+  CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, ROOK_ID, availableHairStyles, characterAppearance, type CharacterAppearance, type CharacterChoice,
 } from "../characters/characterCatalog";
+import femaleBraid from "../characters/previews/hairstyle-female.webp?no-inline";
+import maleCut from "../characters/previews/hairstyle-male.webp?no-inline";
 import { CreatorOption } from "./CreatorOption";
 import "./creatorHairstyles.css";
 
@@ -38,7 +40,10 @@ export function CreatorHairstyles({ choice, onChoice, busy, onContinue, scope = 
             if (scope === "roster" && (!firstFocus.current || selectedStyle)) pick();
             firstFocus.current = false;
           }} onConfirm={onContinue}>
-          <ProfilePortrait choice={portraits[index]} welcomePreview={scope} hairstylePreview />
+          {style.id === "natural"
+            ? <span className="profile-portrait-frame" aria-hidden="true"><img className="character-portrait character-portrait--model"
+                src={choice.id === ROOK_ID ? maleCut : femaleBraid} width={320} height={320} loading="lazy" decoding="async" alt="" /></span>
+            : <ProfilePortrait choice={portraits[index]} welcomePreview={scope} hairstylePreview />}
         </CreatorOption>;
       })}
     </div>

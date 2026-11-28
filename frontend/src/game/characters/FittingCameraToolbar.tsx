@@ -19,11 +19,11 @@ export function FittingZoomRail({ insideCar }: { insideCar: boolean }) {
   return <div data-wardrobe-focus-group="zoom" className="dressing-preview-zoom fitting-camera-toolbar" role="group" aria-label="Camera framing"
     data-controller-row data-controller-columns="1">
     {!insideCar && <>
-      <GameButton variant="menu" className="fitting-tool-icon" aria-label="Reset view" title="Reset view"
+      <GameButton variant="menu" className="fitting-tool-icon chamfered-frame" aria-label="Reset view" title="Reset view"
         pressFeedback onPress={resetView}><PreviewToolIcon icon="reframe" /></GameButton>
       <PreviewZoomSlider label="Preview zoom" min={CHARACTER_ZOOM_MIN} max={CHARACTER_ZOOM_MAX} step={.05}
         value={zoom} valueText={`${Math.round(zoom * 100)}%`} onChange={value => useCharacterPreviewStore.setState({ zoom: value })} />
     </>}
-    <PreviewVisibilityToggle />
+    <PreviewVisibilityToggle className="chamfered-frame" />
   </div>;
 }

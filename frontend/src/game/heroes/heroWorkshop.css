@@ -158,6 +158,12 @@
 }
 .hero-workshop .hero-main-hold{font-size:11px;}
 .hero-workshop .alpha-selection-footer{flex-wrap:nowrap;overflow:visible;}
+.hero-workshop[data-character-page] .character-page { padding-block-end: 0; }
+.hero-workshop .wardrobe-navigation-hints {
+  min-block-size: 0;
+  margin: 0;
+  padding-block: 0;
+}
 .hero-workshop .controller-shortcuts{min-width:0;flex:1;flex-wrap:nowrap;overflow:hidden;}
 .hero-workshop .wardrobe-navigation-hints .controller-shortcuts { flex-wrap: wrap; overflow: visible; }
 .hero-workshop .wardrobe-navigation-hints .controller-shortcuts > [data-shortcut=navigate] { display: inline-flex; }
@@ -188,6 +194,15 @@
 .wardrobe-toolbar-hints button:focus-visible { outline: 2px solid var(--app-accent); outline-offset: -3px; }
 .wardrobe-toolbar-hints .menu-icon { width: 1.2rem; height: 1.2rem; }
 .wardrobe-toolbar-hints button:first-child .menu-icon { transform: scaleX(-1); }
+@media (max-width: 480px) {
+  .hero-workshop .wardrobe-navigation-hints { padding-inline: 6px; gap: 2px; }
+  .hero-workshop .wardrobe-navigation-hints .controller-shortcuts { gap: 0 3px; }
+  .wardrobe-navigation-hints .controller-shortcuts:not([data-input-device="touch"]) > :is(span, button) {
+    flex-direction: column;
+    justify-content: center;
+    gap: 1px;
+  }
+}
 @media (any-pointer: coarse) {
   .wardrobe-navigation-hints :is(.wardrobe-toolbar-hints button, .controller-shortcut-back) {
     min-inline-size: 44px; min-block-size: 44px;

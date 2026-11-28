@@ -10,7 +10,7 @@
   --dressing-raised: color-mix(in srgb, var(--app-raised) 82%, var(--app-background));
   grid-template-columns: minmax(0, 1fr) clamp(270px, 37%, 490px);
   grid-template-rows: minmax(0, 1fr) auto auto;
-  gap: 4px clamp(6px, .9vw, 15px);
+  gap: 2px clamp(6px, .9vw, 15px);
 }
 .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-stage { grid-area: 1 / 1 / -1 / 2; }
 .dressing-camera-block {
@@ -18,6 +18,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: flex-end;
   gap: 4px;
   min-width: 0;
   min-height: 0;
@@ -99,6 +100,17 @@
   pointer-events: none;
 }
 .dressing-preview-zoom > * { pointer-events: auto; }
+.dressing-preview-zoom .fitting-tool-icon.chamfered-frame {
+  --frame-top-cut: 0px;
+  --frame-bottom-cut: 0px;
+  --frame-cut-tl: calc(var(--fitting-tool-size) * .31);
+  --frame-cut-br: var(--frame-cut-tl);
+  --frame-line-color: var(--app-line);
+  border: 0;
+}
+.dressing-preview-zoom .chamfered-frame:is(:hover, :focus-visible, [data-wardrobe-navigation-focus], [data-pressing]) {
+  --frame-line-color: var(--app-accent);
+}
 .dressing-preview-zoom .preview-zoom-slider {
   flex: 0 1 auto;
   min-height: 32px;
@@ -363,19 +375,22 @@
   white-space: normal;
 }
 .dressing-details .fit-review-toggle .fit-badge { padding: 0; }
-.character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-controls--bottom { grid-area: 3 / 1; }
+.character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-controls--bottom { grid-area: 2 / 1; }
+.character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .fitting-rotation-grid { grid-row: 3; }
 .character-page--dressing :is([role="button"], [role="tab"], button, input, select, textarea):focus-visible { outline: 2px solid var(--app-accent); outline-offset: -2px; }
 .character-page--dressing [role="button"].dressing-item:focus-visible { outline: 0; }
 .character-page--dressing button:not(:disabled):hover { border-color: var(--app-accent); }
 @media (orientation: portrait) and (max-width: 760px) {
   .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, 42%);
-    padding: 5px max(6px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    grid-template-rows: minmax(0, 1fr) minmax(0, 42%) auto auto;
+    padding: 5px max(6px, env(safe-area-inset-right)) 0 max(6px, env(safe-area-inset-left));
   }
-  .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-stage { grid-area: 1 / 1 / 4 / 2; }
+  .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-stage { grid-area: 1 / 1; }
   .character-page--dressing :is(.dressing-wardrobe, .dressing-details),
-  .character-page--editor:is(.character-page--details, .character-page--body) > :is(.character-details, .character-body-style) { grid-area: 4 / 1; align-self: stretch; }
+  .character-page--editor:is(.character-page--details, .character-page--body) > :is(.character-details, .character-body-style) { grid-area: 2 / 1; align-self: stretch; }
+  .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .character-controls--bottom { grid-row: 3; }
+  .character-page--editor:is(.character-page--dressing, .character-page--details, .character-page--body) > .fitting-rotation-grid { grid-row: 4; }
   .dressing-wardrobe:has(.dressing-categories:not([hidden])) { align-self: end; }
 }
 @media (pointer: coarse) {

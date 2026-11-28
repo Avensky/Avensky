@@ -1,26 +1,73 @@
 .character-page--body .character-body-style.menu-panel-frame {
-  align-self: stretch; justify-content: flex-start; min-height: 0; overflow: clip;
+  align-self: stretch;
+  justify-content: flex-start;
+  min-height: 0;
+  overflow: clip;
+  padding: clamp(.4rem, 1.2vw, 1rem);
+  gap: clamp(.3rem, .9vh, .65rem);
 }
 .wardrobe-body-heading, .wardrobe-groom-amount, .wardrobe-groom-amount > div {
   display: flex; align-items: center; gap: .5rem;
 }
 .wardrobe-body-heading { flex: none; }
-.wardrobe-body-heading > .menu-control { margin-inline-start: auto; min-height: 44px; }
-.wardrobe-body-back { display: grid; place-items: center; width: 44px; min-height: 44px; }
-.wardrobe-body-back svg { width: 1.25rem; height: 1.25rem; }
-.wardrobe-body-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem;
+.wardrobe-body-heading h2 {
+  margin: 0; font-size: calc(clamp(1.15rem, 2.5vw, 1.8rem) * var(--menu-text-scale, 1)); line-height: 1.18;
 }
-.character-body-style .wardrobe-body-grid {
-  min-height: 0; align-content: start; overflow: auto; overscroll-behavior: contain;
+.wardrobe-body-back {
+  display: grid; place-items: center; width: 44px; min-height: 44px;
+  padding: 0; border: 0; background: transparent; color: var(--app-text);
+}
+.wardrobe-body-back:focus-visible { outline: 0; color: var(--app-accent); box-shadow: inset 0 -2px var(--app-accent); }
+.wardrobe-body-back svg { width: 1.25rem; height: 1.25rem; }
+
+/* Each drill-down replaces the collection in the same panel. The heading,
+   selection caption, and rotation controls stay anchored while that grid scrolls. */
+.wardrobe-body-list, .character-body-style .creator-panel :is(.creator-hairstyles, .creator-color-options, .wardrobe-body-grid) {
+  min-height: 0; max-height: none; overflow-x: hidden; overflow-y: auto;
+  overscroll-behavior: contain; touch-action: pan-y; scrollbar-width: thin;
+}
+.wardrobe-body-list { display: grid; align-content: start; gap: .45rem; }
+.wardrobe-body-grid, .character-body-style .creator-panel .creator-color-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  gap: clamp(4px, .6vw, 9px); align-content: start;
 }
 .wardrobe-body-grid > [role=button] { min-width: 0; min-height: 44px; }
-.wardrobe-body-category { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-content: center; }
-.wardrobe-body-category > small { grid-column: 1 / -1; color: var(--app-muted); }
-.wardrobe-body-category .color-swatch { width: 1.25rem; height: 1.25rem; }
+.wardrobe-body-extra { display: flex; align-items: center; justify-content: space-between; gap: .4rem; }
+.wardrobe-body-extra small { font-weight: normal; }
 
-/* The shell reserves space for the heading, active value and tools. Only the
-   collection of choices scrolls when it is taller than the remaining space. */
+.wardrobe-body-category, .character-body-style .creator-panel .creator-option {
+  --frame-cut-tl: clamp(12px, 1.7vw, 24px);
+  --frame-top-cut: 4px; --frame-bottom-cut: 4px;
+  --frame-line-color: var(--app-line);
+  border: 0; padding: 0; background: var(--app-raised); color: var(--app-text);
+}
+.wardrobe-body-category {
+  display: grid; grid-template-rows: minmax(0, 1fr) auto; align-content: stretch;
+  text-align: start; outline: 0; touch-action: pan-y;
+}
+.wardrobe-body-picture {
+  position: relative; display: block; width: 100%; aspect-ratio: 1.45; overflow: hidden;
+}
+.wardrobe-body-tile-label {
+  display: flex; align-items: center; justify-content: space-between; gap: .2rem; padding: .28rem .45rem;
+  color: var(--app-text);
+  font: 600 calc(clamp(.78rem, 1.1vw, 1rem) * var(--menu-text-scale, 1))/1.18 system-ui, sans-serif;
+  overflow-wrap: anywhere;
+}
+.wardrobe-body-tile-label i {
+  flex: none; width: .45rem; height: .45rem; border: 1px solid #fff7; border-radius: 50%;
+}
+.wardrobe-body-category:is(:focus, [data-pressing]),
+.character-body-style .creator-panel .creator-option:is(:focus-visible, [aria-pressed="true"], [data-wardrobe-navigation-focus]) {
+  --frame-line-color: var(--app-accent); --frame-line-width: 2px;
+}
+@media (hover: hover) {
+  .wardrobe-body-category:hover, .character-body-style .creator-panel .creator-option:hover {
+    --frame-line-color: var(--app-accent);
+  }
+}
 .character-body-style .wardrobe-body-options, .character-body-style .creator-preview-field {
   display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; gap: .4rem;
 }
@@ -28,35 +75,53 @@
   width: 100%; min-width: 0; max-width: none; max-height: none; overflow: clip; pointer-events: auto;
 }
 .character-body-style .creator-preview-field { justify-content: flex-start; }
-.character-body-style :is(.creator-color-channels, .creator-mix, .creator-preview-caption, .wardrobe-groom-amount),
-.wardrobe-body-options > [role=button] { flex: none; }
-.character-body-style .creator-color-channels {
-  flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; overscroll-behavior: contain;
-}
-.character-body-style .creator-color-channels [role=tab] { flex: 1 0 auto; }
-.character-body-style .creator-panel :is(.creator-hairstyles, .creator-color-options) {
-  min-height: 0; max-height: none; overflow-y: auto; overflow-x: hidden;
-  overscroll-behavior: contain; scrollbar-width: thin;
-}
+.character-body-style :is(.creator-mix, .creator-preview-caption, .wardrobe-groom-amount) { flex: none; }
 .character-body-style .creator-hairstyles {
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content;
 }
 .character-body-style .creator-hairstyles .creator-option {
   width: 100%; max-width: none; height: auto; aspect-ratio: 1; align-self: start;
 }
+.character-body-style .creator-panel .creator-color-options .creator-option {
+  min-width: 0; width: 100%; min-height: 44px; aspect-ratio: 1.5; padding: 0;
+}
+.character-body-style .creator-color-options .wardrobe-feature-preview {
+  width: 100%; height: 100%; stroke: none;
+}
+.character-body-style .creator-panel .creator-color-options .creator-check {
+  inset: .24rem .35rem auto auto; transform: none; font-size: 1rem; color: white;
+}
+.wardrobe-color-chip {
+  position: absolute; inset: auto auto .35rem .35rem; width: 24%; height: .37rem;
+  box-shadow: 0 0 0 1px #1119; pointer-events: none;
+}
 .wardrobe-groom-amount { justify-content: space-between; min-height: 44px; }
-.character-body-style .creator-option.wardrobe-custom-dye {
+.character-body-style .creator-panel .creator-option.wardrobe-custom-dye {
   background: conic-gradient(#c74e4e, #ccb745, #498757, #4a8aa8, #9853a2, #c74e4e);
   color: white; font-size: 1.4rem; text-shadow: 0 1px 3px #000;
 }
 .wardrobe-custom-dye input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .wardrobe-custom-dye:focus-within { --frame-line-width: 2px; --frame-line-color: var(--garage-menu-accent); }
+
+@media (min-width: 761px) and (min-height: 500px) and (orientation: landscape) {
+  .character-page--editor.character-page--body {
+    grid-template-columns: minmax(0, 1fr) clamp(320px, 44%, 40rem);
+  }
+  .character-page--body .character-body-style.menu-panel-frame {
+    align-self: start; max-height: 100%;
+  }
+  .character-body-style .wardrobe-body-options, .character-body-style .creator-preview-field {
+    flex: 0 1 auto;
+  }
+  .wardrobe-body-picture { aspect-ratio: 1.2; }
+}
 @media (orientation: portrait) and (max-width: 760px) {
-  .character-page--editor.character-page--body:has(.creator-color-channels) {
-    grid-template-rows: minmax(0, 1fr) auto auto minmax(0, min(65%, max(42%, 18rem)));
+  .wardrobe-body-grid:has(.wardrobe-body-category), .character-body-style .creator-panel .creator-color-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
-@media (orientation: landscape) and (max-height: 360px) {
-  .character-page--editor.character-page--body > .character-body-style { padding-block: 2px; gap: 3px; }
-  .character-body-style :is(.wardrobe-body-options, .creator-preview-field) { gap: 2px; }
+@media (orientation: landscape) and (max-height: 480px) {
+  .character-page--editor.character-page--body > .character-body-style { padding: 4px; gap: 3px; }
+  .wardrobe-body-tile-label { padding: .18rem .35rem; }
+  .character-body-style :is(.wardrobe-body-options, .creator-preview-field) { gap: 3px; }
 }

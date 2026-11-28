@@ -15,9 +15,11 @@
   padding: 0;
   border: 1px solid var(--app-line);
   border-radius: 0;
-  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
   background: linear-gradient(150deg, var(--app-raised), var(--app-panel));
   color: var(--app-text);
+}
+.fitting-camera-toolbar .fitting-tool-icon:not(.chamfered-frame) {
+  clip-path: polygon(5px 0, 100% 0, 100% calc(100% - 5px), calc(100% - 5px) 100%, 0 100%, 0 5px);
 }
 .fitting-camera-toolbar .menu-control:is(:hover, :focus-visible, [aria-expanded="true"], [aria-pressed="true"]):not(:disabled) { border-color: var(--app-accent); color: var(--app-accent); }
 .fitting-camera-toolbar .fitting-tool-icon svg { width: 16px; height: 16px; }
