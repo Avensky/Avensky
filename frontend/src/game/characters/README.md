@@ -361,9 +361,9 @@ for archived imports such as Coat 01 and Dress 01.
 Layers groups the pieces by where they sit in an outfit, from underwear to
 overwear. Each entry groups its available model detail levels. Browse the
 catalog to see the pieces, then try them on Vesper and check combinations with
-the Emotes tab. Trial combinations are session-only and leave the saved outfit
-in place. Ready to wear filters out fitting trials, and search filters the
-current category.
+the Emotes tab. Keep an outfit draft for the current roster slot until the
+player equips or discards it. Check each garment against its catalog slot
+and installed garage model when deciding whether it can be equipped.
 
 Gothic skirt models live in
 `frontend/public/models/characters/female/wardrobe/skirts/gothic-skirt/`.
@@ -374,10 +374,10 @@ Vite after adding them. Compatible revisions keep their authored shape.
 Missing or mismatched revisions use the original skirt and its automatic
 waistband fit.
 
-Selecting a complete outfit previews it. Equip outfit sends the approved look
-to the connected player profile immediately. Discard preview restores the
-equipped look. Trial-only combinations can still be saved as private fitting
-room outfits.
+Equip outfit saves the active character’s complete choice, including fitted hair,
+groom, dye, separable garments and removals. The roster, garage and Wardrobe read that
+equipped choice. Discard preview restores it. Saved outfit presets are separate
+from the equipped choice. Restore older presets’ hair at try-on time.
 
 ## Garment authoring and validation
 
@@ -692,7 +692,7 @@ exposed skin in five sampled poses per tier.
 
 ## Body and emotes
 
-**Details** describes the active character’s identity and personality. Resolve the starter style and signature emotes from the same catalogs that supply creation and playback. **Body** holds hair, eye and eyebrow color, skin tone, and an upper-arm band tattoo. The tattoo uses the skin material and follows the existing rig. Connected profiles save it when the server advertises tattoo support.
+**Details** describes the active character’s identity and personality. Resolve the starter style and signature emotes from the same catalogs that supply creation and playback. **Body** opens a category grid. Reuse creation’s Hairstyle, Hair color, Eyes and Makeup controls alongside Skin tone, Brows and Tattoo. Focus the live camera on the selected feature and restore the category’s focus when the player goes back. The tattoo uses the skin material and follows the existing rig. Connected profiles save it when the server advertises tattoo support.
 
 **Emotes** opens the library with gestures, favorites, poses, and garage interactions. The creator saves named pose sequences on the current browser for the active player. Each keyframe has a body pose and optional hand shape with a hold time, transition speed, and facing. Playing the sequence uses the existing pose solver.
 

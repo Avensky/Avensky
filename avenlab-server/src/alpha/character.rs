@@ -113,6 +113,9 @@ static GARMENTS: LazyLock<Vec<Garment>> = LazyLock::new(|| {
     let discovered: Vec<Garment> = serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/discovered-wardrobe-garments.json"))
         .expect("the generated garment catalog is valid");
     garments.extend(discovered);
+    let fitted: Vec<Garment> = serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/fitted-garments.json"))
+        .expect("the fitted garment catalog is valid");
+    garments.extend(fitted);
     garments
 });
 
@@ -179,6 +182,8 @@ pub struct CharacterAppearance {
     face_shape: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     hair_palette: Option<HairPalette>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    hair_groom: Option<HairGroom>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -197,6 +202,23 @@ impl HairPalette {
         [&self.base, &self.roots, &self.highlights, &self.tips].into_iter().all(|value| hex_color(value))
             && [&self.highlight_strength, &self.tip_blend].into_iter()
                 .all(|value| value.as_f64().is_some_and(|value| (0.0..=1.0).contains(&value)))
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
+struct HairGroom {
+    pieces: BTreeMap<String, HairPalette>,
+    volume: serde_json::Number,
+    thickness: serde_json::Number,
+}
+
+impl HairGroom {
+    fn is_valid(&self) -> bool {
+        const PIECES: [&str; 9] = ["crown", "bangs", "left-side", "right-side", "left-braid", "right-braid", "nape", "bun", "ponytail"];
+        self.volume.as_f64().is_some_and(|v| (0.0..=1.0).contains(&v))
+            && self.thickness.as_f64().is_some_and(|v| (-1.0..=1.0).contains(&v))
+            && self.pieces.iter().all(|(piece, palette)| PIECES.contains(&piece.as_str()) && palette.is_valid())
     }
 }
 
@@ -262,7 +284,14 @@ static CAST: LazyLock<Vec<Character>> = LazyLock::new(|| {
         .expect("the built-in character catalog is valid")
 });
 
-static FITTED_HAIR: LazyLock<Vec<Outfit>> = LazyLock::new(|| {
+#[derive(Deserialize)]
+struct FittedHair {
+    id: String,
+    #[serde(rename = "editableGroom", default)]
+    editable_groom: bool,
+}
+
+static FITTED_HAIR: LazyLock<Vec<FittedHair>> = LazyLock::new(|| {
     serde_json::from_str(include_str!("../../../packages/wardrobe-catalog/fitted-hair.json"))
         .expect("the fitted hairstyle catalog is valid")
 });
@@ -299,17 +328,18 @@ impl CharacterChoice {
     pub fn has_starter_identity(&self, starter: &Self) -> bool {
         self.id == starter.id && self.identity == starter.identity && self.driver_id == starter.driver_id
             && self.outfit == starter.outfit && self.personality() == starter.personality()
+            && self.garments == starter.garments && self.wardrobe_trial == starter.wardrobe_trial
+            && self.wardrobe_ease == starter.wardrobe_ease && self.removed_clothing == starter.removed_clothing
+            && self.bra == starter.bra
     }
 
     pub fn retain_character_details(&mut self, wearer: &Self) {
         self.identity = wearer.identity;
-        if self.personality() != wearer.personality() {
-            if let Some(appearance) = &mut self.appearance {
-                appearance.personality = wearer.personality().map(str::to_owned);
-            } else {
-                // A legacy outfit can carry only an outfit ID.
-                self.appearance.clone_from(&wearer.appearance);
-            }
+        if let Some(appearance) = &mut self.appearance {
+            appearance.personality = wearer.personality().map(str::to_owned);
+        } else {
+            // A legacy outfit can carry only an outfit ID.
+            self.appearance.clone_from(&wearer.appearance);
         }
     }
 
@@ -318,8 +348,7 @@ impl CharacterChoice {
     }
 
     pub fn is_equippable(&self) -> bool {
-        self.garments.is_none() && self.wardrobe_trial.is_none() && self.wardrobe_ease.is_none()
-            && self.removed_clothing.is_none() && self.bra.is_none() && self.is_available()
+        self.is_available()
     }
 
     fn has_valid_garments(&self) -> bool {
@@ -402,6 +431,11 @@ impl CharacterChoice {
                         .all(|(field, group)| group.as_deref().is_none_or(|color| supports(field) && hex_color(color)))
                     && (colors.finish.is_none() || supports("finish"))
             })) { return false; }
+            if let Some(groom) = &appearance.hair_groom {
+                if !FITTED_HAIR.iter().any(|style| style.id == appearance.hair && style.editable_groom) || !groom.is_valid() {
+                    return false;
+                }
+            }
             if !appearance.accent.as_deref().is_none_or(hex_color) || !appearance.hair_palette.as_ref().is_none_or(HairPalette::is_valid) {
                 return false;
             }
@@ -482,6 +516,26 @@ mod wardrobe_tests {
     }
 
     #[test]
+    fn equipped_groom_and_fitted_garments_round_trip() {
+        let palette = json!({"base":"#302118","roots":"#110908","highlights":"#654c41","tips":"#75504c",
+            "tipBlend":0.5,"highlightStrength":0.7});
+        let groom = json!({"volume":0.4,"thickness":-0.3,"pieces":{"left-braid":palette}});
+        let value = json!({"id":"mara-vega","outfit":"dockwear","garments":{"dress":"local-tennis-dress","shoes":"local-wave-wedges"},
+            "appearance":{"hair":"Mia_01","hair_color":"original","skin":"original","headwear":"hat","color":"original","hair_groom":groom}});
+        let saved: CharacterChoice = serde_json::from_value(value.clone()).unwrap();
+        assert!(saved.is_equippable());
+        assert_eq!(serde_json::to_value(saved).unwrap(), value);
+        for (key, invalid) in [("volume",json!(-0.1)), ("thickness",json!(1.1)), ("pieces",json!({"bad-piece":palette}))] {
+            let mut bad = value.clone();
+            bad["appearance"]["hair_groom"][key] = invalid;
+            assert!(!serde_json::from_value::<CharacterChoice>(bad).unwrap().is_equippable());
+        }
+        let mut wrong_style = value;
+        wrong_style["appearance"]["hair"] = json!("natural");
+        assert!(!serde_json::from_value::<CharacterChoice>(wrong_style).unwrap().is_equippable());
+    }
+
+    #[test]
     fn alternate_face_round_trips_only_on_vespers_rig() {
         let mut value = json!({"id":"mara-vega","outfit":"dockwear","appearance":{
             "hair":"natural","hair_color":"original","skin":"original","headwear":"none","color":"original",
@@ -550,7 +604,7 @@ mod wardrobe_tests {
             let restored = serde_json::from_value::<CharacterChoice>(encoded).unwrap();
             assert_eq!(restored, look);
             assert!(restored.is_available());
-            assert!(!restored.is_equippable());
+            assert!(restored.is_equippable());
         }
     }
 

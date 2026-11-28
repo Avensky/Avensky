@@ -97,7 +97,24 @@ const person = (value: unknown) => {
 type Cosmetics = Pick<Progression, "character" | "character_presets" | "character_outfits" | "default_hero" | "hero_loadouts" | "cosmetics_revision">;
 
 export function selectEquippedCharacter(state: { view: SocialView | null; cachedCosmetics: Cosmetics | null }) {
-  return state.view ? state.view.profile.progression?.character : state.cachedCosmetics?.character;
+  return state.view ? equippedForProfile(state.view.profile) : state.cachedCosmetics?.character;
+}
+
+function equippedForProfile(profile: PlayerProfile) {
+  if (!profile.characters) return profile.progression?.character;
+  const slot = profile.characters.find(slot => slot.id === (profile.active_character_id ?? profile.id));
+  return slot ? savedCharacterAppearance(profile, slot) : null;
+}
+
+export function canUseDeviceCharacter(state: Pick<ReturnType<typeof useSocialStore.getState>,
+  "view" | "profileOwner" | "cachedCosmetics" | "stagingSignIn" | "registeredProfile">) {
+  return !state.stagingSignIn && !state.registeredProfile && (!state.profileOwner || Boolean(state.view)) &&
+    selectEquippedCharacter(state) === undefined;
+}
+
+/** Keep pending edits attached to the same career across a socket reconnect. */
+export function selectCharacterSlot(state: { view: SocialView | null; profileOwner: string | null; cachedCharacterSlot: string | null }) {
+  return state.view ? state.view.profile.active_character_id ?? null : state.profileOwner ? state.cachedCharacterSlot : null;
 }
 
 /** Older servers send the character name once a career is active. */
@@ -120,15 +137,15 @@ export function savedCharacterAppearance(profile: PlayerProfile, slot: Character
 }
 
 export function selectMainGarageCharacter(state: { view: SocialView | null; cachedCosmetics: Cosmetics | null; profileOwner: string | null }) {
-  const profile = state.view?.profile;
-  if (!profile) return state.profileOwner ? selectEquippedCharacter(state) ?? null : null;
-  if (!profile.characters) return profile.progression?.character ?? null; // Before career slots were introduced.
-  const active = profile.characters.find(slot => slot.id === (profile.active_character_id ?? profile.id));
-  return active ? savedCharacterAppearance(profile, active) : null;
+  return state.view || state.profileOwner ? selectEquippedCharacter(state) ?? null : null;
 }
 
 function cosmeticsFrom({ character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision }: Cosmetics): Cosmetics {
   return { character, character_presets, character_outfits, default_hero, hero_loadouts, cosmetics_revision };
+}
+
+function cacheProfileCosmetics(profile: PlayerProfile) {
+  return profile.progression ? { ...cosmeticsFrom(profile.progression), character: equippedForProfile(profile) } : null;
 }
 
 function hasCosmeticsRevision(cosmetics: unknown): cosmetics is Cosmetics & { cosmetics_revision: number } {
@@ -150,6 +167,7 @@ export const useSocialStore = create<{
   /** Editor key retained through a transport reconnect. Actions still require the current view. */
   profileOwner: string | null;
   cachedCosmetics: Cosmetics | null;
+  cachedCharacterSlot: string | null;
   view: SocialView | null;
   message: string;
   recoveryMessage?:string;
@@ -169,6 +187,7 @@ export const useSocialStore = create<{
   profileScope: null,
   profileOwner: null,
   cachedCosmetics: null,
+  cachedCharacterSlot: null,
   view: null,
   message:
     "Connect to the updated game server to use worlds and social groups.",
@@ -191,7 +210,7 @@ export const useSocialStore = create<{
     const current = state.view.profile.progression;
     if (hasCosmeticsRevision(current) && hasCosmeticsRevision(profile.progression)
       && profile.progression.cosmetics_revision < current.cosmetics_revision) return state;
-    return { view: { ...state.view, profile }, cachedCosmetics: cosmeticsFrom(profile.progression) };
+    return { view: { ...state.view, profile }, cachedCosmetics: cacheProfileCosmetics(profile), cachedCharacterSlot: profile.active_character_id ?? null };
   }),
   acknowledgeProgression: (owner, fallback, cosmetics) => set(state => {
     const view = state.view;
@@ -318,7 +337,7 @@ export const useSocialStore = create<{
         }
       }
       return { view: { ...view, profile }, profileOwner: profile.id, profileStatus: "ready", entryIssue: null, message: "Connected",
-        cachedCosmetics: profile.progression ? cosmeticsFrom(profile.progression) : null };
+        cachedCosmetics: cacheProfileCosmetics(profile), cachedCharacterSlot: profile.active_character_id ?? null };
     });
   },
 }));

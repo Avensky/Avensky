@@ -17,6 +17,8 @@ import { prepareVillageBonnet } from "./villageBonnet";
 import { prepareWardrobeGarments, type WardrobeGarmentSource } from "./wardrobeGarmentFit";
 import { prepareHairDye } from "./fittedWardrobe/hairDye";
 import { appearanceHairPalette, DEFAULT_HAIR_PALETTE } from "./fittedWardrobe/hairColors";
+import { fitMiaPonytail } from "./fittedWardrobe/miaFit";
+import { createPonySway } from "./fittedWardrobe/ponySway";
 import { bindFittedHair } from "./fittedHair";
 import { prepareStandaloneCorset, type StandaloneCorsetSource } from "./standaloneCorset";
 import { smoothUnderarmSkin } from "./villagerUnderarm";
@@ -78,6 +80,11 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const actorBody = getWardrobeActorBody(root);
   const fittedHair = female && actorBody ? bindFittedHair(hairSource, actorBody.skeleton) : undefined;
   if (fittedHair) root.add(fittedHair);
+  const mia = fittedHair?.name === "Mia_01" ? fittedHair : undefined;
+  const head = root.getObjectByName("head");
+  const ponySway = mia && head ? createPonySway(root, head) : undefined;
+  let releaseMiaFit: (() => void) | undefined;
+  const hairMaterials: MeshStandardMaterial[] = [];
   const suppliedBody = actorBody && isWardrobeBodyDonor(garmentBody, actorBody.skeleton) ? garmentBody : undefined;
   const tennisBody = suppliedBody?.morphTargetDictionary?.TennisUnderarmFit !== undefined
     && garments.some(({ item }) => item.id === "local-wave-wedges" || item.id === "local-tennis-dress") ? suppliedBody : undefined;
@@ -113,14 +120,18 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
     }
     const owned = (material: MeshStandardMaterial) => {
       const palette = piece && !/Skin|Hair|Lash|Cornea/.test(material.name) ? pieceMaterials.get(piece)! : materials;
-      const existing = palette.get(material);
+      const fittedPart = fittedHair && object.parent === fittedHair;
+      const existing = !fittedPart && palette.get(material);
       if (existing) return existing;
       const copy = material.clone();
       if (detachedCorset?.authoredLacedBodice && part === detachedCorset.group) copy.userData.rebuiltLacedBodice = true;
-      if (copy.map && (copy.name === "MAT_Hair" || object === fittedHair)) {
-        hairDyes.set(copy, prepareHairDye(copy, object.geometry, false, undefined, !female));
+      if ((copy.map && copy.name === "MAT_Hair") || (fittedPart && (copy.map || object.geometry.hasAttribute("_avensky_groom")))) {
+        hairDyes.set(copy, prepareHairDye(copy, object.geometry, false, fittedPart ? ponySway?.offset : undefined, !female));
+        if (!copy.map) copy.color.copy(material.color);
       }
-      palette.set(material, copy);
+      // Fitted primitives can share a source material but export different groom channels.
+      if (fittedPart) hairMaterials.push(copy);
+      else palette.set(material, copy);
       return copy;
     };
     object.material = Array.isArray(object.material) ? object.material.map(owned) : owned(object.material);
@@ -200,10 +211,17 @@ export function prepareVillager(scene: Object3D, { female = true, animateFace = 
   const applyTattoo = prepareBodyTattoo(getWardrobeActorBody(root) ?? actorBody);
   return {
     root, materials, pieceMaterials, crop, scalpCap, hairDyes, applyFaceColors, applyFaceLook, faceAccessories, wardrobe, trialGarments, detachedCorset,
-    hat, bonnet, neckBows, bundledWaist, applyTattoo, fittedHair,
+    hat, bonnet, neckBows, bundledWaist, applyTattoo, fittedHair, ponySway,
+    fitHair() {
+      if (mia && actorBody && !releaseMiaFit) {
+        releaseMiaFit = fitMiaPonytail(mia, root, fullBody ?? actorBody);
+      }
+    },
     longHair: root.getObjectByName("HAIR_HAIR20"),
     bow: root.getObjectByName("ACC_BOW"),
     dispose() {
+      releaseMiaFit?.();
+      hairMaterials.forEach(material => material.dispose());
       neckBows?.dispose();
       stockSkin.forEach(geometry => geometry.dispose());
       trialGarments?.dispose();
@@ -294,17 +312,11 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
   const tucksHair = model.trialGarments?.tucksHair;
   // The bundled bonnet belongs to the stock braid. Fitted hairstyles cover the scalp themselves.
   if (model.hat) model.hat.visible = !model.fittedHair;
-  if (model.fittedHair) {
-    model.fittedHair.visible = !cropped && !tucksHair;
-    if (look.appearance.hair_color !== "original") {
-      const materials = Array.isArray(model.fittedHair.material) ? model.fittedHair.material : [model.fittedHair.material];
-      for (const material of materials) if (material instanceof MeshStandardMaterial) material.color.set(look.hair);
-    }
-  }
+  if (model.fittedHair) model.fittedHair.visible = !cropped && !tucksHair;
   const palette = appearanceHairPalette(look.appearance);
   for (const [material, setPalette] of model.hairDyes) {
-    if (palette) material.color.set(0xffffff);
-    setPalette(palette ?? DEFAULT_HAIR_PALETTE, !palette);
+    if (palette && material.map) material.color.set(0xffffff);
+    setPalette(palette ?? DEFAULT_HAIR_PALETTE, !palette, model.ponySway ? look.appearance.hair_groom : undefined);
   }
   if (model.longHair) model.longHair.visible = !model.fittedHair && !cropped && !tucksHair;
   if (model.bow) model.bow.visible = !look.removedClothing.includes("bow")
@@ -315,6 +327,7 @@ export function applyVillagerLook(model: ReturnType<typeof prepareVillager>, loo
   }
   model.scalpCap?.material.color.set(look.hair);
   model.trialGarments?.apply(look);
+  model.fitHair();
   model.neckBows?.apply();
   if (model.hat?.visible) model.bonnet?.setBowVisible(!look.removedClothing.includes("bonnet-bow"));
 }

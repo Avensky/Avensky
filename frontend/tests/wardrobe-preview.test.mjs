@@ -11,16 +11,12 @@ import { createServer } from "vite";
 test("catalog hair styles appear in the preview menu with their GLB mesh names", async () => {
   const server = await wardrobePreviewServer();
   try {
-    const module = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/alphaAssets.ts");
-    for (const entry of expectedHairStyles) {
-      assert.ok(module.fittedHairOptions.some(style => style.id === entry.id
-        && style.label === entry.label && style.url === entry.url && style.mesh === entry.mesh));
-    }
-    const hair = await server.ssrLoadModule("/src/game/characters/fittedWardrobe/LocalHairFeatures.tsx");
-    assert.equal(hair.STOCK_HAIR_LABEL, "Long braid and bonnet");
-    assert.equal(hair.previewStockBonnet(true, true, hair.STOCK_HAIR_ID), true);
-    assert.equal(hair.previewStockBonnet(true, true, expectedHairStyles[0].id), false);
-    assert.equal(hair.previewStockBonnet(false, true, hair.STOCK_HAIR_ID), false);
+    const { availableHairStyles, installedHairStyles, ROOK_ID, VILLAGER_ID } = await server.ssrLoadModule("/src/game/characters/characterCatalog.ts");
+    const installed = installedHairStyles(VILLAGER_ID);
+    assert.deepEqual(installed.map(({ id, label, url, mesh }) => [id, label, url, mesh]),
+      expectedHairStyles.map(({ id, label, url, mesh }) => [id, label, url, mesh]));
+    assert.deepEqual(availableHairStyles(VILLAGER_ID).map(style => style.id), ["natural", ...installed.map(style => style.id)]);
+    assert.deepEqual(availableHairStyles(ROOK_ID).map(style => style.id), ["natural"]);
   } finally {
     await server.close();
   }
@@ -67,7 +63,6 @@ function wardrobePreviewServer(modelFallbacks = {}, assetRelease = null) {
   return createServer({
     define: {
       __FITTED_HAIR_IDS__: JSON.stringify(expectedHairStyles.map(({ id }) => id)),
-      __FITTED_HAIR_STYLES__: JSON.stringify(expectedHairStyles.map(({ id, label, url, mesh }) => ({ id, label, url, mesh }))),
       __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(["skirt-01", "skirt-02", "skirt-03", "skirt-04", "gothic-skirt-02", "gothic-skirt-03", "gothic-skirt-04", "bowtie-01", "medieval-04"]),
       __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(["hat-01", "medieval-04"]),
       __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(["gothic-skirt-02", "gothic-skirt-03"]),

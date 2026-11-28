@@ -1,0 +1,21 @@
+[
+  {
+    "id": "local-tennis-dress",
+    "label": "Tennis Dress",
+    "section": "Dresses",
+    "category": "outfits",
+    "slot": "dress",
+    "piece": "dress",
+    "url": "/models/characters/female/wardrobe/alpha/tennis-dress.glb"
+  },
+  {
+    "id": "local-wave-wedges",
+    "label": "Wave Wedge Sandals",
+    "section": "Shoes",
+    "category": "footwear",
+    "slot": "shoes",
+    "piece": "shoes",
+    "url": "/models/characters/female/wardrobe/alpha/wave-wedge-sandals.glb",
+    "preserveSkin": true
+  }
+]

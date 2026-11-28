@@ -1,15 +1,7 @@
-import { Component, Suspense, useLayoutEffect, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
-import { Group, Matrix4, MeshStandardMaterial, Quaternion, Skeleton, SkinnedMesh, Vector3, type Object3D, type WebGLRenderer } from "three";
-import { useAssetGLTF } from "../../../assets/useAssetGLTF";
-import { getWardrobeActorBody } from "../wardrobeBody";
-import { hairOptions, useLocalHairstyle, type LocalHairOption } from "./LocalHairFeatures";
-import { prepareHairDye } from "./hairDye";
-import { useHairPaletteStore } from "./hairPalette";
+import { useLayoutEffect, useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { Matrix4, MeshStandardMaterial, Quaternion, SkinnedMesh, Vector3, type Object3D, type WebGLRenderer } from "three";
 import { prepareHairShoulderDepth } from "./HairShoulderDepth";
-import { createPonySway } from "./ponySway";
-import { usePreferencesStore } from "../../../store/preferences/preferencesStore";
-import { useCharacterPreviewStore } from "../characterPreviewStore";
 
 function waveClearance(material: MeshStandardMaterial, depth: ReturnType<typeof prepareHairShoulderDepth>) {
   const uniforms = {
@@ -118,77 +110,34 @@ function blendFringeLighting(material: MeshStandardMaterial) {
   };
 }
 
-function FittedHair({ root, style, stockFit }: { root: Object3D; style: LocalHairOption; stockFit: boolean }) {
-  const { scene } = useAssetGLTF(style.url);
-  const invalidate = useThree(state => state.invalidate);
+/** The canonical character renderer already owns these fitted meshes and their palette. */
+export function SpaceBunsMotion({ root, hair }: { root: Object3D; hair: Object3D }) {
   const frame = useRef<((delta: number, renderer: WebGLRenderer) => void) | undefined>(undefined);
-
   useLayoutEffect(() => {
-    const actor = getWardrobeActorBody(root);
-    // Imported hair catalog IDs (hair-01) differ from GLB mesh names (Hair_01).
-    const hair = scene.getObjectByName(style.mesh ?? style.id);
     const head = root.getObjectByName("head");
-    if (!actor || !hair || !head) return;
-    const parts: SkinnedMesh[] = [];
-    hair.traverse(part => { if (part instanceof SkinnedMesh) parts.push(part); });
-    const bonesByName = new Map(actor.skeleton.bones.map((bone, i) => [bone.name, {bone, inverse:actor.skeleton.boneInverses[i]}]));
-    const bindings = parts.map(part => part.skeleton.bones.map((bone,i)=>{
-      const match = bonesByName.get(bone.name);
-      return match?.inverse.elements.every((n,j)=>Math.abs(n-part.skeleton.boneInverses[i].elements[j])<.0001) ? match.bone : undefined;
-    }));
-    if (!parts.length || bindings.some(matched=>matched.length!==actor.skeleton.bones.length || matched.some(bone=>!bone))) return;
-
-    const group = new Group();
-    group.name = "fitted-local-hairstyle";
-    const materials: MeshStandardMaterial[] = [];
-    const skeletons: Skeleton[] = [];
-    const dyes: ReturnType<typeof prepareHairDye>[]=[];
-    const motions: {mesh:SkinnedMesh; uniforms:ReturnType<typeof waveClearance>}[]=[];
-    const contact = style.id === "Space_Buns" ? prepareHairShoulderDepth(root) : undefined;
-    const pony = style.id === "Mia_01" && parts.some(part => part.geometry.hasAttribute("_avensky_tail"))
-      ? createPonySway(root, head) : undefined;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-    parts.forEach((part,i) => {
-      // Let the character's own scalp show through the hair part.
-      if (part.material instanceof MeshStandardMaterial && part.material.name.endsWith("Crown backing")) return;
-      const skinned = part.clone(false);
-      const skin = new Skeleton(bindings[i].filter(bone=>bone!==undefined),part.skeleton.boneInverses);
-      skeletons.push(skin);
-      skinned.bind(skin, part.bindMatrix);
-      skinned.frustumCulled = false;
-      if (part.material instanceof MeshStandardMaterial) {
-        const material=part.material.clone();
-        materials.push(material);
-        if (style.id !== "Mia_01" || material.map) {
-          const mask = part.geometry.getAttribute("_avensky_tail");
-          dyes.push(prepareHairDye(material, part.geometry, style.id.startsWith("Curly_"),
-            mask?.itemSize === 1 && mask.count === part.geometry.attributes.position.count ? pony?.offset : undefined));
-        }
+    if (!head) return;
+    const contact = prepareHairShoulderDepth(root);
+    const motions: {mesh: SkinnedMesh; uniforms: ReturnType<typeof waveClearance>}[] = [];
+    const restore: (() => void)[] = [];
+    hair.traverse(mesh => {
+      if (!(mesh instanceof SkinnedMesh)) return;
+      for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+        if (!(material instanceof MeshStandardMaterial)) continue;
+        const before = material.onBeforeCompile, key = material.customProgramCacheKey;
+        restore.push(() => {
+          material.onBeforeCompile = before;
+          material.customProgramCacheKey = key;
+          material.needsUpdate = true;
+        });
         softenRoots(material);
-        if (contact) {
-          blendFringeLighting(material);
-          const bounds = part.geometry.boundingBox;
-          if (bounds && bounds.min.y < 1.52 && bounds.min.z < .012) {
-            motions.push({mesh:skinned,uniforms:waveClearance(material, contact)});
-          }
+        blendFringeLighting(material);
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        const bounds = mesh.geometry.boundingBox;
+        if (bounds && bounds.min.y < 1.52 && bounds.min.z < .012) {
+          motions.push({mesh, uniforms: waveClearance(material, contact)});
         }
-        skinned.material=material;
       }
-      group.add(skinned);
     });
-    const original = ["HAIR_HAIR20", "villager-short-hair"].flatMap(name => {
-      const part = root.getObjectByName(name);
-      return part ? [{part, visible:part.visible}] : [];
-    });
-    root.add(group);
-    for (const {part} of original) part.visible = false;
-    const setColor=()=>{
-      const {palette,original,grooms}=useHairPaletteStore.getState();
-      dyes.forEach(dye=>dye(palette,original,grooms[style.id]));
-      invalidate();
-    };
-    setColor();
-    const stop=useHairPaletteStore.subscribe(setColor);
     const forward=new Vector3(), oldForward=new Vector3(), kick=new Vector3(), sway=new Vector3();
     const swayVelocity = new Vector3(), springOffset = new Vector3(), springStep = new Vector3();
     const rotation=new Quaternion(), headRotation=new Quaternion();
@@ -199,10 +148,7 @@ function FittedHair({ root, style, stockFit }: { root: Object3D; style: LocalHai
     };
     let firstFrame=true;
     frame.current=(delta, renderer)=>{
-      for (const {part} of original) part.visible=false;
-      if (pony?.step(delta, stockFit && !reducedMotion.matches && !usePreferencesStore.getState().reducedMotion
-        && document.visibilityState === "visible" && !useCharacterPreviewStore.getState().insideCar)) invalidate();
-      if (!contact || !motions.length) return;
+      if (!hair.visible || !motions.length) return;
       root.updateWorldMatrix(true, false);
       root.updateMatrixWorld(true);
       contact.sample(renderer);
@@ -231,30 +177,11 @@ function FittedHair({ root, style, stockFit }: { root: Object3D; style: LocalHai
       }
     };
     return () => {
-      frame.current=undefined;
-      stop();
-      group.removeFromParent();
-      for (const {part, visible} of original) part.visible = visible;
-      materials.forEach(material=>material.dispose());
-      skeletons.forEach(skeleton=>skeleton.dispose());
-      contact?.dispose();
+      frame.current = undefined;
+      restore.forEach(reset => reset());
+      contact.dispose();
     };
-  }, [root, scene, style, stockFit, invalidate]);
-
-  useFrame(({gl},delta)=>frame.current?.(delta,gl),0);
+  }, [root, hair]);
+  useFrame(({gl}, delta) => frame.current?.(delta, gl), 0);
   return null;
-}
-
-class HairLoadBoundary extends Component<{root:Object3D;style:LocalHairOption;stockFit:boolean}, {failed:boolean}> {
-  state = {failed:false};
-  static getDerivedStateFromError() { return {failed:true}; }
-  render() {
-    return this.state.failed ? null : <Suspense fallback={null}><FittedHair {...this.props} /></Suspense>;
-  }
-}
-
-export function SpaceBunsPreview({root, active, stockFit}: {root:Object3D; active:boolean; stockFit:boolean}) {
-  const styleId=useLocalHairstyle(state=>state.id);
-  const style=hairOptions.find(option=>option.id===styleId);
-  return active && style ? <HairLoadBoundary key={root.uuid+style.id} root={root} style={style} stockFit={stockFit} /> : null;
 }

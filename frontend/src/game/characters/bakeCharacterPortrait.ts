@@ -1,4 +1,4 @@
-import type { CharacterPortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
+import type { PortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
 
 type PendingPortrait = { result: Promise<string>; abort: AbortController; viewers: number };
 const portraits = new Map<string, string>();
@@ -15,7 +15,7 @@ export function subscribeCharacterPortrait(listener: () => void) {
   return () => { listeners.delete(listener); };
 }
 
-function startPortrait(key: string, input: CharacterPortraitJob): PendingPortrait {
+function startPortrait(key: string, input: PortraitJob): PendingPortrait {
   const abort = new AbortController();
   let worker: Worker | undefined;
   const image = workerAvailable.then(() => {
@@ -48,7 +48,7 @@ function startPortrait(key: string, input: CharacterPortraitJob): PendingPortrai
   return { result, abort, viewers: 0 };
 }
 
-export function bakeCharacterPortrait(key: string, input: CharacterPortraitJob, signal: AbortSignal) {
+export function bakeCharacterPortrait(key: string, input: PortraitJob, signal: AbortSignal) {
   const cached = peekCharacterPortrait(key);
   if (cached) return Promise.resolve(cached);
   if (signal.aborted) return Promise.reject(signal.reason);

@@ -1,61 +1,17 @@
-import { assetUrl } from "../../assets/runtimeAssets";
-import {
-  ACESFilmicToneMapping, Box3, DirectionalLight, HemisphereLight, LoadingManager, Matrix4, Mesh, OrthographicCamera,
-  Scene, Vector3, WebGLRenderer, type Object3D,
-} from "three";
+import { preparePortraitOutfit, renderWardrobeThumbnail } from "./wardrobeThumbnail.worker";
+import { Box3, LoadingManager, Mesh, OrthographicCamera, Vector3, type Object3D } from "three";
+import { frameHairThumbnail, type HairThumbnailView } from "./hairThumbnail";
+import { loadPortraitAsset, renderPortraitImage } from "./portraitRendering";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { installedHairStyles } from "./characterCatalog";
-import type { CharacterPortraitJob, CharacterPortraitResult } from "./characterPortraitJob";
+import type { CharacterPortraitJob, CharacterPortraitResult, PortraitJob } from "./characterPortraitJob";
 import { applyVillagerLook, prepareVillager } from "./villagerModel";
 import { getWardrobeActorBody, getWardrobeBodyDonor, WARDROBE_BODY_DONOR_URLS } from "./wardrobeBody";
 
 const PORTRAIT_SIZE = 192;
 const HAIRSTYLE_SIZE = 320;
-
-function hairstyleCamera(model: ReturnType<typeof prepareVillager>, hair: Object3D) {
-  // Keep the bundled bonnet with its original braid. Fitted styles and the
-  // male cut own their whole silhouette without any of the actor’s wardrobe.
-  const visible = new Set<Mesh>();
-  const keepMeshes = (part: Object3D) => part.traverseVisible(object => {
-    if (object instanceof Mesh) visible.add(object);
-  });
-  keepMeshes(hair);
-  if (hair === model.longHair && model.hat?.visible) keepMeshes(model.hat);
-
-  const camera = new OrthographicCamera(-1, 1, 1, -1, .1, 10);
-  // A front three-quarter view keeps the fringe, parting and length visible.
-  const view = new Vector3(.55, .16, 1).normalize();
-  camera.position.copy(view).multiplyScalar(2);
-  camera.lookAt(0, 0, 0);
-  camera.updateMatrixWorld();
-  const bounds = new Box3();
-  const modelToView = new Matrix4();
-  const point = new Vector3();
-  model.root.traverseVisible(object => {
-    if (!(object instanceof Mesh)) return;
-    if (!visible.has(object)) {
-      object.layers.disableAll();
-      return;
-    }
-    modelToView.multiplyMatrices(camera.matrixWorldInverse, object.matrixWorld);
-    const count = object.geometry.getAttribute("position").count;
-    for (let i = 0; i < count; i++) {
-      bounds.expandByPoint(object.getVertexPosition(i, point).applyMatrix4(modelToView));
-    }
-  });
-  if (bounds.isEmpty()) throw Error("The hairstyle preview has no visible hair.");
-
-  const center = bounds.getCenter(new Vector3()).applyMatrix4(camera.matrixWorld);
-  const extent = bounds.getSize(point);
-  const half = Math.max(extent.x, extent.y) * .54;
-  camera.left = camera.bottom = -half;
-  camera.right = camera.top = half;
-  camera.position.copy(center).addScaledVector(view, 2);
-  camera.updateProjectionMatrix();
-  return camera;
-}
 
 async function loadPortraitOutfit(
   source: Object3D, dress: NonNullable<CharacterPortraitJob["dress"]>, loadScene: (url: string) => Promise<Object3D>,
@@ -85,7 +41,7 @@ function characterCamera(model: ReturnType<typeof prepareVillager>) {
   const fittedHair = model.fittedHair;
   model.root.traverseVisible(object => {
     if (!(object instanceof Mesh)) return;
-    if (object !== fittedHair && !/hair|hat|bonnet|head_face/i.test(object.name)) return;
+    if (object.parent !== fittedHair && !/hair|hat|bonnet|head_face/i.test(object.name)) return;
     if (!object.geometry.boundingBox) object.geometry.computeBoundingBox();
     if (object.geometry.boundingBox) {
       bounds.copy(object.geometry.boundingBox).applyMatrix4(object.matrixWorld);
@@ -110,20 +66,52 @@ async function renderPortrait({ look, modelUrl, dress, hairstylePreview }: Chara
   const decoder = new DRACOLoader(manager).setDecoderPath("/draco/").setWorkerLimit(1);
   const loader = new GLTFLoader(manager).setDRACOLoader(decoder).setMeshoptDecoder(MeshoptDecoder);
   let model: ReturnType<typeof prepareVillager> | undefined;
-  let renderer: WebGLRenderer | undefined;
   try {
-    const loadScene = async (url: string) => {
-      try {
-        return (await loader.loadAsync(assetUrl(url))).scene;
-      } catch (error) {
-        const original = __CHARACTER_MODEL_FALLBACKS__[url];
-        if (!original) throw error;
-        return (await loader.loadAsync(assetUrl(original))).scene;
-      }
-    };
-    const source = await loadScene(modelUrl).catch(() => { throw Error("The character model is unavailable."); });
-
+    const loadScene = (url: string) => loadPortraitAsset(loader, url);
     const selectedHair = installedHairStyles(look.character.id).find(style => style.id === look.appearance.hair);
+    if (hairstylePreview) {
+      // Most fitted exports contain the complete cut and its rest skeleton.
+      // Only styles fitted against the wearer's body need a character model.
+      const hairScene = selectedHair ? await loadScene(selectedHair.url).catch(() => undefined) : undefined;
+      const fitted = hairScene && selectedHair ? hairScene.getObjectByName(selectedHair.mesh) : undefined;
+      if (selectedHair && !fitted) throw Error("The hairstyle preview is unavailable.");
+      let root: Object3D;
+      let cut: Object3D | undefined;
+      let view: HairThumbnailView = "side";
+      const parts: Object3D[] = [];
+      if (selectedHair?.editableGroom && fitted) {
+        view = "back";
+        model = prepareVillager(await loadScene(modelUrl), { female: look.female, hairSource: fitted });
+        applyVillagerLook(model, look);
+        root = model.root;
+        cut = model.fittedHair;
+      } else if (fitted && hairScene) {
+        root = hairScene;
+        cut = fitted;
+      } else {
+        if (look.appearance.hair !== "natural") throw Error("The hairstyle preview is unavailable.");
+        root = await loadScene(modelUrl);
+        cut = root.getObjectByName(look.female ? "HAIR_HAIR20" : "HAIR_SHORT");
+        const bonnet = look.female && root.getObjectByName("ACC_HAT");
+        if (bonnet) {
+          // The front three-quarter angle shows the fringe and braid together.
+          view = "front";
+          parts.push(bonnet);
+        }
+      }
+      if (!cut) throw Error("The hairstyle preview is unavailable.");
+      parts.push(cut);
+      return await renderPortraitImage(root, frameHairThumbnail(root, parts, view), HAIRSTYLE_SIZE);
+    }
+    const layeredOutfit = look.corset || look.wardrobe || look.bra !== undefined ||
+      Object.keys(look.garments ?? {}).some(slot => slot !== "dress") ||
+      look.removedClothing.some(piece => !look.outfitRemovals.includes(piece));
+    if (layeredOutfit) {
+      model = await preparePortraitOutfit({ kind: "outfit", look, modelUrl, bag: false }, loader);
+      model.root.updateMatrixWorld(true);
+      return await renderPortraitImage(model.root, characterCamera(model), PORTRAIT_SIZE);
+    }
+    const source = await loadScene(modelUrl).catch(() => { throw Error("The character model is unavailable."); });
     const [outfit, hairSource] = await Promise.all([
       dress ? loadPortraitOutfit(source, dress, loadScene) : undefined,
       selectedHair ? loadScene(selectedHair.url).then(scene => scene.getObjectByName(selectedHair.mesh), () => undefined) : undefined,
@@ -141,41 +129,18 @@ async function renderPortrait({ look, modelUrl, dress, hairstylePreview }: Chara
       if (part) part.visible = false;
     }
 
-    const scene = new Scene();
-    const keyLight = new DirectionalLight(0xffefe1, 2);
-    keyLight.position.set(hairstylePreview ? 2.2 : 3, 4, 5);
-    scene.add(model.root, keyLight, new HemisphereLight(0xe5eeff, 0x73685e, 1.25));
-
     model.root.updateMatrixWorld(true);
-    let camera: OrthographicCamera;
-    if (hairstylePreview) {
-      const hair = look.appearance.hair === "natural"
-        ? model.longHair ?? model.root.getObjectByName("HAIR_SHORT") : model.fittedHair;
-      if (!hair) throw Error("The hairstyle preview is unavailable.");
-      camera = hairstyleCamera(model, hair);
-    } else {
-      camera = characterCamera(model);
-    }
-    const size = hairstylePreview ? HAIRSTYLE_SIZE : PORTRAIT_SIZE;
-    const canvas = new OffscreenCanvas(size, size);
-    renderer = new WebGLRenderer({ canvas, alpha: true, antialias: true, preserveDrawingBuffer: true });
-    renderer.setSize(size, size, false);
-    renderer.toneMapping = ACESFilmicToneMapping;
-    renderer.setClearColor(0, 0);
-    renderer.render(scene, camera);
-    return await canvas.convertToBlob({ type: "image/webp", quality: .90 });
+    return await renderPortraitImage(model.root, characterCamera(model), PORTRAIT_SIZE);
   } finally {
     model?.dispose();
-    renderer?.dispose();
-    renderer?.forceContextLoss();
     decoder.dispose();
   }
 }
 
-self.addEventListener("message", async ({ data }: MessageEvent<CharacterPortraitJob>) => {
+self.addEventListener("message", async ({ data }: MessageEvent<PortraitJob>) => {
   let reply: CharacterPortraitResult;
   try {
-    reply = { image: await renderPortrait(data) };
+    reply = { image: "kind" in data ? await renderWardrobeThumbnail(data) : await renderPortrait(data) };
   } catch (error) {
     reply = { error: error instanceof Error ? error.message : "Could not create the character portrait." };
   }

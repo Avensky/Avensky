@@ -13,7 +13,6 @@ import { characterLod, findVillagerModel, hasCharacterModel, hasCompatibleWardro
 import { prepareBuild } from "./scripts/prepare-build.mjs";
 import { publicRoot, releaseOutput, stagingRelease, type StagingRelease } from "./scripts/staging-release.mjs";
 import { isStreamedAsset } from "./src/assets/assetPaths.ts";
-import { fittedHairCatalog, fittedTennisGarments } from "./src/game/characters/fittedWardrobe/alphaAssets.ts";
 import { resolveDeploymentEnvironment } from "./src/net/deploymentEnvironment.ts";
 
 const frontend = fileURLToPath(new URL(".", import.meta.url));
@@ -39,7 +38,8 @@ function assetDefines(release: StagingRelease | null) {
   }]));
 
   const dressingRoomImports: { id: string; url: string; mobileUrl?: string; revisionUrl?: string; retired?: boolean }[] =
-    [wardrobeCatalogFile, discoveredWardrobeCatalogFile].flatMap(file => JSON.parse(readFileSync(file, "utf8")));
+    [wardrobeCatalogFile, discoveredWardrobeCatalogFile, new URL("../packages/wardrobe-catalog/fitted-garments.json", import.meta.url)]
+      .flatMap(file => JSON.parse(readFileSync(file, "utf8")));
   const activeImports = dressingRoomImports.filter(item => !item.retired);
   const garmentFile = (url: string) => new URL(`./public${url}`, import.meta.url);
   const installedRevisions = activeImports.filter(({ id, revisionUrl, url }) =>
@@ -63,20 +63,18 @@ function assetDefines(release: StagingRelease | null) {
     ? (packedPath && Object.hasOwn(release.assets, packedPath) ? packedPath : null)
     : installedPackedVesperPortrait(vesper);
 
-  const fittedHair: {id: string; label: string; url: string; mesh: string; sha256: string; editableGroom?: boolean}[] = JSON.parse(readFileSync(
+  const fittedHair: { id: string; url: string; sha256: string }[] = JSON.parse(readFileSync(
     new URL("../packages/wardrobe-catalog/fitted-hair.json", import.meta.url), "utf8"));
   const activeHair = fittedHair.filter(style => release
     ? release.assets[style.url]?.sha256 === style.sha256
-    : style.editableGroom && hasModel(garmentFile(style.url)));
+    : hasModel(garmentFile(style.url)));
   return {
     __FITTED_HAIR_IDS__: JSON.stringify(activeHair.map(style => style.id)),
-    __FITTED_HAIR_STYLES__: JSON.stringify(activeHair.map(({ id, label, url, mesh, editableGroom }) => ({ id, label, url, mesh, editableGroom }))),
     __STAGING_ASSET_RELEASE__: JSON.stringify(release && {
       id: release.id, paths: Object.fromEntries(Object.keys(release.assets).map(path => [path, true])),
     }),
     __HEROES_VEHICLE_PREVIEWS__: JSON.stringify(heroesVehiclePreviews),
-    __FITTED_HAIR_URLS__: JSON.stringify(fittedHairCatalog.filter(item => hasModel(garmentFile(item.url))).map(item => item.url)),
-    __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify([...activeImports, ...fittedTennisGarments]
+    __DRESSING_ROOM_IMPORTED_IDS__: JSON.stringify(activeImports
       .filter(item => item.url && hasModel(garmentFile(item.url))).map(item => item.id)),
     __DRESSING_ROOM_MOBILE_IDS__: JSON.stringify(activeImports.filter(item => item.mobileUrl && hasModel(garmentFile(item.mobileUrl))).map(item => item.id)),
     __DRESSING_ROOM_REVISION_IDS__: JSON.stringify(installedRevisions),

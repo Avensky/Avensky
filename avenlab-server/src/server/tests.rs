@@ -190,7 +190,12 @@ async fn wardrobe_equip_preserves_saved_character_traits() {
     borrowed["appearance"]["personality"] = json!("mechanic");
     borrowed["appearance"]["hair_color"] = json!("copper");
     let equip = |character: Value| json!({"action":"character_equip", "character":character});
-    let styled = server.handle(&player, equip(borrowed)).await.unwrap();
+    let mut stale = equip(borrowed.clone());
+    stale["character_slot_id"] = json!("previous-career");
+    assert!(server.handle(&player, stale).await.is_err());
+    let mut current = equip(borrowed);
+    current["character_slot_id"] = created["profile"]["active_character_id"].clone();
+    let styled = server.handle(&player, current).await.unwrap();
     assert_eq!(styled["character"]["identity"], "female");
     assert_eq!(styled["character"]["appearance"]["personality"], "racer");
     assert_eq!(styled["character"]["appearance"]["hair_color"], "copper");
@@ -1062,7 +1067,10 @@ async fn character_outfits_save_validated_fitting_room_combinations_to_the_ownin
     assert_eq!(s.handle(&player, save("Gothic layers", &other_character)).await.unwrap_err(),
         "That name belongs to another character's outfit.");
     assert_eq!(s.handle(&player, save("Gothic layers", &outfit)).await.unwrap(), saved);
-    assert!(s.handle(&player, json!({"action": "character_equip", "character": outfit})).await.is_err());
+    let equip = |choice: &Value| json!({"action": "character_equip", "character": choice});
+    let worn = s.handle(&player, equip(&outfit)).await.unwrap();
+    assert_eq!(worn["character"], outfit);
+    assert_eq!(worn["character_outfits"], saved["character_outfits"]);
     for (key, field, value) in [("gothic-03:corset", "hardware", "#123456"), ("gothic-05:corset", "closure", "#123456"),
         ("gothic-05:skirt", "lining", "#123456"), ("gothic-05:corset", "lining", "invalid")] {
         let mut invalid = outfit.clone();
@@ -1071,11 +1079,13 @@ async fn character_outfits_save_validated_fitting_room_combinations_to_the_ownin
     }
     let mut hidden_only = equipped.clone();
     hidden_only["removedClothing"] = json!(["shoes"]);
-    assert!(s.handle(&player, json!({"action": "character_equip", "character": hidden_only})).await.is_err());
+    let worn = s.handle(&player, equip(&hidden_only)).await.unwrap();
+    assert_eq!(worn["character"], hidden_only);
 
     let mut invalid = outfit.clone();
     invalid["garments"]["top"] = json!("gothic-skirt-04");
     assert!(s.handle(&player, save("Gothic layers", &invalid)).await.is_err());
+    assert!(s.handle(&player, equip(&invalid)).await.is_err());
     let mut invalid = outfit.clone();
     invalid["wardrobeTrial"]["set"] = json!("unknown");
     assert!(s.handle(&player, save("Gothic layers", &invalid)).await.is_err());
@@ -1099,7 +1109,7 @@ async fn character_outfits_save_validated_fitting_room_combinations_to_the_ownin
     outfit["removedClothing"] = json!(["corset", "top", "skirt", "shoes", "socks", "hat", "bow", "bonnet-bow", "harness", "dress"]);
     let replaced = s.handle(&player, save("Gothic layers", &outfit)).await.unwrap();
     assert_eq!(replaced["character_outfits"]["Gothic layers"], outfit);
-    assert_eq!(replaced["cosmetics_revision"], 3);
+    assert_eq!(replaced["cosmetics_revision"], worn["cosmetics_revision"].as_u64().unwrap() + 1);
     let sleeveless = json!({"id": "mara-vega", "outfit": "shop-crew", "garments": {"dress": "medieval-kaftan-01"}, "removedClothing": ["sleeves"]});
     let extra = s.handle(&player, save("Sleeveless kaftan", &sleeveless)).await.unwrap();
     assert_eq!(extra["character_outfits"]["Sleeveless kaftan"], sleeveless);
@@ -1126,7 +1136,7 @@ async fn character_outfits_save_validated_fitting_room_combinations_to_the_ownin
     let reloaded: SocialData = serde_json::from_slice(&tokio::fs::read(&s.path).await.unwrap()).unwrap();
     let progression = reloaded.profiles[profile].progression.view();
     assert_eq!(progression["character_outfits"], with_bra["character_outfits"]);
-    assert_eq!(progression["character"], equipped);
+    assert_eq!(progression["character"], hidden_only);
     let deleted = s.handle(&player, remove).await.unwrap();
     assert_eq!(deleted["character_outfits"], json!({"Sleeveless kaftan": sleeveless, "Push-up": push_up}));
     let reloaded: SocialData = serde_json::from_slice(&tokio::fs::read(&s.path).await.unwrap()).unwrap();

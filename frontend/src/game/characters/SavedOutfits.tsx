@@ -7,7 +7,9 @@ import { clothingPieceLabel, wornClothing } from "./clothingPieces";
 import { resolveCharacterWardrobe, wardrobeOverEase, WARDROBE_CORSETS, WARDROBE_WAIST_OPTIONS } from "./wardrobe";
 import { getWardrobeGarment, visibleWardrobeGarments } from "./wardrobeGarments";
 import { LOCAL_OUTFITS_KEY, OUTFIT_NAME_CONFLICT, readLocalOutfits, writeLocalOutfit } from "./localOutfits";
-import { captureLocalOutfit, restoreLocalOutfitHair, localOutfitHairLabel } from "./fittedWardrobe/localOutfitHair";
+import { restoreLocalOutfitHair, localOutfitHairLabel } from "./fittedWardrobe/localOutfitHair";
+import { MenuIcon } from "../../components/menus/MenuIcon";
+import { WardrobeThumbnail } from "./WardrobeThumbnail";
 import "./savedOutfits.css";
 
 const MAX_OUTFITS = 24;
@@ -17,11 +19,10 @@ function outfitForCharacter(outfit: CharacterChoice, wearer: CharacterChoice): C
   const preview = { ...outfit };
   if (outfit.identity !== wearer.identity) preview.identity = wearer.identity;
   if (outfit.driver_id !== wearer.driver_id) preview.driver_id = wearer.driver_id;
-  if (outfit.appearance?.personality !== wearer.appearance?.personality) {
-    // Older saves can be just an outfit ID, with no appearance of their own.
-    preview.appearance = outfit.appearance
-      ? { ...outfit.appearance, personality: wearer.appearance?.personality }
-      : wearer.appearance;
+  // Older saves can be just an outfit ID, with no appearance of their own.
+  if (!outfit.appearance && wearer.appearance) preview.appearance = wearer.appearance;
+  else if (outfit.appearance && outfit.appearance.personality !== wearer.appearance?.personality) {
+    preview.appearance = { ...outfit.appearance, personality: wearer.appearance?.personality };
   }
   return preview;
 }
@@ -111,7 +112,7 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
     if (!canEditCharacter()) return;
     if (source === "device") {
       try {
-        setLocalOutfits(writeLocalOutfit(name, character && captureLocalOutfit(character)));
+        setLocalOutfits(writeLocalOutfit(name, character));
         if (!character) setName(current => current.trim() === name ? "" : current);
         setMessage(character ? `Saved ${name} on this device.` : `Deleted ${name} from this device.`);
       } catch (error) {
@@ -188,15 +189,16 @@ export function SavedOutfits({ choice, onTryOn, onEndPreview, clearPreview }: Sa
     {notice && <p className="saved-outfit-message" role="status">{notice}</p>}
     {looks.length > 0 ? <ul className="saved-outfit-list" aria-label="Saved outfits">
       {looks.map(([outfitName, outfit]) => {
+        const savedLook = outfitForCharacter(source === "device" ? restoreLocalOutfitHair(outfit) : outfit, choice);
         const details = [outfitDetails(outfit), source === "device" && localOutfitHairLabel(outfit)].filter(Boolean).join(" · ");
         return <li key={outfitName} data-controller-row data-controller-columns="2">
           <button type="button" className="menu-control saved-outfit-preview" aria-label={`Try on ${outfitName}`} disabled={!editingAllowed} onClick={() => {
             if (!canEditCharacter()) return;
-            if (source === "device") restoreLocalOutfitHair(outfit);
-            onTryOn(outfitForCharacter(outfit, choice));
+            onTryOn(savedLook);
             setName(outfitName);
             setMessage(`Previewing ${outfitName}.`);
           }}>
+            <WardrobeThumbnail preview={{ kind: "outfit", choice: savedLook }}><MenuIcon name="wardrobe" /></WardrobeThumbnail>
             <strong>{outfitName}</strong>
             {details && <small>{details}</small>}
           </button>

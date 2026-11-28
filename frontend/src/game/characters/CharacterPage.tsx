@@ -8,10 +8,10 @@ import { readLocalCharacter, writeLocalCharacter } from "./localOutfits";
 import { ControllerAction } from "../../components/controller";
 import { MenuBackButton } from "../../components/menus/MenuFrame";
 import { requestSocial } from "../../net/socialClient";
-import { selectActiveCharacterName, selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
+import { canUseDeviceCharacter, selectActiveCharacterName, selectCharacterSlot, selectEquippedCharacter, useSocialStore } from "../../store/social/socialStore";
 import { usePreferencesStore } from "../../store/preferences/preferencesStore";
 import { canEditCharacter, useUIStore } from "../../store/menus/uiStore";
-import { CHARACTERS, CHARACTER_APPEARANCE_OPTIONS, DEFAULT_CHARACTER, ROOK_ID, availableHairStyles, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
+import { CHARACTERS, DEFAULT_CHARACTER, type CharacterAppearance, characterAppearance, characterLook, isEquippableOutfit, type CharacterChoice } from "./characterCatalog";
 import { CharacterDetails } from "./CharacterDetails";
 import { CharacterPortrait } from "./CharacterPortrait";
 import { AlphaAccountPanel } from "./AlphaAccountPanel";
@@ -25,7 +25,7 @@ import { CHARACTER_PERSONALITIES, type AnimationFit } from "./characterPersonali
 import { FittingCameraSelect } from "./FittingCameraSelect";
 import { FittingCameraToolbar } from "./FittingCameraToolbar";
 import { DressingRoom, type WardrobeNavigation } from "./DressingRoom";
-import { LocalHairFeatures, hairOptions, useLocalHairstyle } from "./fittedWardrobe/LocalHairFeatures";
+import { WardrobeBody } from "./WardrobeBody";
 import { clothingColorKey, UNDERWEAR_PIECES } from "./clothingPieces";
 import { PreviewToolIcon } from "../preview/PreviewToolIcon";
 import { PreviewToolButton } from "../preview/PreviewToolButton";
@@ -50,14 +50,17 @@ export type CharacterTab = typeof CHARACTER_TABS[number]["id"];
 
 const PREVIEW_CAST = CHARACTERS.map(item => ({ gender: item.gender, choice: { id: item.id, outfit: item.outfits[0].id } }));
 const COCKPIT_CAMERAS = ["Full body", "Whole car"] as const;
-const BODY_STYLE = [
-  ["Hair", [["hair", "Hairstyle"], ["hair_color", "Hair color"]]],
-  ["Face", [["eye_color", "Eye color"], ["brow_color", "Eyebrow tint"]]],
-  ["Skin", [["skin", "Skin tone"], ["tattoo", "Tattoo"]]],
-] as const;
 const EMOTE_PACKS = EMOTE_GROUPS.filter(group => group !== "Garage");
-type BodyAppearanceField = typeof BODY_STYLE[number][1][number][0];
 type EmoteSection = PreviewEmoteGroup | "Pose pack" | "Interactions" | "Creator";
+
+function sameWardrobe(a: CharacterChoice["wardrobe"], b: CharacterChoice["wardrobe"]) {
+  return a?.set === b?.set && a?.waist === b?.waist && a?.cut === b?.cut;
+}
+
+function samePieces(a: CharacterChoice["garments"], b: CharacterChoice["garments"]) {
+  const slots = Object.keys(a ?? {}) as (keyof NonNullable<typeof a>)[];
+  return slots.length === Object.keys(b ?? {}).length && slots.every(slot => a?.[slot] === b?.[slot]);
+}
 
 function revealCharacterControl(event: FocusEvent<HTMLElement>) {
   event.target.scrollIntoView?.({ block: "nearest", inline: "nearest" });
@@ -86,12 +89,13 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   wardrobeNavigation?: Ref<WardrobeNavigation>;
 }) {
   const page = useRef<HTMLDivElement>(null);
-  const fittedHair = useLocalHairstyle(state => hairOptions.some(style => style.id === state.id));
   const owner = useSocialStore(state => state.view?.profile.id ?? state.profileOwner);
+  const slotId = useSocialStore(selectCharacterSlot);
   const connectedOwner = useSocialStore(state => state.view?.profile.id);
   const characterName = useSocialStore(selectActiveCharacterName);
   const bodyTattoosAvailable = useSocialStore(state => state.bodyTattoosAvailable);
   const saved = useSocialStore(selectEquippedCharacter);
+  const deviceCharacter = useSocialStore(canUseDeviceCharacter);
   // Null is a supported profile awaiting setup. Older servers omit the field.
   const saveToProfile = Boolean(owner) && saved !== undefined;
   const editingAllowed = useUIStore(canEditCharacter);
@@ -119,15 +123,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     } catch { return []; }
   });
   const [createdEmotes, setCreatedEmotes] = useState(() => readCreatedEmotes(ownerKey));
-  const [initialChoice] = useState(() => characterLook(saved) ? saved! : readLocalCharacter());
+  const [initialChoice] = useState(() => characterLook(saved) ? saved! : deviceCharacter ? readLocalCharacter() : undefined);
   const [choice, setChoice] = useState(initialChoice ?? DEFAULT_CHARACTER);
   const [trial, setTrial] = useState<CharacterChoice>();
   const [loadedOutfit, setLoadedOutfit] = useState(false);
   const activeTrial = trial?.id === choice.id ? trial : undefined;
   const wardrobeChoice = activeTrial ?? choice;
-  // Preview hair must not change garment removal arrays, which forces the
-  // entire skinned actor to rebuild and produces black frames in the garage.
-  // Bonnet visibility is preview-only and updated on the existing model.
   const previewChoice = wardrobeChoice;
   const [locked, setLocked] = useState(Boolean(initialChoice));
   const [status, setStatus] = useState<"idle" | "pending" | "saving" | "saved" | "local" | "error">("idle");
@@ -165,10 +166,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
         queued.current.delete(id);
         try {
           if (!owner || useSocialStore.getState().view?.profile.id !== owner) throw Error("Connect your player profile to save.");
-          const result = await requestSocial("character_equip", { character: next });
+          if (selectCharacterSlot(useSocialStore.getState()) !== slotId) return false;
+          const result = await requestSocial("character_equip", { character: next, character_slot_id: slotId ?? undefined });
           const confirmed = result.character as CharacterChoice | undefined;
           const profile = useSocialStore.getState();
-          if (profile.view?.profile.id !== owner || !confirmed || confirmed.id !== next.id || !isEquippableOutfit(confirmed)) {
+          if (selectCharacterSlot(profile) !== slotId) return false;
+          if (profile.view?.profile.id !== owner || !confirmed || confirmed.id !== next.id || !characterLook(confirmed)) {
             throw Error("The server did not confirm the equipped outfit. Reconnect and retry the save.");
           }
           profile.acknowledgeProgression(owner, progression => ({ ...progression, character: confirmed }), result);
@@ -188,7 +191,7 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     };
     running.current = drain().finally(() => { running.current = null; });
     return running.current;
-  }, [owner]);
+  }, [owner, slotId]);
 
   useLayoutEffect(() => {
     if (saved && characterLook(saved) && !running.current && !queued.current.size) {
@@ -200,7 +203,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   useEffect(() => {
     if (editingAllowed && connectedOwner && queued.current.size) void flush();
   }, [editingAllowed, connectedOwner, flush]);
-  useImperativeHandle(beforeClose, () => () => locked ? flush() : running.current ?? Promise.resolve(true), [flush, locked]);
+  useImperativeHandle(beforeClose, () => () => {
+    if (locked && !saveToProfile && status === "error") return Promise.resolve(false);
+    return locked ? flush() : running.current ?? Promise.resolve(true);
+  }, [flush, locked, saveToProfile, status]);
   useLayoutEffect(() => { onPreview?.(previewChoice); }, [previewChoice, onPreview]);
   useLayoutEffect(() => { onReady(locked); }, [locked, onReady]);
   useLayoutEffect(() => {
@@ -278,9 +284,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     timer.current = setTimeout(() => void flush(), 300);
   }
 
-  function hasFittingPreview(next: CharacterChoice) {
-    return loadedOutfit || next.outfit !== choice.outfit || next.wardrobe !== choice.wardrobe
-      || next.garments || next.wardrobeTrial || next.wardrobeEase || next.removedClothing?.length || next.bra !== undefined
+  function hasFittingPreview(next: CharacterChoice, fromSavedOutfit = loadedOutfit) {
+    return fromSavedOutfit || next.outfit !== choice.outfit || !sameWardrobe(next.wardrobe, choice.wardrobe)
+      || !sameWardrobe(next.wardrobeTrial, choice.wardrobeTrial) || next.wardrobeEase !== choice.wardrobeEase
+      || next.bra !== choice.bra || !samePieces(next.garments, choice.garments)
+      || (next.removedClothing?.length ?? 0) !== (choice.removedClothing?.length ?? 0)
+      || next.removedClothing?.some(piece => !choice.removedClothing?.includes(piece))
       || (next.appearance?.briefs_style ?? "briefs") !== (choice.appearance?.briefs_style ?? "briefs")
       || UNDERWEAR_PIECES.some(piece => {
         const key = clothingColorKey(next, piece);
@@ -298,13 +307,11 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
   function previewOutfit(next: CharacterChoice) {
     if (!canEditCharacter()) return;
     setLoadedOutfit(false);
-    if (next.outfit === choice.outfit && next.wardrobe === choice.wardrobe) {
-      setTrial(undefined);
-      return;
-    }
-    setTrial(activeTrial && !equipPreview ? { ...choice, outfit: next.outfit, wardrobe: next.wardrobe,
-      appearance: { ...characterAppearance(choice), color: next.appearance?.color ?? "original", accent: next.appearance?.accent },
-    } : next);
+    // Start a fresh outfit from the equipped body and dyes. A different
+    // fitting-room trial may have colors that have never been equipped.
+    const fresh = activeTrial ? { ...next, appearance: { ...characterAppearance(choice),
+      color: next.appearance?.color ?? "original", accent: next.appearance?.accent } } : next;
+    setTrial(hasFittingPreview(fresh, false) ? fresh : undefined);
   }
 
   function loadOutfit(next: CharacterChoice) {
@@ -325,12 +332,12 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
 
   function editPreviewAppearance(next: CharacterChoice) {
     if (!canEditCharacter()) return;
-    if (activeTrial || hasFittingPreview(next)) setTrial(next);
+    if (activeTrial) setTrial(next);
     else update(next);
   }
 
   function saveClothingColors(next: CharacterChoice) {
-    if (equipPreview) {
+    if (activeTrial && (loadedOutfit || activeTrial.outfit !== choice.outfit || !sameWardrobe(activeTrial.wardrobe, choice.wardrobe))) {
       editPreviewAppearance(next);
       return;
     }
@@ -351,15 +358,10 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     update({ ...choice, appearance: { ...characterAppearance(choice), item_colors } }, activeTrial ? next : undefined);
   }
 
-  function editBodyAppearance(field: BodyAppearanceField, value: string) {
-    const change = field === "hair_color" ? { hair_color: value, hair_palette: undefined } : { [field]: value };
-    const next = { ...choice, appearance: { ...characterAppearance(choice), ...change } };
-    const preview = activeTrial && { ...activeTrial, appearance: { ...appearance, ...change } };
+  function editBodyAppearance(change: Partial<CharacterAppearance>) {
+    const next = { ...choice, appearance: { ...(choice.appearance ?? characterAppearance(choice)), ...change } };
+    const preview = activeTrial && { ...activeTrial, appearance: { ...(activeTrial.appearance ?? appearance), ...change } };
     update(next, preview);
-    const target = field === "skin" || field === "tattoo" ? "Full body" : "Face";
-    if (camera !== target || emote) {
-      useCharacterPreviewStore.setState(s => ({ camera: target, zoom: 1, emote: null, focusRevision: s.focusRevision + 1 }));
-    }
   }
 
   const equipPreview = activeTrial && isEquippableOutfit(activeTrial)
@@ -574,7 +576,6 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
     }>Stop</button>
   </div>;
   const fitting = tab === "appearance";
-  const hairstyles = availableHairStyles(choice.id);
   const rotationDisabled = insideCar || Boolean(garageDoorForEmote(emote?.id)) || isMirrorMakeupEmote(emote?.id);
   const vehiclePreview = tab === "emotes" && Boolean(cockpitVehicle);
   const cameraViews = vehiclePreview ? CHARACTER_CAMERAS : CHARACTER_CAMERAS.filter(view => view !== "Whole car");
@@ -644,26 +645,8 @@ export function CharacterPage({ onPreview, onReady, tab, beforeClose, wardrobeNa
         equipPreview={equipPreview} onDiscardPreview={activeTrial ? endOutfitPreview : undefined}
         onEndPreview={loadedOutfit ? endOutfitPreview : undefined} cameraTools={cameraTools}
         onColors={saveClothingColors} />}
-      {tab === "body" && <section className="character-controls menu-panel-frame character-body-style" aria-label="Body customization">
-        <h2>Body</h2>
-        {BODY_STYLE.map(([section, fields]) => <fieldset key={section}>
-          <legend>{section}</legend>
-          {section === "Hair" && choice.id === "mara-vega" && hairOptions.length > 0 && <LocalHairFeatures />}
-          {fields.map(([field, label]) => (field === "hair" && choice.id === ROOK_ID && __ROOK_MODEL_URL__) ||
-            (section === "Hair" && choice.id === "mara-vega" && fittedHair) ? null
-            : <label className="character-setting" key={field} data-controller-row>{label}
-              <select className="menu-control" aria-label={label} value={field === "hair_color" && appearance.hair_palette ? "" : appearance[field] ?? (field === "hair" ? "natural" : field === "tattoo" ? "none" : "original")}
-                disabled={field === "tattoo" && saveToProfile && !bodyTattoosAvailable}
-                onChange={event => editBodyAppearance(field, event.target.value)}>
-                {field === "hair_color" && appearance.hair_palette && <option disabled value="">Custom palette</option>}
-                {(field === "hair" ? hairstyles : CHARACTER_APPEARANCE_OPTIONS[field]).map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-                {field === "hair" && !hairstyles.some(style => style.id === appearance.hair)
-                  && <option disabled value={appearance.hair}>Saved style unavailable</option>}
-              </select>
-              {field === "tattoo" && saveToProfile && !bodyTattoosAvailable && <small>Update the game server to save tattoos.</small>}
-            </label>)}
-        </fieldset>)}
-      </section>}
+      {tab === "body" && <WardrobeBody choice={previewChoice} onChange={editBodyAppearance}
+        navigation={wardrobeNavigation} disabled={!editingAllowed} tattoosAvailable={!saveToProfile || bodyTattoosAvailable} />}
       {tab === "details" && <CharacterDetails name={characterName} gender={choice.identity ?? character.gender}
         personality={choice.appearance?.personality} bag={bag} selectedId={emote?.id} disabled={brzExiting || reducedMotion}
         onPreview={playEmote} />}

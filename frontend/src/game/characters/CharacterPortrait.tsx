@@ -10,11 +10,12 @@ import "./characters.css";
 const PORTRAIT_QUIET_MS = 900;
 const ROSTER_IDLE_TIMEOUT_MS = 1200;
 const portraitActivity = ["pointerdown", "pointerup", "pointermove", "click", "wheel", "keydown", "avenlab:main-menu-action", "avenlab:panel-action"] as const;
-type WelcomePreview = "candidate" | "selected" | "roster";
+type WelcomePreview = "candidate" | "selected" | "roster" | "catalog";
+const isCatalogTile = (preview?: WelcomePreview) => preview === "roster" || preview === "catalog";
 
 const rosterVisibility = new Map<Element, (visible: boolean) => void>();
 let rosterObserver: IntersectionObserver | undefined;
-function observeRosterTile(tile: Element, update: (visible: boolean) => void) {
+export function observeRosterTile(tile: Element, update: (visible: boolean) => void) {
   rosterObserver ??= new IntersectionObserver(entries => {
     for (const entry of entries) rosterVisibility.get(entry.target)?.(entry.isIntersecting);
   });
@@ -34,12 +35,13 @@ function observeRosterTile(tile: Element, update: (visible: boolean) => void) {
 // A cold roster prepares static images only while the selection menu is idle.
 function portraitMenuAllowsWork({ screen, overlay, isModeLoading }: ReturnType<typeof useUIStore.getState>, preview?: WelcomePreview) {
   if (isModeLoading) return false;
+  if (preview === "catalog") return screen === "heroes" && overlay === null;
   if (screen === "main") return overlay === null;
   if (screen === "welcome") return preview === "roster" || preview === "selected";
   return screen === "heroes" && preview === "selected";
 }
 
-function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) {
+export function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) {
   let timer: number | undefined, idle: number | undefined;
   let cancelWork: (() => void) | undefined;
   let quietUntil = performance.now() + PORTRAIT_QUIET_MS;
@@ -73,14 +75,14 @@ function schedulePortraitWork(work: () => () => void, preview?: WelcomePreview) 
       if (window.requestIdleCallback) {
         // A live garage can consume every idle slot. Visible tiles may enqueue
         // their offscreen worker after the deadline if the player is still idle.
-        idle = window.requestIdleCallback(start, preview === "roster" ? { timeout: ROSTER_IDLE_TIMEOUT_MS } : undefined);
+        idle = window.requestIdleCallback(start, isCatalogTile(preview) ? { timeout: ROSTER_IDLE_TIMEOUT_MS } : undefined);
       } else start();
     }, Math.max(0, quietUntil - performance.now()));
   };
   function activity(event: Event) {
     if (event.type === "pointermove" && !(event as PointerEvent).buttons) return;
     quietUntil = performance.now() + PORTRAIT_QUIET_MS;
-    if (preview === "roster" && cancelWork) {
+    if (isCatalogTile(preview) && cancelWork) {
       cancelWork();
       cancelWork = undefined;
       schedule();
@@ -103,9 +105,9 @@ function portraitKey(look: CharacterLook, url: string, outfitUrl?: string) {
   const { hair, hair_color, skin, headwear, color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, hair_palette, item_colors } = look.appearance;
   const colors = Object.entries(item_colors ?? {}).sort(([a], [b]) => a.localeCompare(b))
     .map(([key, values]) => [key, Object.entries(values).sort(([a], [b]) => a.localeCompare(b))]);
-  const { wardrobe } = look;
+  const { wardrobe, corset, overEase, garments, removedClothing, bra } = look;
   return JSON.stringify([look.character.id, look.outfit.id, url, outfitUrl ?? null, hair, hair_color, skin, headwear,
-    color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, look.appearance.face_shape, hair_palette, colors, wardrobe && [wardrobe.set, wardrobe.shirt, wardrobe.waist]]);
+    color, eye_color, brow_color, glasses, accent, tattoo, makeup, eyeshadow, eyeliner, look.appearance.face_shape, hair_palette, look.appearance.hair_groom, colors, wardrobe, corset, overEase, garments, removedClothing, bra]);
 }
 
 /** Render the saved look from its authored model while the menus are idle. */
@@ -124,7 +126,7 @@ export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, ha
   const dress = !hairstylePreview && look?.garments?.dress ? getWardrobeGarment(look.garments.dress) : undefined;
   const dressUrl = dress?.outfit ? wardrobeGarmentModelUrl(dress, "portrait") : undefined;
   const key = !look || !url ? "" : hairstylePreview
-    ? JSON.stringify(["hairstyle", look.character.id, url, look.appearance.hair, look.appearance.hair_color, look.hair, look.appearance.hair_palette])
+    ? JSON.stringify(["hairstyle", look.character.id, url, look.appearance.hair])
     : portraitKey(look, url, dressUrl);
   const cached = useSyncExternalStore(subscribeCharacterPortrait, () => key ? peekCharacterPortrait(key) : null, () => null);
   const [failedKey, setFailedKey] = useState<string>();
@@ -143,7 +145,7 @@ export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, ha
     return <img className="character-portrait character-portrait--model" src={cached} alt={label ?? ""}
       decoding="async" onError={() => setFailedKey(key)} />;
   }
-  return needsBake && welcomePreview !== "roster"
+  return needsBake && !isCatalogTile(welcomePreview)
     ? <span className="character-portrait character-portrait--loading" aria-hidden="true" />
     : null;
 }
@@ -151,7 +153,7 @@ export function CharacterPortrait({ choice, label, welcomePreview, cacheOnly, ha
 export function ProfilePortrait(props: PortraitProps) {
   const frame = useRef<HTMLSpanElement>(null);
   const [visible, setVisible] = useState(false);
-  const watch = props.welcomePreview === "roster" && typeof IntersectionObserver !== "undefined";
+  const watch = isCatalogTile(props.welcomePreview) && typeof IntersectionObserver !== "undefined";
   useEffect(() => {
     if (watch && frame.current) return observeRosterTile(frame.current, setVisible);
   }, [watch]);

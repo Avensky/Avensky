@@ -459,7 +459,8 @@ export function GarageEmotePlayer({ root, bag = false, previewPacks = false, lea
       return;
     }
     leaveCabin(current, restSeconds);
-    const inspectingFace = previewPacks && (view.camera === "Face" || view.camera === "Selected item") && !preview;
+    const inspectingFace = previewPacks && (view.camera === "Face" || view.camera === "Selected item"
+      || view.camera === "Hair" || view.camera === "Eyes" || view.camera === "Makeup") && !preview;
     if (inspectingFace) {
       current.active?.stop();
       current.active = null;

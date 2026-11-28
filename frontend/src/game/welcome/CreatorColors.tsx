@@ -1,4 +1,4 @@
-import { useEffect, useEffectEvent, useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useEffectEvent, useId, useImperativeHandle, useLayoutEffect, useRef, useState, type CSSProperties, type Ref } from "react";
 import { GameButton } from "../../components/GameButton";
 import { ColorSwatch } from "../../components/menus/ColorSwatch";
 import { SecondaryTabRow } from "../../components/menus/SecondaryTabRow";
@@ -6,39 +6,41 @@ import type { MenuAction } from "../../controls/inputRouting";
 import { useTextKeyboardStore } from "../../store/text/keyboardStore";
 import { CHARACTER_APPEARANCE_OPTIONS as options, characterAppearance, characterLook,
   type CharacterAppearance, type CharacterChoice } from "../characters/characterCatalog";
-import { appearanceHairPalette, DEFAULT_HAIR_PALETTE, HAIR_COLOR_THEMES, HAIR_COLOR_ZONES, type HairColorZone } from "../characters/fittedWardrobe/hairColors";
+import { appearanceHairPalette, DEFAULT_HAIR_PALETTE, HAIR_COLOR_THEMES, HAIR_COLOR_ZONES, type HairColorZone, type HairPalette } from "../characters/fittedWardrobe/hairColors";
+import { BRAIDED_PONYTAIL_THEMES } from "../characters/fittedWardrobe/hairGroom";
 import { CreatorOption } from "./CreatorOption";
 import "./creatorColors.css";
 
-type Step = "skin" | "hair" | "eyes" | "makeup";
-type Channel = HairColorZone | "skin" | "eye_color" | "presets" | "makeup" | "eyeshadow" | "eyeliner";
+type Step = "skin" | "hair" | "eyes" | "makeup" | "brows";
+type Channel = HairColorZone | "brow_color" | "skin" | "eye_color" | "presets" | "makeup" | "eyeshadow" | "eyeliner";
 type Swatch = { id: string; label: string; color?: string };
-type ThemeName = keyof typeof HAIR_COLOR_THEMES;
+const ponytailThemes = { ...BRAIDED_PONYTAIL_THEMES, ...HAIR_COLOR_THEMES };
 const labels: Record<Channel, string> = {
-  skin: "Skin tone", base: "Base", roots: "Roots", highlights: "Highlights", tips: "Tips", eye_color: "Eye color",
+  brow_color: "Eyebrow tint", skin: "Skin tone", base: "Base", roots: "Roots", highlights: "Highlights", tips: "Tips", eye_color: "Eye color",
   presets: "Presets", makeup: "Lipstick", eyeshadow: "Eyeshadow", eyeliner: "Eyeliner",
 };
 const hairColors = [...options.hair_color,
   ...(["Honey Blonde", "Platinum Smoke", "Bright Copper", "Black Cherry", "Midnight Teal", "Icy Blue", "Violet Dusk", "Rose Quartz"] as const)
     .map(label => ({ id: label, label, color: HAIR_COLOR_THEMES[label].base }))];
-const themeNames = Object.keys(HAIR_COLOR_THEMES) as ThemeName[];
 const makeupChannels = ["makeup", "eyeshadow", "eyeliner"] as const;
 const hairChannels = [...HAIR_COLOR_ZONES, "presets"] as const;
-const singleChannels = { skin: ["skin"], eyes: ["eye_color"], cropped: ["base"] } as const;
+const singleChannels = { brows: ["brow_color"], skin: ["skin"], eyes: ["eye_color"], cropped: ["base"] } as const;
 const linerStrokes: Record<string, string> = {
   classic: "M4 18 Q12 9 24 16",
   "cat-eye": "M4 18 Q12 9 23 15 L29 11 Q26 16 23 17",
   graphic: "M4 18 Q12 9 23 15 L29 10 M21 18 Q25 18 28 15",
 };
 
-export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
-  step: Step; choice: CharacterChoice; onChoice: (next: CharacterChoice) => void; busy: boolean; onContinue: () => void;
+export function CreatorColors({ step, choice, onChoice, busy, onContinue, channelNavigation }: {
+  step: Step; choice: CharacterChoice; onChoice: (next: CharacterChoice, change: Partial<CharacterAppearance>) => void; busy: boolean; onContinue?: () => void;
+  channelNavigation?: Ref<(direction: number) => void>;
 }) {
   const [requested, setChannel] = useState<Channel>("base");
   const id = useId();
   const group = useRef<HTMLDivElement>(null);
   const movingToChannel = useRef(false);
   const appearance = choice.appearance ?? characterAppearance(choice);
+  const themes: Record<string, HairPalette> = appearance.hair === "Mia_01" ? ponytailThemes : HAIR_COLOR_THEMES;
   const look = characterLook(choice);
   const natural = characterLook({ id: choice.id, outfit: choice.outfit });
   const channels: readonly Channel[] = step === "hair" ? (appearance.hair === "cropped" ? singleChannels.cropped : hairChannels)
@@ -50,17 +52,18 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
   const mix = channel === "highlights" ? "highlightStrength" : channel === "tips" ? "tipBlend" : undefined;
   const mixLabel = channel === "highlights" ? "Highlight strength" : "Tip blend";
   let values: Swatch[], active: string, change: (option: Swatch) => Partial<CharacterAppearance>;
-  if (channel === "skin" || channel === "eye_color" || channel === "makeup" || channel === "eyeshadow" || channel === "eyeliner") {
+  if (channel === "brow_color" || channel === "skin" || channel === "eye_color" || channel === "makeup" || channel === "eyeshadow" || channel === "eyeliner") {
     values = channel === "makeup" ? options.makeup.filter(option => !option.legacy) : options[channel];
-    active = appearance[channel] ?? (channel === "skin" || channel === "eye_color" ? "original" : "none");
+    active = appearance[channel] ?? (channel === "brow_color" || channel === "skin" || channel === "eye_color" ? "original" : "none");
     change = option => ({ [channel]: option.id });
   } else if (channel === "presets") {
-    values = themeNames.map(name => ({ id: name, label: name, color: HAIR_COLOR_THEMES[name].base }));
+    const themeNames = Object.keys(themes);
+    values = themeNames.map(name => ({ id: name, label: name, color: themes[name].base }));
     active = palette ? themeNames.find(name => {
-      const theme = HAIR_COLOR_THEMES[name];
+      const theme = themes[name];
       return HAIR_COLOR_ZONES.every(key => theme[key] === palette[key]) && theme.highlightStrength === palette.highlightStrength && theme.tipBlend === palette.tipBlend;
     }) ?? "" : "";
-    change = option => ({ hair_color: "original", hair_palette: { ...HAIR_COLOR_THEMES[option.id as ThemeName] } });
+    change = option => ({ hair_color: "original", hair_palette: { ...themes[option.id] } });
   } else {
     values = channel === "base" ? hairColors : hairColors.filter(s => s.id !== "original");
     active = palette ? values.find(option => option.id !== "original" && option.color === palette[channel])?.id ?? "" : channel === "base" ? appearance.hair_color : "";
@@ -71,8 +74,11 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
       return { hair_color: channel === "base" && stock ? option.id : appearance.hair_color, hair_palette: { ...currentPalette, [channel]: option.color! } };
     };
   }
+  function apply(patch: Partial<CharacterAppearance>) {
+    onChoice({ ...choice, appearance: { ...appearance, ...patch } }, patch);
+  }
   function pick(option: Swatch) {
-    if (active !== option.id) onChoice({ ...choice, appearance: { ...appearance, ...change(option) } });
+    if (active !== option.id) apply(change(option));
   }
   function focusSwatch() {
     if (!group.current || group.current.closest("[inert]")) return;
@@ -91,17 +97,20 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
   useLayoutEffect(() => {
     focusSwatch();
   }, [channel]);
+  function moveChannel(direction: number) {
+    if (busy || channels.length < 2 || group.current?.closest("[inert]") || useTextKeyboardStore.getState().session) return;
+    openChannel(channels[(channels.indexOf(channel) + direction + channels.length) % channels.length]);
+  }
+  useImperativeHandle(channelNavigation, () => moveChannel);
   const cycle = useEffectEvent((event: Event) => {
     const action = (event as CustomEvent<MenuAction>).detail;
-    if (action !== "previous_option" && action !== "next_option") return;
-    if (busy || channels.length < 2 || group.current?.closest("[inert]") || useTextKeyboardStore.getState().session) return;
-    const direction = action === "previous_option" ? -1 : 1;
-    openChannel(channels[(channels.indexOf(channel) + direction + channels.length) % channels.length]);
+    if (action === "previous_option" || action === "next_option") moveChannel(action === "previous_option" ? -1 : 1);
   });
   useEffect(() => {
+    if (channelNavigation) return;
     window.addEventListener("avenlab:panel-action", cycle);
     return () => window.removeEventListener("avenlab:panel-action", cycle);
-  }, []);
+  }, [channelNavigation]);
   const activeLabel = values.find(option => option.id === active)?.label ??
     (channel === "presets" ? "Custom" : palette && HAIR_COLOR_ZONES.includes(channel as HairColorZone) ? palette[channel as HairColorZone] : "Original");
   return <>
@@ -114,12 +123,12 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
       aria-labelledby={channels.length > 1 ? id + channel : undefined} aria-label={channels.length === 1 ? labels[channel] : undefined}
       className="creator-preview-field" data-color-field={channel}>
       <div ref={group} key={channel} className={"creator-options creator-color-options " + (channel === "eyeliner" ? "creator-style-options" : "creator-swatches")}
-        data-controller-row role="group" aria-label={labels[channel] + " options"}>
+        data-controller-row data-controller-columns="auto" role="group" aria-label={labels[channel] + " options"}>
         {values.map(option => {
-          const color = option.id === "original" ? (channel === "eye_color" ? natural?.iris : channel === "skin" ? natural?.skin : natural?.hair) : option.color;
-          const preset = channel === "presets" ? HAIR_COLOR_THEMES[option.id as ThemeName] : undefined;
+          const color = option.id === "original" ? (channel === "eye_color" ? natural?.iris : channel === "skin" ? natural?.skin : channel === "brow_color" ? look?.hair : natural?.hair) : option.color;
+          const preset = channel === "presets" ? themes[option.id] : undefined;
           return <CreatorOption key={option.id} id={option.id} label={option.label} selected={active === option.id}
-            hideTooltip={channel === "eyeliner"} busy={busy} onFocusOption={() => { if (!movingToChannel.current) pick(option); }} onPick={() => pick(option)} onConfirm={onContinue}>
+            hideTooltip={channel === "eyeliner"} busy={busy} onFocusOption={() => { if (onContinue && !movingToChannel.current) pick(option); }} onPick={() => pick(option)} onConfirm={onContinue}>
             {preset ? <span className="creator-preset-sample" aria-hidden="true" style={{
               "--roots": preset.roots, "--base": preset.base, "--highlights": preset.highlights, "--tips": preset.tips,
             } as CSSProperties} /> : channel === "eyeliner" ? (
@@ -131,7 +140,12 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
           </CreatorOption>;
         })}
       </div>
-      {mix && <div className="creator-mix" role="group" aria-label={mixLabel}>
+      {channelNavigation && HAIR_COLOR_ZONES.includes(channel as HairColorZone) &&
+        <label className="wardrobe-custom-dye" data-controller-row>Custom color
+          <input type="color" disabled={busy} value={currentPalette[channel as HairColorZone]} aria-label={labels[channel] + " custom color"}
+            onChange={event => apply({ hair_palette: { ...currentPalette, [channel]: event.target.value } })} />
+        </label>}
+      {mix && <div className="creator-mix" data-controller-row role="group" aria-label={mixLabel}>
         <span>{mixLabel}</span>
         {([-1, 1] as const).map(direction => {
           const value = currentPalette[mix];
@@ -141,7 +155,7 @@ export function CreatorColors({ step, choice, onChoice, busy, onContinue }: {
             <GameButton variant="custom" className="creator-mix-button chamfered-frame"
               aria-label={(direction < 0 ? "Decrease " : "Increase ") + mixLabel.toLowerCase()}
               data-creator-option={mix + "-" + direction} disabled={busy || next === value}
-              onPress={() => onChoice({ ...choice, appearance: { ...appearance, hair_palette: { ...currentPalette, [mix]: next } } })}>
+              onPress={() => apply({ hair_palette: { ...currentPalette, [mix]: next } })}>
               {direction < 0 ? "−" : "+"}
             </GameButton>
           </div>;

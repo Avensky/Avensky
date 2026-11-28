@@ -1,11 +1,12 @@
 import type { HairPalette } from "./fittedWardrobe/hairColors";
+import type { HairGroom } from "./fittedWardrobe/hairGroom";
 import type { PieceColors } from "./clothingPieces";
 import type { BriefsStyle } from "./wardrobeUnderwear";
 import type { AnimationFit, CharacterPersonality } from "./characterPersonality";
 import catalog from "../../../../packages/wardrobe-catalog/characters.json";
 import appearanceOptions from "../../../../packages/wardrobe-catalog/character-appearance.json";
 import fittedHair from "../../../../packages/wardrobe-catalog/fitted-hair.json";
-import { hasSeparateWardrobeTop, resolveWardrobe, wardrobeOverEase, type WardrobeChoice } from "./wardrobe";
+import { corsetModelUrl, hasSeparateWardrobeTop, resolveWardrobe, wardrobeOverEase, type WardrobeChoice } from "./wardrobe";
 import type { OverSkirtEase } from "./overSkirtEase";
 import { getWardrobeGarment, removedWardrobeLayers, visibleWardrobeGarments, wardrobeGarmentModelUrl, type WardrobeGarmentChoice, type WardrobeRemoval } from "./wardrobeGarments";
 import { findVehicleDriver, type VehicleDriver } from "./driverRoster";
@@ -16,7 +17,7 @@ export type CharacterStyleField = keyof typeof appearanceOptions;
 type OptionalAppearanceField = "eye_color" | "brow_color" | "glasses" | "tattoo" | "makeup" | "eyeshadow" | "eyeliner" | "face_shape";
 export type CharacterAppearance = Record<Exclude<CharacterStyleField, OptionalAppearanceField>, string>
   & Partial<Record<OptionalAppearanceField, string>> & {
-    hair_palette?: HairPalette; accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;
+    hair_palette?: HairPalette; hair_groom?: HairGroom; accent?: string; item_colors?: Record<string, PieceColors>; personality?: CharacterPersonality; animation_fit?: AnimationFit;
     bra_style?: "push-up";
     briefs_style?: BriefsStyle;
   };
@@ -46,7 +47,6 @@ export type CharacterIdentity = typeof CHARACTER_IDENTITIES[number]["id"];
 export type CharacterChoice = {
   id: string; outfit: string; identity?: CharacterIdentity; appearance?: CharacterAppearance; prop?: "shop-bag"; wardrobe?: WardrobeChoice;
   driver_id?: string;
-  /** Session-only fitting room selections. */
   garments?: WardrobeGarmentChoice;
   wardrobeTrial?: WardrobeChoice;
   wardrobeEase?: Exclude<OverSkirtEase, 0>;
@@ -70,7 +70,14 @@ export function availableHairStyles(characterId: string) {
 }
 
 export function isEquippableOutfit(choice: CharacterChoice) {
-  if (choice.garments || choice.wardrobeTrial || choice.wardrobeEase || choice.removedClothing || choice.bra !== undefined) return false;
+  if (choice.id !== VILLAGER_ID && (choice.garments || choice.wardrobeTrial || choice.wardrobeEase ||
+    choice.removedClothing?.length || choice.bra !== undefined)) return false;
+  if (choice.wardrobeTrial && !corsetModelUrl(choice.wardrobeTrial, "garage")) return false;
+  if (choice.wardrobeEase && (choice.wardrobeTrial ?? choice.wardrobe)?.waist !== "over") return false;
+  for (const [slot, id] of Object.entries(choice.garments ?? {})) {
+    const piece = getWardrobeGarment(id);
+    if (!piece || piece.slot !== slot || !wardrobeGarmentModelUrl(piece, "garage")) return false;
+  }
   const character = CHARACTERS.find(item => item.id === choice.id);
   if (!character?.outfits.some(outfit => outfit.id === choice.outfit)) return false;
   if (choice.wardrobe && (choice.id !== VILLAGER_ID || !resolveWardrobe(choice.wardrobe) ||

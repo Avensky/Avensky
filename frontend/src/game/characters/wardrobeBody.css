@@ -1,0 +1,33 @@
+.character-body-style.menu-panel-frame { justify-content: start; overflow: auto; overscroll-behavior: contain; }
+.character-body-style .creator-panel, .character-body-style .wardrobe-body-grid { flex-shrink: 0; }
+.character-body-style .wardrobe-body-options { min-height: auto; }
+.wardrobe-body-heading, .wardrobe-groom-amount, .wardrobe-groom-amount > div, .wardrobe-custom-dye {
+  display: flex; align-items: center; gap: .5rem;
+}
+.wardrobe-body-heading { flex-shrink: 0; }
+.wardrobe-body-back { display: grid; place-items: center; width: 44px; min-height: 44px; }
+.wardrobe-body-back svg { width: 1.25rem; height: 1.25rem; }
+.wardrobe-body-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-content: start; gap: .45rem; }
+.wardrobe-body-grid > [role=button] { min-width: 0; min-height: 44px; }
+.wardrobe-body-category { display: grid; grid-template-columns: minmax(0,1fr) auto; align-content: center; }
+.wardrobe-body-category > small { grid-column: 1 / -1; color: var(--app-muted); }
+.wardrobe-body-category .color-swatch { width: 1.25rem; height: 1.25rem; }
+.character-body-style .wardrobe-body-options {
+  position: static; display: grid; align-content: start; justify-self: stretch; width: 100%; min-width: 0;
+  max-width: none; max-height: none; overflow: visible; padding: 0; gap: .5rem; pointer-events: auto;
+}
+.character-body-style .creator-color-options { max-height: none; overflow: visible; }
+.character-body-style .wardrobe-body-options:has(.creator-hairstyles) {
+  flex: 1 1 auto; min-height: 0; overflow: hidden; grid-template-rows: minmax(0, 1fr);
+}
+.character-body-style .creator-preview-field:has(.creator-hairstyles) { min-height: 0; grid-template-rows: minmax(0, 1fr) auto; }
+.character-body-style .creator-hairstyles {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: max-content;
+  min-height: 0; max-height: none; overflow-y: auto;
+}
+.character-body-style .creator-hairstyles .creator-option {
+  width: 100%; max-width: none; height: auto; aspect-ratio: 1; align-self: start;
+}
+.character-body-style .creator-color-channels { flex-wrap: wrap; }
+.wardrobe-custom-dye, .wardrobe-groom-amount { justify-content: space-between; min-height: 44px; }
+.wardrobe-custom-dye input { width: 3rem; height: 2.5rem; }

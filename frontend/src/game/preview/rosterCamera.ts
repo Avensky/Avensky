@@ -1,7 +1,9 @@
 import { Vector3, type Box3, type PerspectiveCamera } from "three";
 import type { GarageEntryShot } from "./LiveGarage";
 import { placeGarageOrbit } from "./garageCameraTravel.ts";
+import { creatorFrames, PORTRAIT_FOV as fov, type CreatorFrame } from "./portraitFraming.ts";
 import type { CreatorStep } from "../welcome/CharacterCreator";
+export type { CreatorFrame } from "./portraitFraming.ts";
 
 // Both starter rigs face +Z, with their shoes at garage floor level.
 export const ROSTER_HEADING = .68;
@@ -9,30 +11,19 @@ export type CharacterGarageView = "roster" | "create" | "profile" | "main";
 export const creatorStepFrames = {
   gender: "body", looks: "looks", skin: "face", hairstyle: "face", hair: "face",
   eyes: "eyes", makeup: "makeup", personality: "outfit",
-} as const satisfies Record<CreatorStep, string>;
-export type CreatorFrame = typeof creatorStepFrames[CreatorStep];
+} as const satisfies Record<CreatorStep, CreatorFrame>;
 export type CharacterGarageShot = GarageEntryShot & { fitPortrait(eyeHeight: number, waistHeight: number, eyeX?: number, eyeZ?: number): void };
 const landscape = { bodyFraction: .74, aimHeight: .87, centerY: .53 };
 const portraitFrames = {
   roster:  { bodyFraction: .58, aimHeight: .87, centerY: .40 },
   create:  { bodyFraction: .42, aimHeight: .87, centerY: .315 },
 };
-const fov = 46;
 const viewSpan = 2 * Math.tan(fov * Math.PI / 360);
 const portraitEyeLine = .16;
 const portraitWaistLine = .52;
 
 // Place the eyes above the controls and measure zoom in eye-to-waist lengths
 // so both rigs fill the frame without separate camera positions per character.
-const creatorFrames = {
-  body:   { wide: { eyeLine: .25, torsoSpan: 3.2 }, tall: { eyeLine: .19, torsoSpan: 3.3 } },
-  face:   { wide: { eyeLine: .42, torsoSpan: 1.35 }, tall: { eyeLine: .27, torsoSpan: 1.8 } },
-  looks:  { wide: { eyeLine: .44, torsoSpan: .86 }, tall: { eyeLine: .33, torsoSpan: 1.08 } },
-  makeup: { wide: { eyeLine: .38, torsoSpan: .58 }, tall: { eyeLine: .31, torsoSpan: .73 } },
-  eyes:   { wide: { eyeLine: .47, torsoSpan: .34 }, tall: { eyeLine: .32, torsoSpan: .52 } },
-  outfit: { wide: { eyeLine: .20, torsoSpan: 4.6 }, tall: { eyeLine: .15, torsoSpan: 3.3 } },
-} satisfies Record<CreatorFrame, Record<"wide" | "tall", { eyeLine: number; torsoSpan: number }>>;
-
 export function rosterCamera(view: Exclude<CharacterGarageView, "main"> = "roster", creatorFrame?: CreatorFrame): CharacterGarageShot {
   const target = new Vector3(0, .87, 0);
   let distance = 3;

@@ -12,7 +12,8 @@ import { useUIStore } from "./store/menus/uiStore";
 import { useGarageParking } from "./game/preview/garageParkingStore";
 import { GarageMenuBackdrop } from "./game/welcome/GarageMenuBackdrop";
 import { RosterGaragePreview, type GarageCharacterSelection } from "./game/preview/RosterGaragePreview";
-import { selectMainGarageCharacter, useSocialStore } from "./store/social/socialStore";
+import { useLocalCharacter } from "./game/characters/deviceCharacter";
+import { canUseDeviceCharacter, selectMainGarageCharacter, useSocialStore } from "./store/social/socialStore";
 import { WelcomeScreen } from "./game/welcome/WelcomeScreen";
 import { useAppTheme } from "./theme";
 
@@ -27,9 +28,12 @@ export default function App() {
   const equipped = useSocialStore(state => screen === "main" || holdingGarage ||
     (welcome && state.view && !state.entryIssue && (state.stagingSignIn || state.registeredProfile))
     ? selectMainGarageCharacter(state) : null);
+  const deviceGarage = useSocialStore(canUseDeviceCharacter);
+  const localCharacter = useLocalCharacter(deviceGarage && (screen === "main" || holdingGarage));
+  const garageChoice = equipped ?? localCharacter;
   // A returning roster can keep the equipped rig until it publishes its own selection.
   const garageCharacter: GarageCharacterSelection | null = welcome && welcomeCharacter !== undefined
-    ? welcomeCharacter : equipped && { choice: equipped, mode: welcome ? "roster" : "main" };
+    ? welcomeCharacter : garageChoice ? { choice: garageChoice, mode: welcome ? "roster" : "main" } : null;
   const showGarageBackdrop = useUIStore(state =>
     state.isModeLoading || state.overlay === "team_lineup" || (state.screen !== "sandbox" && state.screen !== "world_builder"));
   const rotate = mobilePortrait && !welcome && screen !== "main" && screen !== "heroes" && !holdingGarage;

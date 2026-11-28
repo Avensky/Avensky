@@ -1,31 +1,26 @@
-import type { CharacterChoice } from "../characterCatalog";
-import { hairOptions, STOCK_HAIR_ID, STOCK_HAIR_LABEL, useLocalHairstyle } from "./LocalHairFeatures";
-import { normalizeHairPalette, useHairPaletteStore, type HairPalette } from "./hairPalette";
-import { DEFAULT_HAIR_GROOM, normalizeHairGroom, type HairGroom } from "./hairGroom";
+import { characterAppearance, type CharacterChoice } from "../characterCatalog";
+import fittedHair from "../../../../../packages/wardrobe-catalog/fitted-hair.json";
+import { normalizeHairPalette, type HairPalette } from "./hairColors";
+import { normalizeHairGroom, type HairGroom } from "./hairGroom";
 
-type LocalHair = { id: string; palette: HairPalette; original: boolean; groom?: HairGroom };
-type LocalOutfit = CharacterChoice & { localHair?: LocalHair };
+type LegacyLocalOutfit = CharacterChoice & {
+  localHair?: { id: string; palette: HairPalette; original: boolean; groom?: HairGroom };
+};
 
-export function captureLocalOutfit(choice: CharacterChoice): LocalOutfit {
-  if (choice.id !== "mara-vega" || !hairOptions.length) return choice;
-  const { id } = useLocalHairstyle.getState();
-  if (id !== STOCK_HAIR_ID && !hairOptions.some(style => style.id === id)) return choice;
-  const { palette, original, grooms } = useHairPaletteStore.getState();
-  return { ...choice, localHair: { id, palette, original, groom: grooms[id] } };
+/** Older device saves stored the fitting room's visible hair outside CharacterChoice. */
+export function restoreLocalOutfitHair(outfit: LegacyLocalOutfit): CharacterChoice {
+  if (!outfit.localHair) return outfit;
+  const { localHair, ...choice } = outfit;
+  if (choice.id !== "mara-vega") return choice;
+  const style = fittedHair.find(style => style.id === localHair.id);
+  if (!style && localHair.id !== "stock") return choice;
+  if (!style) return { ...choice, appearance: { ...characterAppearance(choice), hair: "natural", hair_groom: undefined } };
+  return { ...choice, appearance: { ...characterAppearance(choice), hair: style.id, hair_color: "original",
+    hair_palette: localHair.original !== false ? undefined : normalizeHairPalette(localHair.palette),
+    hair_groom: style.editableGroom && localHair.groom ? normalizeHairGroom(localHair.groom) : undefined } };
 }
 
-export function restoreLocalOutfitHair(choice: LocalOutfit) {
-  const hair = choice.localHair;
-  if (choice.id !== "mara-vega" || !hair ||
-    (hair.id !== STOCK_HAIR_ID && !hairOptions.some(style => style.id === hair.id))) return;
-  useHairPaletteStore.setState({ palette: normalizeHairPalette(hair.palette), original: hair.original !== false });
-  if (hairOptions.some(style => style.id === hair.id && style.editableGroom)) {
-    useHairPaletteStore.getState().setGroom(hair.id, hair.groom ? normalizeHairGroom(hair.groom) : DEFAULT_HAIR_GROOM);
-  }
-  useLocalHairstyle.getState().choose(hair.id);
-}
-
-export function localOutfitHairLabel(choice: LocalOutfit) {
-  return choice.localHair?.id === STOCK_HAIR_ID ? STOCK_HAIR_LABEL
-    : hairOptions.find(style => style.id === choice.localHair?.id)?.label;
+export function localOutfitHairLabel(outfit: LegacyLocalOutfit) {
+  return outfit.localHair?.id === "stock" ? "Long braid and bonnet"
+    : fittedHair.find(style => style.id === (outfit.localHair?.id ?? outfit.appearance?.hair))?.label;
 }
